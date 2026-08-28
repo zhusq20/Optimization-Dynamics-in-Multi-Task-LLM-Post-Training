@@ -1,0 +1,240 @@
+% ============================================================================
+\section{Local Fitting and Efficient Allocation}
+\label{sec:theory}
+% ============================================================================
+
+We now introduce the checkpoint-level analysis evaluated in
+Section~\ref{sec:experiments}. The analysis has two parts. First, a local
+sampled-token fit separates solo reachability, shared-update conflict, and
+finite-update optimization error, then predicts the response to task weights.
+Second, a fixed-objective sampling analysis produces the optimizer-aware
+allocation used by GPAS.
+
+
+\subsection{A local quadratic model of MOPD}
+\label{sec:local_fit}
+
+Fix a checkpoint $\theta_0$. Let $\nu_i^{\theta_0}$ denote the distribution
+of valid response-token pairs $z=(c,y)$ obtained from task-$i$ student
+rollouts at that checkpoint. For one such pair, define the sampled-token
+teacher signal and its score gradient,
+\begin{equation}
+    d_i(z)
+    =\log\tau_i(y\mid c)-\log\pi_{\theta_0}(y\mid c),
+    \qquad
+    j_i(z)=\nabla_\theta\log\pi_{\theta_0}(y\mid c).
+    \label{eq:local_logprob_terms}
+\end{equation}
+For compactness, let $J_i\Delta$ denote the scalar function
+$z\mapsto j_i(z)^\top\Delta$, and define
+\begin{equation}
+    \|h\|_i^2
+    =\mathbb E_{z\sim\nu_i^{\theta_0}}[h(z)^2].
+    \label{eq:local_token_norm}
+\end{equation}
+In experiments this expectation is a mean over cached tokens. $J_i$ is only
+a matrix-free linear map evaluated with Jacobian--vector and
+vector--Jacobian products; no token-by-parameter Jacobian is stored.
+
+Linearizing the sampled student log probability on the fixed cache gives
+$\log\pi_{\theta_0+\Delta}(y\mid c)
+=\log\pi_{\theta_0}(y\mid c)+j_i(z)^\top\Delta
++O(\|\Delta\|^2)$. We therefore use the empirical Gauss--Newton surrogate
+\begin{equation}
+    L_w(\Delta)
+    =
+    \frac12\sum_{i=1}^{M}w_i
+    \left\|d_i-J_i\Delta\right\|_i^2.
+    \label{eq:local_projection}
+\end{equation}
+This model fits the same sampled-token log-ratio signal used by training. It
+is a checkpoint-level empirical diagnostic, not an exact representation of
+the full-vocabulary KL or a global model of the training trajectory.
+Appendix~\ref{app:local_kl} gives its construction and its local connection
+to reverse KL.
+
+
+\subsection{Fitting-Gap Decomposition}
+\label{sec:mixture_sensitivity}
+
+Let $\Delta_w^*$ minimize the unconstrained local surrogate in
+Equation~\ref{eq:local_projection}, and let $L_w^*=L_w(\Delta_w^*)$.
+The weighted least-squares geometry gives the following decomposition.
+
+\begin{proposition}[Local fitting and optimization error]
+\label{prop:gap_decomposition}
+For every local update $\Delta$,
+\begin{equation}
+    L_w(\Delta)
+    =
+    L_w^*
+    +
+    \frac12\sum_{i=1}^{M}w_i
+    \left\|J_i(\Delta-\Delta_w^*)\right\|_i^2.
+    \label{eq:gap_decomposition}
+\end{equation}
+The first term is the residual of the best shared update within this local
+model. The second is the additional local error from not reaching that
+update.
+\end{proposition}
+
+Appendix~\ref{app:projection} proves the proposition. The residual $L_w^*$
+alone does not identify cross-task conflict: it can remain positive even for
+one task whose requested change is outside the student's local tangent space.
+To isolate the cost of sharing an update, define
+\begin{align}
+    \ell_i(\Delta)
+    &:=\frac12\|d_i-J_i\Delta\|_i^2,\\
+    L_{i,\mathrm{solo}}^*(R)
+    &:=\min_{\|\Delta_i\|_2\le R}\ell_i(\Delta_i),
+    \qquad
+    L_{w,\mathrm{solo}}^*(R)
+    :=\sum_iw_iL_{i,\mathrm{solo}}^*(R),\\
+    L_w^*(R)
+    &:=\min_{\|\Delta\|_2\le R}\sum_iw_i\ell_i(\Delta).
+    \label{eq:solo_joint_fit}
+\end{align}
+The joint optimum obeys
+$L_w^*(R)\ge L_{w,\mathrm{solo}}^*(R)$ because separate fits can choose a
+different update for each task. For $L_w(0)>0$ and
+$\|\Delta_{\rm train}\|_2\le R$, the gap diagnostic is
+\begin{align}
+    \mathrm{SoloGap}(R)
+    &:=\frac{L_{w,\mathrm{solo}}^*(R)}{L_w(0)},\\
+    \mathrm{ConflictGap}(R)
+    &:=\frac{L_w^*(R)-L_{w,\mathrm{solo}}^*(R)}{L_w(0)},\\
+    \mathrm{FitGap}(R)
+    &:=\frac{L_w^*(R)}{L_w(0)}
+    =\mathrm{SoloGap}(R)+\mathrm{ConflictGap}(R),\\
+    \mathrm{OptGap}(R)
+    &:=\frac{L_w(\Delta_{\rm train})-L_w^*(R)}{L_w(0)}.
+    \label{eq:gap_diagnostics}
+\end{align}
+These quantities satisfy
+$\mathrm{SoloGap}(R)+\mathrm{ConflictGap}(R)+\mathrm{OptGap}(R)
+=L_w(\Delta_{\rm train})/L_w(0)$ and are nonnegative. The solo gap measures
+residual fit error when each task gets its own update in the tested local
+model and radius. It is not a claim about global student capacity. The
+conflict gap is the additional local residual caused by requiring one shared
+update. These quantities depend on the cache, parameterization, and radius;
+we therefore report held-out estimates, solver diagnostics, and constraint
+status. Exact nonnegativity holds for the objective on which the solutions
+are defined; cross-fitted estimates can deviate slightly because of finite
+cache error.
+
+
+\subsection{Prediction for Task-Weight Interventions}
+\label{sec:weight_response}
+
+The residual in the best local fit also determines how a change in the target
+mixture moves each task. Let $\bar\Delta_w$ denote the joint solution used for
+the diagnostic: $\Delta_w^*$ when the solution is interior, and
+$\arg\min_{\|\Delta\|_2\le R}L_w(\Delta)$ when the trust-region boundary is
+active. Define
+\begin{equation}
+    H_w=\sum_i w_i
+        \mathbb E_i[j_i(z)j_i(z)^\top],
+    \qquad
+    r_i=\mathbb E_i
+        [j_i(z)(d_i(z)-j_i(z)^\top\bar\Delta_w)],
+    \label{eq:local_curvature_simple}
+\end{equation}
+where $\mathbb E_i$ is over $z\sim\nu_i^{\theta_0}$. Here $H_w$ denotes a
+positive-semidefinite linear operator, not a matrix that is formed or
+inverted. Parameterize the weights as $w=\operatorname{softmax}(\eta)$ and let
+$u_i=\partial\bar\Delta_w/\partial\eta_i$. For an interior solution, the
+response is obtained from the matrix-free linear solve
+\begin{equation}
+    H_wu_i=w_i r_i.
+    \label{eq:weight_sensitivity}
+\end{equation}
+For a damped interior solution, the implementation instead solves
+$(H_w+\xi I)u_i=w_i(r_i-\xi\bar\Delta_w)$. If the radius is active, we
+differentiate the trust-region optimality conditions. All systems are solved
+with matrix-free conjugate gradients; Appendix~\ref{app:projection} gives the
+details.
+For the local task loss
+$\ell_j(\Delta)=\tfrac12\|d_j-J_j\Delta\|_j^2$, a small intervention
+$\delta\eta_i$ therefore gives
+\begin{equation}
+    \delta \ell_j
+    \approx
+    -r_j^\top u_i\,\delta\eta_i.
+    \label{eq:task_loss_response}
+\end{equation}
+The cross-task inner products in Equation~\ref{eq:task_loss_response} predict
+which other sampled-token teacher losses improve or deteriorate.
+Section~\ref{sec:exp_mixture} uses the interior or active-constraint solve
+according to the reported constraint status and tests the full response
+matrix with matched short branches.
+
+
+\subsection{Optimizer-Aware Allocation Rule}
+\label{sec:gpas}
+
+The preceding analysis concerns the target mixture $w$. We next hold that
+mixture fixed and choose the sampling probabilities $a$. Before sampling at
+step $t$, freeze AdamW's lagged second-moment preconditioner,
+\begin{equation}
+    P_t=\operatorname{diag}
+    \left((\sqrt{v_{t-1}}+\epsilon)^{-1}\right),
+    \qquad
+    U_i=P_tG_i,
+    \label{eq:optimizer_update}
+\end{equation}
+and define the task signal
+\begin{equation}
+    s_i=\sqrt{\mathbb E\|U_i\|_2^2}.
+    \label{eq:optimizer_scale}
+\end{equation}
+This score is a lagged-preconditioned gradient norm, used as a proxy for the
+task-dependent AdamW step scale. It is not the exact AdamW update. The
+first-order loss decrease also depends on gradient direction, so we treat loss
+reduction as a separate empirical outcome.
+
+For one sampled task and fixed $P_t$, minimizing the second moment of the
+importance-corrected estimator gives
+\begin{equation}
+    a_i^*
+    =
+    \frac{w_i s_i}{\sum_jw_js_j}.
+    \label{eq:optimal_sampling}
+\end{equation}
+Because Equation~\ref{eq:importance_unbiased} fixes the conditional mean,
+this also minimizes
+$\mathbb E\|P_t\widehat g-P_tg_w\|_2^2$. The importance-sampling
+minimization is classical; the modeling choice here is to apply it at the
+fixed-token task level using the lagged AdamW proxy. The short proof is
+in Appendix~\ref{app:optimal_sampling}.
+
+Gradient-Preserving Adaptive Sampling (GPAS) estimates each score online:
+\begin{equation}
+    \widehat s_i^2
+    \leftarrow
+    \gamma\widehat s_i^2
+    +(1-\gamma)\|P_tG_i\|_2^2
+    \label{eq:gpas_ema}
+\end{equation}
+after sampling task $i$. A probability floor limits stale statistics and
+large importance ratios. The exact lower-bounded solution is
+\begin{equation}
+    a_i
+    =\max\left\{a_{\min},
+    c\,w_i\sqrt{\widehat s_i^2+\varepsilon}\right\},
+    \qquad \sum_i a_i=1,
+    \label{eq:gpas_distribution}
+\end{equation}
+where $c$ enforces normalization. The sampled gradient is multiplied by
+$w_I/a_I$ before the AdamW moment update. The name refers specifically to
+preserving the conditional mean of the target gradient estimator. GPAS does
+not preserve the expected AdamW parameter update or the optimizer trajectory.
+It stores one score and one timestamp per task and requires no extra model
+evaluation.
+
+Raw GPAS sets $P_t=I$. Adam GPAS uses Equation~\ref{eq:optimizer_update}.
+The latter relies on the quality of the lagged approximation, which we test
+in Section~\ref{sec:exp_optimizer}. Importance correction preserves the
+conditional expected gradient of the chosen MOPD objective, but AdamW's
+second-moment state still depends on the proposal through squared
+importance-corrected gradients. Appendix~\ref{app:order_adamw} gives the
+state recursion, and the experiments separately measure this order effect.

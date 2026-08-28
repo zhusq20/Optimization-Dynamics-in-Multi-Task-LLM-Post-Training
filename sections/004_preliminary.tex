@@ -1,0 +1,65 @@
+% ============================================================================
+\section{Fixed-Mixture MOPD}
+\label{sec:preliminaries}
+% ============================================================================
+
+\subsection{Target teacher mixture}
+
+Consider $M$ tasks. Task $i$ has a prompt distribution $\mathcal D_i$ and a
+frozen teacher $\tau_i$. The student policy is $\pi_\theta$. Let
+$L_i(\theta)$ be the response-normalized distillation loss for task $i$:
+\begin{equation}
+    L_i(\theta)
+    =
+    \mathbb E\left[
+        \frac{1}{T}\sum_{t=1}^{T}
+        D_{\mathrm{KL}}\!\left(
+            \pi_\theta(\cdot\mid c_t)
+            \,\Vert\,
+            \tau_i(\cdot\mid c_t)
+        \right)
+    \right].
+    \label{eq:task_loss}
+\end{equation}
+The expectation covers prompts from $\mathcal D_i$ and responses sampled from
+the student. The context $c_t$ contains the prompt and the response prefix.
+Response normalization gives every response equal weight before tasks are
+combined. The optimizer uses the standard MOPD semi-gradient: generated
+responses and prefix contexts stay fixed during each parameter update.
+
+The target weights are $\lambda_1,\ldots,\lambda_M$, with
+$\sum_i\lambda_i=1$. The training objective is
+\begin{equation}
+    L_\lambda(\theta)=\sum_i\lambda_i L_i(\theta).
+    \label{eq:mopd_objective}
+\end{equation}
+The vector $\lambda$ expresses a deployment or capability priority. We choose
+$\lambda$ independently of dataset size, response length, and task sampling
+frequency.
+
+\subsection{Task sampling}
+\label{sec:prelim_sampling}
+
+Let $G_i$ be a stochastic gradient for task $i$, after response normalization,
+and let $g_i=\mathbb E[G_i]$. A full-mixture update uses
+$\sum_i\lambda_iG_i$. A task-homogeneous update first samples one task:
+\begin{equation}
+    I\sim q,\qquad
+    \widehat G=\frac{\lambda_I}{q_I}G_I.
+    \label{eq:importance_estimator}
+\end{equation}
+The proposal $q$ controls the fraction of gradient evaluations assigned to
+each task. Averaging Equation~\ref{eq:importance_estimator} over the sampled
+task gives
+\begin{equation}
+    \mathbb E[\widehat G]=\sum_i\lambda_i g_i.
+    \label{eq:importance_unbiased}
+\end{equation}
+The weight ratio in Equation~\ref{eq:importance_estimator} preserves the
+target mixture. Unit gradient scale gives the average gradient
+$\sum_iq_i g_i$ and uses the proposal as the effective teacher mixture.
+
+Our implementation uses task-homogeneous microbatches with a fixed response
+token budget. Each task loss is averaged before applying
+$\lambda_I/q_I$. The same definition supports sampled-token and
+full-vocabulary distillation gradients.

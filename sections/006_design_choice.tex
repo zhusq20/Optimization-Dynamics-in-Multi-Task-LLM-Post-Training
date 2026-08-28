@@ -1,0 +1,38 @@
+% ============================================================================
+\section{Practical Use and Scope}
+\label{sec:training_guide}
+% ============================================================================
+
+\paragraph{Choose the target mixture first.}
+Set $\lambda$ from deployment priorities or a capability target. Average each
+response loss over its generated tokens before applying the task weight.
+The target mixture then has a clear task-level meaning.
+
+\paragraph{Use full-mixture updates when every teacher fits in one step.}
+A full-mixture update removes task-selection noise. GPAS is useful when an
+update uses one teacher, when teacher switching is expensive, or when the
+number of teachers makes full accumulation slow.
+
+\paragraph{Warm up the task scores.}
+Start with a short round-robin period and collect several gradients from every
+task. Update each score after the sampled task finishes. A probability floor
+keeps rare-task scores fresh and limits the importance ratio.
+
+\paragraph{Apply the weight ratio before AdamW.}
+For sampled task $I$, multiply its response-normalized gradient by
+$\lambda_I/q_I$ before updating the AdamW moments. Log the target weight,
+proposal, correction factor, score, and score age at every step.
+
+\paragraph{Select the score with a one-step test.}
+Raw GPAS has the simplest implementation. Adam GPAS is useful when the
+Adam-scaled norm ranks task-dependent parameter steps more accurately in the
+matched-state probe from Section~\ref{sec:exp_optimizer}. The one-step test
+provides a low-cost choice before an end-to-end run.
+
+\paragraph{Scope.}
+The analysis covers fixed-token, task-homogeneous updates and a fixed teacher
+mixture. The gradient result is conditional on the current model and optimizer
+state. AdamW state, rollouts, and task gradients continue to change during
+training, so the end-to-end evaluation measures the final efficiency claim.
+The sampled-token and full-vocabulary estimators use the same GPAS rule and
+maintain separate task scores.

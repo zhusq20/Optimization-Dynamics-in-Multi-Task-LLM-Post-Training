@@ -1,0 +1,50 @@
+\section{Related Work}
+
+\paragraph{Multi-teacher on-policy distillation.}
+MOPD trains a shared student on student-generated responses and routes each
+response to a domain teacher
+\citep{ma2026mopdmultiteacheronpolicydistillation}. PromptSD uses fixed
+per-task rollout counts and adjusts the counts for response length and task
+difficulty \citep{mayingzi2026onestudentmanyteachers}. Open-MOPD makes a
+closely related distinction between a target token budget and the token share
+observed in a mixed batch \citep{gao2026openmopddiagnosingfixingcapability}.
+Its token-share correction reweights losses inside a batch. Its gap-following
+rule changes domain weights during training. GPAS works at the task-batch
+level and keeps a user-selected teacher mixture fixed.
+
+\paragraph{Task allocation in multi-task RL.}
+Multi-task methods often change task weights to improve weak tasks or balance
+gradient scales \citep{chen2018gradnorm,corrado2026drats}. MT-GRPO learns a
+task distribution and uses resampling to match the accepted batch to that
+distribution \citep{ramesh2026multitaskgrporeliablellm}. GPAS starts from a
+fixed target distribution and adapts the proposal used to estimate its
+gradient. The target distribution and the proposal serve separate roles.
+
+\paragraph{Importance sampling for SGD.}
+Importance sampling allocates more computation to examples with large
+gradient signals while preserving a chosen data objective
+\citep{alain2016variancereductionsgddistributed,
+katharopoulos2018samplescreatedequaldeep}. GPAS applies the same principle to
+task-homogeneous MOPD batches. The MOPD setting adds two practical questions:
+teacher calls have a task label, and AdamW can rescale task gradients in
+different ways.
+
+\begin{table}[H]
+    \centering
+    \small
+    \begin{tabular}{lcccc}
+        \hline
+        Method & Fixed target & Adaptive task choice & Correction & Adam score \\
+        \hline
+        Standard MOPD & implicit & no & no & no \\
+        Open-MOPD share balance & yes & no & batch loss & no \\
+        MT-GRPO & learned & yes & resampling & no \\
+        Raw GPAS & yes & yes & weight ratio & no \\
+        Adam GPAS & yes & yes & weight ratio & yes \\
+        \hline
+    \end{tabular}
+    \caption{GPAS separates a fixed target mixture from the task proposal used
+    for gradient evaluation. The correction column describes how each method
+    aligns the realized update with its target.}
+    \label{tab:related_allocation}
+\end{table}

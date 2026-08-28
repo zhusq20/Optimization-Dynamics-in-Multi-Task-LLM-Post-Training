@@ -1,0 +1,75 @@
+% ============================================================================
+\section{Gradient-Preserving Adaptive Sampling}
+\label{sec:theory}
+% ============================================================================
+
+GPAS chooses the proposal $q$ in Equation~\ref{eq:importance_estimator}. The
+target weights $\lambda$ remain fixed.
+
+\subsection{Sampling score}
+
+Fix the current student and optimizer state. Let $v$ be the lagged,
+bias-corrected AdamW second-moment estimate before the next task is sampled.
+For a task gradient $G_i$, define the Adam-scaled gradient by coordinatewise
+division:
+\begin{equation}
+    S_i=\frac{G_i}{\sqrt{v}+\epsilon}.
+    \label{eq:adam_scaled_gradient}
+\end{equation}
+The score for task $i$ is
+\begin{equation}
+    s_i=\sqrt{\mathbb E\|S_i\|_2^2}.
+    \label{eq:gpas_score}
+\end{equation}
+The score includes the mean update signal and stochastic variation within the
+task. GPAS uses recent task gradients to maintain a moving estimate of
+$s_i$.
+
+\subsection{Task proposal}
+
+For the corrected gradient, the Adam-scaled second moment is
+\begin{equation}
+    \mathbb E\left\|
+        \frac{\lambda_I}{q_I}S_I
+    \right\|_2^2
+    =
+    \sum_i\frac{\lambda_i^2s_i^2}{q_i}.
+    \label{eq:gpas_second_moment}
+\end{equation}
+Equation~\ref{eq:importance_unbiased} fixes the average gradient. Reducing
+Equation~\ref{eq:gpas_second_moment} also reduces the mean-squared error of
+the gradient estimate in the same Adam-scaled coordinates. The minimum uses
+\begin{equation}
+    q_i^*
+    =
+    \frac{\lambda_i s_i}{\sum_j\lambda_j s_j}.
+    \label{eq:optimal_sampling}
+\end{equation}
+Appendix~\ref{app:optimal_sampling} gives a short proof.
+
+Adam GPAS estimates the score in Equation~\ref{eq:gpas_score}. Raw GPAS
+replaces $S_i$ with $G_i$. Both methods apply $\lambda_I/q_I$ before the
+AdamW moment update. A probability floor keeps every teacher active and
+limits large weight ratios.
+
+The gradient guarantee applies at the input to AdamW. AdamW updates its
+second-moment state with squared, importance-weighted gradients, so different
+proposals produce different optimizer paths. Section~\ref{sec:exp_optimizer}
+tests whether the lagged Adam-scaled score predicts the next task-dependent
+parameter step.
+
+\subsection{Sampled-token and full-vocabulary gradients}
+\label{sec:estimator_choice}
+
+GPAS uses the gradient produced by the selected distillation estimator.
+Sampled-token OPD estimates each token loss from the rollout token.
+Full-vocabulary OPD sums the loss over the vocabulary at the same response
+prefix. The vocabulary sum removes token-sampling noise and requires more
+teacher output.
+
+The optimal proposal keeps the form in
+Equation~\ref{eq:optimal_sampling} for both estimators. The measured scores
+can differ. Sampled-token scores include token-sampling variation, while
+full-vocabulary scores place more emphasis on prompt and response variation.
+Section~\ref{sec:exp_estimators} measures the change in task ranking,
+estimator error, and proposal entropy on matched response prefixes.

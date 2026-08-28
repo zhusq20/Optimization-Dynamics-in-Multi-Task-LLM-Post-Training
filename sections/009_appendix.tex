@@ -1,0 +1,118 @@
+\section{Additional Analysis and Experimental Details}
+\label{app:details}
+
+\subsection{Target-gradient calculation}
+
+For task $I\sim q$, the corrected gradient from
+Equation~\ref{eq:importance_estimator} has mean
+\begin{equation}
+    \mathbb E[\widehat G]
+    =
+    \sum_i q_i\frac{\lambda_i}{q_i}\mathbb E[G_i]
+    =
+    \sum_i\lambda_i g_i.
+    \label{eq:appendix_target_mean}
+\end{equation}
+The proposal cancels from the average gradient. A proposal may depend on all
+completed training steps. The next task is sampled after the proposal has been
+set.
+
+\subsection{Optimal GPAS proposal}
+\label{app:optimal_sampling}
+
+Let $s_i^2=\mathbb E\|S_i\|_2^2$. The Adam-scaled second moment of the
+corrected gradient is
+\begin{equation}
+    \sum_i\frac{\lambda_i^2s_i^2}{q_i}.
+\end{equation}
+Cauchy--Schwarz gives
+\begin{equation}
+    \left(\sum_i\lambda_i s_i\right)^2
+    \leq
+    \left(\sum_iq_i\right)
+    \left(\sum_i\frac{\lambda_i^2s_i^2}{q_i}\right).
+\end{equation}
+The first factor on the right is one. Equality requires $q_i$ to be
+proportional to $\lambda_i s_i$. Normalizing the probabilities gives
+Equation~\ref{eq:optimal_sampling}.
+
+The implementation adds a probability floor. Tasks below the floor receive
+the floor value, and the remaining probability is distributed in proportion
+to $\lambda_i s_i$. Four-task water filling solves the allocation with a few
+scalar operations.
+
+\subsection{AdamW score}
+\label{app:adam_score}
+
+Adam GPAS uses the second-moment state stored before task sampling. Dividing a
+task gradient by $\sqrt v+\epsilon$ estimates the coordinate scale used by
+the next AdamW update. Stored momentum and weight decay contribute a common
+movement in the one-step probe. A zero-gradient clone removes that common
+movement.
+
+The target-gradient calculation in
+Equation~\ref{eq:appendix_target_mean} covers the gradient sent into AdamW.
+The sampled gradient also updates $v$, so each proposal creates its own AdamW
+state path. The end-to-end experiment measures the effect of that state path.
+
+\subsection{Sampled-token and full-vocabulary scores}
+\label{app:sampled_full}
+
+For one fixed response prefix, let $X_i$ be the sampled-token semi-gradient
+and let $F_i$ be its average over the student's token distribution. The vector
+$F_i$ is the corresponding full-vocabulary semi-gradient for the same prefix.
+With the AdamW denominator held fixed,
+\begin{equation}
+    \mathbb E\left\|
+        \frac{X_i}{\sqrt v+\epsilon}
+    \right\|_2^2
+    =
+    \mathbb E\left\|
+        \frac{F_i}{\sqrt v+\epsilon}
+    \right\|_2^2
+    +
+    \mathbb E\left\|
+        \frac{X_i-F_i}{\sqrt v+\epsilon}
+    \right\|_2^2.
+    \label{eq:sampled_full_decomposition}
+\end{equation}
+The last term measures token-sampling variation. Full-vocabulary OPD removes
+that term at each prefix. Prompt and rollout variation remain in both
+estimators. The checkpoint experiment estimates every term with matched
+prefixes and repeated token draws.
+
+\subsection{Controlled estimator problem}
+\label{app:controlled_sampling}
+
+The controlled problem uses three tasks, 96 coordinates, and a uniform target
+mixture. Coordinates are split into three blocks of size 32. Task-gradient
+standard deviations in the dominant blocks are 2.0, 0.5, and 0.1. The fixed
+AdamW scales for the same blocks are 0.005, 0.05, and 3.0. The raw-gradient
+score favors the first task, while the Adam-scaled score favors the third
+task.
+
+Every trial averages 16 independently sampled, importance-corrected task
+gradients. We use 20,000 trials and report squared error after applying the
+fixed AdamW scale. The script
+\texttt{experiments/controlled\_optimizer\_sampling.py} reproduces
+Figure~\ref{fig:controlled_optimizer_sampling}.
+
+\subsection{End-to-end implementation details}
+
+The adaptive methods use four round-robin observations per task before score
+updates begin. For a sampled task, the implementation performs the following
+operations:
+\begin{enumerate}
+    \item average the loss over valid response tokens and responses;
+    \item compute the task gradient and its GPAS score;
+    \item multiply the gradient by $\lambda_I/q_I$;
+    \item send the corrected gradient directly to the AdamW moment update.
+\end{enumerate}
+The primary target-preservation runs disable gradient clipping, so
+Equation~\ref{eq:appendix_target_mean} applies to the gradient received by
+AdamW. The probability floor limits large correction factors.
+
+Each run logs the sampled task, proposal, target weight, importance ratio,
+score, score age, response-token count, teacher-token count, gradient norm,
+and Adam-scaled norm. Checkpoints also save the proposal moving averages and
+task-sampler random state.

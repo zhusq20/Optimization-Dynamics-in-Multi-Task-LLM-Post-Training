@@ -1,0 +1,19 @@
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+MOPD systems make two separate choices: the teacher mixture defines the
+training objective, and the task proposal allocates teacher and gradient
+evaluations. GPAS connects the two choices with a simple importance weight.
+The resulting gradient estimate preserves the selected mixture.
+
+GPAS allocates more updates to tasks with large optimizer-scaled gradient
+signals. The allocation minimizes task-level estimator error for the current
+model and AdamW state. Raw GPAS provides a simple default. Adam GPAS uses the
+optimizer state when AdamW changes the relative scale of task updates.
+
+The experimental design tests the method at three levels: gradient estimator
+error, matched-state optimizer behavior, and end-to-end MOPD efficiency.
+The sampled-token and full-vocabulary study also shows how the distillation
+estimator changes the task scores used for allocation.

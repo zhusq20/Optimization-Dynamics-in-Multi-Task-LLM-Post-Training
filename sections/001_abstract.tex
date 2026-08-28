@@ -1,0 +1,28 @@
+\begin{abstract}
+
+Multi-teacher on-policy distillation (MOPD) combines several specialist
+teachers in one student. Many training systems use the task sampling rate as
+the teacher weight. Adaptive sampling then changes both the compute allocation
+and the training objective.
+
+We study task allocation for a fixed teacher mixture. Gradient-Preserving
+Adaptive Sampling (GPAS) samples tasks with large gradient signals more often
+and rescales every sampled gradient by the ratio between its target weight and
+sampling probability. The rescaling keeps the average input gradient to the
+optimizer equal to the gradient of the selected MOPD objective. A short
+analysis gives the variance-minimizing task distribution. Raw GPAS uses the
+gradient norm. Adam GPAS measures the same gradient after scaling by the
+current AdamW second-moment state.
+
+Our evaluation connects each claim to a direct test. In a controlled estimator
+experiment, Adam GPAS reduces mean-squared error to $0.698\times$ the uniform
+value; the raw-gradient proposal reaches $7.19\times$ the uniform value under
+the same optimizer scale. Matched-state probes test whether AdamW scaling
+improves task ranking. End-to-end MOPD runs compare GPAS with uniform sampling,
+full-mixture updates, and gap-based allocation under matched student-token and
+teacher-token budgets. A checkpoint study measures how sampled-token and
+full-vocabulary distillation change the GPAS task scores.
+
+% TODO: Add quantitative end-to-end MOPD results after the registered runs.
+
+\end{abstract}

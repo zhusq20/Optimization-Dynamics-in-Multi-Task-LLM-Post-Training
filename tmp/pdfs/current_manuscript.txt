@@ -1,0 +1,814 @@
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+000
+001
+      W HEN C AN S PECIALISTS B E I NTEGRATED ?
+002   T EACHER C OMPATIBILITY IN M ULTI -T EACHER
+003
+004   D ISTILLATION
+005
+006
+       Anonymous authors
+007
+       Paper under double-blind review
+008
+009
+010
+011                                                A BSTRACT
+012
+013            Multi-teacher on-policy distillation (MOPD) is increasingly used to integrate in-
+014            dependently post-trained specialists into one language model. Hard routing sepa-
+015            rates the source of supervision, but not the effects of training: changing one task’s
+016
+               loss weight can affect capabilities outside that task, and an update for one task
+               can change predictions on another even when their parameter gradients are nearly
+017
+               orthogonal.
+018
+               We study a simple question: when can one student fit all routed teachers at the
+019
+               same time? Around a student checkpoint, we freeze the on-policy prefixes used
+020
+               for distillation and linearize the student logits. Under the standard local quadratic
+021            approximation to reverse KL, MOPD becomes a weighted least-squares problem
+022            between the teacher–student logit gaps and the logit changes induced by a shared
+023            parameter update.
+024            This view gives two regimes. If one parameter update can match every teacher’s
+025            logit gap, all positive task weights yield the same fitted logits, although training
+026            rates can differ. Otherwise, the weights determine how the unavoidable local fit-
+027            ting error is distributed across teachers. Based on this distinction, we introduce
+028            Objective-Preserving Adaptive Sampling (OPAS): it samples tasks in proportion
+029            to their weighted gradient scale and importance-corrects each update. Its ideal al-
+030
+               location minimizes the second moment of the single-task gradient estimator while
+               preserving the intended task objective, so training budget can be reallocated with-
+031
+               out silently changing the teacher trade-off.
+032
+033
+034   1   I NTRODUCTION
+035
+036   Large language models are increasingly post-trained with specialized objectives for reasoning, cod-
+037   ing, instruction following, and other capabilities. A natural way to combine independently trained
+038   specialists is multi-teacher on-policy distillation (MOPD): prompts from each domain are routed to
+039   the corresponding teacher, while a single student is trained to match all teachers.
+040
+      At first glance, hard routing appears to separate the tasks. Each example is supervised by only
+041
+      one teacher, so one might expect independently trained capabilities to be transferred independently.
+042   Recent observations suggest otherwise. Multi-task RL can exhibit weak or nearly orthogonal task
+043   gradients (Zhu et al., 2026), while MOPD can still show strong cross-domain effects when teacher
+044   mixtures are changed (Li et al., 2026). Other work finds substantial imbalance even under oracle
+045   routing, with response length and optimization exposure playing an important role (Gao et al., 2026).
+046
+      These phenomena are difficult to reconcile if specialist integration is viewed only through pairwise
+047
+      gradient conflict. We instead ask a more basic question:
+048
+049            Can the student simultaneously learn the capabilities of all teachers?
+050
+051   This question separates two qualitatively different situations. Suppose the student can fit all teacher
+052   targets at once. Then changing the task loss weights does not change the target predictions on the
+053   supervised data; it mainly changes which tasks are learned faster. In contrast, if the teacher targets
+      cannot be fit simultaneously, the task weights determine how the student trades off their fitting errors.
+
+
+                                                         1
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+054
+      We formalize this distinction with a local model of reverse-KL MOPD. Around a checkpoint, we
+055   freeze the sampled on-policy prefixes and linearize the student logits. Let di denote the teacher–
+056   student logit gap for task i, and let Ji ∆θ denote the first-order logit change induced on the same
+057   prefixes by a parameter update. The local MOPD objective takes the form
+058
+                                                     M
+059                                                1X                   2
+060                                  Lloc (∆θ) =         wi ∥di − Ji ∆θ∥Fi ,                             (1)
+                                                   2 i=1
+061
+062   where wi is the task loss weight and Fi is the categorical Fisher matrix.
+063
+064
+      Equation 1 makes the main result immediate. If one parameter update can match the stacked teacher–
+      student logit gap d, then all positive task weights yield the same zero-error fitted logits. If not,
+065
+      the student can only approximate the teachers, and the weights determine how fitting errors are
+066
+      distributed across tasks.
+067
+068   The same local model also clarifies why routing and gradient cosine are insufficient diagnostics of
+069   isolation. A gradient produced from task j changes task i according to
+070
+                                                   Ji Jj⊤ Fj ej ,                                        (2)
+071
+072   where ej is the remaining teacher–student error on task j. Hard routing determines which teacher
+073   defines ej , but it does not make the cross-task Jacobian term Ji Jj⊤ vanish. Moreover, gradient
+074   orthogonality constrains only one scalar inner product and therefore does not imply that the cross-
+075   task output change in Equation 2 is zero.
+076
+      This distinction also suggests an objective-preserving training intervention. Let wi denote the in-
+077
+      tended task loss weight and ai the probability of sampling task i. Increasing wi changes the target
+078   objective and, for incompatible teachers, can change the local optimum. Increasing ai while rescal-
+079   ing the sampled update by wi /ai instead changes where training steps are spent without changing
+080   the expected objective. We use this separation to derive Objective-Preserving Adaptive Sampling
+081   (OPAS), whose ideal allocation samples tasks according to their weighted gradient scale and mini-
+082   mizes the second moment of the resulting unbiased gradient estimator.
+083
+      Our contributions are therefore threefold. First, we formulate MOPD as the problem of fitting mul-
+084   tiple routed teacher policies with one shared student and identify when teacher weights can change
+085   the locally optimal predictions. Second, we show that hard routing and gradient orthogonality do
+086   not guarantee isolation of teacher effects across tasks. Third, we turn the distinction between task
+087   weighting and sampling into OPAS, a practical rule for reallocating training budget without chang-
+088   ing the intended task weights.
+089
+090
+091
+      2   R ELATED W ORK
+092
+093   Multi-teacher distillation and capability integration. Open-MOPD attributes capability imbal-
+094
+      ance to unequal token counts, teacher–student gaps, and stale rewards, and uses these signals to
+      rebalance training (Gao et al., 2026). Complementary work shows that changing teacher data pro-
+095
+      portions can produce cross-domain “seesaw” effects even with oracle routing (Li et al., 2026). These
+096
+      results motivate our distinction between task loss weights and task sampling probabilities. OPAS
+097   may use the same gap signal to decide where to spend training steps, but importance-corrects the
+098   sampled update so that the intended task objective remains fixed. Our compatibility analysis ex-
+099   plains why this distinction is especially important when one student cannot match all teacher targets
+100   simultaneously.
+101
+102   Multi-task update geometry. Recent work finds that multi-task RL gradients can be substantially
+103   more orthogonal than SFT gradients and uses this observation to motivate independent RL training
+104   followed by parameter merging (Zhu et al., 2026). We study a complementary question: whether
+105   a task update changes another task’s predictions. Parameter-gradient orthogonality constrains one
+106   scalar inner product, whereas the cross-task Jacobian response Ji gj measures the full first-order
+107   change in task-i logits. We therefore retain the local least-squares and Jacobian analyses as diagnos-
+      tics, and use only the separation between weighting and sampling to derive a training method.
+
+
+                                                         2
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+108
+      3     M ULTI -T EACHER OPD S ETUP
+109
+110
+      3.1    P RACTICAL REVERSE -KL MOPD
+111
+112   Consider M tasks with prompt distributions {Di }M                                          T
+                                                        i=1 . Task i is routed to teacher τi = πi . Let θ0
+113                                                                                           θ0
+      denote the student checkpoint used to generate the current on-policy rollouts, and let µi denote the
+114   resulting distribution of prefixes for task i.
+115
+      Within an optimization step, practical OPD treats these sampled prefixes as fixed and minimizes
+116
+117                                          M
+                                             X
+118                          Lw (θ; θ0 ) =         wi Ec∼µθ0 [DKL (πθ (· | c) ∥ τi (· | c))] ,            (3)
+                                                            i
+119                                          i=1
+                         P
+120   where wi > 0 and      i wi = 1.
+121
+      Hard routing determines which teacher appears in each term of Equation 3. The student can match
+122
+      all teachers simultaneously if there exists θ⋆ such that
+123
+124                   πθ⋆ (· | c) = τi (· | c)       for prefixes sampled from µθi 0 and every i.         (4)
+125
+      If Equation 4 holds, then Lw (θ⋆ ; θ0 ) = 0 for every positive choice of w, and every zero-loss solution
+126
+      matches all routed teachers on their sampled prefixes. If no such student exists, the optimum can
+127   depend on the task weights because the loss cannot be driven to zero.
+128
+129   Relation to KL-regularized RL.         Many MOPD teachers are obtained by RL. For a KL-regularized
+130   RL objective
+131
+132                    JiRL (π) = Ex,y∼π [Ri (x, y)] − βi Ex [DKL (π(· | x) ∥ ρi (· | x))] ,              (5)
+133   define
+134                                                   ρi (y | x) exp(Ri (x, y)/βi )
+                                     τiR (y | x) =                                  .                     (6)
+135                                                               Zi (x)
+136   Then
+                       JiRL (π) = βi Ex [log Zi (x)] − βi Ex DKL π(· | x) ∥ τiR (· | x) .
+                                                                                      
+137                                                                                                       (7)
+138
+139   Equation 7 is useful mainly as an interpretation: a KL-regularized RL objective implicitly specifies
+140   a target policy, while MOPD receives such a target explicitly from a teacher. We do not assume that
+141   practical PPO/GRPO training and frozen-prefix OPD have identical optimization dynamics. The
+142
+      exact sequence-level identity and its assumptions are given in Appendix A.2.
+143
+144   4     W HEN D O T EACHER W EIGHTS C HANGE THE L OCAL O PTIMUM ?
+145
+146   We analyze MOPD around the rollout checkpoint θ0 . For task i, consider the prefixes sampled at θ0
+147   and concatenate the student’s centered logits over these prefixes into a vector zi (θ). Let ziT denote
+148   the corresponding teacher logits. Centering removes the additive shift of logits that does not affect
+149   the softmax distribution.
+150   Define the teacher–student logit gap for task i as
+151
+152                                                 di := ziT − zi (θ0 ).                                 (8)
+153   To first order, a small parameter update ∆θ changes these student logits by
+154
+155
+                      zi (θ0 + ∆θ) − zi (θ0 ) = Ji ∆θ + O(∥∆θ∥2 ),               Ji := ∇θ zi (θ0 ).       (9)
+156   di is the teacher–student logit gap, while Ji ∆θ is the logit change induced by the parameter update.
+157   When the student distribution is close to the teacher on a prefix, reverse KL is approximated as
+158                                                1
+159                             DKL πθ0 +∆θ ∥ τi = ∥di − Ji ∆θ∥2Fi + O(ϵ3i ),                          (10)
+                                                       2
+160
+161   where ∥u∥2Fi := u⊤ Fi u, and Fi is the categorical Fisher matrix on task i. The derivation is in
+      Appendix A.3.
+
+
+                                                                3
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+162
+      Substituting equation 10 into the MOPD objective gives
+163
+                                                         M
+164                                                   1X
+165                                   Lw (∆θ) =             wi ∥di − Ji ∆θ∥2Fi .                      (11)
+                                                      2 i=1
+166
+167   Stacking all tasks,
+168                                         
+                        d1                 J1
+169                       .
+                   d =  ..  ,              .
+                                      J =  ..  ,           Fw = blkdiag(w1 F1 , . . . , wM FM ),    (12)
+170
+                        dM                 JM
+171
+172   the local objective becomes
+173                                                   1
+                                          Lw (∆θ) =     ∥d − J∆θ∥2Fw .                              (13)
+174                                                   2
+175   d stacks the teacher–student logit gaps across tasks. Range(J) is the set of stacked logit changes
+176   that one local parameter update can produce across all tasks. Teacher-weight sensitivity therefore
+177   depends on whether d belongs to this set.
+178   Proposition 1 (When teacher weights change the local optimum). Consider equation 13 with wi >
+179   0.
+180   If
+181                                             d ∈ Range(J),                                         (14)
+182
+      then every positive task weighting admits zero local loss, and every optimum satisfies
+183
+184                                                   J∆θ⋆ = d.                                       (15)
+185   Hence the fitted local student logits are independent of the task weights.
+186
+187   If instead
+188
+                                               d∈/ Range(J),                                        (16)
+189   then no parameter update can match all teacher–student logit gaps simultaneously. The task weights
+190   determine which teachers are matched more closely and can therefore change the local optimum.
+191
+192   Proof. Because J∆θ ranges over Range(J), equation 13 is equivalent to
+193                                                      1
+194                                                min     ∥d − p∥2Fw .                               (17)
+                                              p∈Range(J) 2
+195
+196   If d ∈ Range(J), choosing p = d gives zero loss for every positive w. Otherwise every realizable p
+197
+      leaves nonzero residual error, and w determines how errors across tasks are distributed.
+198
+199
+      This separates two effects that can look similar in training. When equation 14 holds, changing the
+      task weights can still change training speed because the parameter-space curvature
+200
+201                                                 Hw = J ⊤ Fw J                                     (18)
+202
+      depends on w, but the local target itself does not. When equation 16 holds, the dependence is more
+203
+      fundamental: changing the task weights can change the best-fit local predictions even after the local
+204
+      objective is fully optimized.
+205
+206
+      Example. Sensitivity to task weights does not require the tasks to share prompts. Suppose two
+207   routed tasks depend locally on the same scalar parameter, with
+208
+209                                 d1 = 1,         d2 = −1,       J1 = J2 = [1].                     (19)
+210   Then
+                                                  w1             w2
+211                               Lw (∆θ) =          (1 − ∆θ)2 +    (−1 − ∆θ)2 ,                      (20)
+212                                               2              2
+213   whose minimizer is
+214
+                                               ∆θ⋆ = w1 − w2 .                                       (21)
+215   The teachers supervise disjoint inputs, yet their targets conflict through the shared parameter, so
+      changing their weights changes the local optimum.
+
+
+                                                             4
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+216
+      5    H ARD ROUTING D OES N OT G UARANTEE TASK I SOLATION
+217
+218
+      Hard routing separates the source of supervision, but all routed losses still modify the same student
+219   parameters. The local model makes the resulting cross-task effect explicit.
+220
+221   After a local parameter update ∆θ, define the remaining teacher–student residual on task i as
+222                                              ei := di − Ji ∆θ.                                     (22)
+223
+      Ignoring the learning-rate factor, the task-j descent direction is
+224
+225                                                  gj = Jj⊤ Fj ej .                                  (23)
+226   Applying this update changes the logits on task i by
+227
+                                           ∆zi←j ≈ Ji gj = Ji Jj⊤ Fj ej .                              (24)
+228
+229
+      Routing determines which teacher defines the residual ej , but the effect of the resulting parameter
+230   update on another task is determined by the student Jacobians. Unless
+231
+232                                               Ji Jj⊤ Fj ej = 0,                                    (25)
+233   a task-j update changes task-i outputs to first order.
+234
+      This is also why pairwise gradient cosine is an incomplete diagnostic. For two tasks,
+235
+236                                         ⟨gi , gj ⟩ = e⊤        ⊤
+                                                          i Fi Ji Jj Fj ej .                           (26)
+237   The right-hand side is only one scalar projection of the vector Ji gj . Therefore,
+238
+239                                         ⟨gi , gj ⟩ = 0 ̸⇒ Ji gj = 0.                               (27)
+240
+241   Two task gradients can be orthogonal in parameter space while an update from one task still changes
+242   the outputs of the other. A concrete counterexample is given in Appendix A.4.
+243
+      The distinction is important experimentally. Gradient cosine summarizes alignment between two
+244   parameter updates with one scalar, whereas Ji gj measures the full change in task-i logits caused by
+245   a task-j update. For a small ϵ, the latter can be measured directly by
+246
+                                                  zi (θ + ϵgj ) − zi (θ)
+247                                        Ji gj ≈                       ,                             (28)
+248
+                                                            ϵ
+249   without explicitly materializing the Jacobian.
+250
+251   6    S EPARATING TASK W EIGHTING FROM T RAINING A LLOCATION
+252
+253   When one task improves at the expense of another in MOPD, there are two possible causes. First,
+254   a task may receive too little training budget. Second, the teacher targets may be incompatible, so
+255   fitting one more closely necessarily worsens the fit to another. The first problem calls for better
+256   allocation of training steps; changing the task loss weights in the second case changes the trade-off
+257   being optimized.
+258   Let Gi be a stochastic descent direction for task i, with gi (θ) := E[Gi ]. Let wi denote the intended
+259   task loss weight, so that the desired direction is
+260                                                        M
+                                                           X
+261                                            gw (θ) =          wi gi (θ).                            (29)
+262                                                        i=1
+263
+      Suppose task i is sampled with probability ai > 0. The single-task estimator
+264
+                                                wI
+265                                        gb =     GI ,      I ∼ a,                              (30)
+                                                 aI
+266
+267   satisfies
+268                                             E[bg ] = gw (θ).                                  (31)
+269   Thus w specifies the objective, while a specifies where training steps are spent. The correction
+      wI /aI lets us adapt a without changing the expected update.
+
+
+                                                            5
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+270
+      6.1   O BJECTIVE -P RESERVING A DAPTIVE S AMPLING
+271
+272   The remaining question is how to choose a. Define the per-task gradient second moment
+273
+                                             s2i = E ∥Gi ∥22 .
+                                                            
+                                                                                                        (32)
+274
+275   For the unbiased estimator in equation 30,
+276                                                      M
+277
+                                                      X    wi2 2
+                                                g ∥22 =
+                                              
+                                             E ∥b              s .                                      (33)
+278                                                     i=1
+                                                            ai i
+279
+280
+      Because its mean is fixed, minimizing this second moment also minimizes the trace of its covariance.
+281   Proposition 2 (Optimal
+                        P       objective-preserving sampling). Assume wi si > 0 for all tasks. Among
+282   distributions with i ai = 1, the sampling probabilities that minimize equation 33 are
+283                                                    wi si
+284                                            a⋆i = PM         .                                       (34)
+285                                                   j=1 wj sj
+
+286
+287   The proof is given in Appendix A.1. Tasks with larger gradient scale are sampled more often, while
+288   the corresponding importance correction keeps their expected contribution equal to wi gi .
+289   We call the resulting method Objective-Preserving Adaptive Sampling (OPAS). In practice, OPAS
+290   maintains an exponential moving estimate
+291
+292
+                                           sb2i ← γb
+                                                   s2i + (1 − γ)∥Gi ∥22                                 (35)
+293   whenever task i is sampled. To avoid stale tasks and large importance ratios, we use a probability
+294   floor amin ∈ (0, 1/M ):
+295                                                              p
+                                                              wi sb2i + ε
+296                             ai = amin + (1 − M amin ) P          q      .                      (36)
+297                                                              w    s 2+ε
+                                                               j   j   bj
+298
+299   Each sampled update is then multiplied by the actual ratio wI /aI as in equation 30. Gradient
+300   norms are available after the usual backward pass and determine the next sampling decision; when
+301   they are unavailable, a teacher–student KL or token-level advantage statistic can serve as a cheaper
+302
+      proxy. A proxy may be less variance-efficient, but the importance correction still preserves the target
+      objective.
+303                                                                                           P
+304   Without the correction, adaptive sampling silently changes the expected direction to i ai gi . This
+305   distinction matters most for incompatible teachers: uncorrected gap-following allocation changes
+306   which teacher is fit more closely, whereas OPAS reallocates training budget while holding that
+307   trade-off fixed. When the teachers can be matched simultaneously, both may approach the same
+308
+      fitted predictions, but OPAS still makes explicit which objective is being optimized.
+309
+310   7     E XPERIMENTS
+311
+312   The first three experiments evaluate the diagnostic claims of the local analysis: when task weights
+313   change the final student, whether the local model predicts short-term training changes, and whether
+314   gradient cosine captures cross-task effects. The final experiment evaluates OPAS as the theory-
+315   derived training intervention.
+316
+317   7.1   W HEN DO TASK WEIGHTS CHANGE THE FINAL STUDENT ?
+318
+      We first construct controlled teacher sets around a common student checkpoint θ0 .
+319
+320   For a compatible teacher construction, we choose a shared parameter perturbation u and generate
+321   the routed targets from θ0 + ϵu. To first order,
+322                                                 di ≈ Ji ϵu                                          (37)
+323
+      for every task, so one shared parameter update can match all target changes.
+
+
+                                                        6
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+324
+      For the incompatible construction, different routed teachers are generated from independently cho-
+325   sen perturbations θ0 + ϵui . The corresponding target changes need not admit a common parameter
+326   update.
+327
+328
+      We sweep the task loss weights w while keeping the sampling probabilities and total training budget
+      fixed. We evaluate both task performance and the teacher–student KL at the end of training. We
+329
+      also estimate the minimum local residual from equation 13. The central prediction is that chang-
+330
+      ing task weights should have little effect on the final predictions for compatible teachers, whereas
+331   incompatible teachers should show systematic weight-dependent trade-offs.
+332
+333
+      7.2   D OES THE LOCAL MODEL PREDICT SHORT- HORIZON MOPD UPDATES ?
+334
+335   At several training checkpoints, we estimate the solution of the local least-squares problem in
+336   equation 13 using Jacobian–vector and vector–Jacobian products rather than explicitly forming J.
+337   We compare the predicted output change J∆θ⋆ with the actual short-horizon change produced by
+338   MOPD.
+339   This experiment tests whether the local model accurately predicts short-term training changes before
+340   using its residual as a diagnostic of sensitivity to task weights. In particular, we compare predicted
+341   and observed logit changes, local KL reduction, and the ordering of convergence rates across task
+342   weightings.
+343
+344   7.3   G RADIENT ORTHOGONALITY VERSUS CROSS - TASK CHANGE
+345
+346   For each routed teacher j, we compute its task update gj and measure two quantities on another task
+347   i: the cosine similarity between gi and gj , and the task-i logit change caused by the task-j update,
+348                                                   ∥Ji gj ∥ .                                          (38)
+349
+350   We estimate the second quantity with the finite difference in equation 28.
+351   If gradient orthogonality implied task isolation, the two quantities would vanish together. Our anal-
+352   ysis instead predicts that task pairs with small gradient cosine can still exhibit substantial cross-task
+353   output changes.
+354
+355   7.4   O BJECTIVE -P RESERVING A DAPTIVE S AMPLING
+356
+357   We compare three training rules under the same token budget, base optimizer, and intended task
+358   weights w: (1) uniform sampling with fixed w; (2) OPAS with the wI /aI correction; and (3) the
+359
+      same adaptive sampling probabilities without importance correction. The third condition isolates the
+      consequence of turning adaptive allocation into an unintended dynamic objective. We additionally
+360
+      vary w directly as an objective-changing control.
+361
+362   We run all conditions on both compatible and incompatible teacher constructions from Section 7.1.
+363   For compatible teachers, the primary comparison is convergence speed at a common final fit. For in-
+364   compatible teachers, we test whether OPAS reaches the same teacher–student KL trade-off and final
+365
+      predictions as the uniform fixed-objective baseline, while uncorrected sampling and direct changes
+      to w move the final student. We report weighted training loss versus tokens, the empirical gradient
+366
+      second moment, per-task teacher KL, downstream task performance, and distances between final
+367
+      predictions.
+368
+369   Finally, we repeat the comparison in a realistic multi-teacher setting with mathematics, code, and
+370   instruction-following tasks. This setting tests whether the variance reduction predicted by Proposi-
+371
+      tion 2 translates into faster training when task gradient scales evolve over time.
+372
+373   8     L IMITATIONS
+374
+375   Our analysis is deliberately local. We freeze the on-policy prefix distribution within an update and
+376   linearize the student around a checkpoint. During long-horizon training, the prefix distribution,
+377   student Jacobian, teacher–student gap, and optimizer state all evolve. A teacher target that cannot be
+      matched by one local parameter update may become matchable later in training. Our local analysis
+
+
+                                                          7
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+378
+      therefore does not imply that the teachers can never be matched. The KL-RL connection is also
+379   exact only for the fixed-reference sequence-level objective in equation 5; practical PPO, GRPO,
+380   clipping, and frozen-prefix OPD need not follow identical dynamics.
+381
+382
+      OPAS minimizes the second moment of a one-step single-task estimator, not wall-clock time or long-
+      horizon nonconvex training loss. Its benefit depends on the accuracy and freshness of the gradient-
+383
+      scale estimates. The sampling floor controls extreme importance ratios but can limit adaptation;
+384
+      clipping the ratios themselves would introduce bias. Output-aware interference control based on
+385   ∥Ji u∥ is a promising extension, but requires additional Jacobian–vector products and may suppress
+386   positive transfer.
+387
+388
+389   9   C ONCLUSION
+390
+391   Multi-teacher OPD does not simply add independently trained capabilities to a shared model. It asks
+392   one student to fit several routed teacher policies at the same time. The key distinction is whether one
+393   local parameter update can match all teacher–student logit gaps. When it can, task weights mainly
+394
+      affect training speed; when it cannot, the weights determine the local trade-off between incompat-
+      ible teacher targets. Shared parameters also imply that hard routing and gradient orthogonality are
+395
+      insufficient for task isolation. OPAS acts on the complementary problem of training imbalance: it
+396
+      adapts task sampling while importance-correcting each update, reallocating training budget without
+397   changing the intended task weights.
+398
+399
+      AI USE STATEMENT
+400
+401   In this work, we used generative AI tools for [tasks with required disclosure]. We have not used
+402   generative AI tools for [other tasks with required disclosure], and [the rest of the required disclosure
+403   tasks] are not applicable to this work. Additionally, we used generative AI tools for [tasks with
+404   recommended disclosure]. We have reviewed all AI-assisted work. [Elaborate. For example, “we
+405   checked LLM-generated research ideas for potential plagiarism through a manual literature survey”,
+406   “LLM-generated code was verified and tested for correctness by 2 authors”, etc.]. We take respon-
+407   sibility for the final content of this work, including text, claims or artifacts produced with the aid of
+408   generative AI.
+409   See the ICLR 2027 AI Policy for Authors for more details. This statement should not be more than
+410   1 page.
+411
+412   E THICS STATEMENT
+413
+414   If authors feel that their paper submission raises questions regarding the Code of Ethics, they are en-
+415   couraged to include a paragraph of Ethics Statement (at the end of the main text before references) to
+416   address potential concerns where appropriate. Topics include, but are not limited to, studies that in-
+417   volve human subjects, practices to data set releases, potentially harmful insights, methodologies and
+418   applications, potential conflicts of interest and sponsorship, discrimination/bias/fairness concerns,
+419
+      privacy and security issues, legal compliance, and research integrity issues (e.g., IRB, documenta-
+      tion, research ethics). This statement should not be more than 1 page.
+420
+421
+422   R EPRODUCIBILITY STATEMENT
+423
+      It is important that the work published in ICLR is reproducible. Authors are strongly encouraged to
+424
+      include a paragraph-long Reproducibility Statement at the end of the main text (before references)
+425
+      to discuss the efforts that have been made to ensure reproducibility. This paragraph should not itself
+426   describe details needed for reproducing the results, but rather reference the parts of the main paper,
+427   appendix, and supplemental materials that will help with reproducibility. For example, for novel
+428   models or algorithms, a link to an anonymous downloadable source code can be submitted as sup-
+429   plementary materials; for theoretical results, clear explanations of any assumptions and a complete
+430   proof of the claims can be included in the appendix; for any datasets used in the experiments, a
+431   complete description of the data processing steps can be provided in the supplementary materials.
+      Each of the above are examples of things that can be referenced in the reproducibility statement.
+
+
+                                                         8
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+432
+      R EFERENCES
+433
+434   Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang, Bingxiang He,
+435     Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou. Open-mopd: Diagnosing and fixing capability
+436
+        imbalance in multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/
+        2608.19098.
+437
+438   Zhaoyi Li, Deyang Kong, Yuan Wei, Evan Yang, Ranran Shen, Mahardika Krisna Ihsani, Ming
+439     Yang, Wei Zhang, Chuan Hao, Jian Yang, Ran Tao, Bryan Dai, Shikun Zhang, Wei Ye, Ying
+440     Wei, and Defu Lian. Every coin has two sides: On the dual nature of generalization in on-
+441     policy distillation of large language models, 2026. URL https://arxiv.org/abs/2608.
+442     16647.
+443   Kejian Zhu, Zhuoran Jin, Shangqing Tu, Hongbang Yuan, Yushi Bai, Kang Liu, Juanzi Li, and Jun
+444     Zhao. Sft conflicts, rl coexists: A theoretical and empirical analysis of multi-task learning for
+445     llms, 2026. URL https://arxiv.org/abs/2608.03573.
+446
+447
+448
+      A     A DDITIONAL D ERIVATIONS
+449
+      A.1   O PTIMAL O BJECTIVE -P RESERVING S AMPLING
+450
+451   We prove Proposition 2. Let ci := wi2 s2i > 0. The problem is
+452                                          M                           M
+453
+                                             X ci                        X
+                                     min                  subject to           ai = 1.                   (39)
+454                                  ai >0
+                                             i=1
+                                                   ai                    i=1
+455   Its Lagrangian is
+456                                                 M                   M
+                                                                                   !
+                                                    X ci                X
+457                                  J (a, λ) =                    +λ         ai − 1 .                   (40)
+458                                                     i=1
+                                                              ai        i=1
+459   Stationarity gives                                       √
+460                                        ci                    ci
+                                        − 2 + λ = 0,     ai = √ .                                        (41)
+461                                        ai                     λ
+462   Normalizing the probabilities yields
+463
+                                                √
+                                                  ci      wi si
+464                                      a⋆i = P √ = P             .                                     (42)
+                                                j    c j   j wj sj
+465
+466
+      The objective is strictly convex on the positive orthant because its coordinate-wise second derivatives
+                3
+467    P 2ci /ai > 0, so this stationary point is the unique minimizer. The minimum second moment is
+      are
+      ( i wi si )2 .
+468
+469
+      A.2   KL-R EGULARIZED RL AS F ITTING A TARGET P OLICY
+470
+471   For completeness, we prove the identity used in Equation 7. For a fixed prompt x, define
+472
+                                ρ(y | x) exp(R(x, y)/β)                          h         i
+473              τ R (y | x) =                            ,     Z(x) = Ey∼ρ(·|x) eR(x,y)/β .             (43)
+                                          Z(x)
+474
+475
+      Then
+                                  π(y | x)          π(y | x) R(x, y)
+476                           log R         = log             −       + log Z(x).                        (44)
+                                 τ (y | x)          ρ(y | x)      β
+477
+      Taking expectation under y ∼ π(· | x) gives
+478
+                          DKL π(· | x) ∥ τ R (· | x) = DKL (π(· | x) ∥ ρ(· | x))
+                                                    
+479
+480                                                         1
+                                                        − Ey∼π [R(x, y)] + log Z(x).                     (45)
+481                                                         β
+482   Rearranging and averaging over prompts yields
+483
+                        J RL (π) = β Ex [log Z(x)] − β Ex DKL π(· | x) ∥ τ R (· | x) .
+                                                                                   
+                                                                                                         (46)
+484
+                                                                                              R
+485   Therefore the exact optimizer of the fixed-reference KL-regularized RL objective is τ       whenever it
+      is contained in the policy class.
+
+
+                                                                   9
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+486
+      A.3     L OCAL Q UADRATIC A PPROXIMATION OF R EVERSE KL
+487
+488   Let p(z) = softmax(z) and consider
+489
+                                          f (z) = DKL p(z) ∥ p(z T ) .
+                                                                    
+490                                                                                                 (47)
+491
+      At z = z T ,
+492                                      f (z T ) = 0,      ∇z f (z T ) = 0.                        (48)
+493
+      The Hessian at equality is the categorical Fisher matrix
+494
+495                                            F = diag(p) − pp⊤ .                                  (49)
+496
+                                                                 T
+497
+      Hence, for a small centered logit difference δ = z − z ,
+498                                                    1
+499
+                                    DKL p(z) ∥ p(z T ) = δ ⊤ F δ + O(∥δ∥3 ).                        (50)
+                                                        2
+500
+501   Using
+502                                 z(θ0 + ∆θ) = z(θ0 ) + J∆θ + O(∥∆θ∥2 )                           (51)
+                T
+503   and d = z − z(θ0 ), we obtain
+504
+505
+                                           δ = J∆θ − d + O(∥∆θ∥2 ),                                 (52)
+506   which gives equation 10.
+507
+508   A.4     O RTHOGONAL G RADIENTS N EED N OT I MPLY I SOLATION
+509
+510   A two-dimensional example is sufficient. Let
+511
+                                         Ji = Jj = I,           Fi = Fj = I,                        (53)
+512
+513   and choose residuals                                          
+514                                               1                   0
+                                            ei =     ,          ej =     .                          (54)
+515                                               0                   1
+516   Then                                                          
+517                                               1                   0
+                                            gi =     ,          gj =     ,                          (55)
+518                                               0                   1
+519   so ⟨gi , gj ⟩ = 0. However,                           
+520                                                         0
+521                                              Ji gj =       ̸= 0.                                (56)
+                                                            1
+522
+      Thus an update can change task-i logits even when the two task gradients are exactly orthogonal.
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+
+
+
+                                                           10
+

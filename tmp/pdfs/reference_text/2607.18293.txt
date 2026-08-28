@@ -1,0 +1,1053 @@
+                                              One Student, Many Teachers: Multi-Task On-Policy Distillation via
+                                                              Soft-Prompt Privileged Context
+
+                                                           Yingzi Ma1 *           Zichen Zhu3 *           Ming Jiang1      Chaowei Xiao2
+                                                               1 University of Wisconsin–Madison              2 Johns Hopkins University
+                                                                              3
+                                                                                  Nanyang Technological University
+
+
+
+                                                               Abstract                                   gold answers (Zhao et al., 2026), or verifier-filtered
+                                                                                                          rollouts (Hübotter et al., 2026); RL-tuned teachers
+                                             On-policy self-distillation (OPSD) teaches                   fine-tune the base with verifiable rewards (Gu
+                                             large language models new skills through a
+                                                                                                          et al., 2026; Li et al., 2026); cross-size teachers
+                                             teacher that shares the student’s backbone
+                                             and supervises its own rollouts. Existing                    distill from a larger same-family model (Yang
+                                             teachers either inject privileged context at the             et al., 2025; Agarwal et al., 2024); and SFT-tuned
+                                             input—inducing post-hoc rationalization—or                   teachers fine-tune on (x, ygold ) pairs (Lab, 2025).
+
+
+
+
+arXiv:2607.18293v1 [cs.LG] 30 Jun 2026
+                                             fine-tune weights, accumulating drift and for-               Amid this rapid proliferation, a basic question is
+                                             getting across tasks. We propose P ROMPT SD,                 rarely asked: which teacher should be paired with
+                                             whose teacher differs from the student only by               which task, and once we have a good teacher, why
+                                             a learnable soft prompt: trained on (x, ygold )
+                                                                                                          distill from it rather than deploy it directly?
+                                             pairs with the backbone frozen, the prompt
+                                             yields a task-specific teacher that preserves
+                                                                                                             Each family answers this only partially. Li et al.
+                                             the student’s exact representational geometry.               (2026) formalize two conditions for effective OPD:
+                                             P ROMPT SD extends naturally to multi-task set-              thinking-pattern consistency on student-visited
+                                             tings by routing each example in a merged cor-               states, and a non-trivial capability gap. While
+                                             pus to its corresponding soft-prompt teacher,                observation-based teachers (OPSD) naturally
+                                             allowing a single student to absorb knowledge                preserve the first by sharing weights with the
+                                             from K teachers in parallel; at inference, all               student, they face a structural risk we call post-hoc
+                                             prompts are discarded. On Qwen3-1.7B-Base
+                                                                                                          rationalization (Turpin et al., 2023; Arcuschin
+                                             and Phi-4-mini-instruct across four tasks (Sci-
+                                             ence, Tool Use, Biology, Math), the single-task              et al., 2025): conditioning the teacher on the gold
+                                             variant (OPD with a PT teacher) matches or                   answer leads the teacher to justify rather than
+                                             exceeds full fine-tuning while training orders               derive its trace, a failure mode previously identified
+                                             of magnitude fewer parameters, and the multi-                in CoT distillation as the “reasoning shortcut
+                                             task variant achieves the best overall average               between question and gold answer” (Wang et al.,
+                                             (56.2 on Qwen3-1.7B-Base) while preserving                   2023). RL-based teachers face a different problem:
+                                             general-capability benchmarks—in contrast to
+                                                                                                          they require verifiable rewards (unavailable for
+                                             sequential SFT, which degrades both.
+                                                                                                          many tasks), and recent analysis (Chen et al., 2026)
+                                         1   Introduction                                                 argues that RL primarily amplifies existing capabil-
+                                                                                                          ities rather than injecting new ones—a limitation
+                                         On-policy distillation (OPD) has emerged as a                    visible in domains like vision-language-action
+                                         core post-training technique for large language                  modeling, where SFT cold-start is a prerequisite
+                                         models (Yang et al., 2025; Xiao et al., 2026; Zeng               for RL (Wang et al., 2025). We therefore pursue
+                                         et al., 2026): student rollouts paired with per-token            SFT-based teacher construction.
+                                         teacher distributions provide a denser supervision                  SFT methods span a spectrum of distributional
+                                         signal than off-policy SFT (Arora et al., 2022; Agar-            perturbation: full fine-tuning (FFT), LoRA (Hu
+                                         wal et al., 2024). Recent work realizes the teacher              et al., 2022), adapters (Houlsby et al., 2019),
+                                         πT in four structurally distinct ways: observation-              and prompt tuning (PT) (Lester et al., 2021). PT
+                                         based self-teachers inject privileged context c at               occupies a uniquely favorable position for OPD:
+                                         the input—demonstrations (Shenfeld et al., 2026),                it trains a small set of continuous embeddings
+                                            * Equal contribution. Corresponding to yma382@wisc.edu,       prepended to the input while leaving all trans-
+                                         chaoweixiao@jhu.edu.                                             former weights frozen. As illustrated in Figure 1,
+
+                                                                                                      1
+                      π θ                  π θ                          π θ Δ             π θ                    π θ
+
+
+
+
+              θ   π    π                            θ   π       π                                   θ   π   π
+
+
+
+
+Figure 1: Three families of privileged-information teachers for on-policy distillation. All three share the same
+on-policy reverse-KL objective L(θ) = KL[πs ∥ πt ] over student rollouts Ys , but differ in how the teacher acquires        a1   a1     a2
+privileged information. (a) Observation-based (SDFT, OPSD, SDPO): teacher and student share weights πθ ; the                a2
+
+teacher is conditioned on extra input-side context c. (b) RL-tuned (CoPD): the teacher is fine-tuned with RLVR,                       Base
+
+drifting to πθ + ∆W . (c) Prompt-tuned (ours): the teacher shares the student’s weights but prepends a learnable
+                                                                                                                            b1   b1     b2
+soft prompt P obtained via prompt tuning; only P differs between teacher and student.                                       b2
+                                                                                                                                      Base
+this places PT (panel c) at a distinct point in                     updated via on-policy reverse-KL on its own roll-
+the design space relative to observation-based                      outs, with the teacher’s supervision bounded by the     c1   c1     c2
+                                                                                                                            c2
+(panel a) and RL-tuned (panel b) teachers: the                      prompt-induced gap from the base. At deployment
+                                                                                                                                      Base
+soft prompt P acts as a parametric form of                          we discard all soft prompts and return πθ alone.
+observation, expressed in continuous embedding                         We validate P ROMPT SD through two sets of
+space rather than discrete tokens, while keeping                    experiments on Qwen3-1.7B-Base and Phi-4-mini-
+the transformer weights identical to the student’s.                 instruct. First, on single-task distillation across
+Against weight-modifying methods (FFT, LoRA),                       four tasks (Science, Tooluse, Biology, Math),
+PT preserves thinking-pattern consistency and                       single-task OPD with a PT teacher matches or
+avoids the weight drift and “intruder dimensions”                   exceeds SFT-tuned teachers (FFT, LoRA), and
+that compound across sequential tasks (Biderman                     is the only configuration whose average accuracy
+et al., 2024; Shuttleworth et al., 2026). Against                   exceeds its teacher’s accuracy on a target task.
+observation-based teachers, PT’s soft prompt does                   Second, multi-task P ROMPT SD achieves the best
+not condition the teacher on any answer, elimi-                     overall average (56.2 on Qwen3-1.7B-Base, +2.3
+nating post-hoc rationalization. This design also                   over the strongest single-task baseline) while
+bounds catastrophic forgetting (Kirkpatrick et al.,                 simultaneously preserving general-capability
+2017; Luo et al., 2025): by keeping the teacher                     benchmarks (MMLU-Pro (Wang et al., 2024),
+distributionally close to the base, PT minimizes the                HellaSwag (Zellers et al., 2019), TruthfulQA (Lin
+per-step KL signal driving student weight updates.                  et al., 2022))—in contrast to sequential SFT,
+   In light of these observations, we propose                       which loses both trained-task accuracy and general
+P ROMPT SD, an on-policy distillation framework                     capability to catastrophic forgetting. Our analysis
+that uses a prompt-tuned teacher and extends to                     further yields two principles for OPD teacher
+multiple tasks via parallel routing. P ROMPT SD has                 design: teacher family should match the task type
+two components. First, the prompt-tuned teacher:                    (SFT for capability injection, RL for elicitation),
+for each task k, we attach a set of learnable contin-               and teacher scale matters less than whether the
+uous embeddings Pk to the frozen student πθ and                     teacher carries new knowledge.
+optimize Pk on (x, ygold ) via standard supervised
+fine-tuning, yielding a task-specific teacher πθ+Pk⋆                2     Related Work
+that shares all transformer parameters with the
+                                                                    2.1    On-Policy Distillation
+student and differs only in input-side conditioning.
+Second, parallel multi-task distillation: rather than               On-policy distillation (OPD) addresses the train–
+training one student per task or chaining tasks                     test mismatch of off-policy knowledge distillation
+sequentially, we merge all task datasets into a                     by training the student on its own rollouts under
+single corpus where each example retains a task tag                 teacher per-token supervision. GKD (Agarwal
+k, and at each student update we route the example                  et al., 2024) interpolates between off-policy and on-
+to its corresponding teacher πθ+Pk⋆ . The student is                policy mixtures and supports multiple divergence
+
+                                                            2
+choices, while MiniLLM (Gu et al., 2024) mini-               ure 2. Direct Preference Optimization (Rafailov
+mizes reverse KL to prevent the student from over-           et al., 2023) sidesteps reward modeling but is re-
+estimating the teacher’s low-probability tails. OPD          stricted to preference pairs and has been shown to
+has since been adopted in industrial post-training           induce implicit reward models with limited out-of-
+pipelines (Qwen3 (Yang et al., 2025), MiMo (Xiao             distribution generalization. OPD is complementary
+et al., 2026), GLM-5 (Zeng et al., 2026)) as a com-          to all three: it inherits SFT’s dense token-level sig-
+petitive complement to SFT and outcome-reward                nal, RL’s on-policy training distribution, and avoids
+RL. A subsequent line of self-distillation variants          verifier and preference-annotation requirements.
+couples OPD with a single backbone serving as                Our work asks a sharper question—which teacher
+both teacher and student, where the teacher gains            construction best preserves the conditions under
+its informational advantage from privileged context:         which dense on-policy supervision actually works.
+SDFT (Shenfeld et al., 2026) prepends in-context
+demonstrations, OPSD (Zhao et al., 2026) prepends            3     Motivation
+gold reasoning traces, and SDPO (Hübotter et al.,            3.1    Desiderata for a Suitable OPD Teacher
+2026) uses verifier-filtered student rollouts as con-
+                                                             Building on Li et al. (2026) and our reading of OPD
+text. CoPD (Gu et al., 2026) departs from this input-
+                                                             training dynamics, we identify three desiderata an
+side family by RLVR-tuning the teacher’s weights.
+                                                             OPD teacher πT should jointly satisfy with respect
+Mechanism analyses by Li et al. (2026) identify
+                                                             to a student πs = πθ . Let t index the token position
+thinking-pattern consistency and a non-trivial capa-
+                                                             within a student rollout Ys on prompt x, and let
+bility gap as the two governing conditions of suc-
+cessful OPD—a framework on which we directly                           (p)
+                                                                           = TopK πs (· | x, Ys<t ), k ,
+                                                                                                      
+                                                                      St
+build (§3). None of these methods construct the
+                                                                       (q)
+                                                                      St = TopK πT (· | x, Ys<t ), k
+                                                                                                      
+teacher via prompt tuning, and the parameter-side                                                              (1)
+overlay design we propose is, to our knowledge,
+the first to satisfy both conditions by construction.        denote the student’s and teacher’s top-k sets at po-
+                                                             sition t. The overlap ratio averages the intersection
+2.2   Post-Training Techniques                               size over rollout positions and task prompts:
+Supervised fine-tuning (SFT) (Ouyang et al.,                                                             
+                                                                                        |Ys |   (p)   (q)
+2022) provides dense token-level supervision from                                   1   X     |St ∩ St | 
+                                                                ρ = Ex, Ys ∼πθ                             . (2)
+(x, ygold ) pairs but trains exclusively on expert                                |Ys |             k
+                                                                                       t=1
+trajectories, suffering from exposure bias at in-
+ference (Arora et al., 2022) and inducing sub-               We write ρ(s) for the overlap at OPD training step
+stantial distributional drift that manifests as catas-       s, with ρ(0) the value at initialization and ρ(S) at
+trophic forgetting (Kirkpatrick et al., 2017; Luo            the end of training. We report k=10 throughout
+et al., 2025). Parameter-efficient variants such             (results for k ∈ {1, 5, 50} in the appendix are quali-
+as LoRA (Hu et al., 2022) mitigate but do not                tatively similar).
+eliminate this drift, with recent analyses identify-         (D1) Thinking-pattern consistency. The teacher’s
+ing “intruder dimension” artifacts that concentrate          top-k distribution on student-visited states must
+update mass far from the base manifold (Shuttle-             overlap with πθ enough that the reverse-KL sig-
+worth et al., 2026; Biderman et al., 2024). Re-              nal is absorbable, but not so much that no learning
+inforcement learning approaches train on student-            signal remains. We call this a moderate-overlap
+generated trajectories: RLHF (Ouyang et al., 2022)           regime: when ρ(0) is too low, the gap falls out-
+learns a reward model from human preferences and             side the student’s absorbable range; when ρ(0) is
+optimizes it with PPO, while RLVR (Guo et al.,               too high, πT ≈ πθ and the per-token KL gradient
+2025; Shao et al., 2024) replaces the reward model           vanishes. Formally,
+with programmatic verifiers. Both face structural
+limits in our setting: reward sparsity yields high-                          ρmin < ρ(0) < ρmax .              (3)
+variance trajectory-level gradients, and recent anal-
+yses argue that RLVR primarily amplifies skills              (D2) Capability gap absorbed by the student. Be-
+already latent in the base rather than injecting new         yond a moderate starting point, the teacher must en-
+ones (Chen et al., 2026)—consistent with the stag-           code task-relevant knowledge that πθ progressively
+nant ∆ρ we observe for RLVR teachers in Fig-                 absorbs. We measure this through the change in
+
+                                                         3
+                                             Science: gain vs (0)                                                     Science: gain vs                                                    Tooluse: gain vs (0)                                      Tooluse: gain vs
+                        30        r = 0.87                                                     30   r = +0.86                                                           r = 0.55                                                        r = +0.75
+                                                        PT     FFT                                                              PT                  FFT                                         FFT                                                 Qwen3-8B                            FFT
+                                                                                                                                                                50                                                                 50
+                        20                                                                     20                                                                                            Qwen3-8B
+                                                                                                                                                                                                                                                                      PT
+                                                             LoRA                                                                            LoRA               40                                                                 40
+
+
+
+Performance gain (pp)
+                                                                                                                                                                                     PT
+                        10                   Qwen3-8B                  ICL                     10               ICL       Qwen3-8B                                                                                  RLVR
+                                                                                  RLVR                                                                          30                                                                 30                                      RLVR
+                         0                                                   GT
+                                                                                               0               GT       RLVR                                    20                                                                 20
+                                                                                                                                                                                            LoRA                                                                            LoRA
+                        10 Qwen3-4B                                                            10                                Qwen3-4B                       10                                                                 10                    Qwen3-4B
+                                                                                                                                                                     Qwen3-4B                           GT                                          GT
+
+                        20                                                                     20                                                               0                                                           SDPO   0
+                                                                                  SDPO              SDPO                                                                                                     ICL                        SDPO                    ICL
+                                                                                                                                                                10                                                                 10
+                             50        60          70        80              90          100               0            5          10       15         20                       60               70          80        90                      0       5         10                15         20
+                                             Initial overlap (0) (%)                                                   Overlap gain (pp)                                                  Initial overlap (0) (%)                                    Overlap gain (pp)
+
+Figure 2: Performance gain vs. overlap dynamics across teacher families. For each teacher (markers), we plot
+the 1.7B-Base student’s task accuracy gain (pp over zero-shot) against (left of each pair) the initial overlap ρ(0)
+and (right of each pair) the overlap gain ∆ρ = ρ(S) − ρ(0) , on Science and Tooluse. Dashed lines indicate the
+linear fit. Initial overlap alone is not predictive: high-ρ(0) teachers like RLVR and SDPO produce near-zero or
+negative gains, while moderate-ρ(0) teachers like PT, FFT, and L O RA produce the largest gains. Overlap gain
+∆ρ is strongly predictive of student gain (right panels): teachers occupying the moderate-overlap regime (D1) and
+producing substantial ∆ρ (D2) consistently yield the best students.
+
+overlap rather than benchmark accuracy: a real                                                                                                                  RL-tuned teachers satisfy D3 but require task-
+capability gap manifests as steadily rising ρ(s) ,                                                                                                              specific verifiers and primarily amplify existing
+while a teacher that merely amplifies existing be-                                                                                                              behaviors rather than inject new ones (Chen
+haviors (Chen et al., 2026) leaves overlap stagnant                                                                                                             et al., 2026). RLVR sits in the high-ρ(0) region
+despite higher accuracy. We require                                                                                                                             with stagnant ∆ρ: the teacher’s distribution is
+                                                                                                                                                                already nearly fully covered by the student, so the
+                                                    ∆ := ρ(S) − ρ(0) > δ.                                                                        (4)            reverse-KL signal vanishes and D2 fails.
+
+(D3) No post-hoc rationalization. The teacher’s
+conditioning context at distillation time should ide-                                                                                                           Large-sized teachers satisfy D2 and D3 but suffer
+ally not contain ygold , as doing so leads the teacher                                                                                                          cross-model parameterization mismatch—distinct
+to justify rather than derive its reasoning—a pattern                                                                                                           pretraining trajectories and tokenization-level
+the student inherits without access to the answer at                                                                                                            idiosyncrasies place the teacher’s distribution off
+inference (Wang et al., 2023). This is particularly                                                                                                             the student’s behavioral manifold. Q WEN 3-4B
+acute when ygold is only a short final answer: the                                                                                                              and Q WEN 3-8B populate the left edge of the ρ(0)
+teacher has no intermediate trace to follow and fab-                                                                                                            plots (≈ 55–65%) and produce small student gains,
+ricates a derivation that lands on the predetermined                                                                                                            consistent with D1’s lower bound being violated.
+answer, biasing token-level distributions toward
+backward-chained justification.
+                                                                                                                                                                SFT-tuned teachers and the SFT trap. FFT and
+                                                                                                                                                                L O RA satisfy D1–D3 and occupy the upper-right
+3.2                                Existing Teacher Families
+                                                                                                                                                                corner of the ∆ρ plots—largest ∆ρ and largest
+We examine how six teacher families fare against                                                                                                                student gains. Yet the desiderata miss a side effect:
+D1–D3 by plotting each teacher’s student gain                                                                                                                   the same ∆W that enables capability absorption
+against its overlap dynamics (ρ(0) and ∆ρ) on Sci-                                                                                                              (D2) also perturbs the teacher’s distribution on out-
+ence and Tooluse (Figure 2).                                                                                                                                    of-task inputs (FFT broadly; L O RA via low-rank
+Observation-based teachers share weights with                                                                                                                   “intruder dimensions” (Shuttleworth et al., 2026)),
+the student (D1 satisfied) but place ygold in the                                                                                                               which the student inherits as catastrophic forgetting
+teacher’s input, violating D3—as a gold an-                                                                                                                     in sequential settings (§5.3). Prompt tuning sits
+swer (Zhao et al., 2026), demonstrations as in                                                                                                                  naturally between observation-based teachers
+SDFT (Shenfeld et al., 2026), or verifier-filtered                                                                                                              (privileged context c at the input, D3-violating)
+rollouts (Hübotter et al., 2026). ICL yields nega-                                                                                                              and SFT-tuned teachers (∆W -driven drift): the
+tive ∆ρ on Science: its logits depend on demonstra-                                                                                                             soft prompt P provides a learnable, parametric
+tion context the student never sees, compounded                                                                                                                 privileged context while keeping ∆W =0 in the
+by SLMs’ weak in-context learning. GT and                                                                                                                       transformer body. The teacher πθ+P thus satisfies
+SDPO occupy the high-ρ(0) end of Figure 2 (≥                                                                                                                    D1–D3 without off-manifold drift. In Figure 2,
+85%) yet produce near-zero student gain—the gold-                                                                                                               PT lands in the moderate-ρ(0) region with the
+conditioned teacher is already nearly identical to                                                                                                              largest student gain—the only same-base teacher
+the student on student-visited prefixes.                                                                                                                        achieving both D1 and D2 jointly.
+
+                                                                                                                                                            4
+              4     P ROMPT SD                                                              a1
+                                                                                            a2
+                                                                                                       a1     a2   Soft Prompt A
+                                                                                                                                                              b2    Soft Prompt B
+
+
+                                                                                                            Base Model
+                                                                                                                                                              Base Model
+              P ROMPT SD realizes the teacher design motivated                                                                     Soft Prompt A
+
+                                                                                            b1         b1     b2   Soft Prompt B                     A   a1
+              in §3.1: a soft-prompt overlay on the frozen student                          b2
+                                                                                                                                   Soft Prompt B
+                                                                                                                                                     C
+                                                                                                                                                     B
+                                                                                                                                                         c2
+                                                                                                                                                         b2
+                                                                                                            Base Model                               B   b1   θ     π      π
+              backbone, supervising the student via on-policy                                                                                        A
+                                                                                                                                                     C
+                                                                                                                                                         a2
+                                                                                                                                                         c2
+
+              reverse-KL distillation. We describe the three                                c1
+                                                                                            c2
+                                                                                                       c1     c2   Soft Prompt C   Soft Prompt C
+                                                                                                                                                              Base Model
+
+              components in turn: constructing the soft-prompt                                              Base Model
+                                                                                                                                                                    b2
+
+              teacher (§4.1), the on-policy distillation objective
+              (§4.2), and the parallel multi-task extension (§4.3).                  Figure 3: Overview of P ROMPT SD. (a) Task-specific
+                                                                                     soft prompts {P1⋆ , . . . , PK⋆
+                                                                                                                     } are trained in parallel on
+              4.1    Building a Soft-Prompt Teacher                                  {D1 , . . . , DK } via next-token cross-entropy (Eq. 6); the
+        π θ           π θ                π θ Δ          π θ                π θ
+              Given a base model πθ and a task dataset D =                           base model is frozen. (b) Datasets are merged with
+              {(xi , yi )}N                                                          task tags; each example is routed to its soft-prompt
+                          i=1 , we construct a teacher by attaching
+                                                                                     teacher πθ+Pk⋆ , while the student πθ rolls out on the
+              L continuous embeddings P = [p1 , . . . , pL ] ∈
+                                                                                     input alone. The student is updated via per-token reverse
+θ   π    π    RL×d to the input embedding layer of πθ , where
+                             θ   π   π                        θ   π   π
+                                                                                     KL on student-visited states (Eq. 10). At inference, soft
+              d is the hidden dimension. For input x with em-                        prompts are discarded.
+              bedding sequence E(x), the teacher’s forward pass
+              treats P as a virtual prefix:                                          on exactly the states the student visits. At infer-
+                                                                                     ence, P ⋆ is discarded and the deployed model is πθ
+                       πθ+P (· | x) = πθ (· | [P ; E(x)]) ,               (5)        alone, incurring no parameter or compute overhead
+                                                                                     relative to the base.
+              where [ · ; · ] denotes concatenation along the se-
+              quence axis. Only P is trainable; all transformer                      4.3    Parallel Multi-Task Distillation
+              weights θ remain frozen. We optimize P by mini-                        P ROMPT SD extends naturally to settings with K
+              mizing the next-token cross-entropy on D:                              tasks {T1 , . . . , TK }, each with dataset Dk . We first
+                                                                                     train K task-specific soft prompts {P1⋆ , . . . , PK  ⋆}
+                  LPT (P ) = − E(x,y)∼D [log πθ+P (y | x)] , (6)
+                                                                                     in parallel by applying Eq. 6 independently on each
+              yielding P ⋆ that encodes task knowledge in L ×                        Dk ; the prompts share no parameters and incur no
+              d parameters—typically 10–100× smaller than                            inter-task interference. We then form a merged
+              LoRA at standard rank settings—while leaving θ                         distillation corpus
+              untouched.                                                                                       K
+                                                                                                               [
+              4.2    On-Policy Soft-Prompt Distillation                                    Dmerged =                {(x, y, k) : (x, y) ∈ Dk },                             (9)
+                                                                                                              k=1
+              With πθ+P ⋆ fixed, we distill its capability into πθ
+              via on-policy reverse-KL distillation. At each step,                   in which each example retains a task tag k identify-
+              we sample x ∼ D, generate a student rollout Ys ∼                       ing its source. At each distillation step, we sample
+              πθ (· | x), and evaluate both models on each prefix                    (x, y, k) ∼ Dmerged , generate Ys ∼ πθ (· | x), and
+              Ys<t . Let                                                             update the student against the task-routed teacher
+                                                                                     πθ+Pk⋆ :
+                            pt (·) ≜ πθ (· | x, Ys<t ),                                                                                "                             #
+                            qt (·) ≜      πθ+P ⋆ (· | x, Ys<t )           (7)                                                                                 (k)
+                                                                                                                                           X
+                                                                                       Lmulti
+                                                                                        OPD (θ) = E(x,y,k), Ys                                     KL(pt ∥ qt ) ,
+                                                                                                                                               t
+              denote the per-step student and teacher distribu-                                                                                                          (10)
+              tions. The student is updated to minimize
+                                                                                                 (k)
+                                       
+                                         |Ys |
+                                                                                    where qt (·) = πθ+Pk⋆ (· | x, Ys<t ). Task-specific
+                                                                                     knowledge is routed through the corresponding soft
+                                         X
+                 LOPD (θ) = Ex, Ys ∼πθ        KL(pt ∥ qt ) . (8)
+                                                 t=1                                 prompt at supervision time but unified into shared
+                                                                                     parameters at the student. Because all K prompts
+              Crucially, both models receive the same prompt                         are simultaneously available throughout training,
+              x—P ⋆ acts as a parameter-side overlay on the                          this scheme is order-independent and avoids the
+              teacher rather than an input-side context shift—so                     per-task forgetting incurred by sequential continual
+              the teacher’s per-token supervision is computed                        learning—a property we examine empirically in §5.
+
+                                                                                 5
+Table 1: Per-method results on four independently fine-tuned tasks (Qwen3-1.7B-Base; no sequential continual
+learning). Acc = task accuracy (%). ∆ρ measures capability transfer: ρ(S) − ρ(0) in percentage points, where ρ is
+the mean top-10 next-token overlap between student and teacher over teacher-forced validation rollouts. Positive ∆ρ
+means the student moved toward the teacher (genuine absorption rather than amplifying prior behavior). Best and
+second-best Acc per column among same-size students are bolded and underlined. ∗ denotes multi-task learning.
+
+                          Science            Tooluse             Biology               Math          Average
+    Method
+                       Acc      ∆ρ        Acc       ∆ρ        Acc       ∆ρ      Acc       ∆ρ      Acc      ∆ρ
+
+                                                     Base model
+    Zero-Shot          29.3         –     7.2        –        32.0        –     16.4          –   21.2      –
+                                               Teacher upper bounds
+    ICL teacher        35.3         –      0.0       –        38.0        –     57.0          –   32.6      –
+    RLVR teacher       30.3         –     40.2       –        32.0        –     44.2          –   36.7      –
+    LoRA teacher       46.7         –     51.5       –        26.0        –     52.8          –   44.3      –
+    FFT teacher        54.3         –     51.5       –        42.0        –     48.8          –   49.2      –
+    PT teacher         52.7         –     47.4       –        58.0        –     48.6          –   50.4      –
+                                           Large-sized cross-size baselines
+    OPD (Qwen-4B)      23.7     +8.5      16.5      +9.3      20.0       +0.5   86.4      +4.3    36.7     +5.7
+    OPD (Qwen-8B)      35.3     +5.1      53.6      +7.2      20.0       +8.3   85.2      +1.3    48.5     +5.5
+                                             Observation-based baselines
+    SDFT (Demo)        34.7     +2.7       4.1      +8.2      30.0      −1.2    67.0      +0.6    34.0    +2.6
+    OPSD (GT)          30.3     +2.0       9.3      +4.8      30.0       +6.8   20.6      +0.3    22.6    +3.5
+    SDPO (Rollout)      8.0     −0.5       3.1     −0.9       32.0       +3.9   16.4      −3.2    14.9    −0.2
+                                                 RL-tuned baselines
+    OPD (RLVR)         31.3     +4.0      39.2     +11.4      42.0       +8.6   41.0      +2.9    38.4     +6.7
+                                                SFT-tuned baselines
+    OPD (LoRA)         49.3     +17.3     18.6     +12.2      28.0      +30.1   55.4      +13.0   37.8    +18.2
+    OPD (FFT)          52.0     +17.7     55.7     +17.0      38.0      +29.6   47.0      +13.1   48.2    +19.4
+    OPD (PT)           51.0     +9.9      51.5      +9.9      62.0      +12.0   51.0      +8.1    53.9    +10.0
+    P ROMPT SD ∗       55.3     +8.8      48.4     +12.9      54.0       +4.2   67.2      +8.1    56.2    +8.5
+
+
+5     Experiment                                             2026), n=300), Tooluse (ReAct against Stable-
+                                                             Diffusion tools (Patil et al., 2024), n=97), Biol-
+5.1    Experimental Setup                                    ogy (SciKnowEval (Feng et al., 2024), n=50),
+Models.       We use Qwen3-1.7B-Base (Yang                   and Math (MATH-500 (Hendrycks et al., 2021),
+et al., 2025) (pretrained, no instruction tuning)            n=500). Each task has its own train/val/test split;
+as the student backbone throughout, so that all              soft prompts and on-policy rollouts use the training
+teacher-induced gains are isolated from prior                split, validation drives early stopping, and all re-
+RLHF biases. The same backbone is used to                    ported numbers are on test. We report task-specific
+construct every same-size teacher: PT prepends               accuracy with greedy decoding via vLLM (Kwon
+L learnable virtual-token embeddings to the input            et al., 2023). Further details in the appendix.
+embedding sequence (§4.1); L O RA uses rank
+r=16 on {q, k, v, o} projections; FFT updates                Implementation. Phase A (soft-prompt training):
+all transformer weights; RLVR fine-tunes the                 2000 steps, AdamW lr 5×10−3 , cosine schedule,
+teacher with GRPO (Shao et al., 2024) using each             effective batch size 16; only the L × d prompt
+task’s verifier as the reward signal; ICL provides           embeddings are updated. Phase B (on-policy dis-
+K=3 in-context demonstrations sampled from the               tillation): 600 steps, AdamW lr 1×10−5 , with the
+train split; GT wraps the gold answer in a fixed             reverse-KL objective in Eq. 8; the rollout buffer is
+prefix template. For cross-size baselines we use             refreshed every 64 steps via vLLM. For the multi-
+Qwen3-4B and Qwen3-8B, both of which share                   task variant (§4.3), the merged corpus shuffles all
+the Qwen3 tokenizer with the 1.7B student so that            four tasks, and each example is routed to its task-
+token-level logits are directly comparable.                  specific frozen teacher. All experiments run on 4
+Datasets and Metrics. We evaluate on four tasks              NVIDIA H100 80GB GPUs; a single-task pipeline
+spanning complementary capabilities: Science (4-             takes 1–2 GPU-hours, full main results ∼30 GPU-
+way MCQ with reasoning tags (Shenfeld et al.,                hours. Further details in the appendix.
+
+                                                         6
+Table 2: Trained-task performance vs. general-capability retention (Qwen3-1.7B-Base). Avg-T averages
+accuracy (%) over the four target tasks; Avg-U averages over three held-out 5-shot utility benchmarks.
+  Method                              Science   Tooluse   Biology    Math     Avg-T   MMLU-Pro    HellaSwag   TruthfulQA   Avg-U
+  Base                                 29.3       7.2      32.0      16.4     21.2       35.8        65.5        50.0      50.4
+  SFT (sequential)                     45.7      58.8      44.0      29.0     44.4       29.7        62.5        46.4      46.2
+  OPD (PT, sequential)                 49.3      45.4      60.0      53.0     51.9       34.5        66.9        52.6      51.3
+  SFT (multi-task)                     51.3      53.6      38.0      32.0     43.7       34.8        65.5        52.7      51.0
+  OPD (LoRA, multi-task)               51.7      51.5      34.0      53.0     47.5       35.6        62.8        56.8      51.7
+  P ROMPT SD (multi-task)              55.3      48.4      54.0      67.2     56.2       36.6        68.1        50.4      51.7
+
+                                                                            ence (55.3, the table’s best). Multi-task exposure
+                 60                                                         thus provides positive cross-task transfer: jointly
+                 50                                                         training on Science, Tooluse, and Biology rollouts
+
+  Accuracy (%)
+                                                           Science
+                                                           Tooluse          reinforces the reasoning and instruction-following
+                 40                                        Biology
+                                                           Math             Math latently requires, letting the student elicit
+                 30
+                                                                            capability beyond any single-task teacher. PT
+                 20
+                                                                            teachers compose cleanly—four parametric
+                 10
+                      100 200   400               800                       privileged contexts absorbed by one student
+                 Soft-prompt length L
+                                                                            without interference.
+Figure 4: Soft-prompt length L (number of learnable
+virtual tokens in the PT teacher), across all four tasks.                   5.3   Continual Learning
+5.2              Main Results                                               Per-task SFT (or RLVR) suffices when adapting
+Single-Task Distillation. Table 1 compares all                              to a single domain in isolation—SFT injects new
+teacher families on Qwen3-1.7B-Base. The teacher                            knowledge for capability-heavy tasks like Science
+upper bounds reveal a task-type contrast: SFT-                              or Biology, and RLVR sharpens reasoning where
+tuned teachers excel when new knowledge must be                             the capability is already latent. Realistic deploy-
+injected, while observation- and RL-based teachers                          ment, however, is continual: a model must absorb
+compete when capability is already latent and                               new domains over time without erasing prior ca-
+only needs elicitation. On Science, Tooluse, and                            pabilities. Table 2 reports trained-task accuracy
+Biology, SFT-tuned teachers (PT 50.4, FFT 49.2)                             (Avg-T) and held-out utility (Avg-U, over MMLU-
+clearly outperform RLVR (36.7) and ICL (32.6);                              Pro, HellaSwag, TruthfulQA) across sequential and
+on Math, the gap narrows—ICL leads (57.0) and                               multi-task baselines. Sequential SFT fails on both
+SFT teachers fall to 48–53. Among same-size stu-                            fronts—44.4 Avg-T and a drop from the base’s
+dents, OPD (PT) achieves the best average (53.9)                            50.4 to 46.2 Avg-U (MMLU-Pro −6.1)—the SFT
+and reaches 62.0% on Biology—+4 above its own                               trap of §3.2 realized at the student level: cumulative
+teacher and +34 above OPD (L O RA)—as the PT                                ∆W across tasks shifts the student off-manifold on
+teacher injects capability without the off-manifold                         unrelated inputs. Sequential OPD (PT) already
+drift that caps SFT-tuned students. OPD (FFT)                               mitigates this (51.9/51.3) because the PT teacher’s
+trails PT on average (48.2) and its ∆ρ≈+18                                  bounded per-task perturbation (D1) leaves general
+on every task signals heavy teacher alignment,                              capability intact, justifying OPD over deploying
+foreshadowing the catastrophic forgetting reported                          the teacher directly. Switching to a multi-task
+in §5.3. Notably, what matters is not teacher scale                         schedule alone does not close the gap: multi-task
+but whether it carries new knowledge: cross-size                            SFT and OPD (LoRA) recover Avg-U (51.0, 51.7)
+OPD (Q WEN -8B) dominates only on Math (85.2)                               but stall at 43.7 and 47.5 Avg-T, indicating that
+where Qwen3-1.7B-Base is limited, but trails                                the Avg-T bottleneck is the adaptation mechanism,
+OPD (PT) on the other three tasks.                                          not the schedule. P ROMPT SD improves both axes
+Multi-Task P ROMPT SD. P ROMPT SD extends                                   simultaneously (56.2 Avg-T, 51.7 Avg-U), with
+OPD (PT) by distilling four task-specific PT                                the largest gain on Math (67.2 vs. sequential PT
+teachers into a single student via merged-corpus                            53.0, sequential SFT 29.0), where cross-task PT
+routing (§4.3). P ROMPT SD ∗ achieves the best                              exposure unlocks latent capability. The simulta-
+average (56.2), exceeding the strongest single-task                         neous Avg-U lift confirms that parametric privi-
+baseline by +2.3 and cross-size OPD (Q WEN -8B)                             leged contexts compose without cumulative drift—
+by +7.7. The gain is most pronounced on Math                                P ROMPT SD delivers task specialization and pre-
+(67.2 vs. 51.0, +16.2 over single-task PT) and Sci-                         serves general capability.
+
+                                                                       7
+Table 3: Divergence choice in the on-policy distilla-       Table 4: Per-method results on four independently fine-
+tion loss (PT teacher). We compare reverse-KL (mode-        tuned tasks based on Phi-4-mini-instruct.
+seeking), forward-KL (mean-seeking), symmetric KL,              Method           Science   Tooluse   Biology    Math   Average
+and Jensen–Shannon (JSD).                                                                 Base model
+                                                                Zero-Shot         33.7       46.4       22.0    55.2    39.3
+  Divergence   Science   Tooluse   Biology   Math                                    Teacher upper bounds
+                                                                RLVR teacher      39.3       46.4       36.0    58.0    44.9
+  Forward        50.0      48.4      62.0     13.0              LoRA teacher      52.0       54.6       32.0    57.2    49.0
+  Symmetric      49.0      49.5      64.0     18.0              FFT teacher       53.7       59.8       52.0    60.0    56.4
+  JSD            47.0      51.5      58.0     14.0              PT teacher        41.7       53.1       51.0    59.2    51.3
+  Reverse        51.0      51.5      60.0     51.0                                Observation-based baselines
+                                                                SDFT (Demo)       37.0       45.4       34.0    57.8    43.6
+                                                                OPSD (GT)         39.3       46.4       22.0    62.0    42.4
+                                                                SDPO (Rollout)    45.2       52.8       38.6    58.2    48.7
+5.4   Ablation Study                                                                   RL-tuned baselines
+                                                                OPD (RLVR)        40.0       45.4       24.0    62.0    42.9
+Soft Prompt Length. Figure 4 ablates the num-                                         SFT-tuned baselines
+                                                                OPD (LoRA)        50.7       60.8       34.0    60.6    51.5
+ber of learnable virtual tokens L in the PT teacher             OPD (FFT)         53.3       58.8       48.0    61.2    55.3
+                                                                OPD (PT)          45.3       51.5       40.0    61.4    49.6
+across all four tasks. No single L dominates:
+                                                                P ROMPT SD        49.7      60.8       56.0     59.2    56.4
+L=400 is best (or tied for best) on Science, Too-
+luse, and Math, while Biology shows a U-shaped
+response peaking at both L=100 and L=400                    tuned teachers dominate capability-heavy tasks
+(62.0) with a dip at L=200. The general pattern             (FFT teacher reaches 52.0 on Biology vs. RLVR’s
+is that more learnable parameters help capacity-            36.0), while observation- and RL-based teachers
+demanding tasks: Math gains +13 points from                 lead on Math, where the base is already strong
+L=100 to L=400, and Tooluse jumps from 30.9                 (62.0 for OPSD (GT) and OPD (RLVR), vs. FFT
+to 51.5 once L reaches 400. Beyond L=400, gains             teacher’s 60.0). Third, the SFT trap remains vis-
+flatten or invert (Math 51.0 → 29.0 at L=800),              ible: OPD (FFT) falls short of its teacher on three
+suggesting diminishing returns. We adopt L=400              of four tasks (Science, Tooluse, Biology), capped
+as the default in all main-results experiments as a         at the teacher’s ceiling. By contrast, P ROMPT SD
+balance between expressiveness and stability.               inherits no such cap and reaches the teacher’s over-
+Divergence Choice. Table 3 compares four di-                all accuracy. Notably, the single-task PT teacher is
+vergences in the OPD loss with a PT teacher:                the relatively weaker teacher among these on this
+forward KL (mean-seeking), reverse KL (mode-                backbone (avg 51.3), yet P ROMPT SD’s multi-task
+seeking) (Gu et al., 2024), symmetric KL (Wu et al.,        framework still recovers the strongest student
+2025), and Jensen–Shannon (Agarwal et al., 2024).           (56.4)—showing that the merged-corpus routing
+On Science, Tooluse, and Biology, all four fall             of §4.3 extracts transferable signal even when
+within ≤6 points of each other—divergence choice            individual teachers are imperfect.
+is largely immaterial for capability-heavy tasks.
+                                                            6      Conclusion
+The exception is Math, where reverse-KL substan-
+tially outperforms the alternatives (51.0 vs. 13–18         We introduced P ROMPT SD, an on-policy distilla-
+for the others), consistent with its mode-seeking           tion framework built around a soft-prompt teacher.
+behavior concentrating mass on the teacher’s high-          Existing teacher families each satisfy only a subset
+probability solution tokens rather than averaging           of the three desiderata for effective OPD—thinking-
+across competing trajectories. We adopt reverse-            pattern consistency, an absorbed capability gap,
+KL as the default for this Math advantage and for           and no post-hoc rationalization—with SFT-tuned
+consistency with the OPSD literature.                       teachers in particular suffering an off-manifold
+Different Backbones. To confirm that our                    “SFT trap” that caps the student and induces catas-
+findings generalize beyond Qwen3-1.7B-Base,                 trophic forgetting. Prompt tuning resolves these
+Table 4 repeats the main comparison on Phi-4-               trade-offs through a learnable, parametric privi-
+mini-instruct (Abdin et al., 2024), and three               leged context that preserves the student’s represen-
+observations carry over.       First, P ROMPT SD            tational geometry while encoding new task knowl-
+achieves the best overall average (56.4), matching          edge. P ROMPT SD distills multiple task-specific
+the FFT teacher upper bound itself (56.4) while             PT teachers into a single student that outperforms
+outperforming all same-size single-task baselines           task-specialized counterparts while preserving gen-
+including OPD (FFT) (55.3) and OPD (L O RA)                 eral capability, and yields two principles for OPD
+(51.5). Second, the task-type contrast persists: SFT-       teacher design: teacher family should match the
+
+                                                        8
+task type (SFT for capability injection, RL for elici-         the Association for Computational Linguistics: ACL
+tation), and teacher scale matters less than whether           2022, pages 700–710.
+the teacher carries new knowledge.                           Dan Biderman, Jacob Portes, Jose Javier Gonzalez Ortiz,
+                                                               Mansheej Paul, Philip Greengard, Connor Jennings,
+7   Limitations                                                Daniel King, Sam Havens, Vitaliy Chiley, Jonathan
+                                                               Frankle, and 1 others. 2024. Lora learns less and
+Our study is limited in several respects. Ex-                  forgets less. arXiv preprint arXiv:2405.09673.
+periments use Qwen3-1.7B-Base and Phi-4-mini-
+instruct as students with same- or near-size teach-          Zhiqi Chen, Rui Lu, Andrew Zhao, Zhaokai Wang, Yang
+                                                               Yue, Shiji Song, and Gao Huang. 2026. Does rein-
+ers, leaving the behavior of PT teachers at larger             forcement learning really incentivize reasoning ca-
+scales (7B–70B) as an open question. Our four                  pacity in llms beyond the base model? Advances in
+tasks span knowledge MCQ, tool calling, and math               Neural Information Processing Systems, 38:57654–
+reasoning, but do not yet cover open-ended gen-                57689.
+eration, multilingual, agentic, or multimodal set-           Kehua Feng, Xinyi Shen, Weijie Wang, Xiang Zhuang,
+tings, where the capability-injection vs. elicitation          Yuqi Tang, Qiang Zhang, and Keyan Ding. 2024. Sci-
+distinction may take different forms. The multi-               knoweval: Evaluating multi-level scientific knowl-
+task P ROMPT SD setup combines four tasks; fur-                edge of large language models. arXiv preprint
+                                                               arXiv:2406.09098.
+ther scaling to many task-specific PT teachers may
+surface interference between privileged contexts             Naibin Gu, Chenxu Yang, Qingyi Si, Chuanyu Qin,
+that the bounded-perturbation argument (D1) does               Dingyu Yao, Peng Fu, Zheng Lin, Weiping Wang,
+not explicitly address. We also note that D1–D3                Nan Duan, and Jiaqi Wang. 2026. Co-evolving policy
+                                                               distillation. arXiv preprint arXiv:2604.27083.
+are operationally defined and empirically validated
+rather than formally proven, and alternative con-            Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang. 2024.
+structions (e.g., rank-constrained adapters) may               Minillm: Knowledge distillation of large language
+satisfy them as well. A natural next step is to ex-            models. In International Conference on Learning
+                                                               Representations, volume 2024, pages 32694–32717.
+tend P ROMPT SD beyond PT teachers to a broader
+family of plug-and-play modules—such as LoRA                 Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song,
+adapters, prefix tuners, and task vectors—as inter-            Peiyi Wang, Qihao Zhu, Runxin Xu, Ruoyu Zhang,
+changeable privileged-context providers, enabling              Shirong Ma, Xiao Bi, and 1 others. 2025. Deepseek-
+                                                               r1 incentivizes reasoning in llms through reinforce-
+modular composition of capabilities at distillation            ment learning. Nature, 645(8081):633–638.
+time.
+                                                             Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul
+                                                               Arora, Steven Basart, Eric Tang, Dawn Song, and Ja-
+References                                                     cob Steinhardt. 2021. Measuring mathematical prob-
+                                                               lem solving with the math dataset. arXiv preprint
+Marah Abdin, Jyoti Aneja, Harkirat Behl, Sébastien             arXiv:2103.03874.
+ Bubeck, Ronen Eldan, Suriya Gunasekar, Michael
+ Harrison, Russell J Hewett, Mojan Javaheripi, Piero         Neil Houlsby, Andrei Giurgiu, Stanislaw Jastrzebski,
+ Kauffmann, and 1 others. 2024. Phi-4 technical re-            Bruna Morrone, Quentin De Laroussilhe, Andrea
+ port. arXiv preprint arXiv:2412.08905.                        Gesmundo, Mona Attariyan, and Sylvain Gelly. 2019.
+                                                               Parameter-efficient transfer learning for nlp. In In-
+Rishabh Agarwal, Nino Vieillard, Yongchao Zhou, Pi-            ternational conference on machine learning, pages
+  otr Stanczyk, Sabela Ramos Garea, Matthieu Geist,            2790–2799. PMLR.
+  and Olivier Bachem. 2024. On-policy distillation
+  of language models: Learning from self-generated           Edward J Hu, Yelong Shen, Phillip Wallis, Zeyuan
+  mistakes. In International Conference on Learning            Allen-Zhu, Yuanzhi Li, Shean Wang, Liang Wang,
+  Representations, volume 2024, pages 21246–21263.             Weizhu Chen, and 1 others. 2022. Lora: Low-rank
+                                                               adaptation of large language models. Iclr, 1(2):3.
+Iván Arcuschin, Jett Janiak, Robert Krzyzanowski,
+   Senthooran Rajamanoharan, Neel Nanda, and Arthur          Jonas Hübotter, Frederike Lübeck, Lejs Behric, An-
+   Conmy. 2025.      Chain-of-thought reasoning in             ton Baumann, Marco Bagatella, Daniel Marta, Ido
+   the wild is not always faithful. arXiv preprint             Hakimi, Idan Shenfeld, Thomas Kleine Buening,
+   arXiv:2503.08679.                                           Carlos Guestrin, and 1 others. 2026. Reinforce-
+                                                               ment learning via self-distillation. arXiv preprint
+Kushal Arora, Layla El Asri, Hareesh Bahuleyan, and            arXiv:2601.20802.
+  Jackie Chi Kit Cheung. 2022. Why exposure bias
+  matters: An imitation learning perspective of error        James Kirkpatrick, Razvan Pascanu, Neil Rabinowitz,
+  accumulation in language generation. In Findings of          Joel Veness, Guillaume Desjardins, Andrei A Rusu,
+
+
+                                                         9
+  Kieran Milan, John Quan, Tiago Ramalho, Ag-                  Idan Shenfeld, Mehul Damani, Jonas Hübotter, and
+  nieszka Grabska-Barwinska, and 1 others. 2017.                  Pulkit Agrawal. 2026. Self-distillation enables con-
+  Overcoming catastrophic forgetting in neural net-               tinual learning. arXiv preprint arXiv:2601.19897.
+  works. Proceedings of the national academy of sci-
+  ences, 114(13):3521–3526.                                    Reece Shuttleworth, Jacob Andreas, Antonio Torralba,
+                                                                 and Pratyusha Sharma. 2026. Lora vs full fine-tuning:
+Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying                     An illusion of equivalence. Advances in Neural In-
+ Sheng, Lianmin Zheng, Cody Hao Yu, Joseph Gon-                  formation Processing Systems, 38:174627–174662.
+ zalez, Hao Zhang, and Ion Stoica. 2023. Efficient
+                                                               Miles Turpin, Julian Michael, Ethan Perez, and Samuel
+ memory management for large language model serv-
+                                                                 Bowman. 2023. Language models don’t always say
+ ing with pagedattention. In Proceedings of the 29th
+                                                                 what they think: Unfaithful explanations in chain-of-
+ symposium on operating systems principles, pages
+                                                                 thought prompting. Advances in Neural Information
+ 611–626.
+                                                                 Processing Systems, 36:74952–74965.
+Thinking Machines Lab. 2025. On-policy distillation.           Peifeng Wang, Zhengyang Wang, Zheng Li, Yifan
+                                                                 Gao, Bing Yin, and Xiang Ren. 2023. Scott: Self-
+Brian Lester, Rami Al-Rfou, and Noah Constant. 2021.             consistent chain-of-thought distillation. In Proceed-
+  The power of scale for parameter-efficient prompt              ings of the 61st Annual Meeting of the Association for
+  tuning. In Proceedings of the 2021 conference on               Computational Linguistics (Volume 1: Long Papers),
+  empirical methods in natural language processing,              pages 5546–5558.
+  pages 3045–3059.
+                                                               Yan Wang, Wenjie Luo, Junjie Bai, Yulong Cao, Tong
+Yaxuan Li, Yuxin Zuo, Bingxiang He, Jinqian Zhang,               Che, Ke Chen, Yuxiao Chen, Jenna Diamond, Yifan
+  Chaojun Xiao, Cheng Qian, Tianyu Yu, Huan-ang                  Ding, Wenhao Ding, and 1 others. 2025. Alpamayo-
+  Gao, Wenkai Yang, Zhiyuan Liu, and 1 others. 2026.             r1: Bridging reasoning and action prediction for gen-
+  Rethinking on-policy distillation of large language            eralizable autonomous driving in the long tail. arXiv
+  models: Phenomenology, mechanism, and recipe.                  preprint arXiv:2511.00088.
+  arXiv preprint arXiv:2604.13016.
+                                                               Yubo Wang, Xueguang Ma, Ge Zhang, Yuansheng Ni,
+Stephanie Lin, Jacob Hilton, and Owain Evans. 2022.              Abhranil Chandra, Shiguang Guo, Weiming Ren,
+  Truthfulqa: Measuring how models mimic human                   Aaran Arulraj, Xuan He, Ziyan Jiang, and 1 others.
+   falsehoods. In Proceedings of the 60th annual meet-           2024. Mmlu-pro: A more robust and challenging
+   ing of the association for computational linguistics          multi-task language understanding benchmark. Ad-
+  (volume 1: long papers), pages 3214–3252.                      vances in Neural Information Processing Systems,
+                                                                 37:95266–95290.
+Yun Luo, Zhen Yang, Fandong Meng, Yafu Li, Jie Zhou,
+  and Yue Zhang. 2025. An empirical study of catas-            Taiqiang Wu, Chaofan Tao, Jiahao Wang, Runming
+  trophic forgetting in large language models during             Yang, Zhe Zhao, and Ngai Wong. 2025. Rethinking
+  continual fine-tuning. IEEE Transactions on Audio,             kullback-leibler divergence in knowledge distillation
+  Speech and Language Processing.                                for large language models. In Proceedings of the 31st
+                                                                 International Conference on Computational Linguis-
+Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida,                tics, pages 5737–5755.
+  Carroll Wainwright, Pamela Mishkin, Chong Zhang,
+  Sandhini Agarwal, Katarina Slama, Alex Ray, and 1            Bangjun Xiao, Bingquan Xia, Bo Yang, Bofei Gao,
+  others. 2022. Training language models to follow in-           Bowen Shen, Chen Zhang, Chenhong He, Chiheng
+  structions with human feedback. Advances in neural             Lou, Fuli Luo, Gang Wang, and 1 others. 2026.
+  information processing systems, 35:27730–27744.                Mimo-v2-flash technical report. arXiv preprint
+                                                                 arXiv:2601.02780.
+Shishir G Patil, Tianjun Zhang, Xin Wang, and Joseph E         An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,
+  Gonzalez. 2024. Gorilla: Large language model                  Binyuan Hui, Bo Zheng, Bowen Yu, Chang
+  connected with massive apis. Advances in Neural                Gao, Chengen Huang, Chenxu Lv, and 1 others.
+  Information Processing Systems, 37:126544–126565.              2025. Qwen3 technical report. arXiv preprint
+                                                                 arXiv:2505.09388.
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-
+  pher D Manning, Stefano Ermon, and Chelsea Finn.             Rowan Zellers, Ari Holtzman, Yonatan Bisk, Ali
+  2023. Direct preference optimization: Your language            Farhadi, and Yejin Choi. 2019. Hellaswag: Can
+  model is secretly a reward model. Advances in neural           a machine really finish your sentence? In Proceed-
+  information processing systems, 36:53728–53741.                ings of the 57th annual meeting of the association for
+                                                                 computational linguistics, pages 4791–4800.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu,
+  Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan               Aohan Zeng, Xin Lv, Zhenyu Hou, Zhengxiao Du,
+  Zhang, YK Li, Yang Wu, and 1 others. 2024.                     Qinkai Zheng, Bin Chen, Da Yin, Chendi Ge,
+  Deepseekmath: Pushing the limits of mathematical               Chenghua Huang, Chengxing Xie, and 1 others. 2026.
+  reasoning in open language models. arXiv preprint              GLM-5: from vibe coding to agentic engineering.
+  arXiv:2402.03300.                                              arXiv preprint arXiv:2602.15763.
+
+
+                                                          10
+Siyan Zhao, Zhihui Xie, Mengchen Liu, Jing Huang,
+  Guan Pang, Feiyu Chen, and Aditya Grover.
+  2026.      Self-distilled reasoner: On-policy self-
+  distillation for large language models. arXiv preprint
+  arXiv:2601.18734.
+
+
+
+
+                                                           11
+A     Overview                                               only a placeholder rationale (“the correct option is
+                                                             X”) and Tool uses only bare action calls. Because
+This appendix collects reproducibility details and
+                                                             on-policy distillation from a teacher trained on
+four additional analyses supporting our claims
+                                                             answer-only targets collapses the student’s chain-
+about P ROMPT SD.
+                                                             of-thought into restating the answer (Appendix E),
+    • Details of experiments (§ B). Datasets and             we annotate accurate, answer-consistent reasoning
+      splits, metrics, implementation, and the full          for the Biology and Tool-use training targets with
+      P ROMPT SD configuration (soft-prompt width,           Qwen3-235B-A22B 1 as an external annotator: the
+      refresh schedule (K, M ), multi-task routing).         model is given the question and the verified gold
+                                                             answer, and asked to produce a faithful derivation,
+    • Efficiency (§ C). Teacher input-token and              after which the gold answer/action is re-attached de-
+      trainable-parameter footprint of P ROMPT SD            terministically, so target–answer consistency holds
+      versus observation- and SFT-based teachers.            by construction. Validation and test splits are left
+                                                             unchanged.
+    • Statistical significance (§ D). Three-seed
+      mean±std on Qwen3-1.7B and Phi-4-mini,
+      with paired bootstrap tests and 95% CIs on             B.2      Metrics
+      the small splits.                                      Task accuracy and format. We report Acc (cor-
+                                                             rectness) with task-specific answer extraction. Sci-
+    • Post-hoc rationalization (§ E). A counterfac-
+                                                             ence / Biology (MCQ): we read the letter inside
+      tual answer-swap probe quantifying desidera-
+                                                             <answer>...</answer>—falling back to the last
+      tum D3: gold-conditioned teachers follow an
+                                                             standalone A–D token if the tag is malformed—and
+      injected wrong answer, while the soft-prompt
+                                                             compare to the gold option; Fmt checks that a well-
+      teacher cannot be steered.
+                                                             formed answer tag is emitted. Tool use: we parse
+    • PT teacher vs. multi-task exposure (§ F).              every Action:/Action Input: pair and count a
+      A leave-one-teacher-out ablation separating            generation correct iff the multiset of action names
+      competence taught by a task’s own teacher              matches the gold and the merged JSON arguments
+      from that elicited by co-training.                     match exactly. Math: we extract the final answer
+                                                             from \boxed{} (or <answer>) and score by mathe-
+    • Case studies (§ G). Side-by-side base / PT-            matical equality after numeric/symbolic normaliza-
+      teacher / P ROMPT SD traces, including failure         tion (Hendrycks et al., 2021); Fmt checks answer-
+      cases.                                                 tag presence. All task evaluations use greedy
+                                                             decoding via vLLM (Kwon et al., 2023) with
+B     Details of Experiments
+                                                             max_new_tokens set to 1024/1536/2048/16384
+B.1    Datasets                                              for Science/Tool use/Biology/Math, sized to fit
+Table 5 lists the four tasks (§5.1) and their splits.        each task’s full reasoning trace.
+Each task has its own train/val/test split: soft             General-capability (utility). MMLU-Pro and
+prompts (Phase A) and on-policy rollouts (Phase B)           HellaSwag are scored by multiple-choice accuracy;
+are drawn from train, val drives early stopping,             TruthfulQA-MC1 uses accuracy with the answer
+and all reported numbers are on test (evaluated on           options shuffled per example (the released order
+n=300/97/50/100 items for Science/Tool use/Bi-               always places the correct option first, which
+ology/Math). The three general-capability bench-             otherwise rewards positional bias). For Qwen3-
+marks used for the retention analysis (Table 2) are          1.7B-Base model, all three are evaluated 5-shot.
+500-item subsets of MMLU-Pro and HellaSwag                   Teacher–student overlap. For the transfer anal-
+and the full TruthfulQA-MC1 (817 items), all eval-           ysis we use the top-k next-token overlap ρ (§3.1):
+uated 5-shot since the non-instruction-tuned base            the mean over teacher-forced validation positions
+cannot follow the multiple-choice format zero-shot.          of |Tk ∩ Sk |/k between the teacher’s and student’s
+Reasoning-target annotation. The Science and                 top-k next-token sets (k=10). ∆ρ = ρ(S) − ρ(0)
+Math training targets carry genuine step-by-step             measures how far the student moves toward the
+reasoning natively (per-option rationales and long-          teacher over training.
+form solutions, respectively). The original Biol-
+                                                                1
+ogy and Tool-use targets do not: Biology supplies                   https://huggingface.co/Qwen/Qwen3-235B-A22B
+
+
+                                                        12
+Table 5: Tasks and split sizes. Science/Math targets contain native step-by-step reasoning; Biology and Tool-use
+targets are annotated with reasoning (text below).
+             Task       Source / format                                                            Train   Val    Test
+             Science    4-way MCQ, <reasoning>/<answer>                                            2,474   200    507
+             Tool use   ReAct tool calling, Gorilla toolset (Patil et al., 2024)                   3,846   200    97
+             Biology    SciKnowEval Biology 4-MCQ (Feng et al., 2024)                               405     45     50
+             Math       LIMO solutions (train) / MATH-500 test (Hendrycks et al., 2021)             800     13    500
+
+Table 6: Per-task hyperparameters. Phase A trains the                 Table 7: Per-refresh task-sampling ratio of the multi-
+soft-prompt teacher; Phase B is on-policy distillation of             task student on each backbone.
+the student.
+                                                                       Backbone              Science   Tool use   Biology   Math
+             Prompt       Phase A                Phase B
+  Task         L          (lr, steps)     (lr, steps, max_new)         Qwen3-1.7B-Base         1           1        2       0.5
+                                                                       Phi-4-mini-instruct     1           1        1       0.5
+  Science      400      5×10−3 , 2000     1×10−5 , 600, 1024
+  Tool use     800      5×10−3 , 2000     1×10−5 , 600, 768           on the frozen base to convergence (Table 6), and
+  Biology      800      5×10−3 , 2000     2×10−5 , 1000, 640
+  Math         400      5×10−3 , 2000     1×10−5 , 600, 4096          Phase B performs on-policy distillation against
+                                                                      these frozen teachers. Within Phase B only the on-
+                                                                      policy rollout buffer is regenerated (every 64 stu-
+B.3      Implementation
+                                                                      dent steps); the soft prompts Pk⋆ are not re-adapted
+Hardware and software. Each run uses a sin-                           to the updating student, and no EMA is used. At
+gle NVIDIA A100 (40 GB), L40S (48 GB), or                             inference the soft prompts are discarded and only
+H100 (80 GB) GPU. Training uses PyTorch with                          πθ is deployed.
+HuggingFace Transformers; the on-policy rollout                       Multi-task routing. The merged corpus (Eq. 9)
+buffer is generated with vLLM (Kwon et al., 2023)                     is routed at the sample level: each rollout refresh
+(bf16, eager mode). Optimization uses AdamW                           draws a fixed number of prompts per task (a base
+(no weight decay) with a cosine schedule and 3%                       of 32 by default), rolls them out from the current
+warm-up, and gradient clipping at 1.0 (0.3 for the                    student, and supervises each against its own frozen
+higher-LR multi-task runs). Gradient checkpoint-                      soft-prompt teacher πθ+Pk⋆ . The per-refresh sam-
+ing is on throughout, and during each rollout re-                     pling ratios for the reported multi-task students
+fresh the optimizer state is offloaded to CPU to                      are given in Table 7, expressed relative to this 32-
+free memory for vLLM; the Phi-4-mini full-fine-                       rollout base. On both backbones we down-weight
+tuning student requires the 80 GB H100 (its 3.8 B                     the Math teacher to 0.5×: Math reasoning traces
+optimizer state does not fit on 40–48 GB cards).                      are substantially longer than those of the other three
+Hyperparameters. Soft prompts are initialized                         tasks, so sampling Math at the base rate inflates per-
+by tiling the task-description tokens (no random                      refresh compute and crowds out the gradient signal
+padding), trained with the backbone frozen, and                       from Science, Tool use, and Biology within the
+selected by validation loss; the on-policy buffer                     same student step budget. Halving the Math rollout
+is refreshed every 64 student steps with a reverse-                   count restores a roughly balanced per-task token
+KL objective and an entropy bonus of 0.02 (0.01                       budget without removing the Math teacher from the
+for Science/Math). Table 6 gives the per-task set-                    routing mix. On Qwen3-1.7B-Base we additionally
+tings: defaults follow §5, and we tune the soft-                      up-weight Biology to 2×, since it is the smallest
+prompt width L and the Phase-B learning rate /                        split (n=50 test) and the most knowledge-dense;
+step count on validation—knowledge-heavy Biol-                        on Phi-4-mini-instruct, Biology’s zero-shot base-
+ogy and the structured Tool-use task benefit from a                   line is already lower (22.0 vs. 32.0 on Qwen3), and
+wider prompt (L=800), and Biology from a higher                       we observed no benefit from up-weighting on the
+Phase-B learning rate. The multi-task P ROMPT SD                      validation split, so we leave it at 1×. These ratios
+trains for 2400 steps at learning rate 3×10−5 , with                  were fixed before the final main-table runs based on
+Biology up-weighted 2× in the routing mix.                            a small grid on the validation splits (Appendix F).
+                                                                      The K soft prompts are fully independent (L × d
+B.4      Details of P ROMPT SD                                        parameters each, with no shared dimensions).
+Two-phase instantiation (frozen teacher). Our                         Task composition of P ROMPT SD. The reported
+experiments use a two-phase protocol with a frozen                    P ROMPT SD trains four task-specific soft-prompt
+teacher: Phase A trains the soft-prompt teacher(s)                    teachers (Science, Tool use, Biology, Math) in par-
+
+                                                                 13
+allel and routes the merged corpus among them                  Table 8: Trainable-parameter footprint of same-size
+with the ratios in Table 7. At inference all four soft         teachers (Qwen3-1.7B backbone).
+prompts are discarded, and only πθ is deployed.                  Teacher              Trainable params        % of backbone
+                                                                 PT (L=400)                        0.82M                 0.048
+C    Efficiency Discussion                                       PT (L=800)                        1.64M                 0.095
+                                                                 LoRA (r=16)                        6.4M                 0.373
+Trainable parameters. The soft-prompt teacher                    FFT                               1.72B                   100
+trains only the L × d prefix embeddings (d=2048
+for Qwen3-1.7B), making PT one to two orders                   Table 9: Single-task OPD-PT accuracy over 3 seeds
+                                                               (mean±std).
+of magnitude smaller than the other same-size
+teachers (Table 8): 0.05–0.10% of the backbone                  Backbone              Science    Tool use   Biology     Math
+
+at L ∈ {400, 800}, versus 0.37% for LoRA (r=16                  Qwen3-1.7B-Base       51.3±0.9   49.8±3.9   56.7±4.2   50.7±2.3
+                                                                Phi-4-mini-instruct   45.5±2.0   51.4±1.1   40.3±3.1    59.5±2.1
+on {q, k, v, o}) and 100% for FFT—about 4–8×
+fewer parameters than LoRA and ∼ 103 × fewer
+than FFT.                                                      r=16 adapters and ≈ 6.9B for K=4 FFT copies.
+Teacher conditioning cost. The teacher families                This linear-in-K, near-zero-overhead footprint is
+differ in how much context each teacher forward                what makes the parallel multi-task routing (§4.3)
+must process per instance. PT prepends a fixed                 practical, even though all prompts are discarded at
+L-token soft prefix (L=400), independent of the                student inference.
+instance, so its teacher input is L + |x|. GT is the
+most token-frugal—it appends only the gold an-
+swer (we strip the gold rationale), |x| + |yans | with         D    Statistical Significance Analysis
+|yans | ≈ 5—but pays the post-hoc-rationalization
+cost (§E). The costly families are demonstration-              Multi-seed. Table 9 reports single-task OPD-PT
+and rollout-based: ICL/SDFT-Demo process |x| +                 over three random seeds on both backbones. Run-
+3 |exemplar| (∼ 1.5–2K tokens) and SDPO pro-                   to-run variance is small on the structured Science
+cesses |x| + |trajectory|, both growing with ex-               and Tool-use tasks (std ≤ 2 on Phi-4-mini, ≤ 4
+ample length and becoming impractical on long-                 on Qwen3-1.7B) and larger on the n=50 Biology
+context tasks—on Math (mean |y| ≈ 7.2K tokens)                 split and the high-variance Math task; the single-
+ICL demonstrations must be length-trimmed to fit               seed numbers reported in the main tables lie within
+the window, whereas PT’s prefix stays at a con-                one standard deviation of these means. (Phi-4-mini
+stant 400. PT thus bounds the per-instance teacher             Math is low and unstable—the PT-math distillation
+context independently of task length, avoiding the             transfers poorly to this backbone, which we note
+ICL/SDPO blow-up without GT’s answer leakage.                  as a limitation rather than smooth over.)
+Training and inference cost. The soft prompt is                Paired bootstrap and confidence intervals. To
+discarded after training, so the deployed student is           test whether the headline gaps survive on the small
+exactly the base architecture—no added parame-                 test splits, we compare P ROMPT SD (OPD-PT)
+ters, prefix, or latency. Cross-size distillation like-        against the strongest SFT teacher (OPD-FFT) by
+wise discards the teacher at inference, but during             a paired bootstrap over test examples (5000 re-
+training it must host and run forward passes on                samples) on Qwen3-1.7B. On Biology (n=50),
+a 2–5× larger model (Qwen3-4B/8B) for every                    P ROMPT SD reaches 60.0 (95% CI [46, 74]) ver-
+rollout-time logit computation; PT keeps all for-              sus 38.0 for OPD-FFT and exceeds it in 99% of
+ward passes at base scale throughout. (Trainable-              resamples (p ≈ 0.01)—a significant advantage
+parameter count does not by itself imply faster wall-          despite the small split, consistent with the SFT-
+clock: PT still runs a full-model forward for the              trap mechanism (§5). On Tool use the two are
+frozen backbone, so its training time is comparable            statistically indistinguishable (overlapping 95%
+to LoRA/FFT—its savings are in parameters and                  CIs; P (P ROMPT SD>FFT)=0.08), i.e. no same-
+storage, below.)                                               size teacher dominates that task. Together with the
+Multi-teacher P    storage. For K tasks, PT stor-              small Science/Tool-use seed variance, this indicates
+age scales as         k Lk d: the four teachers in             that P ROMPT SD’s advantages are driven by gen-
+P ROMPT SD total ≈ 4.9M parameters (L ∈                        uine, repeatable differences—most decisively on
+{400, 800}), versus ≈ 25.6M for K=4 LoRA-                      Biology—rather than by seed or test-set sampling.
+
+                                                          14
+Table 10: Counterfactual answer-swap follow-rate (%): fraction of teacher generations whose final answer matches
+an injected wrong reference answer. Higher = more post-hoc rationalization (D3 violation). Chance baseline is
+(1−a)/(C−1) with a the teacher’s task accuracy.
+
+                                                          Science                      Biology
+              Teacher                            Follow-rate        Chance      Follow-rate      Chance
+
+              GT (gold in context)                 59.1              13.3         62.5           14.0
+              PT (soft prompt; no answer slot)     15.9              15.8         12.5           14.0
+
+
+E    Analysis of Post-hoc Rationalization                     ence +2.0, Math +0.3, both substantially below
+                                                              PT’s +9.9 and +8.1): the gold-conditioned signal
+Desideratum D3 (§3.1) requires that the teacher not           is both unhelpful (little new knowledge transferred)
+condition on the gold answer: a gold-conditioned              and structurally biased—the teacher’s per-token
+teacher justifies a predetermined answer rather than          distribution reflects backward chaining from ygold ,
+deriving it, and the student—which has no answer              which the student inherits via reverse-KL despite
+at inference—inherits this backward-chained pat-              never seeing ygold at inference. Appendix G shows
+tern through reverse-KL on per-token teacher dis-             representative traces in which the GT teacher visi-
+tributions. We make D3 operational with a coun-               bly back-chains to the injected answer (e.g., gener-
+terfactual answer-swap probe.                                 ating “option A is correct because [. . . ]; this rules
+Probe. For each evaluation instance (x, ygold ) we            out B, C, D” when ygold =“C” has been swapped to
+replace the gold answer in the teacher’s context              ỹ=“A”).
+with a randomly chosen wrong answer ỹ ̸= ygold , let         Coverage. The D3 failure mode is, by the anal-
+the teacher generate a full trace under greedy de-            ysis in §3.1, most acute when ygold is a short fi-
+coding, and measure the follow-rate: the fraction of          nal answer with no intermediate trace—the canoni-
+cases whose generated answer equals the injected ỹ.          cal case being mathematical reasoning, where the
+A teacher who derives their answer should largely             teacher must fabricate a derivation landing on the
+ignore the injection; a teacher that rationalizes will        predetermined numerical answer. Probing Math
+reproduce it. The PT teacher has no answer slot in            under the same protocol requires a distractor dis-
+its input and therefore cannot be steered. its follow-        tribution over plausible wrong numerical answers
+rate is expected to coincide with the chance-level            (rather than the discrete option sets used here) and
+baseline (1−a)/(C−1), where a is the teacher’s                a matcher robust to equivalent numerical forms; we
+task accuracy and C is the number of answer op-               leave this to future work and note it as the most
+tions. We run the probe on Science (4-way MCQ,                important extension of the probe.
+n=44) and Biology (discrete-answer subset of Sci-
+KnowEval with verified distractors, n=40); answer             F   PT teacher vs. multi-task exposure
+matching is exact string match after normalization.
+Results. Table 10 shows a ∼ 4–5× gap between                  A natural concern with P ROMPT SD is whether
+gold-conditioned and prompt-tuned teachers. On                each trained-task gain comes from that task’s PT
+Science, the PT teacher’s 15.9% follow-rate is sta-           teacher or merely from co-training on the merged
+tistically indistinguishable from the chance base-            corpus. We isolate this with a leave-one-teacher-
+line (1−0.527)/3 ≈ 15.8% implied by its task ac-              out ablation on Qwen3-1.7B-Base: for one task at a
+curacy a=52.7%: PT exhibits no steering by the                time we remove both its soft-prompt teacher and its
+injected wrong answer. The GT teacher’s 59.1%,                training data, train on the remaining three, and eval-
+by contrast, exceeds the analogous chance baseline            uate the held-out task—so any non-trivial accuracy
+by ∼ 46 pp—a direct quantitative magnitude of                 must come from cross-task exposure alone.
+rationalization above the random-error floor. The             Only math is elicited. Table 11 shows a sharp split
+Biology pattern is identical at the proportions re-           between tasks where the dedicated PT teacher is the
+ported.                                                       dominant contributor and tasks where it is not. Re-
+Interpretation. This is direct evidence that PT sat-          moving the Science, Tool-use, or Biology teacher
+isfies D3 by construction while observation-based             drops that task by 20–41 pp—Tool use collapses
+teachers violate it. It complements the small ∆ρ              exactly to its zero-shot base (7.2), and Science and
+of GT teachers in the main results (Table 1: Sci-             Biology fall to roughly 2–5 pp above base. These
+
+                                                         15
+Table 11: Leave-one-teacher-out on Qwen3-1.7B-Base.                     flagging: a deployment that cares about a single
+For each row the held-out task’s teacher and data are                   capability-injection task is better served by single-
+removed; “cross-task only” is the held-out accuracy
+                                                                        task OPD-PT than by P ROMPT SD.
+reached by training on the other three tasks alone.
+  Held-out task   Cross-task only   P ROMPT SD   OPD (PT)   Base        G    Case Study
+  Science              34.3            55.3        51.0     29.3
+  Tool use              7.2            48.4        51.5      7.2        We ground the analysis on a single representative
+  Biology              34.0            54.0        62.0     32.0
+  Math                 61.0            67.2        51.0     16.4        Science item—a molecular logD multiple-choice
+                                                                        question (gold answer D)—tracing it through the
+                                                                        base model before and after P ROMPT SD training,
+knowledge/format tasks are carried by their own
+                                                                        and through the two teachers that explain the dif-
+PT teacher and are not recoverable from the oth-
+                                                                        ference.
+ers. Math is the lone exception—with no math
+teacher and no math data the student still reaches
+61.0, far above the base (16.4), above the dedi-
+cated single-task math PromptSD (51.0, Table 1),
+and only 6.2 pp below the full P ROMPT SD (67.2).
+Math is also the only row in which “cross-task only”
+beats single-task PT—a sign that for this task the
+dedicated math teacher is not just dispensable but
+actively limiting. Math behaves as a latent pretrain-
+ing capability that on-policy co-training on other
+reasoning tasks surfaces, rather than a skill that
+must be distilled.
+Quantifying per-teacher contribution. Read-
+ing the gap between “cross-task only” and the
+full P ROMPT SD column directly attributes each
+teacher’s marginal value within the multi-task stu-
+dent: Science teacher +21.0 pp, Tool-use teacher
++41.2 pp, Biology teacher +20.0 pp, math teacher
++6.2 pp. The math teacher’s contribution is an
+order of magnitude smaller than the others. A soft-
+prompt math teacher on a 1.7B base is itself a lim-
+ited mathematician (Math accuracy 48.6, Table 1),
+and on-policy distillation toward it adds only a
+small residual on top of what cross-task elicitation
+already provides. The teacher’s distribution acts
+as a soft anchor, not a hard prerequisite. This is
+why the reported P ROMPT SD down-weights math
+to 0.5× (Table 7) rather than emphasizing it: we
+keep the math teacher in the routing mix for the
+residual it contributes, but do not credit it as the
+primary mechanism behind the 67.2 Math score.
+Multi-task interference on knowledge/format
+tasks. A side observation from the fourth col-
+umn: on Science, Tool use, and Biology, the dedi-
+cated single-task PT student is higher than the full
+P ROMPT SD (51.0>55.3 fails, but 51.5>48.4 on
+Tool use and 62.0>54.0 on Biology hold). Multi-
+task routing buys an average improvement and an
+elicited Math boost at the cost of small per-task
+regressions on the capability-injection tasks—an
+accepted trade-off in our setting, but one worth
+
+                                                                   16
+Question ( Science / molecular - property MCQ ) :
+
+What is the correct octanol / water distribution coefficient logD
+under the circumstance of pH 7.4 for the molecule
+" COc1cc2ncnc ( Nc3cccc ( Cl ) c3F ) c2cc1CN1C [ C@H ]( OC ) C [ C@@H ]1 C ( N ) = O " ?
+
+  A: 3.2          B : 2.3        C : -0.51         D : 3.09     ( gold )
+
+Output format required :
+< reasoning > ... </ reasoning >
+< answer > X </ answer >    ( X in {A ,B ,C , D })
+
+
+
+G.1      Before vs. after training
+Before training, the base model fails the task outright: it emits a degenerate, off-language fragment,
+produces no <reasoning>/<answer> structure, and lands on the most hydrophilic (and incorrect) option.
+After P ROMPT SD training, the same backbone—now πθ , with no soft prompt and no answer in context—
+produces a well-formed, structure-grounded derivation: it reasons about the chlorine, fluorine, and the
+nitrogen heterocycle, considers the ionization state at pH 7.4, explicitly rules out the hydrophilic distractor
+(−0.51), and commits to the correct answer D. The gain is not memorized formatting: it is a genuine
+chain of reasoning the base model could not previously externalize.
+Base model , BEFORE training . No < answer > tag ; degenerate ( names C , wrong ; gold D )
+
+[ verbatim output ] " Answer : C : -0.51"
+
+
+Student \ method * ( ours ) , AFTER training . Generated answer : D                   ( correct )
+
+< reasoning >
+The octanol / water distribution coefficient , logD , is a measure of how a
+compound distributes itself between octanol and water , taking into account
+its ionization state at a given pH . The molecule in question is a complex
+organic compound with multiple functional groups , including a chlorine
+atom , a fluorine atom , and a nitrogen - containing heterocycle . At pH 7.4 ,
+which is close to physiological pH , the ionizable groups in the molecule
+will be in their neutral form , affecting the logD value . The presence of
+chlorine and fluorine atoms , which are generally hydrophobic , will
+contribute to a higher logD value , while the nitrogen - containing
+heterocycle may have some ionizable groups that could slightly affect the
+logD . Given the options , a logD value of 3.2 or 3.09 seems plausible , as
+these values are typical for moderately hydrophobic compounds with
+ionizable groups . The value of -0.51 suggests a more hydrophilic
+compound , which is less likely given the presence of hydrophobic groups .
+Therefore , the most reasonable choice is 3.09.
+</ reasoning >
+< answer >
+D
+</ answer >
+
+
+
+
+                                                                           17
+

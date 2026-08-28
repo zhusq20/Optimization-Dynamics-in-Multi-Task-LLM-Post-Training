@@ -1,0 +1,711 @@
+                                          Demystifying On-Policy Distillation: Roles, Pathologies, and Regulations
+
+                                                             Rui Wang† , Hongru Wang† , Yi Chen, Boyang Xue†
+                                                              Tianqing Fang‡* , Wenhao Yu‡ , Kam-Fai Wong†*
+                                                           †
+                                                             The Chinese University of Hong Kong ‡ Tencent AI Lab
+                                                  ruiwangnlp@outlook.com fangtq229@gmail.com kfwong@cuhk.edu.hk
+
+
+
+                                                                                                      Not a Ceiling Breaker        Stronger Better   Length Exploitation
+                                                               Abstract                                                            Teacher
+                                                                                                                                   Student             Length
+                                                                                                                                                       Adv.
+                                             On-policy distillation (OPD) has become a key
+                                                                                                  pass@k
+                                             paradigm in LLM post-training, yet its train-
+                                                                                                                           Score
+                                             ing dynamics remain poorly understood. We
+                                             present a systematic study examining the role,                         Base
+                                             pathologies, and regulations of OPD. We first                          OPD
+                                             clarify the role of OPD as an exploration cat-                     k                                           Steps
+                                             alyst: it steers the student toward correct rea-      Figure 1: Left: OPD accelerates exploration but cannot
+
+
+
+
+arXiv:2607.13399v1 [cs.CL] 15 Jul 2026
+                                             soning paths via dense token-level guidance,          exceed the model ceiling. Middle: a stronger teacher
+                                             without expanding capability ceiling. We con-         does not guarantee a better student. Right: advantage
+                                             firm this by showing that prompt diversity mat-       rises while length explodes or crashes.
+                                             ters more than per-problem sampling numbers,
+                                                                                                   ness (Gu et al., 2026; Yang et al., 2025; DeepSeek-
+                                             and critically, that the effectiveness of OPD
+                                             hinges entirely on the quality of its guiding sig-    AI, 2026). Despite its growing adoption, the fun-
+                                             nal. This dependency exposes two pathologies          damental training dynamics of OPD remain poorly
+                                             that derail exploration. The Student-Teacher          understood. Practitioners often observe highly in-
+                                             Mismatch occurs when a large teacher-student          consistent behaviors: OPD sometimes improves
+                                             distributional gap causes the guiding signal to       performance (Lu and Lab, 2025), yet in other cases
+                                             misalign with task correctness, steering explo-       becomes unstable (Luo et al., 2026; Zhu et al.,
+                                             ration in counterproductive directions. Length        2026), collapses exploration, even underperforms
+                                             Exploitation arises when the aggregated token-
+                                                                                                   outcome-based reinforcement learning (Li et al.,
+                                             level objective creates length-dependent short-
+                                             cuts, allowing the student to game the reward         2026a). This raises our systematic empirical study,
+                                             landscape through response truncation or re-          we aim to (1) explore what benefits OPD brings
+                                             dundant padding, exploring degenerate length          (Role§ 3), (2) when OPD fails (Pathologies§ 4),
+                                             modes rather than reasoning strategies. To tame       and (3) how to improve it from the previous find-
+                                             these pathologies, we investigate lightweight         ings (Regulations§ 5).
+                                             signal regulations: advantage clipping and            Role OPD simultaneously embodies two distinct
+                                             log-scale compression, ensuring exploration is
+                                             guided by faithful signals. Experiments across
+                                                                                                   features: it is formulated as knowledge distilla-
+                                             seven benchmarks demonstrate that these regu-         tion (Gu et al., 2026), yet operates like an on-
+                                             lations eliminate length exploitation and enable      policy RL algorithm driven by dense token-level
+                                             effective distillation, stably surpassing naive       rewards (Yang et al., 2026a). This dual nature mo-
+                                             OPD and RLVR baselines, thereby confirming            tivates us to investigate whether OPD acts as a
+                                             that well-regulated signal quality, rather than       standard distillation mechanism that expands the
+                                             mere teacher scale, governs successful explo-         student’s capability boundary (Hinton et al., 2015),
+                                             ration in OPD.
+                                                                                                   or as an RL framework that merely reshapes trajec-
+                                                                                                   tories within the base model’s existing capability
+                                         1   Introduction
+                                                                                                   space (Chen et al., 2024; Yue et al., 2025). Our
+                                         On-policy distillation (OPD) has rapidly become a         empirical evaluations strongly support the latter
+                                         standard component of modern LLM post-training            RL-centric view. We find that while OPD consis-
+                                         pipelines. By providing token-level supervision           tently accelerates early-stage learning, it rarely al-
+                                         from a stronger teacher over the student’s own roll-      ters the asymptotic performance ceiling achievable
+                                         outs, OPD has demonstrated remarkable effective-          by the base student. This acceleration stems from
+                                                            Paper Overview
+              What does OPD do?                              When does it fail?                              How to fix it?
+
+
+    Role (§3)                                       Pathologies (§4)                             Regulations (§5)
+                                              →                                           →
+    Exploration Catalyst                      but   Signal Misalignment → Collapse         fix   Signal Quality > Teacher Scale
+    • Dense Token-Level Guidance                    • Student-Teacher Mismatch                   • Hard: ãt =clip(∆ℓt , cmin , cmax )
+    • Not a Capacity Expander                       • Endless Exploration                        • Soft: ãt =sgn(∆ℓt )·log(1+|∆ℓt |)
+    • Prompt Diversity Elevates Exploration         • Abrupt Degeneration
+
+
+Figure 2: Overview. We characterize OPD’s role as an exploration catalyst (§3), diagnose pathologies (§4), and
+propose lightweight signal regulations that restore stability without additional compute (§5).
+
+the dense, token-level guidance provided along                          but require additional computation. We investigate
+student-generated trajectories, which effectively                       two token-level regulation strategies designed to
+helps the student discover correct reasoning paths                      suppress pathological incentives while preserving
+already reachable within its inherent capability                        useful exploration guidance: Hard Clipping and
+bounds. Furthermore, under a fixed computational                        Soft Log-scale Compression. Across seven reason-
+budget, scaling problem diversity (prompt cover-                        ing benchmarks, these interventions consistently
+age) yields significantly higher accuracy than scal-                    stabilize training, eliminate previous pathologies,
+ing per-problem sampling depth. Together, these                         and substantially outperform naive OPD, RLVR,
+findings demonstrate that OPD functions primar-                         and prior OPD variants (Jin et al., 2026). Notably,
+ily as an exploration catalyst that reshapes the tra-                   our regulated framework with a modest teacher de-
+jectory distribution, rather than a mechanism for                       cisively surpasses state-of-the-art methods relying
+fundamental capability expansion.                                       on a massive 30B teacher (Yang et al., 2026a; Hou
+Pathologies Viewing OPD as an exploration                               et al., 2026), demonstrating that the quality of the
+guidance mechanism immediately uncovers a crit-                         optimization signal ultimately governs distillation
+ical dependency: its effectiveness relies entirely                      success over brute-force teacher scaling. Overall,
+on the fidelity of the guidance signal itself. While                    this work makes three contributions:
+faithful teacher preferences steer the student toward                   • We empirically frame OPD as an exploration
+correct trajectories, distorted signals inevitably bias                   guidance rather than a capability expander.
+exploration toward degenerate behaviors. Our anal-                      • We pinpoint guidance corruption, specifically dis-
+ysis reveals two major sources of such guidance                           tribution mismatch and length exploitation, as the
+corruption, as shown in Figure 1.                                         root cause of OPD failures.
+                                                                        • We demonstrate that signal regulations effec-
+• Student-Teacher Mismatch: When a severe
+                                                                          tively improve OPD stability and effectiveness
+  capability gap exists between the teacher and
+                                                                          across diverse reasoning tasks.
+  the student, the teacher’s preference allocations
+  on student-generated trajectories decouple from
+  actual quality, generating misleading guidance.                        2        Preliminaries
+  This is rooted not in the teacher’s absolute                           2.1       On-Policy Distillation (OPD)
+  strength, but in the mismatch between teacher
+  preferences and the student’s rollout distribution.                    Let x denote a prompt and y = (y1 , . . . , yT )
+• Length Exploitation: Because token-level sig-                          a response over vocabulary V. We consider a
+  nals are aggregated over sequences of varying                                    QTπT and a trainable student πθ , with
+                                                                         fixed teacher
+  lengths, the standard optimization objective inad-                     π(y|x) = t=1 π(yt |y<t , x).
+  vertently admits degenerate shortcuts. The stu-                        Objective OPD trains the student to minimize
+  dent exploits this via either Endless Exploration                      the reverse KL divergence from student to teacher:
+  (filler tokens to dilute negative advantages), or                                                                         
+  Abrupt Degeneration (premature truncation for                                                                     πT (y|x)
+                                                                             LOPD (θ) = KL[πθ ∥πT ] = −Ex, y∼πθ log            .
+                                                                                                                    πθ (y|x)
+  high aggregated advantage).                                                                                                  (1)
+Regulations We further explore how to eliminate                          Because the expectation is taken over the student’s
+these pathologies. Intuitive methods include cold-                       own samples, the signal is evaluated on sequences
+start teacher-student alignment finetuning (Luo                          the student actually generates, avoiding the distribu-
+et al., 2026; Li et al., 2026a), which are effective                     tional mismatch inherent in off-policy distillation.
+Per-token advantage Expanding the sequence-
+level KL token-by-token yields per-token log-ratio:
+                     πT (yt | y<t , x)
+         ∆ℓt ≜ log                     ,   y ∼ πθ (· | x).    (2)
+                     πθ (yt | y<t , x)
+Intuitively, ∆ℓt > 0 indicates the teacher assigns
+higher probability to token yt than the student, pro-
+viding a positive learning signal; ∆ℓt < 0 indicates
+the student over-weights yt relative to the teacher.
+Policy optimization OPD is implemented via
+policy gradient with ∆ℓt as the per-token advan-                     Figure 3: Pass@k performance of Qwen3-1.7B-Base
+tage. We apply clipping (Schulman et al., 2017) on                   trained via different methods. OPD variants outperform
+the importance ratio to stabilize updates:                           Base and GRPO models in low-k. However, the conver-
+                                                                     gence at higher k suggests OPD accelerates exploration
+    Lclip (θ) = −Et [min(rt ãt , clip(rt , 1−ϵ, 1+ϵ) ãt )] , (3)   rather than raising the model’s performance ceiling.
+where rt = πθ (yt | y<t , x) / πθold (yt | y<t , x) is
+the importance ratio and ãt is a regulated form of                  et al., 2026), and on-policy RL with dense token-
+∆ℓt . This ratio clipping constrains how far the pol-                level rewards (Yang et al., 2026a). While standard
+icy moves per update but does not alter the reward                   distillation intuition suggests that the teacher trans-
+landscape defined by the teacher signal.                             fers superior intelligence to expand the student’s
+                                                                     capability boundary, RL primarily reshapes trajec-
+2.2     Empirical Framework and Setup                                tories within the latent capability space already
+In this section, we establish the experiment bases                   encoded in the base model (Chen et al., 2024; Yue
+for our study. To ensure a systematic investigation                  et al., 2025). Under large sampling budgets (k),
+and the reproducibility of our findings, we strictly                 the performance of RL-trained models often con-
+adhere to the experimental configurations described                  verges to that of their unaligned base counterparts
+below across subsequent training and evaluation.                     via brute-force test-time sampling (Yue et al., 2025).
+                                                                     This capability convergence motivates a fundamen-
+Training Configuration Our empirical analysis                        tal question for OPD: Does OPD fundamentally el-
+uses Qwen3-1.7B-Base as the student and Qwen3-                       evate the inherent capability ceiling of the student,
+series post-trained models of varying scales as                      akin to distillation, or does it accelerate early-stage
+teachers. To isolate true distillation gains from                    exploration efficiency, much like RL?
+mere thinking-mode shifts, we enforce a strict                          To disentangle these two possibilities, we sys-
+non-thinking constraint by prefixing all rollouts                    tematically analyze the performance convergence
+with a block. This simultaneously ensures an                         trajectories of student models trained via OPD and
+aligned prompt format between models (Li et al.,                     RLVR across varying teacher configurations and
+2026a). Trained on the Nemotron-Cascade Math                         evaluation sampling size k. We set the Qwen3-
+dataset (Wang et al., 2026), we compare models                       1.7B-Base as the student, and Qwen3-4B-instruct-
+optimized via GRPO (Shao et al., 2024; Yu et al.,                    2507, Qwen3-{4B,8B,32B} and GRPO trained
+2025) and OPD (Gu et al., 2026).                                     Qwen3-4B as the teachers. Then we test the
+Evaluation To provide a robust and statistically                     pass@1024 of tuned models to explore their per-
+sound assessment, we employ the avg@32 met-                          formance ceilings.
+ric for AMC23 (MAA, 2026b), AIME 2024–                               Efficient Exploration rather than Ceiling
+2026 (MAA, 2026a), and HMMT25 Feb (Dekon-                            Breaker As shown in Figure 3, OPD variants
+inck et al., 2026), while reporting standard pass@1                  provide a distinct boost in the low-sample regime
+for MATH500 (Hendrycks et al., 2021) and Min-                        (k ≤ 64). However, in the high-sample regime,
+erva (Lewkowycz et al., 2022) following previous                     this performance gap narrows. The base model
+works (Jin et al., 2026).                                            eventually converges to the level of the GRPO and
+                                                                     OPD-trained models, indicating that OPD, just like
+3     Exploring the Role of OPD
+                                                                     RLVR, does not fundamentally inject entirely new
+Conceptually, OPD operates at the intersection of                    capabilities (Yue et al., 2025). Instead, it acts as an
+knowledge distillation (Hinton et al., 2015; Gu                      exploration catalyst that re-weights the student’s in-
+                                MATH-500                     AIME 2025                 Informativeness
+                                                                                .05
+                                                  .15
+                     .60
+                                                                                  0
+
+          Accuracy
+                                                  .10
+                     .50
+                                                                                .05
+                                                  .05
+                     .40
+                                                                                .10
+                                                   0
+                           0   250 500 750 1.0k         0   250 500 750 1.0k          0 250 500 750 1.0k
+                                 Qwen3-4B-GRPO      Qwen3-1.7B-GRPO         Qwen3-4B        Qwen3-1.7B
+
+Figure 4: Weak teacher outperforms strong teacher in OPD w/ Clip. Benchmark accuracy (first two panels) and
+informativeness I on the validation set for OPD w/ Clip runs distilling from four teachers with varying capabilities
+into the same Qwen3-1.7B-Base student.
+
+herent generative space, ensuring optimal solutions              anism breaks down, leading to the stagnation or
+are surfaced within the first few attempts.                      collapse of student performance.
+   This characterization highlights a critical vulner-              First, a Student-Teacher Mismatch (§4.1): we
+ability: If the teacher’s guidance is misaligned or              challenge the stronger-is-better dogma by showing
+the objective function contains structural flaws, this           that a significant distributional gap between teacher
+catalytic effect will instead accelerate the student’s           and student can turn the distillation signal into
+convergence toward degenerate or sub-optimal so-                 counter-productive noise. Second, a Length Ex-
+lutions. We dissect these specific pathologies in the            ploitation (§4.2): the cumulative nature of token-
+following section.                                               level advantages creates length-dependent short-
+Prompt Diversity v.s. Rollout Sizes Our pre-                     cuts that allow the student to leverage the objective
+vious analysis establishes that OPD benefits the                 without genuine reasoning improvements.
+student primarily through high-density guidance
+across diverse problem spaces. This motivates a                  4.1   Student-Teacher Mismatch
+critical resource-allocation question: Under a fixed             A common intuition in knowledge distillation is
+computational budget, should we prioritize prob-                 that a more capable teacher yields a superior stu-
+lem coverage (more distinct prompts) or rollout                  dent. However, our empirical results challenge this
+depth (more rollouts per prompt)?                                assumption, revealing a complex trade-off between
+   To investigate this, we evaluate n=1 (B distinct              standalone capability and distributional alignment.
+prompts with 1 rollout each) against n=2 and n=8                 Setup We continue to employ Qwen3-1.7B-Base
+configurations under identical total compute. As                 as the student. To evaluate the student’s sensitiv-
+illustrated in Figure 5, the n=1 setup consistently              ity to varying teacher expertise, we select teachers
+achieves superior final accuracy. This confirms that             across a controlled spectrum of capabilities (Ta-
+OPD’s exploration benefits scale primarily with                  ble 1): Qwen3-{1.7B, 4B}-GRPO, and Qwen3-
+problem diversity rather than per-problem sam-                   {1.7B, 4B}. The capability order of teachers
+pling depth. Consequently, we adopt the n = 1                    is: Qwen3-4B-GRPO > Qwen3-1.7B-GRPO >
+configuration across all subsequent experiments to               Qwen3-4B > Qwen3-1.7B.
+maximize distillation efficiency.
+                                                                 Early Efficiency is Deceptive As shown in the
+    Finding 1. OPD incentivizes the student’s ex-                MATH-500 results (Figure 4), weaker teachers
+    ploration efficiency, not performance ceilings.              such as Qwen3-1.7B and Qwen3-4B lead to rapid
+                                                                 accuracy gains during the initial training steps. This
+4     Pathologies of On-Policy Distillation                      high initial learning efficiency suggests that teach-
+                                                                 ers with lower performance are more learnable for
+Given that OPD operates by re-weighting the stu-                 a base student. However, this early speed is de-
+dent’s exploration landscape, its efficacy hinges on             ceptive. These models quickly hit a performance
+the fidelity of the reward signal. We identify two               plateau, particularly on challenging benchmarks,
+distinct failure modes where this guidance mech-                 due to their capability boundaries. This observation
+                 50%
+                                              n=1   n=2   n=8         rapid early gains on MATH500 but quickly plateau
+                 40%                                                  on the harder AIME 2025; (2) Misleading (I <
+
+  Accuracy (%)
+                 30%                                                  0): Qwen3-4B-GRPO provides persistently anti-
+                 20%                                                  correlated signals, leading to early accuracy drops
+                                                                      and a low ceiling; and (3) Recovery: Qwen3-1.7B-
+                 10%
+                                                                      GRPO starts negative but recovers past zero, un-
+                  0%                                                  locking a late-stage surge that ultimately outper-
+                       AMC23 AIME24 AIME25 AIME26HMMT'25 Avg
+                                                                      forms all others.
+Figure 5: Avg@32 across varying prompt-to-rollout
+configurations. Under a fixed batch B, we vary the roll-
+                                                                       Finding 2. The effectiveness of OPD depends
+out count n per prompt. Maximizing problem diversity
+consistently outperforms a larger sampling size.                       on whether the teacher can give rewards aligned
+                                                                       with Informativeness I on student’s rollouts,
+implies that initial learning velocity is an unreliable                rather than the teacher’s absolute capability.
+proxy for the final capability ceiling.
+                                                                      4.2   Length Exploitation
+The Failure of the Strongest Teacher The most
+                                                                      While the previous section highlighted how exter-
+striking observation is the failure of the most capa-
+                                                                      nal teacher selection destabilizes training, we now
+ble model in our suite: Qwen3-4B-GRPO. Despite
+                                                                      turn to an intrinsic vulnerability embedded within
+having the highest performance, it is paradoxically
+                                                                      the standard OPD objective itself. The sequence-
+the least effective teacher. As shown across both
+                                                                      level guidance is propagated via the token-level
+benchmarks in Figure 4, the student distilled from
+                                                                      distillation advantage, at = log πT (yt |y<t ) −
+4B-GRPO remains nearly stagnant, with its accu-
+                                                                      log πθ (yt |y<t ). Unlike outcome-based rewards that
+racy on AIME 2025 hovering near 2% throughout
+                                                                      are inherently bounded and strictly tied to final cor-
+the training process.
+                                                                      rectness, at is unconstrained, exhibits high vari-
+   This inversion is a significant anomaly: a 4B RL-
+                                                                      ance, and is fundamentally decoupled from the
+trained model provides significantly worse guid-
+                                                                      actual accuracy of the response.    Since the token-
+ance than its 1.7B counterpart. It suggests that stan-                                           1 P
+                                                                      mean advantage ā = T t at depends on both
+dalone performance does not translate into teaching
+                                                                      the per-token signal and the response length T , the
+quality. Ultimately, 1.7B-GRPO yields the high-
+                                                                      student can exploit this interaction to inflate its ad-
+est final accuracy, outperforming teachers that are
+                                                                      vantage without improving accuracy. We identify
+either easier to learn from or smarter in isolation
+                                                                      two complementary failure modes, illustrated in
+(4B-GRPO). This indicates that the most effective
+                                                                      Figure 6 and Figure 7.
+teacher is not necessarily the one who is easiest to
+mimic or the one with the strongest performance,                      Endless Exploration (Mode A) When a rollout
+but the one whose reasoning paths are both ad-                        yields an incorrect reasoning path, it incurs a se-
+vanced and bridgeable for the student.                                vere overall negative advantage. Crucially, because
+                                                                      standard OPD objectives optimizeP the sequence-
+Diagnosis To explain this paradox, we introduce
+                                                                      averaged advantage ā = T1 Tt=1 at , the stu-
+the Informativeness metric I, which measures
+                                                                      dent discovers a degenerate shortcut to evade this
+whether the teacher’s token-level signal discrimi-
+                                                                      penalty: appending low-information filler tokens to
+nates correct from incorrect student rollouts:
+                                                     
+                                                                      inflate the denominator T . Formally, suppose the
+                 I = Ey∼πθ ∆ℓ | r = 1 − Ey∼πθ ∆ℓ | r = 0 ,      (4)
+                                                                                                           P 0T0 with a
+                                                                      core reasoning block terminates at step
+                            1 P                                       cumulative negative signal Acore = Tt=1      at < 0.
+where ∆ℓ = |y| t (log πT (yt ) − log πθ (yt )) is
+                                                                      By continually generating redundant tokens up to
+the mean per-token log-ratio, r denoting the roll-
+                                                                      a prolonged length T (T ≫ T0 ), the aggregated
+out accuracy. A positive I indicates that the
+                                                                      advantage decomposes as:
+teacher assigns a higher probability to tokens in
+correct rollouts than incorrect ones, providing an                                        Acore   T − T0
+                                                                                   ā =         +        āfiller .       (5)
+outcome accuracy aligned optimization. The right-                                          T        T
+most panel of Figure 4 reveals that informative-                      Eq. (5) reveals a severe structural pathology: By
+ness (I) precisely predicts distillation trajectories,                scaling the sequence length T , the student can
+clustering into three distinct dynamic modes: (1)                     asymptotically suppress the magnitude of its nega-
+Passable (I ≈ 0): Qwen3-1.7B and 4B drive                             tive advantage (limT →∞ ā = 0), effectively wash-
+                                                                                                            0 R G H  $   ( Q G O H V V  ( [ S O R U D W L R Q               0 R G H  %   $ E U X S W  ' H J H Q H U D W L R Q
+                                             $ F F X U D F \                                                        5 H V S R Q V H  / H Q J W K                                              & O L S  5 D W L R                                        . /  $ G Y D Q W D J H
+                                                                                                                                                                                                                                   
+                        
+
+                                                                                                                                                                                                                                        
+                                                                                                 
+                                                                            7 R N H Q V
+                        
+       S D V V # 
+                                                                                                                                                                                                                                            
+                                                                                                                                                                 
+                                                                                                                                                                                                                                            
+                                                                                                                                                                    
+                                                                   6 W H S                                                                       6 W H S                                                         6 W H S                                             6 W H S
+Figure 6: Length exploitation illustration. Advantage increases, while accuracy drops. Teacher→Student: Qwen3-
+4B-GRPO→Qwen3-1.7B (Mode A), and Qwen3-1.7B-GRPO→Qwen3-1.7B-Base (Mode B).
+
+                                                               lp color scale
+                              >2         0.5~2       0.1~0.5         ~0           -0.1~-0.5 -0.5~-2                     < -2
+                                                                                                                                                                      immediately emitting EOS, the model captures the
+  (a) Correct                                              R=1                                                          lp / T = -0.187
+                                                                                                                                                                                                   PTpre
+                                                                                                                                                                      favorable prefix advantage t=1     at while avoid-
+    We                 are         given         a      probl..       where                 Wang           Li           ang          has
+   +0.07              +0.00        +0.08     +0.44         +0.02      -0.81                  -1.9         +0.00        +0.00        -0.72
+                                                                                                                                                                      ing the riskier reasoning steps where at may turn
+                                                     ...           2854 tokens                           ...
+    **                Final        Answer        :             \      boxed                    {               1         }            **
+                                                                                                                                                                      negative. Formally, whenever the prefix advantage
+   -1.1               -0.00        +0.00      -1.2         -0.04      +0.00                 +0.00         -0.00        +0.00        +0.02                             exceeds the full-sequence advantage:
+  (b) Long Wrong                                           R=0                                                          lp / T = -0.032
+                                                                                                                                                                                                                       Tpre                                T
+   Step                  _           1           :      Ident..       what                    we          need          to          find
+                                                                                                                                                                                                                     1 X                               1 X
+   -9.4               +0.03        +0.00     +0.00         -3.8       -5.0                  -14.0         +1.0         +0.05        +0.47                                                                                               at >                 at ,                              (6)
+                                                     ...       10691 tokens                              ...                                                                                                      Tpre t=1                             T t=1
+   was           corre..             .           _             \      boxed                    {               1         0             }
+   +0.00              +0.00        -0.01     +0.13         +2.0       +0.03                 +0.03         +0.28        -0.27        +0.19
+
+
+  (c) Short Truncated                                      R=0                                                          lp / T = +0.869                               The optimizer is incentivized to favor shorter tra-
+    It                seems         like      you          've       provi..                   a                                                                      jectories regardless of correctness. As shown in
+   +1.6               +0.14        +0.01     -0.03         +2.3       +1.9                  +0.14
+                                                                                                                                                                      Figure 6, in the late training stage, the student
+                                                                                                                                                                      only output extremely short and safe responses,
+Figure 7: (a) A correct rollout receives a mildly negative                                                                                                            but receives a high reverse KL advantage from the
+token-mean. (b) Mode A (Endless Exploration): a long                                                                                                                  teacher. Once the policy locks into short outputs,
+wrong rollout with negative scores diluted across tokens,                                                                                                             the gradient reinforces this equilibrium.
+failing to penalize the incorrect response. (c) Mode B
+(Abrupt Degeneration): a short, fully teacher-preferred                                                                                                               Dignosis Both modes exploit the same structural
+rollout prefix that yields a strongly positive token-mean                                                                                                             flaw: the token-level advantage at interacts with
+despite an incorrect outcome.                                                                                                                                         sequence length in a way that creates gradients un-
+                                                                                                                                                                      related to reasoning correctness. Mode A exploits
+ing out the penalty gradient (∇θ L ≈ 0). As a result,                                                                                                                 unfavorable sequences by padding late; Mode B ex-
+the student is never penalized for its logical failures,                                                                                                              ploits favorable prefixes by cutting early. Together
+trapping the training loop in an unproductive state                                                                                                                   they form a squeeze: the optimizer can always im-
+of endless, verbose exploration without any actual                                                                                                                    prove the objective by manipulating length rather
+improvement in reasoning accuracy.                                                                                                                                    than improving reasoning, regardless of whether
+   As shown in Figure 6, both runs exhibit a com-                                                                                                                     the current rollout outcome is positive or negative.
+mon pattern: response lengths grow sharply. Once
+                                                                                                                                                                           Finding 3. The unstable token-level objective
+truncated, the model fails to produce valid final
+                                                                                                                                                                           introduces degenerate optimization shortcuts at
+answers, causing a sharp collapse in accuracy. This
+                                                                                                                                                                           both length extremes.
+pathology is particularly severe in the Qwen3-
+4B→Qwen3-1.7B setting, which response length
+                                                                                                                                                                      5             Regulations
+grows until hitting the predefined maximum limit.
+Crucially, despite the drop in performance, the ag-                                                                                                                   Prior work stabilizes OPD through mechanisms
+gregated advantage continues to climb, demonstrat-                                                                                                                    such as utilizing off-policy data (Luo et al., 2026),
+ing a clear pattern of advantage hacking.                                                                                                                             or scoring top-k tokens beyond the predicted one
+                                                                                                                                                                      to smooth gradient estimates (DeepSeek-AI, 2026).
+Short-Sequence Exploitation (Mode B) In this                                                                                                                          These approaches are effective but incur substantial
+situation, the student learns to truncate responses                                                                                                                   overhead, maintaining full vocab replay buffers dur-
+prematurely. By generating a high-confidence                                                                                                                          ing training (DeepSeek-AI, 2026) or warm-starting
+preamble (e.g., “We are given the problem...”) and                                                                                                                    students with SFT on teacher rollouts for cold
+                                                                     pass@1                                   avg@32
+ Teacher Student                                 Method                                                                                      Avg
+                                                             MATH500 Minerva AMC’23 AIME’24 AIME’25 AIME’26 HMMT’25
+                      Qwen3-1.7B-Base            –               18.0                4.1     6.3      1.7       0.4        0.6        0.1     4.5
+                      Qwen3-1.7B                 –               73.0               32.7    42.5     13.4       9.8        7.8        3.7    26.1
+ —
+                      Qwen3-8B                   –               83.4               47.8    66.9     29.1      20.9       14.8       10.4    39.0
+                      Qwen3-4B-Inst-2507         –               93.6               52.9    94.2     59.3      47.4       55.8       31.4    62.1
+ —                    Qwen3-1.7B-Base            GRPO            63.1               29.5    43.0      9.2       4.9        4.7        2.3    22.4
+ —                    Qwen3-1.7B                 GRPO            90.0               45.9    81.7     41.9      32.5       37.5       21.7    50.2
+ —                    Qwen3-4B                   GRPO            93.6               55.5    92.9     64.4      57.1       57.3       37.3    65.4
+ Teacher: Qwen3-8B
+           Qwen3-1.7B-Base                       KD              63.8               30.2    40.6      9.2      4.6         –             –    –
+           Qwen3-1.7B-Base                       EOPD            68.7               30.2    41.9     10.4      5.8         –             –    –
+ Teacher: Qwen3-1.7B-GRPO
+           Qwen3-1.7B-Base                       OPD             75.6               36.3    43.9     13.6      10.6       10.3        6.3    28.1
+           Qwen3-1.7B-Base                       +Clip           77.0               35.4    45.7     12.1      13.7       10.5        5.8    28.6
+           Qwen3-1.7B-Base                       +Scale          79.3               40.1    46.3     13.8      15.6       10.6        7.3    30.4
+ Teacher: Qwen3-4B-GRPO
+           Qwen3-1.7B-Base                       OPD             74.4               34.2    44.3     11.6       9.4       8.6         4.7    26.7
+           Qwen3-1.7B-Base                       +Clip           76.2               33.8    47.4     10.8      13.5       8.7         6.5    28.1
+           Qwen3-1.7B-Base                       +Scale          74.3               34.2    41.2     12.8      12.1       7.8         5.4    26.8
+
+Table 1: Performance of different methods on benchmarks. Among all evaluated downstream student models
+(bottom two blocks), the overall best scores are bolded and the second best are underlined.
+
+                (a) Distribution after regulation (b) Per-token comparison
+                                                                                           teacher’s ordinal signal; (2) Outlier suppression,
+                       Raw                            t8
+          0.3          Hard clip                      t7                  ranking          pathologically large magnitudes should be damp-
+                       Log-scale                      t6                  lost
+                                                                                           ened without discarding fine-grained token-level
+Density
+          0.2                                         t5
+                                                      t4           cmax                    information. We investigate two complementary
+                                            ranking   t3
+          0.1                                 lost                                         paradigms, representing Hard truncation and Soft
+                                                      t2
+                                                      t1                                   compression respectively (Figure 8):
+          0.0           cmin           cmax
+                 10       5        0    5        10          0      5          10          • Hard Clipping. As a representative of rigid
+                       Advantage value ãt                 Advantage value ãt
+                                                                                             thresholding, this method truncates the advan-
+Figure 8: Hard Clipping collapses all tokens beyond the                                      tage into a deterministic bound to eliminate se-
+[cmin , cmax ] to the same value (ranking lost). Log-scale                                   vere outliers while preserving signal diversity:
+compression preserves ordering across the full range.
+                                                                                                        ˜ t = clip ∆ℓt , cmin , cmax .
+                                                                                                                                    
+                                                                                                        ∆ℓ                                     (7)
+start (Luo et al., 2026). We instead pursue modifi-
+cations that stabilize OPD without additional com-                                         • Soft Log-Scale Compression. As a smooth alter-
+pute, operating entirely within the existing training                                        native, this method dampens unbounded signals
+loop and motivated by the diagnostic findings of                                             without discarding the relative rankings beyond
+the previous section.                                                                        fixed bounds:
+                                                                                                      ˜ t = sign(∆ℓt ) · log 1 + |∆ℓt | .
+                                                                                                                                       
+5.1             Stabilizing OPD with Signal Regulation                                                ∆ℓ                                       (8)
+
+Motivated by the aforementioned pathologies, we                                              The choice of log(1+|x|) is motivated by its dual-
+transition from diagnosing length exploitation to                                            regime properties. Near zero, it approximates a
+developing proactive in-loop remedies. To pre-                                               linear mapping (∆ℓ ˜ t ≈ ∆ℓt ), fully preserving
+vent extreme token-level log-ratios from dominat-                                            the teacher’s fine-grained preferences. Crucially,
+ing the policy gradient, which exacerbates the                                               when |∆ℓt | → ∞, its sub-linear growth radically
+teacher–student mismatch and enables the stu-                                                compresses the magnitude of unbounded values.
+dent to exploit length through extreme signals,
+we introduce token-level signal regulation.                                                Experiment Setup To explore the performance
+   Our design follows two principles: (1) Prefer-                                          of the above two optimization techniques for OPD,
+ence preservation, regulation must not reverse the                                         we utilize Qwen3-1.7B-GRPO, Qwen3-4B-GRPO
+                  12k                                                                    Method     AIME24     AIME25     AIME26     HMMT25
+                                                             .15
+
+
+
+Response Length
+                  10k                                                                            Teacher: Qwen3-30B-A3B-Instruct-2507
+
+
+
+                                            Train Accuracy
+                                                                                         Teacher      74.7      62.8      63.3        44.2
+                   7k                                        .10
+                                                                                         UniOPD       35.2      30.7       –          17.7
+                   5k                                                                    GOPD         37.3      31.5       –          16.2
+                                                             .05                OPD
+                   2k                                                           +Clip                 Teacher: Qwen3-1.7B-GRPO
+                                                                                +Logs    Teacher      41.9      32.5      37.5          21.7
+                   0                                          0
+                        0 100 200 300 400                          0 100 200 300 400     CLIP         44.4      32.5      35.9          20.9
+                           Training Step                              Training Step
+                                                                                                       Teacher: Qwen3-4B-GRPO
+    Figure 9: Training dynamics of OPD variants. Teacher:                                Teacher      64.4       57.1     57.3          37.3
+    Qwen3-4B-GRPO; Student: Qwen3-1.7B-Base. Vanilla                                     CLIP         45.2       37.5     36.0          19.0
+    OPD suffers greater length exploitation, whereas Clip
+    produces shorter responses and achieves higher accu-                                Table 2: Performance of Qwen3-1.7B student tuned by
+    racy than naive OPD.                                                                OPD+Clip (CLIP) and previous methods (Hou et al.,
+                                                                                        2026; Yang et al., 2026a), which further proves that
+                                                                                        a stronger teacher cannot ensure better student perfor-
+   as the teachers, and Qwen3-1.7B-Base and Qwen3-                                      mance. The best and the second best scores are marked.
+   1.7B as the students. For better comparison, we se-
+   lect current OPD variants as counterparts (Jin et al.,                               Impact of Student Capacity Comparing Ta-
+   2026; Yang et al., 2026a; Hou et al., 2026). The                                     bles 1 and 2 reveals a striking impact between
+   performance of Qwen3-1.7B-Base as the student is                                     student capacity and teacher strength. When the
+   shown in Table 1, and the scores of Qwen3-1.7B                                       student is upgraded from a base model to the post-
+   are shown in Table 2.                                                                trained Qwen3-1.7B, the initial distributional mis-
+                                                                                        match is significantly mitigated. Consequently, the
+                                                                                        performance hierarchy flips: Qwen3-4B-GRPO
+    5.2                 Analysis
+                                                                                        teacher now delivers the best results, decisively out-
+   Signal Regulation is Effective. As shown in                                          performing the Qwen3-1.7B-GRPO teacher. This
+   Table 1, both regulation variants yield clear im-                                    shift confirms that the trap stems from the capabil-
+   provements over naive OPD. With the 1.7B-GRPO                                        ity gap with student-teacher mismatch. Crucially,
+   teacher, OPD+Clip brings substantial gains across                                    by resolving this mismatch, our regulated OPD
+   all benchmarks. Comparing the two variants, log-                                     with a 4B teacher ultimately surpasses previous
+   scale compression outperforms hard clipping for                                      methods distilled from a larger 30B teacher. This
+   Qwen3-1.7B-Base, likely because it retains the                                       demonstrates that proper capacity matching com-
+   teacher’s full token ranking rather than flattening                                  bined with signal regulation can eclipse brute-force
+   extreme values to the clip boundary.                                                 parameter scaling.
+   Alleviating the Student-Teacher Mismatch.                                            6   Related Work
+   Our experiments further demonstrate that naively
+   scaling up the teacher does not guarantee better stu-                                On-Policy Distillation. Early formulations of
+   dent performance. Hard clipping partially rescues                                    OPD optimized a reverse-KL objective to re-
+   this, lifting the 4B-guided student back to 28.1 of                                  strict the student to the teacher’s high-probability
+   average score. Interestingly, log-scale compression,                                 modes (Gu et al., 2026; Agarwal et al., 2024). Sub-
+   which excelled with the 1.7B teacher, fails to yield                                 sequent work reframed the teacher’s per-token log-
+   comparable gains here, as the training dynamics                                      ratios as dense rewards capable of shaping explo-
+   shown in Figure 9. We attribute this to the nature                                   ration trajectories (Yang et al., 2026a), fueling its
+   of the distributional shift: a much stronger teacher                                 rapid adoption in scale post-training (DeepSeek-
+   heavily mixes genuine correctness cues with biases                                   AI, 2026; Yang et al., 2025; GLM-5-Team et al.,
+   in its advantages. Log-scale compression preserves                                   2026; Yang et al., 2026b). Despite this widespread
+   this noise, whereas hard clipping aggressively trun-                                 use, the failure conditions of this dense guidance re-
+   cates it. This yields a crucial insight: when the                                    main poorly understood. Prior exploratory studies
+   teacher-student gap is large, aggressively trun-                                     attribute training instability to factors like thinking-
+   cating extreme signals is more effective than                                        pattern compatibility, offering external fixes such
+   compressing them.                                                                    as prompt alignment or cold-start initialization (Li
+et al., 2026a; Luo et al., 2026; Yu et al., 2026).       fidelity, we introduce lightweight signal regulations
+Our work takes a fundamentally parallel yet deeper       that require zero off-policy overhead. Our empiri-
+trajectory: we diagnose signal-level pathologies         cal results demonstrate that regulating token-level
+(student-teacher mismatch and length exploitation)       advantage dynamics effectively eliminates these
+and propose zero-overhead in-loop regulations            failures, enabling a 4B teacher to surpass configu-
+(clipping and log-scale compression) that require        rations distilled from larger models, which is signal
+neither off-policy data nor prompt filtering.            quality, not teacher scale, governs OPD success.
+Capacity Gap in Knowledge Distillation. A                Limitations
+recurring phenomenon in knowledge distillation
+(KD) is that excessively capable teachers can un-        Although our proposed hard clipping and soft log-
+expectedly degrade student performance. Specifi-         scale compression strategies effectively restore
+cally, Cho and Hariharan (2019) noted that higher        guidance fidelity and stabilize training, they intro-
+benchmark accuracy in teachers does not inherently       duce hyperparameter heuristics that require empiri-
+translate into superior distillation efficacy. To mit-   cal tuning based on the specific teacher-student ca-
+igate the structural mismatches between models,          pacity gap. A dynamic, adaptive regulation frame-
+various strategies have been proposed: Huang et al.      work could be further explored. Our systematic
+(2022) identified a severe prediction discrepancy        empirical study primarily focuses on mathematical
+between teachers and students, proposing the uti-        reasoning benchmarks, where outcomes are eas-
+lization of the teacher’s recommendation label pref-     ily verifiable and reasoning chains are dense. The
+erence order to alleviate the gap, while Mirzadeh        behavior of regulated OPD in open-ended text gen-
+et al. (2019) introduced intermediate teacher assis-     eration or knowledge-intensive QA tasks has not
+tants to bridge this capacity rift. Within the con-      been fully verified.
+text of reasoning, this learnability barrier remains
+equally pronounced. For instance, Li et al. (2025)       References
+observed that complex, long reasoning traces gener-
+                                                         Rishabh Agarwal, Nino Vieillard, Piotr Stanczyk,
+ated by strong teachers consistently underperform
+                                                           Sabela Ramos, Matthieu Geist, and Olivier Bachem.
+simpler, teacher-free approaches when distilled into       2024. GKD: Generalized knowledge distillation for
+smaller student models. Li et al. (2026b) demon-           auto-regressive sequence models. In Proceedings
+strated that the alignment of thinking patterns be-        of the 12th International Conference on Learning
+tween teachers and students profoundly impacts             Representations (ICLR).
+distillation outcomes.                                   Qiguang Chen, Libo Qin, Jiaqi WANG, Jingxuan Zhou,
+   Our work extends this classic line of inquiry           and Wanxiang Che. 2024. Unlocking the capabili-
+into the on-policy regime. Rather than merely doc-         ties of thought: A reasoning boundary framework
+                                                           to quantify and optimize chain-of-thought. In The
+umenting the empirical decay caused by strong              Thirty-eighth Annual Conference on Neural Informa-
+teachers, we offer a precise, signal-level explana-        tion Processing Systems.
+tion for why and when these advanced guidance
+                                                         Jang Hyun Cho and Bharath Hariharan. 2019. On the
+signals corrupt on student-generated rollouts. Fur-        efficacy of knowledge distillation. In Proceedings
+thermore, we demonstrate that the capability gap           of the IEEE/CVF International Conference on Com-
+can be mitigated via lightweight, in-loop signal           puter Vision (ICCV), pages 4794–4802.
+regulation.
+                                                         DeepSeek-AI. 2026. Deepseek-v4: Towards highly
+                                                           efficient million-token context intelligence.
+7   Conclusion
+                                                         Jasper Dekoninck, Nikola Jovanović, Tim Gehrunger,
+In this work, we look inside OPD to shift the               Kári Rögnvaldsson, Ivo Petrov, Chenhao Sun, and
+paradigm from empirical scaling to rigorous signal-         Martin Vechev. 2026. Beyond benchmarks: Math-
+level diagnosis. We first established that OPD              arena as an evaluation platform for mathematics with
+                                                            llms.
+acts as an exploration catalyst which benefits more
+from problem diversity. Then we systematically           GLM-5-Team, Aohan Zeng, Xin Lv, Zhenyu Hou,
+expose two critical pathologies: length exploita-          Zhengxiao Du, Qinkai Zheng, Bin Chen, Da Yin,
+                                                           Chendi Ge, Chenghua Huang, Chengxing Xie,
+tion via redundant token padding, and the Student-         Chenzheng Zhu, Congfeng Yin, Cunxiang Wang,
+Teacher Mismatch, where severe capabilities mis-           Gengzheng Pan, Hao Zeng, Haoke Zhang, Haoran
+match causes negative impacts. To restore guidance        Wang, Huilong Chen, and 167 others. 2026. Glm-5:
+  from vibe coding to agentic engineering. Preprint,    Feng Luo, Yu-Neng Chuang, Guanchu Wang, Zicheng
+  arXiv:2602.15763.                                       Xu, Xiaotian Han, Tianyi Zhang, and Vladimir
+                                                          Braverman. 2026. Demystifying opd: Length in-
+Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang. 2026.     flation and stabilization strategies for large language
+  Minillm: On-policy distillation of large language       models. Preprint, arXiv:2604.08527.
+  models. Preprint, arXiv:2306.08543.
+                                                        MAA. 2026a. American invitational mathematics
+Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul       examination (AIME).  https://www.maa.org/
+  Arora, Steven Basart, Eric Tang, Dawn Song, and        math-competitions.
+  Jacob Steinhardt. 2021. Measuring mathematical
+  problem solving with the MATH dataset. NeurIPS.       MAA. 2026b.      American mathematics com-
+                                                         petitions (AMC).      https://www.maa.org/
+Geoffrey Hinton, Oriol Vinyals, and Jeff Dean. 2015.     math-competitions.
+  Distilling the knowledge in a neural network.
+  Preprint, arXiv:1503.02531.                           Seyed-Iman Mirzadeh, Mehrdad Farajtabar, Ang
+                                                          Li, Nir Levine, Akihiro Matsukawa, and Has-
+Wenjin Hou, Shangpin Peng, Weinong Wang, Zheng            san Ghasemzadeh. 2019.          Improved knowl-
+ Ruan, Yue Zhang, Zhenglin Zhou, Mingqi Gao, Yifei        edge distillation via teacher assistant. Preprint,
+ Chen, Kaiqi Wang, Hongming Yang, and 1 oth-              arXiv:1902.03393.
+ ers. 2026. Uni-opd: Unifying on-policy distilla-
+ tion with a dual-perspective recipe. arXiv preprint    John Schulman, Filip Wolski, Prafulla Dhariwal,
+ arXiv:2605.03677.                                        Alec Radford, and Oleg Klimov. 2017. Prox-
+                                                          imal policy optimization algorithms. Preprint,
+Tao Huang, Shan You, Fei Wang, Chen Qian, and Chang       arXiv:1707.06347.
+  Xu. 2022. Knowledge distillation from a stronger
+  teacher. Preprint, arXiv:2205.10536.                  Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu,
+                                                          Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan
+Woogyeol Jin, Taywon Min, Yongjin Yang,                   Zhang, Y. K. Li, Y. Wu, and Daya Guo. 2024.
+ Swanand Ravindra Kadhe, Yi Zhou, Dennis                  Deepseekmath: Pushing the limits of mathemati-
+ Wei, Nathalie Baracaldo, and Kimin Lee. 2026.            cal reasoning in open language models. Preprint,
+ Entropy-aware on-policy distillation of language         arXiv:2402.03300.
+ models. Preprint, arXiv:2603.07079.
+                                                        Boxin Wang, Chankyu Lee, Nayeon Lee, Sheng-
+Aitor Lewkowycz, Anders Andreassen, David Dohan,          Chieh Lin, Wenliang Dai, Yang Chen, Yangyi Chen,
+  Ethan Dyer, Henryk Michalewski, Vinay Ramasesh,         Zhuolin Yang, Zihan Liu, Mohammad Shoeybi,
+  Ambrose Slone, Cem Anil, Imanol Schlag, Theo            Bryan Catanzaro, and Wei Ping. 2026. Nemotron-
+  Gutman-Solo, and 1 others. 2022. Solving quan-          cascade: Scaling cascaded reinforcement learning
+  titative reasoning problems with language models.       for general-purpose reasoning models. Preprint,
+  NeurIPS.                                                arXiv:2512.13607.
+Yaxuan Li, Yuxin Zuo, Bingxiang He, Jinqian Zhang,      An Yang, Anfeng Li, Baosong Yang, Beichen Zhang,
+  Chaojun Xiao, Cheng Qian, Tianyu Yu, Huan ang           Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao,
+  Gao, Wenkai Yang, Zhiyuan Liu, and Ning Ding.           Chengen Huang, Chenxu Lv, Chujie Zheng, Day-
+  2026a. Rethinking on-policy distillation of large       iheng Liu, Fan Zhou, Fei Huang, Feng Hu, Hao
+  language models: Phenomenology, mechanism, and          Ge, Haoran Wei, Huan Lin, Jialong Tang, and 41
+  recipe. Preprint, arXiv:2604.13016.                     others. 2025. Qwen3 technical report. Preprint,
+                                                          arXiv:2505.09388.
+Yuetai Li, Xiang Yue, Zhangchen Xu, Fengqing Jiang,
+  Luyao Niu, Bill Yuchen Lin, Bhaskar Ramasubrama-      Wenkai Yang, Weijie Liu, Ruobing Xie, Kai Yang, Saiy-
+  nian, and Radha Poovendran. 2025. Small models          ong Yang, and Yankai Lin. 2026a. Learning beyond
+  struggle to learn from strong reasoners. In Find-       teacher: Generalized on-policy distillation with re-
+  ings of the Association for Computational Linguis-     ward extrapolation. Preprint, arXiv:2602.12125.
+  tics: ACL 2025, pages 25366–25394, Vienna, Austria.
+  Association for Computational Linguistics.            Zhuolin Yang, Zihan Liu, Yang Chen, Wenliang
+                                                          Dai, Boxin Wang, Sheng-Chieh Lin, Chankyu Lee,
+Zhaoyi Li, Xiangyu Xi, Zhengyu Chen, Wei Wang,            Yangyi Chen, Dongfu Jiang, Jiafan He, Renjie Pi,
+  Gangwei Jiang, Ranran Shen, Linqi Song, Ying Wei,       Grace Lam, Nayeon Lee, Alexander Bukharin, Mo-
+  and Defu Lian. 2026b. On the role of reasoning          hammad Shoeybi, Bryan Catanzaro, and Wei Ping.
+  patterns in the generalization discrepancy of long      2026b. Nemotron-cascade 2: Post-training llms with
+  chain-of-thought supervised fine-tuning. Preprint,      cascade rl and multi-domain on-policy distillation.
+  arXiv:2604.01702.
+                                                        Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan,
+Kevin Lu and Thinking Machines Lab. 2025. On-             Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan,
+  policy distillation. Thinking Machines Lab: Con-        Gaohong Liu, Lingjun Liu, Xin Liu, Haibin Lin,
+  nectionism. Https://thinkingmachines.ai/blog/on-        Zhiqi Lin, Bole Ma, Guangming Sheng, Yuxuan
+  policy-distillation.                                    Tong, Chi Zhang, Mofan Zhang, Wang Zhang, and
+    16 others. 2025. Dapo: An open-source llm re-
+    inforcement learning system at scale. Preprint,
+    arXiv:2503.14476.
+Xinlei Yu, Gen Li, Qingyi Si, Guibin Zhang, Yuqi
+  Xu, Congcong Wang, Shuai Dong, Kaiwen Tuo, Xi-
+  angyu Zeng, Kaituo Feng, Qunzhong Wang, Yang
+  Shi, Xiaobin Hu, Xiangyu Yue, Jiaqi Wang, and
+  Shuicheng Yan. 2026. Dopd: Dual on-policy dis-
+  tillation. Preprint, arXiv:2606.30626.
+Yang Yue, Zhiqi Chen, Rui Lu, Andrew Zhao, Zhaokai
+  Wang, Yang Yue, Shiji Song, and Gao Huang. 2025.
+  Does reinforcement learning really incentivize rea-
+  soning capacity in llms beyond the base model?
+  Preprint, arXiv:2504.13837.
+Siqi Zhu, Xuyan Ye, Hongyu Lu, Weiye Shi, and
+  Ge Liu. 2026. The many faces of on-policy dis-
+  tillation: Pitfalls, mechanisms, and fixes. Preprint,
+  arXiv:2605.11182.
+
+A     Experiment Configurations
+We implement the training pipeline using verl. For
+the OPD pipeline, policy optimization uses a total
+batch size of 128, 1 rollout for each prompt. For the
+GRPO baselines, the group advantage is calculated
+across a size of 128 × 8 rollouts. Optimization
+is limited to a single epoch per rollout batch to
+eliminate off-policy bias. The maximum sequence
+length is set to 16, 384 tokens during training. Roll-
+outs are generated using stochastic sampling with
+a temperature of τ = 1.0 and top-p = 1.0.
+   For the avg@32 metric, we utilized N = 40
+candidate responses per problem for better estima-
+tion. To obtain a stable estimation, we perform
+M = 10 independent trials. In each trial, we ran-
+domly sample a subset of k = 32 responses from
+the candidate pool and calculate the correctness of
+the j-th response as Ij ∈ {0, 1}. The final score is
+the average across all trials, formulated as:
+                                          
+                           M
+                        1 X1 X 
+          avg@32 =                      Ij        (9)
+                       M          k
+                          i=1      j∈Si
+
