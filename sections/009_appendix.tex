@@ -28,30 +28,6 @@ For a token $V$ sampled from $p$, the sampled-token gradient is
 Response normalization averages the prefix gradients according to
 Equation~\ref{eq:response_normalized_update}.
 
-\subsection{Corrected KL-trajectory proposal}
-\label{app:kl_trajectory}
-
-KL-Trajectory adapts the learning-progress signal of D$^3$-MOPD
-\citep{sun2026d3mopd} to task-homogeneous updates. Let $\bar\ell_{i,m}$ be the
-EMA of response-normalized reverse KL after the $m$th observed batch from task
-$i$, and let $\ell_i^{(0)}$ be its warm-start mean. With window length $W$ and
-$R$ non-overlapping windows, the score is
-\begin{equation}
-    z_{i,m}
-    =\frac{\bar\ell_{i,m}}{\ell_i^{(0)}}
-    \left[
-      \frac{1}{R}\sum_{r=0}^{R-1}
-      \frac{\bar\ell_{i,m-(r+1)W}-\bar\ell_{i,m-rW}}
-           {\bar\ell_{i,m-(r+1)W}+\epsilon_{\mathrm{KL}}}
-    \right]_+.
-    \label{eq:kl_trajectory_score}
-\end{equation}
-Available windows replace $R$ during warmup. Max-normalization, a
-temperature-controlled softmax, and the common floor give
-$q_i=\operatorname{FloorSoftmax}(\widehat z_i)$. Multiplying the sampled
-gradient by $\lambda_i/q_i$ changes only the proposal and preserves the target
-in Proposition~\ref{prop:conditional_preservation}.
-
 \subsection{Task-homogeneous GRPO gradient}
 \label{app:grpo_update}
 
@@ -101,10 +77,9 @@ If $r_i\in[1-\delta,1+\delta]$, the Kantorovich inequality gives
 The result concerns proposal quality for fixed scores. Model drift, observation
 noise, and the probability floor are measured separately.
 
-\subsection{Probability floor and saved state}
+\subsection{Probability floor and sampler state}
 
 The online sampler fixes entries below $q_{\min}$ and renormalizes the remaining
-active entries. A checkpoint stores every task's
-score average, cost average, observation count, last-step time, task cursor, and
-current proposal. Restoring the random state and task cursors reproduces the
-next task draw and batch.
+active entries. Each checkpoint stores the score average, cost average,
+observation count, and current proposal for every task together with the model
+and optimizer state.

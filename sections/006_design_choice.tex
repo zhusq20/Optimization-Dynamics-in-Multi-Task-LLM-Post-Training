@@ -21,7 +21,8 @@ Run a short round-robin warm start. Store a moving average of
 $\|\widetilde G_i\|_2^2$ for every task in the selected optimizer metric. This
 is the raw gradient norm for SGD; the four-task protocol uses AdamW's stored
 second moment before the sampling correction. Cost-GPAS also stores a moving
-average of task time. The protocol uses 16 warm-start steps and $\gamma=0.95$.
+average of task time. The protocol uses eight warm-start steps and
+$\gamma=0.95$.
 
 \paragraph{4. Sample and optimize.}
 GPAS sets $q_i\propto\lambda_i\widehat s_i$. Cost-GPAS sets
@@ -30,9 +31,8 @@ floor, sample one task, compute and clip $G_i$, record its score, multiply by
 $\lambda_I/q_I$, and call the optimizer. The four-task protocol uses AdamW and
 $q_{\min}=0.05$.
 
-\paragraph{5. Save and audit.}
-Checkpoint the score average, cost average, timestamps, proposal, task cursors,
-and random state. Log $I$, $q_I$, $\lambda_I/q_I$, valid tokens, prompt count,
-GPU time, and the raw and optimizer-metric gradient norms. A large inverse
-sampling factor or a stale task score triggers inspection of the probability
-floor.
+\paragraph{5. Save training state.}
+Checkpoint the score and cost averages with the model and optimizer. Log $I$,
+$q_I$, $\lambda_I/q_I$, valid tokens, prompt count, total GPU time, and the raw
+and optimizer-metric gradient norms. These fields are sufficient to resume a
+run and analyze the sampler.

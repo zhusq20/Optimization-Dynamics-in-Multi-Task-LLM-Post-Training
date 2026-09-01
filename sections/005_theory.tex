@@ -65,7 +65,8 @@ Equality requires $q_i\propto\lambda_i s_i$, which proves the claim.
 The identity metric makes the result the classical SGD gradient-norm rule. For
 AdamW, GPAS uses the stored state because the score must be available before
 task selection. This lagged score approximates the task-dependent part of the
-next AdamW step; E3 compares it with a measured AdamW task step.
+next AdamW step; the frozen-gradient study compares it with the corresponding
+AdamW task step computed from saved optimizer moments.
 
 \subsection{Include measured task cost}
 \label{sec:cost_gpas}
@@ -87,9 +88,9 @@ $q_i\propto\lambda_i s_i/\sqrt{c_i}$.
 \end{proof}
 This applies the cost-aware sampling rule of
 \citet{mohri2026costawarelearning} to complete task batches in the selected
-optimizer metric. $J(q)$ is a local training signal. E2 measures it on held-out
-gradient banks, and the end-to-end experiment measures weighted teacher loss
-against GPU hours.
+optimizer metric. $J(q)$ is a local training signal. The frozen-gradient study
+measures it on held-out task batches, and the end-to-end experiment measures
+weighted teacher loss against GPU hours.
 
 \subsection{Estimate the scores online}
 \label{sec:gpas}
@@ -104,9 +105,9 @@ entries. The floor limits score staleness and large importance weights.
 
 Score error changes sampling efficiency smoothly. Appendix
 \ref{app:score_approximation} shows that a relative score error of at most
-$\delta$ increases $V(q)$ by at most a factor of $1/(1-\delta^2)$. E2 evaluates
-the proposal with held-out gradients, and E3 compares the online moving average
-with fresh task scores.
+$\delta$ increases $V(q)$ by at most a factor of $1/(1-\delta^2)$. The
+frozen-gradient study evaluates proposals on task batches not used to estimate
+their scores.
 
 Each completed step records the clipped task gradient before the importance
 correction. The trainer then multiplies the gradient by $\lambda_I/q_I$ and
