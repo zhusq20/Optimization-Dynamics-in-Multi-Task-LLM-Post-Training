@@ -3,73 +3,96 @@
 \label{sec:theory}
 % ============================================================================
 
-GPAS chooses the proposal $q$ in Equation~\ref{eq:importance_estimator}. The
-target weights $\lambda$ remain fixed.
+Section~\ref{sec:update_interface} fixes the target task mixture and leaves the
+sampling probabilities available for compute allocation. Every expectation in
+this section conditions on the model, optimizer, and sampler state before the
+next task is selected.
 
-\subsection{Sampling score}
+\subsection{Sample tasks from optimizer-scaled gradients}
 
-Fix the current student and optimizer state. Let $v$ be the lagged,
-bias-corrected AdamW second-moment estimate before the next task is sampled.
-For a task gradient $G_i$, define the Adam-scaled gradient by coordinatewise
-division:
+Raw gradient norms can be misleading under AdamW because the optimizer gives
+different parameter coordinates different effective step sizes. Let
+$\bar v_{\mathrm{prev}}$ be AdamW's stored, bias-corrected second moment before
+task selection. We define the scaled task gradient by element-wise division:
 \begin{equation}
-    S_i=\frac{G_i}{\sqrt{v}+\epsilon}.
-    \label{eq:adam_scaled_gradient}
+    \widetilde G_i
+    =\frac{G_i}{\sqrt{\bar v_{\mathrm{prev}}}+\epsilon_{\mathrm{Adam}}},
+    \label{eq:adamw_lagged_metric}
 \end{equation}
-The score for task $i$ is
+and summarize task $i$ by
+$s_i=\sqrt{\mathbb E\|\widetilde G_i\|_2^2}$.
+
+For the corrected task gradient in
+Equation~\ref{eq:importance_estimator}, the part of the scaled mean-squared
+error that depends on the proposal is
 \begin{equation}
-    s_i=\sqrt{\mathbb E\|S_i\|_2^2}.
-    \label{eq:gpas_score}
+    V(q)=\sum_i\frac{\lambda_i^2s_i^2}{q_i}.
+    \label{eq:preconditioned_second_moment}
 \end{equation}
-The score includes the mean update signal and stochastic variation within the
-task. GPAS uses recent task gradients to maintain a moving estimate of
-$s_i$.
-
-\subsection{Task proposal}
-
-For the corrected gradient, the Adam-scaled second moment is
+\begin{proposition}[Variance-optimal task proposal]
+\label{prop:gpas_optimality}
+If $\lambda_i s_i>0$ for every task, $V(q)$ over the probability simplex is
+minimized by $q_i^\star=\lambda_i s_i/\sum_j\lambda_j s_j$.
+\end{proposition}
+\begin{proof}
+Cauchy--Schwarz and $\sum_iq_i=1$ give
 \begin{equation}
-    \mathbb E\left\|
-        \frac{\lambda_I}{q_I}S_I
-    \right\|_2^2
-    =
-    \sum_i\frac{\lambda_i^2s_i^2}{q_i}.
-    \label{eq:gpas_second_moment}
+    \left(\sum_i\lambda_i s_i\right)^2
+    =\left(\sum_i\sqrt{q_i}\,
+      \frac{\lambda_i s_i}{\sqrt{q_i}}\right)^2
+    \leq \left(\sum_iq_i\right)V(q)=V(q).
+    \label{eq:gpas_cs_bound}
 \end{equation}
-Equation~\ref{eq:importance_unbiased} fixes the average gradient. Reducing
-Equation~\ref{eq:gpas_second_moment} also reduces the mean-squared error of
-the gradient estimate in the same Adam-scaled coordinates. The minimum uses
-\begin{equation}
-    q_i^*
-    =
-    \frac{\lambda_i s_i}{\sum_j\lambda_j s_j}.
-    \label{eq:optimal_sampling}
-\end{equation}
-Appendix~\ref{app:optimal_sampling} gives a short proof.
+Equality requires $q_i\propto\lambda_i s_i$, which proves the claim.
+\end{proof}
+GPAS uses the stored AdamW state because the score must be available before
+task selection. The score approximates the task-dependent part of the next
+AdamW step. The E3 audit compares this approximation with a measured AdamW
+task step.
 
-Adam GPAS estimates the score in Equation~\ref{eq:gpas_score}. Raw GPAS
-replaces $S_i$ with $G_i$. Both methods apply $\lambda_I/q_I$ before the
-AdamW moment update. A probability floor keeps every teacher active and
-limits large weight ratios.
+\subsection{Include measured task cost}
+\label{sec:cost_gpas}
 
-The gradient guarantee applies at the input to AdamW. AdamW updates its
-second-moment state with squared, importance-weighted gradients, so different
-proposals produce different optimizer paths. Section~\ref{sec:exp_optimizer}
-tests whether the lagged Adam-scaled score predicts the next task-dependent
-parameter step.
+Fixed-token task batches can have different runtimes. Let $c_i$ be the measured
+time for generation, teacher or reward evaluation, actor training, and the
+optimizer step. Cost-GPAS minimizes the local compute score
+$J(q)=(\sum_i q_i c_i)V(q)$.
+\begin{corollary}[Cost-aware task proposal]
+\label{cor:cost_gpas}
+If additionally $c_i>0$, the minimizer of $J(q)$ is
+$q_i^\star=(\lambda_i s_i/\sqrt{c_i})/
+\sum_j(\lambda_j s_j/\sqrt{c_j})$.
+\end{corollary}
+\begin{proof}
+Cauchy--Schwarz gives
+$J(q)\geq(\sum_i\lambda_i s_i\sqrt{c_i})^2$, with equality exactly when
+$q_i\propto\lambda_i s_i/\sqrt{c_i}$.
+\end{proof}
+This applies the cost-aware sampling rule of
+\citet{mohri2026costawarelearning} to complete task batches and AdamW-scaled
+gradients. $J(q)$ is a local training signal. E2 measures it on held-out
+gradient banks, and the end-to-end experiment measures weighted teacher loss
+against GPU hours.
 
-\subsection{Sampled-token and full-vocabulary gradients}
-\label{sec:estimator_choice}
+\subsection{Estimate the scores online}
+\label{sec:gpas}
 
-GPAS uses the gradient produced by the selected distillation estimator.
-Sampled-token OPD estimates each token loss from the rollout token.
-Full-vocabulary OPD sums the loss over the vocabulary at the same response
-prefix. The vocabulary sum removes token-sampling noise and requires more
-teacher output.
+After task $i$ completes, GPAS updates one moving average,
+$\widehat s_i^2\leftarrow\gamma\widehat s_i^2+
+(1-\gamma)\|\widetilde G_i\|_2^2$.
+Cost-GPAS applies the same update to measured task time. A round-robin warm
+start observes every task. After computing the proposal, the implementation
+sets probabilities below $q_{\min}$ to the floor and renormalizes the remaining
+entries. The floor limits score staleness and large importance weights.
 
-The optimal proposal keeps the form in
-Equation~\ref{eq:optimal_sampling} for both estimators. The measured scores
-can differ. Sampled-token scores include token-sampling variation, while
-full-vocabulary scores place more emphasis on prompt and response variation.
-Section~\ref{sec:exp_estimators} measures the change in task ranking,
-estimator error, and proposal entropy on matched response prefixes.
+Score error changes sampling efficiency smoothly. Appendix
+\ref{app:score_approximation} shows that a relative score error of at most
+$\delta$ increases $V(q)$ by at most a factor of $1/(1-\delta^2)$. E2 evaluates
+the proposal with held-out gradients, and E3 compares the online moving average
+with fresh task scores.
+
+Each completed step records the clipped task gradient before the importance
+correction. The trainer then multiplies the gradient by $\lambda_I/q_I$ and
+calls AdamW. Gradient clipping is applied before the correction so the
+conditional mean in Equation~\ref{eq:importance_unbiased} matches the stated
+training objective.

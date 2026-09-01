@@ -1,118 +1,94 @@
-\section{Additional Analysis and Experimental Details}
-\label{app:details}
+% ============================================================================
+\section{Derivations and Implementation Details}
+% ============================================================================
 
-\subsection{Target-gradient calculation}
+\subsection{Sampled-token OPD}
+\label{app:opd_estimators}
 
-For task $I\sim q$, the corrected gradient from
-Equation~\ref{eq:importance_estimator} has mean
+Fix a student-generated prefix $z$. Write
+$p_v=\pi_\theta(v\mid z)$ and $\tau_v=T_i(v\mid z)$. The reverse-KL ascent
+gradient at prefix $z$ is
 \begin{equation}
-    \mathbb E[\widehat G]
+    u_i(z)
     =
-    \sum_i q_i\frac{\lambda_i}{q_i}\mathbb E[G_i]
+    \sum_v p_v\log\frac{\tau_v}{p_v}
+    \nabla_\theta\log p_v.
+    \label{eq:full_token_rkl_update}
+\end{equation}
+For a token $V$ sampled from $p$, the sampled-token gradient is
+\begin{equation}
+    U_i(z,V)
     =
-    \sum_i\lambda_i g_i.
-    \label{eq:appendix_target_mean}
+    \operatorname{sg}\!\left[\log\frac{\tau_V}{p_V}\right]
+    \nabla_\theta\log p_V,
+    \qquad
+    \mathbb E[U_i(z,V)\mid z]=u_i(z).
+    \label{eq:pg_prefix_unbiased}
 \end{equation}
-The proposal cancels from the average gradient. A proposal may depend on all
-completed training steps. The next task is sampled after the proposal has been
-set.
+Response normalization averages the prefix gradients according to
+Equation~\ref{eq:response_normalized_update}.
 
-\subsection{Optimal GPAS proposal}
-\label{app:optimal_sampling}
+\subsection{Task-homogeneous GRPO gradient}
+\label{app:grpo_update}
 
-Let $s_i^2=\mathbb E\|S_i\|_2^2$. The Adam-scaled second moment of the
-corrected gradient is
+For task $i$, GRPO samples response groups from one prompt, computes
+within-prompt advantages, and applies the standard clipped policy surrogate
+\citep{shao2024deepseekmathpushinglimitsmathematical}. The implementation first
+averages token terms inside each response and then averages responses inside the
+task batch. The resulting clipped task gradient is $G_i$. The GRPO policy ratio
+handles behavior-policy change inside a task, while $\lambda_i/q_i$ handles task
+sampling.
+
+\subsection{Frozen-gradient evaluation metric}
+
+For an evaluation bank, let $\widetilde h$ be the full-mixture mean after the
+element-wise AdamW scaling in Equation~\ref{eq:adamw_lagged_metric}, and let
+$\widehat{\widetilde g}$ be the scaled corrected draw. The centered error is
 \begin{equation}
-    \sum_i\frac{\lambda_i^2s_i^2}{q_i}.
+    M(q)=\mathbb E\left\|\widehat{\widetilde g}-\widetilde h\right\|_2^2.
+    \label{eq:empirical_estimator_mse}
 \end{equation}
-Cauchy--Schwarz gives
+The experiment estimates $h$ and the expectation from held-out task batches.
+Calibration batches supply $q$, so proposal construction and evaluation use
+separate samples.
+
+\subsection{Approximate-score penalty}
+\label{app:score_approximation}
+
+Let $q_i^*=\lambda_i s_i/Z$, where $Z=\sum_i\lambda_i s_i$, and let
+$\widehat q_i=\lambda_i\widehat s_i/\widehat Z$. Write
+$w_i=\lambda_i s_i/Z$ and $r_i=\widehat s_i/s_i$. Then
 \begin{equation}
-    \left(\sum_i\lambda_i s_i\right)^2
+    \frac{V(\widehat q)}{V(q^*)}
+    =\left(\sum_iw_ir_i\right)
+     \left(\sum_i\frac{w_i}{r_i}\right).
+\end{equation}
+If $r_i\in[1-\delta,1+\delta]$, the Kantorovich inequality gives
+\begin{equation}
+    \frac{V(\widehat q)}{V(q^*)}
     \leq
-    \left(\sum_iq_i\right)
-    \left(\sum_i\frac{\lambda_i^2s_i^2}{q_i}\right).
+    \frac{\big((1-\delta)+(1+\delta)\big)^2}
+         {4(1-\delta)(1+\delta)}
+    =\frac{1}{1-\delta^2}.
 \end{equation}
-The first factor on the right is one. Equality requires $q_i$ to be
-proportional to $\lambda_i s_i$. Normalizing the probabilities gives
-Equation~\ref{eq:optimal_sampling}.
+The result concerns proposal quality for fixed scores. Model drift, observation
+noise, and the probability floor are measured separately.
 
-The implementation adds a probability floor. Tasks below the floor receive
-the floor value, and the remaining probability is distributed in proportion
-to $\lambda_i s_i$. Four-task water filling solves the allocation with a few
-scalar operations.
+\subsection{Probability floor and saved state}
 
-\subsection{AdamW score}
-\label{app:adam_score}
+The online sampler fixes entries below $q_{\min}$ and renormalizes the remaining
+active entries. A checkpoint stores every task's
+score average, cost average, observation count, last-step time, task cursor, and
+current proposal. Restoring the random state and task cursors reproduces the
+next task draw and batch.
 
-Adam GPAS uses the second-moment state stored before task sampling. Dividing a
-task gradient by $\sqrt v+\epsilon$ estimates the coordinate scale used by
-the next AdamW update. Stored momentum and weight decay contribute a common
-movement in the one-step probe. A zero-gradient clone removes that common
-movement.
+\subsection{AdamW task-step measurement}
 
-The target-gradient calculation in
-Equation~\ref{eq:appendix_target_mean} covers the gradient sent into AdamW.
-The sampled gradient also updates $v$, so each proposal creates its own AdamW
-state path. The end-to-end experiment measures the effect of that state path.
-
-\subsection{Sampled-token and full-vocabulary scores}
-\label{app:sampled_full}
-
-For one fixed response prefix, let $X_i$ be the sampled-token semi-gradient
-and let $F_i$ be its average over the student's token distribution. The vector
-$F_i$ is the corresponding full-vocabulary semi-gradient for the same prefix.
-With the AdamW denominator held fixed,
-\begin{equation}
-    \mathbb E\left\|
-        \frac{X_i}{\sqrt v+\epsilon}
-    \right\|_2^2
-    =
-    \mathbb E\left\|
-        \frac{F_i}{\sqrt v+\epsilon}
-    \right\|_2^2
-    +
-    \mathbb E\left\|
-        \frac{X_i-F_i}{\sqrt v+\epsilon}
-    \right\|_2^2.
-    \label{eq:sampled_full_decomposition}
-\end{equation}
-The last term measures token-sampling variation. Full-vocabulary OPD removes
-that term at each prefix. Prompt and rollout variation remain in both
-estimators. The checkpoint experiment estimates every term with matched
-prefixes and repeated token draws.
-
-\subsection{Controlled estimator problem}
-\label{app:controlled_sampling}
-
-The controlled problem uses three tasks, 96 coordinates, and a uniform target
-mixture. Coordinates are split into three blocks of size 32. Task-gradient
-standard deviations in the dominant blocks are 2.0, 0.5, and 0.1. The fixed
-AdamW scales for the same blocks are 0.005, 0.05, and 3.0. The raw-gradient
-score favors the first task, while the Adam-scaled score favors the third
-task.
-
-Every trial averages 16 independently sampled, importance-corrected task
-gradients. We use 20,000 trials and report squared error after applying the
-fixed AdamW scale. The script
-\texttt{experiments/controlled\_optimizer\_sampling.py} reproduces
-Figure~\ref{fig:controlled_optimizer_sampling}.
-
-\subsection{End-to-end implementation details}
-
-The adaptive methods use four round-robin observations per task before score
-updates begin. For a sampled task, the implementation performs the following
-operations:
-\begin{enumerate}
-    \item average the loss over valid response tokens and responses;
-    \item compute the task gradient and its GPAS score;
-    \item multiply the gradient by $\lambda_I/q_I$;
-    \item send the corrected gradient directly to the AdamW moment update.
-\end{enumerate}
-The primary target-preservation runs disable gradient clipping, so
-Equation~\ref{eq:appendix_target_mean} applies to the gradient received by
-AdamW. The probability floor limits large correction factors.
-
-Each run logs the sampled task, proposal, target weight, importance ratio,
-score, score age, response-token count, teacher-token count, gradient norm,
-and Adam-scaled norm. Checkpoints also save the proposal moving averages and
-task-sampler random state.
+Equation~\ref{eq:adamw_lagged_metric} uses the previous bias-corrected second
+moment and omits the current gradient's effect on AdamW's denominator.
+AdamW momentum can also move parameters when the current task gradient is zero. The
+matched-state measurement in Section~\ref{sec:exp_geometry_tracking} runs one
+clone with task gradient $G_i$ and one clone with a zero gradient. Both clones
+use the same model, AdamW state, learning rate, and moment decay. The difference
+between the two parameter vectors isolates the increment associated with the
+current task gradient.

@@ -1,28 +1,26 @@
 \begin{abstract}
 
-Multi-teacher on-policy distillation (MOPD) combines several specialist
-teachers in one student. Many training systems use the task sampling rate as
-the teacher weight. Adaptive sampling then changes both the compute allocation
-and the training objective.
+Multi-task LLM post-training uses task weights to specify capability priorities
+and task sampling to allocate compute. Conflating the two makes efficiency
+claims hard to interpret; global token averaging can also give long-response
+tasks unintended weight.
 
-We study task allocation for a fixed teacher mixture. Gradient-Preserving
-Adaptive Sampling (GPAS) samples tasks with large gradient signals more often
-and rescales every sampled gradient by the ratio between its target weight and
-sampling probability. The rescaling keeps the average input gradient to the
-optimizer equal to the gradient of the selected MOPD objective. A short
-analysis gives the variance-minimizing task distribution. Raw GPAS uses the
-gradient norm. Adam GPAS measures the same gradient after scaling by the
-current AdamW second-moment state.
+We present Gradient-Preserving Adaptive Sampling (GPAS) for multi-teacher
+on-policy distillation and multi-task reinforcement learning. Each update uses
+a task-homogeneous batch and gives every response equal weight. GPAS measures
+task gradients after scaling each parameter coordinate by AdamW's stored
+second moment. GPAS samples high-impact tasks more often and rescales every
+sampled gradient by its target weight divided by its sampling probability. The
+conditional expected gradient remains equal to the user-specified task mixture.
+The online sampler reuses completed gradients and stores one score per task.
+Cost-GPAS also uses measured task time.
 
-Our evaluation connects each claim to a direct test. In a controlled estimator
-experiment, Adam GPAS reduces mean-squared error to $0.698\times$ the uniform
-value; the raw-gradient proposal reaches $7.19\times$ the uniform value under
-the same optimizer scale. Matched-state probes test whether AdamW scaling
-improves task ranking. End-to-end MOPD runs compare GPAS with uniform sampling,
-full-mixture updates, and gap-based allocation under matched student-token and
-teacher-token budgets. A checkpoint study measures how sampled-token and
-full-vocabulary distillation change the GPAS task scores.
-
-% TODO: Add quantitative end-to-end MOPD results after the registered runs.
+In a controlled three-task experiment, GPAS attains a calculated error ratio of
+$0.698$ and a Monte Carlo ratio of $0.697$ relative to uniform sampling; the
+cost-aware proposal lowers its local compute proxy by $10.7\%$. The completed
+experiment verifies the estimator calculation. Four-teacher MOPD and
+three-task GRPO experiments will test the AdamW score, online tracking, teacher
+compatibility, and progress per token and GPU hour. The large-model experiments
+remain pending in this draft.
 
 \end{abstract}

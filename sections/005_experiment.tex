@@ -3,155 +3,218 @@
 \label{sec:experiments}
 % ============================================================================
 
-The experiments test four claims. The weight ratio preserves the selected
-teacher mixture. The GPAS proposal reduces task-level estimator error. The
-Adam-scaled score can predict task-dependent AdamW updates better than the raw
-gradient norm. Sampled-token and full-vocabulary distillation can produce
-different task scores.
+The controlled experiment checks the GPAS and Cost-GPAS calculations. Frozen
+gradient banks test response normalization, proposal quality, and the AdamW
+score. Paired MOPD runs measure end-to-end efficiency. A final experiment
+applies the task sampler to GRPO.
 
-\subsection{Setup}
+\paragraph{Evidence status.}
+The controlled experiment is complete and reproducible from the released
+script. The four-teacher MOPD and GRPO runs require a multi-GPU training setup
+and remain pending in this draft. The protocol below assigns a measurement and
+a success rule to each planned large-model claim.
 
-We use Qwen3-1.7B as the shared initialization. Four same-origin teachers are
-trained from that checkpoint with single-task GRPO on mathematics, code,
-instruction following, and science question answering. The MOPD student
-starts from the shared initialization. Every method uses the same frozen
-teachers, prompt pools, response limits, AdamW configuration, and learning-rate
-schedule.
+\subsection{Controlled validation of the sampling rule}
+\label{sec:controlled_experiment}
 
-The primary MOPD loss uses the sampled-token reverse-KL estimator. Each task
-microbatch contains about 65,536 generated response tokens. The loss first
-averages tokens within a response and responses within a task microbatch.
-Every end-to-end run uses 600 optimizer updates. The target mixture is uniform,
-with $\lambda_i=1/4$.
+We construct three Gaussian task-gradient distributions with different raw
+gradient scales, AdamW coordinate scales, and task costs. All methods target
+$\lambda_i=1/3$ and apply the correction in
+Equation~\ref{eq:importance_estimator}. We draw 20,000 Monte Carlo trials, with
+16 corrected task gradients per trial.
+The controlled comparison omits the probability floor so its proposals match
+the closed-form calculation.
 
-We use seeds 41, 42, and 43 for the main training methods. Teacher loss is
-measured every 25 updates on fixed held-out prompts. Capability evaluation
-runs at updates 0, 150, 300, 450, and 600. We report generated response
-tokens, teacher-scored tokens, wall-clock time, and GPU time for every run.
+Figure~\ref{fig:controlled_sampling} reports three results. The calculated GPAS
+error ratio is $0.698$, and the Monte Carlo ratio is $0.697$, relative to
+uniform sampling. The raw-gradient proposal reaches $7.178$ times the observed
+uniform error because its largest raw coordinates receive a small AdamW scale.
+Cost-GPAS reaches $0.893$ times the uniform time-weighted second-moment proxy.
+Every corrected proposal has a relative mean-gradient error below $2.1\%$. The
+controlled experiment checks the estimator and implementation. The LLM study
+tests score quality, teacher compatibility, and training progress.
 
-\subsection{Controlled estimator test}
-\label{sec:controlled}
-
-We first isolate the sampling result from language-model training. The
-controlled problem has three equally weighted tasks and 96 gradient
-coordinates. Each task has most of its gradient variation in a different
-coordinate block. A fixed AdamW scale assigns different update sizes to the
-three blocks.
-
-Uniform sampling, Raw GPAS, and Adam GPAS estimate the same target gradient
-from 16 sampled tasks. We compare the formula in
-Equation~\ref{eq:gpas_second_moment} with 20,000 Monte Carlo trials.
-Figure~\ref{fig:controlled_optimizer_sampling} shows close agreement between
-the formula and simulation. Raw GPAS assigns too much probability to a large
-raw gradient that AdamW strongly suppresses. Its estimator error is
-$7.19\times$ the uniform error. Adam GPAS follows the Adam-scaled task scores
-and reduces the error to $0.698\times$ the uniform value.
-
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.92\linewidth]{figures/controlled_optimizer_sampling.pdf}
-    \caption{Controlled test of task allocation. Bars show 20,000 Monte Carlo
-    trials, and crosses show the value from
-    Equation~\ref{eq:gpas_second_moment}. Adam GPAS uses the task proposal
-    predicted by the current optimizer scale and has the lowest estimator
-    error.}
-    \label{fig:controlled_optimizer_sampling}
+    \includegraphics[width=\linewidth]{figures/controlled_optimizer_sampling.pdf}
+    \caption{Controlled sampling experiment. Bars show Monte Carlo results
+    normalized by the observed uniform baseline; black crosses show calculated
+    error ratios. Task costs are $5$, $2$,
+    and $10$. Lower values are better in the center and right panels.}
+    \label{fig:controlled_sampling}
 \end{figure}
 
-\subsection{Target preservation and estimator error}
-\label{sec:exp_gradient}
+\subsection{Four-teacher MOPD setup}
+\label{sec:exp_setup}
 
-At updates 0, 150, 300, 450, and 600 of the seed-42 uniform run, we collect 32
-independent fixed-token gradients per task. A large stratified pool estimates
-the full target gradient. The same gradient pool supports Monte Carlo
-evaluation of each task proposal.
+The planned MOPD study uses a frozen revision of Qwen3-1.7B
+\citep{qwen2025qwen3}. Four teachers start from the Qwen3 checkpoint and
+receive separate post-training on mathematics, code, instruction following,
+and science question answering. Teacher selection occurs before the
+multi-teacher runs. The release specification requires model revisions, teacher
+hashes, data splits, and the four capability scores of every teacher.
 
-We compare corrected and uncorrected estimates from the same proposal. The
-primary target-preservation measures are relative gradient bias and cosine
-similarity with the full target gradient. The primary allocation measure is
-the Adam-scaled mean-squared error:
-\begin{equation}
-    \mathbb E\left\|
-    \frac{\widehat G-g_\lambda}{\sqrt v+\epsilon}
-    \right\|_2^2.
-    \label{eq:empirical_estimator_error}
-\end{equation}
-The comparison uses uniform sampling, gap-based sampling, Raw GPAS, Adam GPAS,
-and a retrospective oracle computed from the full gradient pool. The oracle
-measures the error caused by online score estimation.
+Each optimizer step samples one task, generates a task-homogeneous batch, calls
+one frozen teacher, and consumes the rollout once. Every task batch targets
+65,536 valid response tokens. Prompt count is estimated from earlier response
+lengths, and every completed response enters the gradient. The logs record the
+actual token count and overshoot.
 
-The corrected and uncorrected gap proposals share the same task sequence and
-score history. Their difference isolates the weight ratio in
-Equation~\ref{eq:importance_estimator}. We also report the cumulative
-gradient weight assigned to every task. The cumulative weights make objective
-drift visible without relying on a final benchmark score.
+The primary loss uses the sampled-token OPD gradient in
+Appendix~\ref{app:opd_estimators}. Each response is averaged by its valid-token
+count, followed by an average over responses and one shared task-gradient clip.
+The trainer records the raw and AdamW-scaled scores, applies
+$\lambda_i/q_i$, and calls AdamW. The target mixture is $\lambda_i=1/4$.
 
-\subsection{Does AdamW scaling improve task ranking?}
-\label{sec:exp_optimizer}
+All methods use 600 optimizer steps, an 8,192-token response cap, temperature
+1, top-$p$ 1, and disabled thinking mode. A uniform pilot fixes the learning
+rate, warmup, clipping threshold, batch target, moving-average rate
+$\gamma=0.95$, and probability floor $q_i\geq0.05$. Every paired seed shares a
+16-step round-robin warm start, model state, AdamW state, task cursors, and
+random streams.
 
-We copy the model and AdamW state before every one-step probe. Each task
-provides 16 independent fixed-token gradients at each evaluation checkpoint.
-For every gradient, we record its raw norm, Adam-scaled norm, and the exact
-parameter displacement produced by one AdamW step. A zero-gradient clone
-removes displacement from stored momentum and weight decay.
+\subsection{Methods}
+\label{sec:exp_methods}
 
-We measure Spearman correlation and pairwise task-ranking accuracy between
-each score and the task-dependent parameter displacement. Held-out teacher
-loss reduction provides a secondary measure that also depends on update
-direction. The same checkpoints compare the proposal predicted by each score
-with the retrospective oracle from Section~\ref{sec:exp_gradient}.
+Table~\ref{tab:exp_methods} contains the three main methods and three diagnostic
+controls. Raw GPAS tests the AdamW scaling. Cost-only tests whether cheap-task
+preference explains the gains. Uncorrected GPAS measures the objective shift
+caused by using the proposal as the task weight.
 
-The matched-state design tests the Adam approximation used by GPAS. The
-end-to-end comparison between Raw GPAS and Adam GPAS tests whether better
-one-step ranking improves training efficiency.
+\begin{table}[H]
+\centering
+\small
+\caption{Planned MOPD methods. Primary comparisons use five paired seeds;
+diagnostic controls use three.}
+\label{tab:exp_methods}
+\begin{tabular}{llll}
+\hline
+Method & Task proposal & Gradient factor & Seeds \\
+\hline
+Uniform & $q_i=1/4$ & $1$ & 41--45 \\
+GPAS & $q_i\propto\lambda_i\widehat s_i$
+    & $\lambda_i/q_i$ & 41--45 \\
+Cost-GPAS & $q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$
+    & $\lambda_i/q_i$ & 41--45 \\
+Raw GPAS & $q_i\propto\lambda_i\widehat r_i$
+    & $\lambda_i/q_i$ & 41--43 \\
+Cost-only & $q_i\propto\lambda_i/\sqrt{\widehat c_i}$
+    & $\lambda_i/q_i$ & 41--43 \\
+Uncorrected GPAS & GPAS proposal & $1$ & 41--43 \\
+\hline
+\end{tabular}
+\end{table}
 
-\subsection{Sampled-token versus full-vocabulary OPD}
-\label{sec:exp_estimators}
+Here $\widehat r_i^2$ tracks $\mathbb E\|G_i\|_2^2$. Additional diagnostic runs
+include a corrected teacher-loss gap sampler, Raw Cost-Aware, round robin, and a
+full-mixture reference. The full-mixture reference computes four
+response-normalized microbatches and averages them before one AdamW step.
 
-We compare the two distillation estimators on the same prompts, response
-prefixes, student checkpoint, and AdamW state. The full-vocabulary gradient
-uses the complete student and teacher distributions at each selected prefix.
-The sampled-token gradient draws tokens from the same student distribution.
-Repeated token draws estimate the token-sampling part of the gradient
-variation.
+\subsection{Mechanism audits}
 
-For each task and checkpoint, we report four quantities: the raw GPAS score,
-the Adam GPAS score, the resulting task probability, and estimator error.
-Rank correlation between sampled-token and full-vocabulary scores shows
-whether both estimators prioritize the same teachers. Proposal entropy shows
-whether removing token-sampling noise makes the task allocation more uniform.
-Teacher-logit memory, teacher-token throughput, and wall-clock time measure the
-cost of the full-vocabulary signal.
+\paragraph{E1: response length and task cost.}
+\label{sec:exp_length_cost}
+At steps 0, 150, 300, 450, and 600 of a uniform run, cached rollouts measure each
+task's response length, prompt count for a fixed-token batch, token share in a
+prompt-balanced mixed batch, and GPU time. Cached responses form two gradient
+estimates: global token averaging and response normalization followed by a
+weighted task average. E1 tests whether global token averaging follows response
+length and whether response normalization keeps the explicit coefficient at
+$1/4$. Timing separates rollout, teacher forward, actor forward/backward, and
+optimizer work.
+
+\paragraph{E2: corrected-gradient and cost audit.}
+\label{sec:exp_estimator}
+Each checkpoint supplies independent calibration and evaluation gradient banks.
+The calibration bank builds each proposal. The evaluation bank measures the
+distance and cosine similarity between the resampled mean gradient and the
+four-task full-mixture gradient. The evaluation bank also measures the
+AdamW-scaled estimator error $M(q)$ from
+Equation~\ref{eq:empirical_estimator_mse} and the compute score $J(q)$ defined
+in Section~\ref{sec:cost_gpas}. Each result includes its ratio to a
+proposal built from held-out task gradients and costs. The preregistered
+predictions are: corrected methods match the full-mixture mean, GPAS improves on
+Uniform and Raw GPAS in $M(q)$, and Cost-GPAS improves on Uniform, GPAS, and
+Cost-only in $J(q)$.
+
+E2 also measures teacher--student reverse KL, the fraction of shared tokens in
+the teacher and student top-16 sets, and the 95th and 99th percentiles of the
+absolute token log-probability gap. The compatibility metrics show whether a large gradient
+score comes with a usable teacher signal or an extreme log-ratio tail. Each
+measure is reported by task and checkpoint.
+
+\paragraph{E3: AdamW score and online tracking.}
+\label{sec:exp_geometry_tracking}
+For each task, one model clone applies $G_i$ and another applies a zero gradient
+from the same model and AdamW state. The difference between the two parameter
+vectors isolates the
+task-dependent part of one AdamW step. Task-pair accuracy and Spearman
+correlation compare raw gradient size and $\|\widetilde G_i\|_2$ with the measured
+parameter change. The measured changes also define an exact-step oracle
+proposal, which bounds the improvement available from a better optimizer
+metric. A held-out teacher-loss batch records the immediate loss change from
+each task gradient.
+
+An excluded uniform pilot compares the online score moving average with fresh
+gradient-bank scores every 25 steps. A parallel cost audit compares the cost
+moving average with the next observed task time. The score and cost comparisons test the fixed
+$\gamma=0.95$ configuration before the primary runs.
 
 \subsection{End-to-end MOPD efficiency}
 \label{sec:exp_allocation}
 
-All methods optimize the same uniform teacher mixture unless the method name
-states an uncorrected ablation:
-\begin{enumerate}
-    \item \textbf{Uniform}: sample every task with probability $1/4$.
-    \item \textbf{Full mixture}: use one quarter of each update's token budget
-    for every task and average the four task gradients.
-    \item \textbf{Corrected gap}: sample from a teacher-gap score and apply
-    $\lambda_I/q_I$.
-    \item \textbf{Uncorrected gap}: use the same proposal with unit gradient
-    scale.
-    \item \textbf{Raw GPAS}: use the raw-gradient score and apply
-    $\lambda_I/q_I$.
-    \item \textbf{Adam GPAS}: use the Adam-scaled score and apply
-    $\lambda_I/q_I$.
-\end{enumerate}
+Every 25 steps, fresh student rollouts on a fixed prompt set measure the weighted
+teacher loss
+\begin{equation}
+    L(N)=\sum_i\lambda_i\ell_i(N),
+    \label{eq:weighted_teacher_loss}
+\end{equation}
+where $N$ denotes cumulative valid response tokens or measured GPU hours. The
+token comparison is GPAS versus Uniform. The GPU-hour comparison is Cost-GPAS
+versus Uniform and GPAS. Curves use the shortest budget completed by every
+method in a comparison. An excluded Uniform pilot fixes two teacher-loss
+targets before the main runs. We report the budget required to reach each target
+and the area under the loss curve over the shared budget.
 
-Adaptive methods start with 16 round-robin updates, giving four observations
-per task. Each method uses an exponential moving average with decay 0.95 and a
-probability floor of 0.05. The importance ratio is applied before the AdamW
-first- and second-moment updates.
+Each comparison reports all five paired differences, their mean, a paired
+effect size, and a 95\% paired interval. An efficiency claim requires four of
+five seeds in the predicted direction, an interval excluding zero, and the
+matching E2 metric in the predicted direction. We separately verify that the
+methods use the same number of model evaluations per step and report sampler
+synchronization overhead.
 
-We report weighted teacher-loss area under the training curve, tokens needed
-to reach fixed loss thresholds, and wall-clock time. Per-task teacher losses
-at matched weighted loss measure task balance. Final evaluations use
-MATH-500, LiveCodeBench, IFBench, and GPQA-Diamond. The main GPAS claim
-requires lower estimator error and faster fixed-mixture training under matched
-student-token and teacher-token budgets.
+The run record includes response tokens, teacher-scored tokens, prompts,
+optimizer steps, GPU hours, wall-clock time, truncation, invalid outputs,
+sampling probabilities, inverse sampling factors, infrastructure failures, and
+every task's teacher loss.
 
-% TODO: Insert end-to-end tables and checkpoint plots after the registered runs.
+\paragraph{Capability evaluation.}
+The capability evaluation covers the initial student and checkpoints at steps
+300 and 600. Metrics are MATH-500 greedy pass@1, a frozen post-cutoff
+LiveCodeBench pass@1 slice, IFBench strict accuracy, and GPQA-Diamond averaged
+over four samples. The capability table contains all four scores, their macro
+average, and the lowest score. The full vector displays the trade-off behind
+each aggregate.
+
+\subsection{Transfer to multi-task GRPO}
+\label{sec:exp_grpo}
+
+The GRPO study uses MATH train, APPS train, and ARC-Challenge train with
+executable or exact-match rewards
+\citep{hendrycks2021math,hendrycks2021apps,clark2018arc}. The target is
+$\lambda_i=1/3$. Each task-homogeneous batch targets 32,768 response tokens and
+samples eight responses per prompt. Uniform, sequence-level Cost-Aware GRPO,
+GPAS, and Cost-GPAS share a 12-step round-robin warm start and run for 400
+optimizer steps. The Cost-Aware GRPO baseline first samples tasks with
+$q_i=\lambda_i$, then resamples completed responses inside the selected task in
+proportion to advantage magnitude divided by the square root of
+prompt-plus-response length \citep{mohri2026costawarelearning}. A small uniform
+mixture gives every completed response positive sampling probability.
+Importance weights preserve the empirical task objective. GPAS and Cost-GPAS
+select the task before generation and use the task-level correction in
+Equation~\ref{eq:importance_estimator}.
+
+The primary curves report weighted held-out KL-regularized return over tokens
+and GPU hours. MATH-500, APPS test pass@1, and ARC-Challenge accuracy provide
+the task vector. Multi-Task GRPO supplies a capability-oriented reference using
+its published task-weight rule \citep{ramesh2026multitaskgrporeliablellm}.

@@ -3,55 +3,60 @@
 \label{sec:intro}
 % ============================================================================
 
-Large language models often use separate post-training runs for mathematics,
-code, instruction following, science, and other capabilities. Multi-teacher
-on-policy distillation (MOPD) sends each student response to a matching
-specialist teacher and trains one student from the resulting token-level
-feedback \citep{ma2026mopdmultiteacheronpolicydistillation}.
+Post-training one model on mathematics, code, instruction following, and science
+requires two decisions. Target weights state which capabilities the objective
+values. Sampling probabilities decide which task receives the next rollout,
+teacher call, and update. Keeping target weights and sampling probabilities
+separate makes both decisions visible.
 
-Task allocation matters because teacher evaluation is expensive. One update
-design places every task in the same optimizer step. Another design selects
-one task for a task-homogeneous step. Task-homogeneous steps reduce memory use
-and teacher switching costs. Their use raises a practical question: how often
-should the system select each task?
+Many systems use the sampling ratio as the task weight. Sampling a weak or cheap
+task more often then changes the model objective, so the resulting capability
+trade-off can come from the objective, the compute schedule, or both. A coupled
+design makes optimization efficiency difficult to measure.
 
-Most implementations answer that question with a data mixture or a manually
-chosen sampling ratio. The same ratio controls the number of gradient
-evaluations and the average training gradient. Recent MOPD work shows that
-response length and learning speed can make the effective domain contribution
-very different from the prompt ratio
-\citep{gao2026openmopddiagnosingfixingcapability}. Increasing the sampling rate
-of a weak task changes its influence on the final model. Some training goals
-favor that change. Deployment requirements may instead specify a fixed teacher
-mixture.
+Response length creates a second ambiguity. In a prompt-balanced mixed batch,
+global token averaging gives long-response tasks a larger coefficient. Recent
+MOPD work diagnoses this imbalance and changes domain loss weights
+\citep{gao2026openmopddiagnosingfixingcapability}. Our training objective gives
+each response equal weight inside a task-homogeneous batch.
 
-We separate two choices. Target weights describe the MOPD objective. Sampling
-probabilities describe the use of gradient and teacher evaluations. When task
-$i$ is sampled, a simple weight ratio converts its gradient into an estimate
-of the target mixture gradient. The training system can then adapt its task
-allocation while retaining the selected objective.
+Teacher selection is a prerequisite for OPD. A wide teacher--student gap can
+create extreme token log-ratios, whereas a narrow gap supplies little signal.
+Recent studies report stronger transfer at moderate distributional overlap
+\citep{ma2026mopdmultiteacheronpolicydistillation,
+wang2026demystifyingopd,mayingzi2026onestudentmanyteachers}. We train teachers
+from the student initialization, audit them on student rollouts, and study task
+allocation only within the selected teacher set.
 
-Gradient-Preserving Adaptive Sampling (GPAS) chooses the allocation from
-recent task gradients. The task score measures the size of the update signal,
-including stochastic variation inside a task. Sampling in proportion to the
-score minimizes the task-level gradient estimator error for the current model.
-Raw GPAS uses the usual gradient norm. Adam GPAS first scales the gradient with
-the current AdamW second-moment state. The Adam-scaled score reflects the
-coordinates where the optimizer can make a larger parameter update.
+Suppose task $i$ has target weight $\lambda_i$ and sampling probability $q_i$.
+Multiplying its sampled gradient by $\lambda_i/q_i$ keeps the conditional mean
+equal to the target mixture. The sampling probabilities can then allocate
+compute while the target mixture stays fixed.
+
+Gradient-Preserving Adaptive Sampling (GPAS) applies classical importance
+sampling at the task-batch level. GPAS first scales task gradients with AdamW's
+stored second moment, then assigns more probability to tasks with larger scaled
+gradients. A moving average estimates each task score from completed updates.
+A probability floor limits stale scores and large importance weights.
+Cost-GPAS also uses measured task time.
+
+The controlled experiment checks the sampling formulas with known gradient
+distributions and costs. The large-model experiments use frozen gradient banks
+to compare raw gradients, GPAS scores, and measured AdamW task steps. Paired
+training runs then measure teacher-loss progress per token and GPU hour. A GRPO
+experiment tests the same task sampler with reward-based updates.
 
 The paper makes three contributions:
 \begin{itemize}
-    \item We formulate task sampling as a compute-allocation decision for a
-    fixed, response-normalized MOPD objective. The formulation separates target
-    weights from task sampling probabilities.
-    \item We derive GPAS with one short variance calculation and give two
-    practical scores: raw-gradient GPAS and Adam-scaled GPAS.
-    \item We evaluate the analysis through gradient estimator error,
-    matched-state AdamW probes, sampled-token versus full-vocabulary
-    comparisons, and end-to-end fixed-mixture MOPD training.
+    \item We define a response-normalized task-batch interface that separates a
+    fixed multi-task target from compute allocation in on-policy post-training.
+    \item We use AdamW-scaled task gradients to allocate updates. A cost-aware
+    version also uses measured end-to-end task time. Both samplers estimate
+    their task scores online from completed updates.
+    \item We validate the estimator calculation and specify direct MOPD and
+    GRPO tests that connect score quality to progress per token and GPU hour.
 \end{itemize}
 
-Section~\ref{sec:preliminaries} defines the fixed-mixture objective and the
-task-level estimator. Section~\ref{sec:theory} presents the GPAS allocation.
-Section~\ref{sec:experiments} tests target preservation, estimator error, and
-training efficiency.
+Section~\ref{sec:preliminaries} defines the objective and sampling interface;
+Section~\ref{sec:theory} presents GPAS; Section~\ref{sec:experiments} gives the
+MOPD and GRPO studies. The appendix contains proofs and implementation details.

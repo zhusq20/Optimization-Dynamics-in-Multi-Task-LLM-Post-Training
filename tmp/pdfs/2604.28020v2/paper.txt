@@ -1,0 +1,2090 @@
+                                                                            Cost-Aware Learning
+
+
+                                                       Clara Mohri∗                      Amir Globerson                      Haim Kaplan
+                                                     Kempner Institute                   Google Research                    Google Research
+                                                     Harvard University                 Tel Aviv University                Tel Aviv University
+
+                                                                  Tomer Koren                                    Yishay Mansour
+
+
+
+
+arXiv:2604.28020v2 [cs.LG] 29 May 2026
+                                                                 Google Research                                 Google Research
+                                                                Tel Aviv University                             Tel Aviv University
+
+
+
+                                                                                             Abstract
+
+                                                     We consider the problem of Cost-Aware Learning, where sampling different com-
+                                                     ponents of a finite-sum objective incurs different costs. The objective is to reach a
+                                                     target error while minimizing the total cost. We propose Cost-Aware SGD, which
+                                                     uses a distribution based on gradient norms and costs to sample components. We
+                                                     provide a thorough analysis of this algorithm, including cost-improvement bounds
+                                                     over baselines, a characterization of distribution proxy sub-optimality, and a lower
+                                                     bound. We apply our theoretical insights to reinforcement learning with language
+                                                     models, where the computational cost of sequence-level policy gradients varies
+                                                     with length. We find that the advantage magnitude serves as a high-fidelity proxy
+                                                     for gradient norms, and use this to introduce Cost-Aware GRPO. Empirical results
+                                                     on 1.5B, 4B, and 8B LLMs demonstrate that this algorithm significantly reduces the
+                                                     tokens used in policy optimization while matching or exceeding baseline accuracy.
+
+
+                                         1     Introduction
+
+                                         Stochastic gradient descent (SGD) [Nemirovsky et al., 1983] theory typically measures convergence
+                                         in terms of the number of gradient steps required to reach a target error. This implicitly assumes
+                                         that gradient evaluation on any data point incurs an identical computational cost. However, in
+                                         modern language model training, the assumption of uniform cost is not always true. For example,
+                                         in reinforcement learning for language models [Ouyang et al., 2022, Shao et al., 2024], the FLOPs
+                                         required to compute a policy gradient scale linearly with sequence length, meaning a long reasoning
+                                         trace can cost an order of magnitude more than a concise response.
+                                         Motivated by this computational heterogeneity, we study the problem of Cost-Aware Learning: given
+                                         a finite-sum objective where each component has a known evaluation cost 𝑐 𝑖 , how should one sample
+                                         gradients to reach 𝜖-error at a minimum total cost? We propose Cost-Aware SGD, which leverages
+                                         importance sampling [Kloek and    √ Van Dijk, 1978, Beygelzimer et al., 2009] to derive the optimal
+                                         sampling distribution 𝑝 ∗𝑖 ∝ 𝐺 𝑖 / 𝑐 𝑖 , where 𝐺 𝑖 is the Lipschitz constant (gradient norm bound) of
+                                         component 𝑖.
+                                         We analyze the cost-improvement over uniform and variance-reduction baselines, and validate this in
+                                         a synthetic setting. Since exact gradient norms are often unavailable in practice, we characterize the
+                                         sub-optimality of using a proxy distribution. We establish an information-theoretic lower bound for
+                                         cost-aware learning, which motivates a subset selection algorithm. Finally, we show that the derived
+                                         sampling strategy extends beyond convex objectives.
+                                             ∗ Work done while Clara Mohri was a Student Researcher at Google Research. Correspondence to: cmohri@harvard.edu.
+
+
+
+
+                                         Preprint.
+                                      Accuracy vs. Token Count (Qwen3-8B)
+                      60
+
+                      55
+                                                                                              Method
+                      50                                                                       GRPO
+
+
+       Accuracy (%)
+                                                                                               CA-GRPO
+                      45
+
+                      40                        (1) 17% fewer tokens
+
+                      35                                               (2) 51% fewer tokens
+
+                           0   100M             200M                   300M                     400M
+                                                Cumulative Tokens
+
+Figure 1: Qwen3-8B training with GRPO and Cost-Aware GRPO (CA-GRPO). We evaluate on
+AIME1983-2024 (pass@1/mean@32) and report cumulative tokens used in policy gradient computa-
+tion. We plot every 20 training steps until peak accuracy is attained for both. CA-GRPO requires:
+(1) 17% fewer tokens to reach its absolute peak than GRPO requires to come within 2% of that
+performance, (2) 51% fewer tokens to match or exceed the peak accuracy of GRPO.
+
+
+We apply these insights to the policy optimization phase of GRPO [Shao et al., 2024], where sequence
+length provides a natural cost. A key empirical finding, motivated by the form of the policy gradient,
+is that the advantage magnitude | 𝐴𝑖 | serves as a high-fidelity proxy for 𝐺 𝑖 based on our sub-optimality
+metrics. Equipped with this proxy, we introduce Cost-Aware GRPO, which samples model-generated
+sequences according to 𝑝 ∗ with | 𝐴𝑖 | in place of 𝐺 𝑖 during policy optimization. Cost-Aware GRPO
+significantly reduces the FLOPs used in policy optimization while matching or exceeding baseline
+performance. Through extensive ablations, we demonstrate robustness to proxy noise, hyperparameter
+choices, and show that cost-aware sampling generalizes beyond GRPO to the CISPO objective [Chen
+et al., 2025].
+The main contributions of this paper are as follows:
+
+      1. Cost-Aware SGD (§4). We derive the optimal cost-aware sampling distribution for convex
+         and strongly convex finite-sum optimization, analyze its cost-improvement over baselines,
+         characterize the sub-optimality of using a proxy distribution, and establish an information-
+         theoretic lower bound.
+      2. Cost-Aware GRPO (§5). We identify | 𝐴𝑖 | as a high-fidelity proxy for gradient norms and
+         apply cost-aware sampling to GRPO. Experiments with Qwen2.5-Math-1.5B-Instruct [Yang
+         et al., 2024], Qwen3-4B Base and Qwen3-8B Base [Yang et al., 2025] demonstrate consistent
+         improvements in token efficiency without compromising on performance.
+
+
+2   Related Work
+
+We describe the primary related work, and defer the discussion of additional works to Appendix A.
+
+Importance sampling for SGD. A significant body of work focuses on accelerating SGD conver-
+gence via importance sampling, primarily through variance reduction [Zhao and Zhang, 2015, Needell
+et al., 2014]. A foundational result by Alain et al. [2015] established that the optimal sampling
+distribution for variance reduction assigns probabilities proportional to the per-sample gradient norms.
+In the context of deep learning, where exact gradient norms are expensive to compute, methods have
+been proposed to approximate these norms using upper bounds or loss values [Katharopoulos and
+Fleuret, 2018, Johnson and Guestrin, 2018]. However, these approaches operate under a standard
+optimization framework that treats iterations as the unit of resource consumption. They aim to maxi-
+mize the information gain per step, implicitly assuming uniform computational cost across samples.
+Our work generalizes this by considering the cost-aware setting where the aim is to minimize training
+cost, leading to a sampling distribution that balances gradient magnitude against sample cost.
+
+
+                                                       2
+In particular, the work of Chen et al. [2023b] shares similarities with our work by also studying
+a finite-sum setting with varying sample costs. However, our contributions differ significantly
+in analysis and scope: while their work focuses on asymptotic behavior, we provide finite-time
+guarantees complemented by a lower bound. Furthermore, we implement this cost-aware framework
+with language models via Cost-Aware GRPO.
+
+RL for Language Models. While policy gradient methods [Sutton et al., 1999, Kakade, 2001,
+Schulman et al., 2015] have been used in many settings, the works of Ouyang et al. [2022], Dai
+et al. [2023] have garnered significant attention for their application to LLM post-training. Various
+methods such as DPO [Rafailov et al., 2023], PPO [Schulman et al., 2017, Zheng et al., 2023], and
+GRPO [Shao et al., 2024] have been shown to be extremely effective in improving accuracy on
+standard benchmarks. However, these methods incur substantial computational and memory costs.
+Several methods aim to improve data efficiency: [Wang et al., 2025, Fatemi et al., 2025, Li et al.,
+2025, Yu et al., 2025, Xu et al., 2025, Zheng et al., 2025]. Yu et al. [2025] introduces, among other
+contributions, a mechanism to continue resampling from a model until a sufficient amount of non-zero
+advantage responses have been generated, showing that this data helps the model achieve better
+performance. Xu et al. [2025] attempts to subsample the generations of a model in an effort to train
+on less data. Zheng et al. [2025] keeps track of the history of various prompts in an effort to remove
+low-signal prompts. Our work contrasts with these by using importance reweighting and taking into
+account the computational cost of sequences when making decisions.
+
+3     Problem Formulation
+We consider minimizing a convex function 𝑓 in the finite-sum setting where 𝑓 (𝑥) = 𝑛1 𝑖=1
+                                                                                             Í𝑛
+                                                                                                    𝑓𝑖 (𝑥).
+We assume that 𝑓 is minimized at 𝑥 ∗ , and that each component 𝑓𝑖 is a convex and 𝐺 𝑖 -Lipschitz
+function. In the cost-aware setting, each component 𝑖 has an evaluation cost 𝑐 𝑖 ≥ 0 for querying its
+gradient oracle. Namely, upon querying a particular sample 𝑖 at a point 𝑥, the algorithm obtains the
+exact gradient ∇ 𝑓𝑖 (𝑥) and incurs cost 𝑐 𝑖 . We assume that the learning algorithm has access to 𝐺 𝑖 and
+𝑐 𝑖 for all samples 𝑖.
+For a given 𝜖 > 0, the objective of a (possibly randomized) cost-aware learning algorithm is to incur
+the minimum possible cost to obtain 𝑥ˆ such that 𝔼[ 𝑓 ( ˆ𝑥) − 𝑓 (𝑥 ∗ )] ≤ 𝜖.
+
+4     Cost-Aware SGD
+In this section, we address the problem presented in Section 3. We propose Cost-Aware SGD, a
+simple variant of standard SGD, which differs only in the use of a non-uniform sampling distribution
+and importance weighting to account for bias. Pseudocode is provided in Appendix 1. While the
+analysis in this section assumes convex loss functions in order to provide meaningful insights, in
+Appendix F we show that the optimal sampling distribution derived does not strictly rely on convexity.
+
+4.1   Cost Analysis
+
+Consider a fixed sampling distribution p ∈ Δ𝑛 used in the Cost-Aware SGD algorithm. The total
+                                                                   Í
+cost of the algorithm over 𝑇 iterations is the random variable K𝑇 = 𝑇𝑡=1 𝑐 𝑖𝑡 . By the linearity of
+expectation, the expected total cost is:
+                                        𝑇
+                                       ∑︁                      𝑛
+                                                              ∑︁
+                            𝔼[K𝑇 ] =          𝔼 [𝑐 𝑖𝑡 ] = 𝑇         𝑝 𝑖 𝑐 𝑖 = 𝑇 · 𝐶 (p),               (1)
+                                             𝑖𝑡 ∼p
+                                       𝑡=1                    𝑖=1
+               Í𝑛
+where 𝐶 (p) = 𝑖=1   𝑝 𝑖 𝑐 𝑖 represents the expected cost per iteration. Our goal is to minimize the total
+expected cost required to reach a target error 𝜖. Let 𝑇 (𝜖, p) denote the number of iterations required
+to achieve expected error 𝜖 using distribution p. We seek to find 𝑝 which minimizes:
+                                       K (𝜖, p) = 𝑇 (𝜖, p) · 𝐶 (p).                                    (2)
+
+Case 1: General Convex Functions For general convex functions, standard convergence√results
+for SGD [Nemirovsky et al., 1983, Bubeck et al., 2015] state that with step size 𝜂 ∝ 1/ 𝑇, the
+
+
+                                                       3
+                                                              √
+                                                            𝐷 𝑆 (p)
+expected suboptimality satisfies: 𝔼[ 𝑓 ( 𝑥¯𝑇 ) − 𝑓 (𝑥 ∗ )] ≤ √      , where 𝑆(p) = 𝔼𝑖∼p [∥ ˜𝑔∥ 2 ] is the
+                                                                𝑇
+second moment of the gradient estimator, and 𝐷 is the diameter of the parameter space. Expanding
+                                                                             2     Í𝑛 𝐺𝑖2
+                                                               𝑝 𝑖 ∇ 𝑛𝑓𝑖𝑝(𝑖𝑥) ≤ 𝑛12 𝑖=1
+                                                           Í𝑛
+the second moment for importance sampling: 𝑆(p) = 𝑖=1                                   𝑝𝑖 , where 𝐺 𝑖 is
+                                                                                      2
+the Lipschitz constant for component 𝑓𝑖 . To guarantee error 𝜖, we require 𝑇 = 𝐷 𝜖𝑆2(p) . Substituting
+this into the cost formula:
+                                          2      
+                                          𝐷 𝑆(p)
+                             K (𝜖, p) =             𝐶 (p) ∝ 𝑆(p)𝐶 (p).                             (3)
+                                             𝜖2
+
+Case 2: Strongly Convex Functions For 𝑓 that is 𝜇-strongly convex, SGD with decaying step
+size 𝜂𝑡 = 1/(𝜇𝑡) achieves a rate of O (𝑆(p)/𝜇𝑇) [Rakhlin et al., 2011]. The expected total cost under
+distribution p to attain error 𝜖 becomes:
+                                                   
+                                              4𝑆(p)
+                                 K (𝜖, p) =           𝐶 (p) ∝ 𝑆(p)𝐶 (p).                          (4)
+                                               𝜇𝜖
+In both cases, minimizing the total cost is equivalent to minimizing the product 𝐽 (p) = 𝑆(p)𝐶 (p).
+
+4.2   Derivation of the Optimal Distribution
+
+Theorem 4.1 (Optimal Cost-Weighted Distribution). The sampling distribution p∗ that minimizes
+K (𝜖, 𝑝) is:                                      √
+                                             𝐺 𝑖 / 𝑐𝑖
+                                   𝑝 ∗𝑖 = Í𝑛        √ .                                   (5)
+                                           𝑗=1 𝐺 𝑗 / 𝑐 𝑗
+Under this distribution, the expected costs for general convex and 𝜇-strongly convex functions are:
+                                 𝑛
+                                           !2                                  𝑛
+                                                                                        !2
+                    ∗     𝐷 2 1 ∑︁ √                                ∗    4 1 ∑︁ √
+          Kcvx (𝜖, p ) = 2          𝐺 𝑖 𝑐𝑖 ,          Kstr-cvx (𝜖, p ) =          𝐺 𝑖 𝑐𝑖 .       (6)
+                          𝜖 𝑛 𝑖=1                                        𝜇𝜖 𝑛 𝑖=1
+
+Proof. We minimize the product √      term 𝐽 (p) = 𝑆(p)𝐶√ (p). By the Cauchy-Schwarz inequality, for
+vectors 𝑢, 𝑣 ∈ ℝ𝑛 defined by 𝑢 𝑖 = 𝑝 𝑖 𝑐 𝑖 and 𝑣 𝑖 = 𝐺 𝑖 / 𝑝 𝑖 :
+                                 ! 𝑛       !                                     !2
+                        𝑛
+                       ∑︁          ∑︁ 𝐺 2                            ∑︁𝑛
+                                                                             √
+                                         𝑖        2   2          2
+                           𝑝𝑖 𝑐𝑖             = ∥𝑢∥ ∥𝑣∥ ≥ ⟨𝑢, 𝑣⟩ =         𝐺 𝑖 𝑐𝑖 .                     (7)
+                       𝑖=1         𝑖=1
+                                        𝑝𝑖                            𝑖=1
+                                                      √            √                   √
+Equality holds if and only if 𝑢 ∝ 𝑣, which implies 𝑝 𝑖 𝑐 𝑖 ∝ 𝐺 𝑖 / 𝑝 𝑖 , or 𝑝 𝑖 ∝ 𝐺 𝑖 / 𝑐 𝑖 . Substituting
+                                                                                    √
+the minimum value of the product back into 𝐽 (p), we obtain 𝐽 (p∗ ) = 𝑛12 ( 𝐺 𝑖 𝑐 𝑖 ) 2 . Substituting
+                                                                               Í
+𝐽 (p∗ ) into Eq. 3 and Eq. 4 yields the stated costs.                                                    □
+
+4.3   Cost-Improvement over Baselines
+
+We compare p∗ against two baselines. Uniform sampling sets ( 𝑝 unif )𝑖 = 1/𝑛. Í The variance strategy
+ignores costs and samples proportionally to gradient norms: ( 𝑝 var )𝑖 = 𝐺 𝑖 / 𝑗 𝐺 𝑗 , which minimizes
+the variance of the gradient estimator [Alain et al., 2015, Zhao and Zhang, 2015, Needell et al., 2014]
+(see Appendix D.1 for a derivation).
+Their expected costs to achieve 𝜖 error under general convex losses are: K (𝜖, 𝑝 unif ) =
+ 𝐷 2 Í𝑛      2 Í𝑛 𝑐                             𝐷 2 Í𝑛
+                                                            Í𝑛           
+𝜖 2 𝑛2 𝑖=1 𝐺 𝑖      𝑖=1 𝑖 and K (𝜖, 𝑝 var ) = 𝜖 2 𝑛2 𝑖=1 𝐺 𝑖     𝑖=1 𝐺 𝑖 𝑐 𝑖 . The cost ratios relative to
+optimal sampling are:
+                              Í √                                             Í √
+           K (𝜖, p∗ )        ( 𝐺 𝑖 𝑐𝑖 ) 2              K (𝜖, p∗ )            ( 𝐺 𝑖 𝑐𝑖 ) 2
+                         = Í 2 Í           ≤ 1,                       = Í         Í           ≤ 1.     (8)
+         K ( 𝜖, 𝑝 unif )    ( 𝐺 𝑖 ) ( 𝑐𝑖 )           Kvar (𝜖, 𝑝 var )    ( 𝐺 𝑖 ) ( 𝑖 𝐺 𝑖 𝑐𝑖 )
+When all costs are equal, Kopt = Kvar , but Kopt still improves over Kunif by minimizing variance (see
+Appendix D.1 for a detailed comparison). When costs and gradients are negatively correlated, the
+gains can be dramatic: setting 𝐺 𝑖 = 2−𝑖/4 , 𝑐 𝑖 = 2𝑖 yields Kopt /Kunif = Θ(2−𝑛/2 ) and Kopt /Kvar =
+Θ(2−𝑛/4 ).
+
+
+                                                    4
+                                 Error vs. Training Steps                                           Error vs. Total Cost
+                       7                                                              7
+
+
+
+      Error (f(x) f(x * ))                                           Error (f(x) f(x * ))
+                       6                                                              6                                              Strategy
+                                                                                                                                      Uniform
+                       5                                                              5                                               Variance
+                       4                                                              4                                               Optimal
+                       3                                                              3
+                             0   2000   4000   6000   8000   10000                          0   1        2       3         4   5
+                                         Iterations                                                   Cumulative Cost          1e6
+
+Figure 2: Synthetic validation. We compare the error with the total training steps and the total cost
+incurred by each sampling strategy.
+
+
+4.4           Synthetic Validation
+
+We evaluate the sampling strategies on a linear least squares task with 𝑁 = 3000 points in dimension
+𝑑 = 50. The data vectors 𝑎 𝑖 are scaled such that their norms are bounded by 𝐿 = 10. This geometry
+ensures that the Lipschitz constants 𝐺 𝑖 are bounded but heterogeneous across the dataset. Evaluation
+costs 𝑐 𝑖 are assigned randomly from a uniform distribution between 1 and 1000.√ We compare three
+sampling approaches: Uniform, Variance (𝑝 𝑖 ∝ 𝐺 𝑖 ), and Optimal (𝑝 𝑖 ∝ 𝐺 𝑖 / 𝑐 𝑖 ). The results are
+shown in Figure 2. We average over 1000 trials and report standard deviation error bars.
+Cost Efficiency: For a fixed error target, the Optimal strategy incurs the least total cost. By weighting
+samples by the ratio of information to cost, it effectively identifies samples that provide significant
+variance reduction with a low cost. Convergence Rate: The Variance strategy converges the fastest
+in terms of iteration count. This is expected, as it minimizes the gradient estimator’s variance without
+regard for computational budget.
+
+4.5           Proxy Sub-Optimality
+
+In practice, it can be prohibitively costly to compute 𝐺 𝑖 . As such, one may not have access to the
+perfect sampling distribution 𝑝 ∗ ; in fact, this is the case for later experiments in this paper. In this
+subsection, we consider the sub-optimality of using a proxy. We recall that 𝐽 (p) = 𝑆(p)𝐶 (p), and
+that K (𝜖, p) is the expected cost to attain error 𝜖 under distribution p. In Section 4.1, we showed that
+for any 𝜖, K (𝜖, p) ∝ 𝐽 (p). 𝐽 ( 𝑝 ′ ) represents how cost scales with error for 𝑝 ′ . Hence, the quantity
+𝐽 ( 𝑝 ′ )/𝐽 ( 𝑝 ∗ ) represents the ratio between the cost incurred by 𝑝 ′ and that of 𝑝 ∗ .
+                                                                                            Í 𝑃2
+The 𝜒2 -divergence is defined as follows for two distributions 𝑃, 𝑄: 𝐷 𝜒2 (𝑃||𝑄) =              𝑄 − 1. In
+Theorem 4.2, we exactly characterize the sub-optimality due to using a different sampling distribution
+𝑝 ′ in place of 𝑝 ∗ .
+Theorem 4.2 (Sub-optimality gap for distribution proxy). Let 𝑝 ′ be any empirical sampling dis-
+tribution. We define the cost-biased distribution 𝑝˜ corresponding to 𝑝 as: 𝑝˜𝑖 = ( 𝑝 𝑖 𝑐 𝑖 )/𝐶 ( 𝑝). The
+sub-optimality gap is: 𝐽 ( 𝑝 ′ )/𝐽 ( 𝑝 ∗ ) = 1 + 𝐷 𝜒2 ( 𝑝˜∗ || 𝑝˜′ ).
+
+To provide further intuition as to when one can use some proxy 𝐺 𝑖′ in place of 𝐺 𝑖 for a proxy sampling
+distribution, we provide Theorem D.5 (Appendix D.5). It implies that, when 𝐺 𝑖 and 𝐺 𝑖′ have near-
+1 Pearson correlation, 𝔼[𝐽 ( 𝑝 ′ )] ≈ 𝐽 ( 𝑝 ∗ ). The Pearson correlation between random variables 𝑋
+and 𝑌 with expected values 𝜇 𝑋 , 𝜇𝑌 , and standard deviations 𝜎𝑋 , 𝜎𝑌 , respectively, is defined as:
+                )
+𝜌 𝑋,𝑌 = Cov(𝑋,𝑌
+          𝜎𝑋 𝜎𝑌 . Both proofs are deferred to Appendix D.5.
+
+
+4.6           Lower Bound
+
+Having established the upper bounds for Cost-Aware SGD, a natural question is whether it is possible
+to design a sampling strategy that achieves a lower total cost. In this section, we provide a lower
+bound for the class of convex functions.
+Theorem 4.3. Fix 𝜖, 𝐺 > 0. For any number of components 𝑛 ≥ 𝐺 2 /𝜖 2 , any set of nonnegative
+query costs {𝑐 𝑖 }𝑖=1
+                  𝑛 , and any (possibly randomized) algorithm with an expected error guarantee
+𝔼[𝐹 ( ˆ𝑥) − min 𝐹 (𝑥)] ≤ 𝜖, there exists a convex, 𝐺-Lipschitz (i.e., with 𝐺 𝑖 = 𝐺 for all 𝑖) finite-sum
+
+
+                                                                                            5
+                  Correlation, Divergence vs. Training Step (8B, GRPO)                                              Correlation, Divergence vs. Training Step (1.5B, GRPO)
+               0.10                                                   1.00                                        0.10                                                    1.00
+
+
+
+
+                                                                         Pearson Correlation                                                                                 Pearson Correlation
+               0.08                                                   0.98                                        0.08                                                    0.98
+
+
+2 Divergence                                                                                       2 Divergence
+               0.06                                                   0.96                                        0.06                                                    0.96
+
+               0.04                                                   0.94                                        0.04                                                    0.94
+
+               0.02                                                   0.92                                        0.02                                                    0.92
+
+               0.00                                                   0.90                                        0.00                                                    0.90
+                      0        100   200        300    400      500                                                       200    400   600    800    1000   1200   1400
+                                       Training Step                                                                                     Training Step
+
+
+ Figure 3: Sub-optimality metrics for using | 𝐴𝑖 | in place of 𝐺 𝑖 for GRPO experiments across two
+ model sizes. The Pearson correlations are near 1. The cost-biased 𝜒2 -divergence between the true 𝑝 ∗
+ and the distribution defined by this proxy is near 0.
+
+
+ problem instance over X = [−1, 1] such that the algorithm’s expected total query cost is at least:
+                                                              !2
+                                             © 𝐺 2 1 ∑︁ √
+                                            Ω­ 2
+                                                                 ª
+                                                            𝑐𝑖 ® ,
+                                               𝜖   𝑛 𝑖 ∈𝑆 ∗
+                                             «                   ¬
+ where 𝑆 ∗ √⊆ [𝑛] isÍany set of components such that following cost-uniformity condition holds:
+                             √
+ (max𝑖 ∈𝑆 ∗ 𝑐 𝑖 )/( 𝑛1 𝑗 ∈𝑆 ∗ 𝑐 𝑗 ) ≤ 40𝜖
+                                       𝐺
+                                          .
+We defer the proof to Appendix E. The lower bound matches the upper bound from Theorem 4.1 in
+                                                                                            Í𝑛 √ 2
+its 𝑛21𝜖 2 dependence, but differs in how it aggregates costs: the upper bound scales with ( 𝑖=1  𝑐𝑖 ) ,
+                                              √
+while the lower bound scales with ( 𝑖 ∈𝑆 ∗ 𝑐 𝑖 ) 2 . For uniform costs, 𝑆 ∗ = [𝑛] and the bounds match
+                                       Í
+up to constants. When costs are highly non-uniform, the gap arises because expensive components are
+excluded from 𝑆 ∗ . This motivates combining importance-weighted sampling with subset selection:
+first choosing which components to include, then optimizing sampling probabilities over the selected
+subset. We develop this approach in Appendix C, where we show that the subset selection problem
+reduces to a min-cost knapsack problem, for which a polynomial-time 2-approximation exists that
+simply selects the cheapest components.
+
+ 5                    Cost-Aware GRPO
+We apply our theoretical analysis to the empirical setting of GRPO [Shao et al., 2024]. In particular,
+we focus on reducing the number of FLOPs used by policy optimization.
+
+ 5.1                      Datasets and Models
+
+We perform experiments with the Qwen2.5-Math-1.5B-Instruct [Yang et al., 2024], Qwen3-4B and
+Qwen3-8B [Yang et al., 2025] models. We use the DAPO dataset [Yu et al., 2025] for training,
+designed for improving accuracy on AIME problems. We evaluate on the following benchmarks:
+AIME1983-2024 [Veeraboina, 2023], AMC [Art of Problem Solving, n.d.], MATH500 [Hendrycks
+et al., 2021], and GSM8K [Cobbe et al., 2021]. All experiments are performed with the Verl
+framework [Sheng et al., 2025], and we make only slight modifications for the purpose of our
+algorithm. Hyperparameters for all experiments in Appendix G.
+
+ 5.2                      Cost-Aware Learning with GRPO
+
+Background on GRPO. In GRPO, training alternates between two stages. The first stage generates
+many responses for each prompt in order to build a dataset for the second stage. The second stage is
+where policy gradient updates are made. The gradient updates are made on the current set of prompts
+and responses, which can be considered as the current dataset.
+We assume the training dataset has “verifiable rewards,” such as a math dataset where the answers
+are known. The reward is 1 if the response is correct and 0 otherwise. Given 𝑀 responses for a
+                                                1 Í𝑀
+prompt, advantages are normalized: 𝐴𝑖 = (𝑟 𝑖 − 𝑀    𝑘=1 𝑟 𝑘 )/(std({𝑟 𝑘 } 𝑘=1 )). One of the key benefits
+                                                                          𝑀
+of GRPO-style algorithms is that the advantage is very cheap to obtain.
+
+
+                                                                                               6
+                                Accuracy vs. Token Count (GRPO)                                                    Accuracy vs. Token Count (GRPO+ZVF)
+               70                                                                                       70
+
+
+               60                                                                                       60
+
+
+
+
+Accuracy (%)                                                                             Accuracy (%)
+               50                                                                                       50
+
+
+               40                                                                                       40
+                                                                  Method                                                                           Method
+                                                              No sampling                                                                        No sampling
+               30                                             p*                                        30                                       p*
+                                                                *
+                                                              psmooth ( = 0.01)                                                                    *
+                                                                                                                                                 psmooth ( = 0.01)
+               20                                                                                       20
+                    0.0   0.2     0.4   0.6    0.8    1.0   1.2      1.4    1.6                              0.0     0.2      0.4       0.6      0.8         1.0
+                                        Cumulative Tokens                      1e9                                           Cumulative Tokens                     1e9
+
+
+
+
+Figure 4: Accuracy vs. token count on AIME throughout training for both GRPO and GRPO+ZVF
+settings for the 1.5B model. We plot the accuracy on the 𝑦-axis and the cumulative number of tokens
+used in policy optimization on the 𝑥-axis, to compare the number of tokens used for a fixed accuracy.
+We evaluate every 100 steps.
+
+
+ Defining 𝑐 𝑖 . The notion of cost fits seamlessly in this setting of GRPO because different prompt
+ and response pairs have different lengths. The amount of FLOPs required in the policy gradient
+ step depends linearly on the total number of tokens in the prompt and response. Hence, for each
+ prompt and response pair, we define 𝑐 𝑖 to be the sum of the length of the prompt and the length of the
+ response.
+ Proxy for 𝐺 𝑖 . It remains to find a strong proxy for 𝐺 𝑖 ; recall that 𝐺 𝑖 represents the norm of the
+ gradient of a sample. In language model training, it would not be logical to compute the norm of the
+ gradient of each sample in order to obtain an optimal sampling distribution, as this has a very high
+ computational burden and defeats the purpose. Crucially, we estimate 𝐺 𝑖 with | 𝐴𝑖 |, the magnitude of
+ the advantage of sample 𝑖. This is motivated by the expression for the policy gradient, in which the
+ magnitude of the advantage appears to play a large role.
+We justify this choice by observing low cost-biased 𝜒2 -divergence between the sampling proxy
+obtained this way and the true 𝑝 ∗ distribution (invoking Theorem 4.2), as well as high Pearson
+correlation between 𝐺 𝑖 and | 𝐴𝑖 | (invoking Theorem D.5). In Figure 3, we report the Pearson
+correlation between | 𝐴𝑖 | and 𝐺 𝑖 across training for GRPO with the 8B and 1.5B models. In order
+to obtain 𝐺 𝑖 , we compute true sequence-level gradients. Upon computing the true gradient norms,
+we compute the cost-biased 𝜒2 divergence between the distributions obtained using | 𝐴𝑖 | and 𝐺 𝑖
+respectively. We report sub-optimality metrics for all training settings in Appendix G.8.
+
+Algorithm. Equipped with notions of cost and a gradient proxy, we combine cost-aware learning
+with GRPO in the policy-gradient stage of training. When we perform the policy gradient steps, we
+fill mini-batches according to the 𝑝 ∗ distribution
+                                                 √ rather than simply using  all samples once. The 𝑝 ∗
+                                      ∗                                  ∗
+distribution is obtained by letting 𝑝 𝑖 ∝ | 𝐴𝑖 |/ 𝑐 𝑖 . Thus, computing 𝑝 simply requires obtaining the
+advantage for all samples. We use importance sampling to mitigate bias. Aside from this, we make
+no changes to the GRPO pipeline. The exact procedure is detailed in Algorithm 2.
+
+ 5.3                Settings and Methods
+
+We evaluate combinations of two training settings and three sampling methods.
+Training settings. (1) GRPO: Standard GRPO training as described in Section 5.2. (2) GRPO +
+ZVF: GRPO with zero-variance filtering (ZVF) [Yu et al., 2025], which removes zero-advantage
+prompts. To maintain a fixed batch size, rollouts are resampled until sufficient non-zero-advantage
+samples are obtained.
+Sampling methods. (1) No sampling: Standard training on all generated rollouts without resampling
+or importance weighting. (2) 𝑝 ∗ sampling: We sample rollouts according to 𝑝 ∗ (Section 5.2,
+Algorithm 2) and apply importance weighting to correct for bias. (3) Smoothed 𝑝 ∗ sampling: We
+also consider 𝑝 ∗smooth (𝛼) = (1 − 𝛼) 𝑝 ∗ + 𝛼U, where U is the uniform distribution.
+
+
+                                                                                     7
+  Model            Setting   Method                 AIME   AMC      MATH      GSM8K       Avg. Accuracy
+                   GRPO      No sampling            61.3    64.1      73.2      86.2           71.2
+                   GRPO      𝑝∗                     65.6    71.2      73.2      86.0           74.0
+                   GRPO      𝑝 ∗smooth (𝛼 = 0.01)   65.3    68.1      72.3      86.0           72.9
+  Math-1.5B-IT
+                   ZVF       No sampling            58.1    64.7      73.2      86.1           70.6
+                   ZVF       𝑝∗                     57.6    63.0      72.9      85.9           69.8
+                   ZVF       𝑝 ∗smooth (𝛼 = 0.01)   62.9    68.0      73.3      85.8           72.5
+                   GRPO      No sampling            56.4    72.1      86.5      94.5           77.4
+  4B-Base          GRPO      𝑝∗                     56.7    74.5      86.3      94.2           77.9
+                   GRPO      𝑝 ∗smooth (𝛼 = 0.01)   56.9    72.0      86.8      94.2           77.4
+                   GRPO      No sampling            58.3    72.8      87.0      96.0           78.5
+  8B-Base          GRPO      𝑝∗                     58.5    74.7      86.7      95.2           78.8
+                   GRPO      𝑝 ∗smooth (𝛼 = 0.01)   58.5    74.0      86.7      94.9           78.5
+
+Table 1: Cost-aware sampling preserves model performance. For each setting and method, we
+report the best averaged checkpoint accuracy across four benchmarks. 𝑝 ∗ sampling and variants
+consistently preserve overall model performance.
+
+
+For the 1.5B model, we evaluate all settings and sampling methods. For the 4B and 8B models, we
+restrict our attention to the GRPO setting because it outperforms GRPO+ZVF in the smaller scale
+setting. Implementation and hyperparameter details are provided in Appendix G.
+
+
+5.4   Results
+
+We evaluate all methods across two primary axes: benchmark accuracy and the cumulative tokens
+used in policy optimization. Since token count is directly proportional to FLOPs in the policy
+gradient step, this measures the cost-accuracy tradeoff of each strategy. All reported accuracies
+denote pass@1/mean@32, the average correctness of querying the model 32 times. In all figures, we
+plot up to peak accuracy. We focus on AIME accuracy, as this is the intended downstream benchmark
+for the DAPO training set.
+Qwen2.5-Math-1.5B-Instruct Results. Figure 4 plots the cumulative policy optimization tokens
+against AIME accuracy. Under standard GRPO, both 𝑝 ∗ and 𝑝 ∗smooth (𝛼 = 0.01) match the baseline’s
+peak accuracy using 28% and 32% fewer tokens respectively and ultimately surpass the baseline’s
+maximum accuracy by 5 percentage points (pp).
+Under GRPO+ZVF, 𝑝 ∗smooth (𝛼 = 0.01) maintains an advantage, achieving the baseline’s peak
+accuracy using 13% fewer tokens before ultimately outperforming it by 5pp.
+Results on AMC benchmark (visualized in Figure 12) show a similar pattern: (1) 𝑝 ∗ sampling with
+GPRO requires 34% fewer tokens than the baseline to achieve the same accuracy and improves peak
+accuracy by 7pp, and (2) 𝑝 ∗smooth (0.01) sampling with GRPO+ZVF requires 5% fewer tokens than
+the baseline to achieve the same accuracy and improves peak accuracy by 3pp.
+Qwen3-4B Results. On AIME (Figure 13), 35% fewer tokens are needed for 𝑝 ∗ sampling to reach its
+absolute peak than no sampling requires to come within 1% of this accuracy. On AMC (Figure 14),
+𝑝 ∗ sampling exceeds the baseline by 2pp, and requires ~24% fewer tokens to reach the peak accuracy.
+Qwen3-8B Results. Figure 1 shows AIME accuracy. 𝑝 ∗ sampling achieves the baseline’s peak
+accuracy using 51% fewer tokens. Because the baseline’s late-stage improvement is marginal, we
+also report an asymmetric comparison: matching 𝑝 ∗ when it reaches 99% of its peak accuracy. Even
+under this relaxed threshold, 𝑝 ∗ requires 17% fewer tokens than the baseline. This efficiency trend
+extends to the AMC benchmark (Figure 17), where 𝑝 ∗ sampling reaches the baseline’s maximum
+accuracy using 47% fewer tokens. We also explored smoothed variants (Figure 16). These improve
+upon the baseline, but 𝑝 ∗ performs best, possibly due to the high fidelity of | 𝐴𝑖 | as a proxy (Figure 3).
+Lastly, Table 1 reports the best checkpoint accuracy for all models and methods. Crucially, these
+results demonstrate that cost-aware sampling preserves model performance with respect to standard
+GRPO training; in fact, it is even able to improve upon baseline performance.
+
+
+                                                     8
+                          Accuracy vs. Token Count (CISPO)                                                Accuracy vs. Token Count ( 2 noise for p * -NOISE- 2 )
+               60
+
+               55                                                                                    60
+
+               50
+
+
+
+Accuracy (%)                                                                          Accuracy (%)
+                                                                                                     50                                                Method
+               45
+                                                                                                                                                       p*
+               40                                                                                                                                      p*-NOISE-0.01
+                                                                                                     40
+               35
+                                                             Method                                                                                    p*-NOISE-0.1
+                                                            No sampling                                                                                p*-NOISE-1
+               30                                           p*                                       30                                                p*-NOISE-5
+               25
+                                                              *
+                                                            psmooth ( = 0.01)                                                                          No sampling
+                                                                                                          0.0   0.2   0.4    0.6    0.8    1.0   1.2        1.4   1.6
+                    0.0   0.5     1.0       1.5       2.0             2.5
+                                  Cumulative Tokens                         1e9                                              Cumulative Tokens                       1e9
+
+
+(a) CISPO. AIME accuracy (pass@1/mean@32) for                                         (b) Noisy proxies. Math-1.5B with GRPO when
+training Qwen2.5-Math-1.5B-Instruct with CISPO.                                       adding zero-mean, 𝜎 2 -variance noise to the proxy
+Cost-aware learning is robust to training objectives.                                 | 𝐴𝑖 | prior to computing the sampling distribution.
+
+
+Across the board, cost-aware sampling preserves, and often improves upon, the accuracy of standard
+GRPO, while substantially reducing the token cost of policy optimization, as seen in the results above.
+Across model scales, we showed that | 𝐴𝑖 | is a reliable proxy for 𝐺 𝑖 , and that cost-aware sampling
+reduces the cost of policy optimization. While our primary focus is on the cost of policy optimization,
+results also indicate that fewer overall training steps are needed for cost-aware sampling.
+
+ 5.5                Ablations
+
+Training objective. We consider a variant of the GRPO objective, CISPO Chen et al. [2025]. CISPO
+applies a stop-gradient to the importance weight of the objective. We base our hyperparameters on
+findings from Khatri et al. [2025]. Results, reported in Figure 5a, show that our method is not specific
+to the GRPO objective; rather, it generalizes across training objectives. 𝑝 ∗ sampling and 𝑝 ∗smooth (0.01)
+sampling require 31% and 34% fewer tokens respectively to attain the baseline’s peak accuracy,
+and ultimately outperform by about 4pp. This finding is further supported by strong sub-optimality
+metrics, performance on additional benchmarks, and smoothed variants in Appendix G.7.
+ Proxy sub-optimality. We ablate the noise level associated with our proxy | 𝐴𝑖 |. In particular, we
+ add zero-mean noise with variance 𝜎 2 to | 𝐴𝑖 | prior to computing the sampling distribution. Results
+ are shown in Figure 5b. We observe that Cost-Aware GRPO is robust to noise up until 𝜎 2 = 0.1, but
+ as noise approaches 𝜎 2 = 1.0, it deteriorates with respect to the baseline.
+Choice of 𝛼 and proxy. In Appendix G.6, we ablate our choice of 𝛼 and report results for 𝑝 ∗smooth
+with 𝛼 = 0.05 and 𝛼 =√0.1 as well. We also ablate our choice of approximating 𝐺 𝑖 with | 𝐴𝑖 | and
+consider using 𝑝 ∗𝑖 = 1/ 𝑐 𝑖 , which corresponds to substituting 𝐺 𝑖 with 1 for all samples. We observe
+that it does not perform as well, which implies a need for correctly approximating the gradient norm
+of a sample. In Appendix G.11, we report smoothed variants for the 4B and 8B model as well.
+
+ 6                  Conclusion
+ In this paper, we formalize the problem of cost-aware learning and propose Cost-Aware SGD.
+ Our analysis derives the optimal sampling distribution for convex and strongly convex objectives,
+ providing theoretical guarantees on the expected cost to attain an error of 𝜖. We extensively analyze
+ the properties of this algorithm.
+We apply our theoretical insights to GRPO and introduce Cost-Aware GRPO. Our use of | 𝐴𝑖 | as
+a proxy for 𝐺 𝑖 in the optimal sampling distribution is supported by strong sub-optimality metrics
+across scales. Our experiments demonstrate the broad effectiveness of this approach; it significantly
+reduces the tokens used in policy optimization, while maintaining or exceeding the peak performance
+of standard baselines.
+
+ Future Directions. In Cost-Aware GRPO, we primarily rely on the magnitude of the advantage
+ as a proxy for the gradient norm; identifying superior proxies remains an interesting direction for
+ future research. Furthermore, having demonstrated that cost-aware sampling generalizes successfully
+
+
+                                                                                  9
+from standard GRPO to the CISPO objective, a natural next step is to explore its integration into a
+broader class of RLVR and RLHF algorithms. It would also be of interest to dynamically set 𝛼 in
+smoothed variants of Cost-Aware GRPO in order to obtain superior performance. Lastly, closing the
+gap between the upper and lower bounds in Section 4 would be of theoretical significance.
+
+
+
+
+                                                10
+References
+Guillaume Alain, Alex Lamb, Chinnadhurai Sankar, Aaron Courville, and Yoshua Bengio. Variance
+  reduction in sgd by distributed importance sampling. arXiv preprint arXiv:1511.06481, 2015.
+Art of Problem Solving. Amc problems and solutions. https://artofproblemsolving.com/
+  wiki/index.php/AMC_Problems_and_Solutions, n.d. Accessed: 2026-01-28.
+Alina Beygelzimer, Sanjoy Dasgupta, and John Langford. Importance weighted active learning. In
+  Proceedings of the 26th annual international conference on machine learning, pages 49–56, 2009.
+Sébastien Bubeck et al. Convex optimization: Algorithms and complexity. Foundations and Trends®
+  in Machine Learning, 8(3-4):231–357, 2015.
+Aili Chen, Aonian Li, Bangwei Gong, Binyang Jiang, Bo Fei, Bo Yang, Boji Shan, Changqing Yu,
+  Chao Wang, Cheng Zhu, et al. Minimax-m1: Scaling test-time compute efficiently with lightning
+  attention. arXiv preprint arXiv:2506.13585, 2025.
+Lichang Chen, Shiyang Li, Jun Yan, Hai Wang, Kalpa Gunaratna, Vikas Yadav, Zheng Tang, Vijay
+  Srinivasan, Tianyi Zhou, Heng Huang, et al. Alpagasus: Training a better alpaca with fewer data.
+  arXiv preprint arXiv:2307.08701, 2023a.
+Xiangyi Chen, Sijia Liu, Ruoyu Sun, and Mingyi Hong. On the convergence of a class of adam-type
+  algorithms for non-convex optimization. arXiv preprint arXiv:1808.02941, 2018.
+Ziang Chen, Jianfeng Lu, Huajie Qian, Xinshang Wang, and Wotao Yin. Hetersgd: Tackling
+  heterogeneous sampling costs via optimal reweighted stochastic gradient descent. In Francisco
+  Ruiz, Jennifer Dy, and Jan-Willem van de Meent, editors, Proceedings of The 26th International
+  Conference on Artificial Intelligence and Statistics, volume 206 of Proceedings of Machine
+  Learning Research, pages 10732–10781. PMLR, 25–27 Apr 2023b.
+Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser,
+  Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, et al. Training verifiers to solve
+  math word problems. arXiv preprint arXiv:2110.14168, 2021.
+Corinna Cortes, Giulia DeSalvo, Claudio Gentile, Mehryar Mohri, and Ningshan Zhang. Region-
+  based active learning. In The 22nd International Conference on Artificial Intelligence and Statistics,
+  pages 2801–2809. PMLR, 2019.
+Corinna Cortes, Giulia Desalvo, Claudio Gentile, Mehryar Mohri, and Ningshan Zhang. Adaptive
+  region-based active learning. In Hal Daumé III and Aarti Singh, editors, Proceedings of the
+  37th International Conference on Machine Learning, volume 119 of Proceedings of Machine
+  Learning Research, pages 2144–2153. PMLR, 13–18 Jul 2020. URL https://proceedings.
+  mlr.press/v119/cortes20a.html.
+János Csirik, Johannes Bartholomeus Gerardus Frenk, Martine Labbé, and Shuzhong Zhang. Heuris-
+  tics for the 0-1 min-knapsack problem. Acta Cybernetica, 10(1-2):15–20, 1991.
+Josef Dai, Xuehai Pan, Ruiyang Sun, Jiaming Ji, Xinbo Xu, Mickel Liu, Yizhou Wang, and
+  Yaodong Yang. Safe rlhf: Safe reinforcement learning from human feedback. arXiv preprint
+  arXiv:2310.12773, 2023.
+Tri Dao, Dan Fu, Stefano Ermon, Atri Rudra, and Christopher Ré. Flashattention: Fast and memory-
+  efficient exact attention with io-awareness. Advances in neural information processing systems, 35:
+  16344–16359, 2022.
+Sanjoy Dasgupta. Two faces of active learning. Theoretical computer science, 412(19):1767–1781,
+  2011.
+Olivier Devolder, Francois Glineur, and Yurii Nesterov. First-order methods of smooth convex
+  optimization with inexact oracle. Mathematical Programming, 146(1):37–75, 2014.
+Mehdi Fatemi, Banafsheh Rafiee, Mingjie Tang, and Kartik Talamadupula. Concise reasoning via
+ reinforcement learning. arXiv preprint arXiv:2504.05185, 2025.
+
+
+                                                  11
+Saeed Ghadimi and Guanghui Lan. Stochastic first-and zeroth-order methods for nonconvex stochastic
+  programming. SIAM journal on optimization, 23(4):2341–2368, 2013.
+Nicholas J. A. Harvey, Christopher Liaw, Yaniv Plan, and Sikander Randhawa. Tight analyses for non-
+  smooth stochastic gradient descent. In Alina Beygelzimer and Daniel Hsu, editors, Proceedings
+  of the Thirty-Second Conference on Learning Theory, volume 99 of Proceedings of Machine
+  Learning Research, pages 1579–1613. PMLR, 25–28 Jun 2019. URL https://proceedings.
+  mlr.press/v99/harvey19a.html.
+Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric Tang, Dawn Song,
+  and Jacob Steinhardt. Measuring mathematical problem solving with the math dataset. arXiv
+  preprint arXiv:2103.03874, 2021.
+Prateek Jain, Dheeraj Nagaraj, and Praneeth Netrapalli. Making the last iterate of sgd information
+  theoretically optimal. In Alina Beygelzimer and Daniel Hsu, editors, Proceedings of the Thirty-
+  Second Conference on Learning Theory, volume 99 of Proceedings of Machine Learning Research,
+  pages 1752–1755. PMLR, 25–28 Jun 2019. URL https://proceedings.mlr.press/v99/
+  jain19a.html.
+Tyler B Johnson and Carlos Guestrin. Training deep models faster with robust, approximate impor-
+  tance sampling. Advances in Neural Information Processing Systems, 31, 2018.
+Sham M Kakade. A natural policy gradient. Advances in neural information processing systems, 14,
+  2001.
+Angelos Katharopoulos and Francois Fleuret. Not all samples are created equal: Deep learning with
+  importance sampling. In International conference on machine learning, pages 2525–2534. PMLR,
+  2018.
+Devvrit Khatri, Lovish Madaan, Rishabh Tiwari, Rachit Bansal, Sai Surya Duvvuri, Manzil Zaheer,
+  Inderjit S Dhillon, David Brandfonbrener, and Rishabh Agarwal. The art of scaling reinforcement
+  learning compute for llms. arXiv preprint arXiv:2510.13786, 2025.
+Teun Kloek and Herman K Van Dijk. Bayesian estimates of equation system parameters: an
+  application of integration by monte carlo. Econometrica: Journal of the Econometric Society,
+  pages 1–19, 1978.
+Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E.
+ Gonzalez, Hao Zhang, and Ion Stoica. Efficient memory management for large language model
+ serving with pagedattention. In Proceedings of the ACM SIGOPS 29th Symposium on Operating
+ Systems Principles, 2023.
+Xuefeng Li, Haoyang Zou, and Pengfei Liu. Limr: Less is more for rl scaling. arXiv preprint
+  arXiv:2502.11886, 2025.
+Deanna Needell, Nathan Srebro, and Rachel Ward. Stochastic gradient descent, weighted sampling,
+  and the randomized kaczmarz algorithm. Advances in neural information processing systems, 27,
+  2014.
+AS Nemirovsky, DB Yudin, and E Dawson. Wiley-interscience series in discrete mathematics, 1983.
+Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong
+  Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, et al. Training language models to follow
+  instructions with human feedback. Advances in neural information processing systems, 35:27730–
+  27744, 2022.
+Mansheej Paul, Surya Ganguli, and Gintare Karolina Dziugaite. Deep learning on a data diet: Finding
+ important examples early in training. Advances in neural information processing systems, 34:
+ 20596–20607, 2021.
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Christopher D Manning, Stefano Ermon, and Chelsea
+  Finn. Direct preference optimization: Your language model is secretly a reward model. Advances
+  in neural information processing systems, 36:53728–53741, 2023.
+
+
+                                                12
+Alexander Rakhlin, Ohad Shamir, and Karthik Sridharan. Making gradient descent optimal for
+  strongly convex stochastic optimization. arXiv preprint arXiv:1109.5647, 2011.
+John Schulman, Sergey Levine, Pieter Abbeel, Michael Jordan, and Philipp Moritz. Trust region
+  policy optimization. In International conference on machine learning, pages 1889–1897. PMLR,
+  2015.
+John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy
+  optimization algorithms. arXiv preprint arXiv:1707.06347, 2017.
+Ohad Shamir and Tong Zhang. Stochastic gradient descent for non-smooth optimization: Convergence
+  results and optimal averaging schemes. In International conference on machine learning, pages
+  71–79. PMLR, 2013.
+Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang,
+  Mingchuan Zhang, YK Li, Yang Wu, et al. Deepseekmath: Pushing the limits of mathemat-
+  ical reasoning in open language models. arXiv preprint arXiv:2402.03300, 2024.
+Guangming Sheng, Chi Zhang, Zilingfeng Ye, Xibin Wu, Wang Zhang, Ru Zhang, Yanghua Peng,
+  Haibin Lin, and Chuan Wu. Hybridflow: A flexible and efficient rlhf framework. In Proceedings
+  of the Twentieth European Conference on Computer Systems, pages 1279–1297, 2025.
+Ben Sorscher, Robert Geirhos, Shashank Shekhar, Surya Ganguli, and Ari Morcos. Beyond neural
+  scaling laws: beating power law scaling via data pruning. Advances in Neural Information
+  Processing Systems, 35:19523–19536, 2022.
+Richard S Sutton, David McAllester, Satinder Singh, and Yishay Mansour. Policy gradient
+  methods for reinforcement learning with function approximation. In S. Solla, T. Leen, and
+  K. Müller, editors, Advances in Neural Information Processing Systems, volume 12. MIT
+  Press, 1999. URL https://proceedings.neurips.cc/paper_files/paper/1999/file/
+  464d828b85b0bed98e80ade0a5c43b0f-Paper.pdf.
+Hemish Veeraboina. Aime problem set 1983-2024, 2023. URL https://www.kaggle.com/
+  datasets/hemishveeraboina/aime-problem-set-1983-2024.
+Yiping Wang, Qing Yang, Zhiyuan Zeng, Liliang Ren, Liyuan Liu, Baolin Peng, Hao Cheng, Xuehai
+  He, Kuan Wang, Jianfeng Gao, et al. Reinforcement learning for reasoning in large language
+  models with one training example. arXiv preprint arXiv:2504.20571, 2025.
+Sang Michael Xie, Shibani Santurkar, Tengyu Ma, and Percy S Liang. Data selection for language
+  models via importance resampling. Advances in Neural Information Processing Systems, 36:
+  34201–34227, 2023.
+Yixuan Even Xu, Yash Savani, Fei Fang, and Zico Kolter. Not all rollouts are useful: Down-sampling
+  rollouts in llm reinforcement learning. arXiv preprint arXiv:2504.13818, 2025.
+An Yang, Beichen Zhang, Binyuan Hui, Bofei Gao, Bowen Yu, Chengpeng Li, Dayiheng Liu, Jian-
+  hong Tu, Jingren Zhou, Junyang Lin, et al. Qwen2. 5-math technical report: Toward mathematical
+  expert model via self-improvement. arXiv preprint arXiv:2409.12122, 2024.
+An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang
+  Gao, Chengen Huang, Chenxu Lv, et al. Qwen3 technical report. arXiv preprint arXiv:2505.09388,
+  2025.
+Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian
+  Fan, Gaohong Liu, Lingjun Liu, et al. Dapo: An open-source llm reinforcement learning system at
+  scale. arXiv preprint arXiv:2503.14476, 2025.
+Jingzhao Zhang, Tianxing He, Suvrit Sra, and Ali Jadbabaie. Why gradient clipping accelerates
+   training: A theoretical justification for adaptivity, 2020. URL https://arxiv.org/abs/1905.
+   11881.
+Peilin Zhao and Tong Zhang. Stochastic optimization with importance sampling for regularized loss
+  minimization. In international conference on machine learning, pages 1–9. PMLR, 2015.
+
+
+                                               13
+Haizhong Zheng, Yang Zhou, Brian R Bartoldson, Bhavya Kailkhura, Fan Lai, Jiawei Zhao, and
+  Beidi Chen. Act only when it pays: Efficient reinforcement learning for llm reasoning via selective
+  rollouts. arXiv preprint arXiv:2506.02177, 2025.
+Rui Zheng, Shihan Dou, Songyang Gao, Yuan Hua, Wei Shen, Binghai Wang, Yan Liu, Senjie Jin,
+  Qin Liu, Yuhao Zhou, et al. Secrets of rlhf in large language models part i: Ppo. arXiv preprint
+  arXiv:2307.04964, 2023.
+
+
+
+
+                                                 14
+Contents
+1   Introduction                                                                                     1
+
+2   Related Work                                                                                     2
+
+3   Problem Formulation                                                                              3
+
+4   Cost-Aware SGD                                                                                   3
+    4.1 Cost Analysis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      3
+    4.2 Derivation of the Optimal Distribution . . . . . . . . . . . . . . . . . . . . . . . .       4
+    4.3 Cost-Improvement over Baselines . . . . . . . . . . . . . . . . . . . . . . . . . .          4
+    4.4 Synthetic Validation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .     5
+    4.5 Proxy Sub-Optimality . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       5
+    4.6 Lower Bound . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        5
+
+5   Cost-Aware GRPO                                                                                  6
+    5.1 Datasets and Models . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        6
+    5.2 Cost-Aware Learning with GRPO . . . . . . . . . . . . . . . . . . . . . . . . . .            6
+    5.3 Settings and Methods . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       7
+    5.4 Results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .    8
+    5.5 Ablations . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .      9
+
+6   Conclusion                                                                                      9
+
+A Related Work                                                                                      16
+
+B Algorithms                                                                                        17
+  B.1 Cost-Aware SGD . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .          17
+  B.2 Cost-Aware GRPO . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .           17
+
+C Subset Selection                                                                                  18
+
+D Proofs                                                                                            19
+  D.1 Variance reduction strategy derivation . . . . . . . . . . . . . . . . . . . . . . . .        19
+  D.2 Cost-Improvement & Comparison Analysis . . . . . . . . . . . . . . . . . . . . .              19
+  D.3 Min Cost Knapsack . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         20
+  D.4 Strongly Convex Subset Selection . . . . . . . . . . . . . . . . . . . . . . . . . .          21
+  D.5 Sub-Optimality Proofs . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         21
+
+E Lower bound                                                                                       24
+
+F Extensions and Generality of the Theoretical Analysis                                             27
+  F.1 Differences between Theory and Practice . . . . . . . . . . . . . . . . . . . . . .           27
+  F.2 Generality of the Cost Objective in Non-Convex Settings . . . . . . . . . . . . . .           27
+  F.3 Average Iterate (𝑥¯𝑇 ) vs. Last Iterate (𝑥𝑇 ) . . . . . . . . . . . . . . . . . . . . . . .   27
+
+G Experimental Details and Ablations                                                                28
+  G.1 Experimental Details . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        28
+  G.2 Implementation . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        28
+  G.3 Importance Weighting with GRPO . . . . . . . . . . . . . . . . . . . . . . . . . .            28
+  G.4 Hyperparameters . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .         29
+  G.5 Computational Requirements . . . . . . . . . . . . . . . . . . . . . . . . . . . . .          30
+  G.6 Ablation on variants of 𝑝 ∗ . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       31
+  G.7 Full CISPO results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .        32
+  G.8 Full sub-optimality results . . . . . . . . . . . . . . . . . . . . . . . . . . . . . .       33
+  G.9 Additional results for Qwen2.5-Math-1.5B-Instruct . . . . . . . . . . . . . . . . .           34
+  G.10 Additional results for Qwen3-4B . . . . . . . . . . . . . . . . . . . . . . . . . . .        35
+  G.11 Additional results for Qwen3-8B . . . . . . . . . . . . . . . . . . . . . . . . . . .        36
+
+
+
+
+                                                  15
+A    Related Work
+We describe further related work.
+
+Training Data Pruning/ Selection. There is a large literature focused on pruning a training dataset.
+Typically, the objective is to obtain a better predictor or maintain performance with fewer samples.
+Related works include [Sorscher et al., 2022, Paul et al., 2021, Xie et al., 2023, Chen et al., 2023a].
+Our work differs from these as it explicitly considers a variable cost per sample.
+
+Active learning. There is a significant body of work studying the problem of active learning, which
+considers when to request more information about training samples. We refer the reader to [Dasgupta,
+2011] for an in-depth overview of the literature. Most related to our work, Beygelzimer et al. [2009],
+Cortes et al. [2020, 2019] use importance weighting to probabilistically select samples for which
+to query a label. Generally, these algorithms fix a hypothesis set a priori, in which hypotheses are
+eliminated as more data is acquired. Our work shares the similarity of deciding when to request more
+information, however, in contrast, our work requests the gradient of a sample. Furthermore, we do
+not use a current hypothesis set in order to make these decisions.
+
+
+
+
+                                                  16
+B     Algorithms
+B.1    Cost-Aware SGD
+
+Algorithm 1 Cost-Aware SGD
+ 1: Input: Initial point 𝑥 1 , iterations 𝑇, step size 𝜂, sampling distribution p∗ .
+ 2: for 𝑡 = 1 to 𝑇 do
+ 3:   Sample index 𝑖 𝑡 ∼ p∗
+ 4:   Query ∇ 𝑓𝑖𝑡 (𝑥 𝑡 ), incur cost 𝑐 𝑖𝑡 .
+ 5:   Compute importance-weighted stochastic gradient:
+ 6:      𝑔˜ 𝑡 = 𝑛 𝑝1𝑖 ∇ 𝑓𝑖𝑡 (𝑥 𝑡 )
+                     𝑡
+ 7:   Update parameter: 𝑥 𝑡+1 = Π X (𝑥 𝑡 − 𝜂 𝑔˜ 𝑡 )
+ 8: end for
+ 9: Output: 𝑥¯𝑇 = 𝑇1 𝑡=1 𝑥 𝑡 (or suffix averaging solution for strongly convex case [Rakhlin et al.,
+                         Í𝑇
+    2011])
+
+
+B.2    Cost-Aware GRPO
+
+Algorithm 2 Cost-Aware GRPO
+    Input: Initial policy 𝜋 𝜃 , Dataset D, Prompt batch size 𝑛, Rollouts per prompt 𝑀, Mini-batch size
+    𝐵, Iterations 𝐾
+    for iteration 𝑘 = 1 to 𝐾 do
+      // Phase 1: Data Collection
+      Sample prompt batch 𝑋 = {𝑥 1 , . . . , 𝑥 𝑛 } ∼ D
+      Generate 𝑀 outputs per prompt: 𝑦 𝑖, 𝑗 ∼ 𝜋 𝜃old (·|𝑥𝑖 )
+      Form rollout dataset Dstep of size 𝑁 = 𝑛 × 𝑀
+      Compute advantages for all samples in Dstep
+      // Phase 2: Compute Sampling   √ Distribution
+      Estimate weights 𝑠𝑢 ← 𝐺 𝑢 / 𝑐 𝑢 Í    for all 𝑢 ∈ Dstep
+      Compute probabilities 𝑝 ∗𝑢 ← 𝑠𝑢 / 𝑣∈ Dstep 𝑠 𝑣
+      // Phase 3: Importance Weighted Updates
+      Set number of updates 𝑇 ← ⌈𝑁/𝐵⌉
+      for update step 𝑡 = 1 to 𝑇 do
+          // Sample mini-batch and optimize policy
+          Sample mini-batch ∼ Multinomial(support = Dstep , probs = 𝑝 ∗ , size = 𝐵)
+                                         ( 𝑝∗ )
+          Update 𝜋 𝜃 by maximizing ĴGRPO       (𝜃) over mini-batch
+      end for
+    end for
+
+
+
+
+                                                    17
+Figure 6: Synthetic validation of the greedy subset selection algorithm. Γ is a tunable parameter
+representing the allowable bias budget. As it is increased, the greedy algorithm chooses fewer (and
+cheaper) samples to train on.
+
+
+C    Subset Selection
+                                                                  √
+The importance sampling strategy p∗ achieves cost ( 𝑖 𝐺 𝑖 𝑐 𝑖 ) 2 , but may remain expensive when
+                                                            Í
+high-cost samples have large gradients. To reduce cost, we consider optimizing over a subset
+𝜋 ⊆ {1, . . . , 𝑛}, defining 𝑓 𝜋 (𝑥) = 𝑛1 𝑖∈ 𝜋 𝑓𝑖 (𝑥). This introduces bias, as optimization converges to
+                                         Í
+ ∗                ∗
+𝑥 𝜋 instead of 𝑥 , but reduces computational cost.
+
+Biased SGD on a subset. Let ∥∇ 𝑓𝑖 (𝑥) ∥ ≤ 𝐺 𝑖 . For a subset 𝜋 and sampling distribution q
+supported on 𝜋, define the bias 𝛽 𝜋 = 𝑛1 𝑖∉ 𝜋 𝐺 𝑖 and note ∥∇ 𝑓 (𝑥) − ∇ 𝑓 𝜋 (𝑥) ∥ ≤ 𝛽 𝜋 . Stan-
+                                                Í
+                                                                         √
+dard
+  √ 2SGD results [Devolder et al., 2014] imply         that with 𝜂𝑡 ∝ 1/ 𝑇, 𝔼[ 𝑓 ( 𝑥¯𝑇 ) − 𝑓 (𝑥 ∗ )] ≤
+𝐷 𝜎 𝜋 (q)                                         𝐺2
+          + 𝐷 𝛽 𝜋 , where 𝜎𝜋2 (q) ≤ 𝑛12 𝑖∈ 𝜋 𝑞𝑖𝑖 . Thus, the cost to achieve error 𝜖 > 𝐷 𝛽 𝜋 is:
+                                            Í
+    √
+     𝑇
+                 𝐷2       Í         √ 2
+K 𝜋 (𝜖) = 𝑛2 ( 𝜖 −𝐷𝛽    2  𝑖 ∈ 𝜋 𝐺 𝑖 𝑐 𝑖 , where we used the optimal sampling distribution restricted to
+                     𝜋)
+𝜋.
+Optimal subset selection. We minimize K 𝜋 (𝜖) subject to a bias budget 𝐷 𝛽 𝜋 ≤ Γ.
+Theorem C.1 (Knapsack equivalence). This problem is equivalent to a min-cost knapsack:
+                                 ∑︁        √         ∑︁          ∑︁      𝑛Γ
+                         min        𝑧 𝑖 𝐺 𝑖 𝑐 𝑖 s.t.    𝑧𝑖 𝐺 𝑖 ≥    𝐺𝑖 −    .
+                      𝑧𝑖 ∈ {0,1}                                         𝐷
+                                  𝑖                   𝑖           𝑖
+
+We defer the proof to Appendix D.2. A similar result for strongly convex objectives is in Ap-
+pendix D.4.
+
+Greedy approximation. A standard greedy algorithm selects items by decreasing value-to-weight
+density 𝜌𝑖 = 𝑣 𝑖 /𝜔𝑖 . In our setting:
+                                              𝑣𝑖   𝐺𝑖    1
+                                       𝜌𝑖 =      = √ =√ ,
+                                              𝜔𝑖  𝐺 𝑖 𝑐𝑖 𝑐𝑖
+so the 𝐺 𝑖 terms cancel and the greedy order is determined entirely by cost 𝑐 𝑖 . The algorithm simply
+selects the cheapest components until the constraint is met, yielding a 2-approximation [Csirik et al.,
+1991]. Remarkably, the optimal greedy strategy does not depend on the Lipschitz constants 𝐺 𝑖 at all.
+Under a similar setting to Section 4.4, we implement this greedy approximation and report results in
+Figure 6. Within a smaller bias budget, subset selection is able to attain similar error at a significantly
+reduced cost. As the selected subset becomes much smaller, the error increases due to bias.
+
+
+
+
+                                                    18
+D     Proofs
+In this section we provide the proofs and derivations for statements made in the paper.
+
+D.1   Variance reduction strategy derivation
+
+In this case, we have:
+                                                            2
+                                                       𝑛         𝑛
+                                                                       !
+                                                © 1 ∑︁ 𝐺 𝑗 ª ∑︁
+                            𝐽 (p) = 𝑆(p)𝐶 (p) = ­ 2           ®     𝑝𝑖 ,
+                                                  𝑛 𝑗=1 𝑝 𝑗 𝑖=1
+                                                «             ¬
+where p ∈ Δ𝑛 . From Cauchy-Schwarz, we can lower bound 𝐽 ( 𝑝):
+                                                     𝑛
+                                                          !2
+                                               1 ∑︁
+                                       𝐽 (p) ≥ 2       𝐺𝑖 .
+                                               𝑛 𝑖=1
+                                       √      √
+This lower bound is attained when 𝐺 𝑖 / 𝑝 𝑖 ∝ 𝑝 𝑖 , or equivalently, 𝑝 𝑖 ∝ 𝐺 𝑖 . Hence, when costs are
+uniform, we focus on minimizing the second moment. This gives:
+                                                        𝐺𝑖
+                                          ( 𝑝 var )𝑖 = Í      .                                     (9)
+                                                         𝑗 𝐺𝑗
+
+When we apply 𝑝 var to the non-uniform cost setting, the total expected cost to attain error 𝜖 becomes:
+                                               𝑛
+                                                      !2 𝑛                   !
+                                        𝐷 2 ∑︁           ∑︁
+                             𝐾var (𝜖) = 2 2       𝐺𝑖          ( 𝑝 var )𝑖 𝑐 𝑖
+                                       𝜖 𝑛 𝑖=1            𝑖=1
+                                               𝑛
+                                                      !2 𝑛                    !
+                                        𝐷 2 ∑︁           ∑︁ 𝐺 𝑖
+                                      = 2 2       𝐺𝑖           Í          𝑐𝑖
+                                       𝜖 𝑛 𝑖=1            𝑖=1     𝑗 𝐺𝑗
+                                               𝑛
+                                                      ! 𝑛           !
+                                        𝐷 2 ∑︁          ∑︁
+                                      = 2 2       𝐺𝑖         𝐺 𝑖 𝑐𝑖 .
+                                       𝜖 𝑛 𝑖=1          𝑖=1
+
+
+D.2   Cost-Improvement & Comparison Analysis
+
+Theorem D.1 (Comparison of Adaptive vs. Uniform). Unlike the optimal strategy, the adaptive
+strategy 𝑝 var is not guaranteed to outperform uniform sampling. The ratio of their costs is given by:
+                                              Í            Í𝑛
+                                   𝐾var (𝜖)  ( 𝑛 𝐺 𝑖 ) ( 𝑖=1    𝐺 𝑖 𝑐𝑖 )
+                                            = Í𝑖=1                       .                       (10)
+                                  𝐾unif (𝜖)          𝐺 2𝑖 ) ( 𝑖=1
+                                                 𝑛           Í𝑛
+                                              ( 𝑖=1               𝑐𝑖 )
+Let 𝔼[·] denote the expectation taken over a uniform distribution of indices 𝑖 ∼ Uniform(1, . . . , 𝑛).
+Then 𝐾var ≤ 𝐾unif holds if and only if:
+                                  𝔼[𝐺] Cov(𝐺, 𝑐) ≤ 𝔼[𝑐] Var(𝐺).                                    (11)
+Consequently, if gradients and costs are negatively correlated or uncorrelated, adaptive sampling is
+superior. However, if gradients and costs are strongly positively correlated (i.e., samples with large
+gradients are disproportionately expensive), uniform sampling may yield a lower total cost.
+
+Proof. Recall that 𝐾unif ∝ ( 𝐺 2𝑖 ) ( 𝑐 𝑖 ) and 𝐾var ∝ ( 𝐺 𝑖 ) ( 𝐺 𝑖 𝑐 𝑖 ). WeÍcan rewrite these sums in
+                            Í        Í                  Í       Í
+terms of expectations over uniformly sampled indices. For any vector 𝑥, 𝑥𝑖 = 𝑛 𝔼[𝑥]. Thus:
+                            𝐾var    (𝑛 𝔼[𝐺]) (𝑛 𝔼[𝐺𝑐]) 𝔼[𝐺] 𝔼[𝐺𝑐]
+                                  =                      =              .
+                            𝐾unif   (𝑛 𝔼[𝐺 2 ]) (𝑛 𝔼[𝑐])   𝔼[𝐺 2 ] 𝔼[𝑐]
+We seek the condition under which this ratio is ≤ 1, which implies 𝔼[𝐺] 𝔼[𝐺𝑐] ≤ 𝔼[𝐺 2 ] 𝔼[𝑐]. We
+apply the definitions 𝔼[𝐺𝑐] = Cov(𝐺, 𝑐) + 𝔼[𝐺] 𝔼[𝑐] and 𝔼[𝐺 2 ] = Var(𝐺) + 𝔼[𝐺] 2 . Substituting
+these into the inequality:
+                                                                      
+                     𝔼[𝐺] (Cov(𝐺, 𝑐) + 𝔼[𝐺] 𝔼[𝑐]) ≤ Var(𝐺) + 𝔼[𝐺] 2 𝔼[𝑐].
+
+
+                                                  19
+Expanding both sides:
+
+                      𝔼[𝐺] Cov(𝐺, 𝑐) + 𝔼[𝐺] 2 𝔼[𝑐] ≤ 𝔼[𝑐] Var(𝐺) + 𝔼[𝐺] 2 𝔼[𝑐].
+Subtracting the common term 𝔼[𝐺] 2 𝔼[𝑐] from both sides yields the final condition:
+                                      𝔼[𝐺] Cov(𝐺, 𝑐) ≤ 𝔼[𝑐] Var(𝐺).
+Since 𝔼[𝐺], 𝔼[𝑐], and Var(𝐺) are non-negative, this inequality always holds if Cov(𝐺, 𝑐) ≤ 0
+(negative or zero correlation). It is violated only if Cov(𝐺, 𝑐) is sufficiently large and positive. □
+
+D.3   Min Cost Knapsack
+
+Theorem D.2 (Equivalence to Min-Knapsack Problem). Let Γ be the maximum allowable bias budget
+such that convergence is possible. Finding the optimal subset 𝜋 ∗ that minimizes the expected total
+cost subject to this budget is equivalent to solving the Min-Cost Knapsack Problem.
+Specifically, let 𝑧𝑖 ∈ {0, 1} be the indicator variable where 𝑧 𝑖 = 1 if 𝑖 ∈ 𝜋. The problem is:
+                                       𝑛
+                                      ∑︁                             𝑛
+                                                                    ∑︁
+                                min         𝑧 𝑖 𝜔𝑖    subject to          𝑧 𝑖 𝑣 𝑖 ≥ 𝑉req ,               (12)
+                                  𝑧
+                                      𝑖=1                           𝑖=1
+                                 √
+where the “item cost” is 𝜔𝑖 = 𝐺 𝑖 𝑐 𝑖 , the “item value” is 𝑣 𝑖 = 𝐺 𝑖 , and the required value coverage
+         Í𝑛
+is 𝑉req = 𝑗=1 𝐺 𝑗 − 𝑛Γ
+                    𝐷.
+
+
+Proof. We aimÍ to minimize
+                      √          the cost complexity factor derived for the optimal distribution restricted to
+𝜋: 𝐽 (𝜋) = ( 𝑖 ∈ 𝜋 𝐺 𝑖 𝑐 𝑖 ) 2 . The constraint is on the bias error contribution 𝐷 𝛽 𝜋 ≤ Γ < 𝜖. Recalling
+the definition of bias:                                                !
+                                          1 ∑︁               1 ∑︁
+                                   𝛽𝜋 ≤          𝐺 𝑗 =⇒ 𝐷           𝐺 𝑗 ≤ Γ.
+                                          𝑛 𝑗∉ 𝜋             𝑛 𝑗∉ 𝜋
+
+Minimizing the sum of gradients excluded from 𝜋 is equivalent to maximizing the sum of gradients
+included in 𝜋. We rewrite the constraint:
+                                    𝑛                                  𝑛
+               ∑︁            𝑛Γ    ∑︁       ∑︁        𝑛Γ    ∑︁        ∑︁       𝑛Γ
+                      𝐺𝑗 ≤      =⇒     𝐺𝑗 −      𝐺𝑖 ≤    =⇒      𝐺𝑖 ≥     𝐺𝑗 −    .
+               𝑗∉ 𝜋
+                             𝐷     𝑗=1      𝑖∈ 𝜋
+                                                      𝐷     𝑖∈ 𝜋      𝑗=1
+                                                                               𝐷
+                             Í                            √
+Therefore, if we let 𝑉req = 𝑛𝑗=1 𝐺 𝑗 − 𝑛Γ 𝐷 , let 𝜔𝑖 = 𝐺 𝑖 𝑐 𝑖 as the penalty for including item 𝑖, and let
+𝑣 𝑖 = 𝐺 𝑖 as the gain toward satisfying the constraint, we recover the formulation in Equation (12). □
+
+Using this algorithm, the worst case 𝔼[𝐾 (𝜖)], where 𝜖 > Γ, for 𝐷 𝛽 𝜋 ≤ Γ is:
+
+                                                              𝐷 2 𝐽 (𝜋)
+                                                     min                  .
+                                              { 𝜋:𝛽 𝜋 ≤Γ/𝐷 } 𝑛2 (𝜖 − Γ) 2
+
+                                                                                 Í
+The bias constraint 𝐷 𝛽 𝜋 ≤ Γ determines the required gradient coverage 𝑉req = 𝑖 𝐺 𝑖 − 𝑛Γ/𝐷, and
+thus defines a specific Min-Cost Knapsack instance as in Theorem C.1. By varying Γ over its feasible
+range and solving the associated knapsack problem for each choice, we obtain an optimal subset
+𝜋(Γ) minimizing the total cost subject to that bias budget. Since the total expected complexity
+
+                                                               𝐷 2 𝐽 (𝜋)
+                                            𝔼[𝐾 𝜋 (𝜖)] =
+                                                           𝑛2 (𝜖 − 𝐷 𝛽 𝜋 ) 2
+depends on both the numerator (the sampling cost) and the denominator (the bias floor), enumerating
+over Γ allows us to evaluate the achievable error–cost tradeoff for every subset. Consequently, we
+can compute the optimal target accuracy 𝜖 by selecting the bias level Γ that yields the smallest overall
+expected cost.
+
+
+                                                           20
+D.4    Strongly Convex Subset Selection
+
+Theorem D.3 (Subset Selection for Strongly Convex Functions). Assume 𝑓 is 𝜇-strongly convex. Let
+𝑧𝑖 ∈ {0, 1} be
+            Í the indicator
+                   √        variable for including data point 𝑖 in subset 𝜋. We seek to minimize the cost
+complexity 𝑧𝑖 𝐺 𝑖 𝑐 𝑖 subject to a budget Γ on the function value suboptimality 𝑓 (𝑥 ∗𝜋 ) − 𝑓 (𝑥 ∗ ) ≤ Γ.
+This problem is structurally equivalent to the Min-Cost Knapsack formulation in Theorem C.1, with a
+modified requirement 𝑉req . The optimal solution to the LP relaxation is obtained by selecting indices
+𝑖 strictly based on increasing cost 𝑐 𝑖 .
+
+Proof. Using the Polyak-Lojasiewicz (PL) inequality and the fact that ∇ 𝑓𝑆 (𝑥 𝑆∗ ) = 0, the gradient at
+the proxy minimizer is determined solely by the excluded gradients:
+                                                 1 ∑︁
+                                   ∇ 𝑓 (𝑥 ∗𝜋 ) =        ∇ 𝑓 𝑗 (𝑥 ∗𝜋 ).
+                                                 𝑛 𝑗∉ 𝜋
+                                                                                          Í          Í
+We bound the norm of this gradient using the triangle inequality (∥                           𝑣∥ ≤       ∥𝑣∥) and the gradient
+upper bound definition (∥∇ 𝑓 𝑗 (𝑥) ∥ ≤ 𝐺 𝑗 ):
+
+                                                           1 ∑︁
+                                          ∥∇ 𝑓 (𝑥 ∗𝜋 ) ∥ =        ∇ 𝑓 𝑗 (𝑥 ∗𝜋 )
+                                                           𝑛 𝑗∉ 𝜋
+                                                          1 ∑︁
+                                                        ≤        ∥∇ 𝑓 𝑗 (𝑥 ∗𝜋 ) ∥
+                                                          𝑛 𝑗∉ 𝜋
+                                                          1 ∑︁
+                                                        ≤        𝐺 𝑗.
+                                                          𝑛 𝑗∉ 𝜋
+
+                                                                        1
+Substituting this back into the PL inequality ( 𝑓 (𝑥 ∗𝜋 ) − 𝑓 (𝑥 ∗ ) ≤ 2𝜇 ∥∇ 𝑓 (𝑥 ∗𝜋 ) ∥ 2 ) yields:
+                                                                  !2           𝑛
+                                                                                               !2
+                                                 1 ∑︁                     1 ∑︁
+                       𝑓 (𝑥 ∗𝜋 ) − 𝑓 (𝑥 ∗ ) ≤             𝐺𝑗           =          (1 − 𝑧 𝑖 )𝐺 𝑖 .
+                                                2𝜇𝑛2 𝑗∉ 𝜋                2𝜇𝑛2 𝑖=1
+
+We enforce the constraint 𝑓 (𝑥 ∗𝜋 ) − 𝑓 (𝑥 ∗ ) ≤ Γ. Because the gradient norms 𝐺 𝑖 are non-negative, we
+can take the square root of the inequality to linearize the constraint without altering the optimization
+region:
+                                        ∑︁𝑛                    √︁
+                                              (1 − 𝑧 𝑖 )𝐺 𝑖 ≤ 𝑛 2𝜇Γ.
+                                                𝑖=1
+                                                               √︁
+This is now a linear constraint on the excluded mass. Let 𝐵 = 𝑛 2𝜇Γ be the effective budget for the
+excluded gradients. We rewrite this in terms of the included variables 𝑧𝑖 :
+                            𝑛
+                           ∑︁             𝑛
+                                         ∑︁                         𝑛
+                                                                   ∑︁                𝑛
+                                                                                    ∑︁
+                                  𝐺𝑗 −          𝑧𝑖 𝐺 𝑖 ≤ 𝐵 =⇒            𝑧𝑖 𝐺 𝑖 ≥         𝐺 𝑗 − 𝐵.
+                            𝑗=1          𝑖=1                       𝑖=1              𝑗=1
+                                           Í       √               Í
+The optimization problem is to minimize 𝑧𝑖 (𝐺 𝑖 𝑐 𝑖 ) subject to 𝑧 𝑖 𝐺 𝑖 ≥ 𝑉req . This is identical
+to Equation 12. This problem is structurally equivalent to the Min-Cost Knapsack formulation in
+Theorem C.1, with a modified requirement 𝑉req . Its LP relaxation is a fractional knapsack problem
+whose optimal solution is obtained by ordering indices by increasing evaluation cost 𝑐 𝑖 (equivalently,
+decreasing density 𝑣 𝑖 /𝜔𝑖 ).                                                                        □
+
+D.5    Sub-Optimality Proofs
+
+Theorem D.4 (Sub-optimality Gap via Cost-Biased Divergence). Let 𝑝 ∗ be the optimal cost-aware
+sampling distribution and 𝑝 ′ be anyÍempirical sampling distribution. Let the expected cost per itera-
+                                      𝑛
+tion for a distribution 𝑝 be 𝐶 ( 𝑝) = 𝑖=1 𝑝 𝑖 𝑐 𝑖 .We define the cost-biased distribution 𝑝˜ corresponding
+to 𝑝 as:
+                                                       𝑝𝑖 𝑐𝑖
+                                               𝑝˜𝑖 =         .
+                                                      𝐶 ( 𝑝)
+
+                                                             21
+The optimality gap is exactly determined by the Pearson 𝜒2 -divergence between the cost-biased
+optimal distribution and the cost-biased empirical distribution:
+                                                 𝐽 ( 𝑝′)
+                                                         = 1 + 𝐷 𝜒2 ( 𝑝˜∗ || 𝑝˜′ ).
+                                                 𝐽 ( 𝑝∗)
+
+Proof. Recall that minimizing the total expected cost is equivalent
+                                                                  √
+                                                                      to minimizing the product 𝐽 ( 𝑝) =
+                                                       ∗      𝐺𝑖 / 𝑐𝑖               Í      𝐺
+𝑆( 𝑝)𝐶 ( 𝑝). The optimal distribution is defined as 𝑝 𝑖 = 𝑍𝑑𝑒𝑛 , where 𝑍 𝑑𝑒𝑛 = 𝑛𝑗=1 √𝑐𝑗𝑗 . We can
+rearrange this to express the true gradient norms in terms of 𝑝 ∗𝑖 :
+                                                          √
+                                          𝐺 𝑖 = 𝑍 𝑑𝑒𝑛 𝑝 ∗𝑖 𝑐 𝑖 .
+                                                                                                               𝐺𝑖2
+Substituting this expression for 𝐺 𝑖 into the variance term 𝑆( 𝑝 ′ ) = 𝑛12
+                                                                                                        Í𝑛
+                                                                                                           𝑖=1 𝑝𝑖′ yields the objective for
+the empirical distribution:
+                                                                             !
+                                              2
+                                      ′
+                                            𝑍 𝑑𝑒𝑛    ′
+                                                         ∑︁𝑛
+                                                              ( 𝑝 ∗𝑖 ) 2 𝑐 𝑖
+                                 𝐽(𝑝 ) = 2 𝐶(𝑝 )                               .
+                                             𝑛            𝑖=1
+                                                                   𝑝 𝑖′
+
+Evaluating this same expression for the optimal distribution 𝑝 ∗ (where 𝑝 𝑖′ = 𝑝 ∗𝑖 ) gives 𝐽 ( 𝑝 ∗ ) =
+ 2
+𝑍𝑑𝑒𝑛
+ 𝑛2
+     𝐶 ( 𝑝 ∗ ) 2 . Taking the ratio of the two costs isolates the gap:
+
+                                                                          ( 𝑝∗ ) 2
+                                                       𝐶 ( 𝑝 ′ ) 𝑖=1
+                                                                Í𝑛
+                                             𝐽 ( 𝑝′)                   𝑐 𝑖 𝑝𝑖′
+                                                                              𝑖
+                                                     =
+                                             𝐽 ( 𝑝∗)            𝐶 ( 𝑝∗)2
+
+By the definition of the cost-biased distribution, we have 𝑝 𝑖 = 𝑝˜𝑖 𝐶 𝑐( 𝑖𝑝) . Substituting this expression
+for both 𝑝 ∗ and 𝑝 ′ into the summation term:
+                                                                       ∗
+                                                                           2
+                                   𝑛
+                                  ∑︁    ( 𝑝 ∗𝑖 ) 2 ∑︁
+                                                    𝑛       𝑝˜∗𝑖 𝐶 (𝑐𝑝𝑖 )
+                                      𝑐𝑖 ′ =           𝑐𝑖                ′    .
+                                  𝑖=1
+                                           𝑝𝑖      𝑖=1       𝑝˜𝑖′ 𝐶 (𝑐𝑝𝑖 )
+
+Simplifying the terms inside the sum:
+                                                                       ∗ 2
+                                       𝑛
+                                      ∑︁         ( 𝑝˜∗𝑖 ) 2 𝐶 (𝑐𝑝2 )              𝐶 ( 𝑝 ∗ ) 2 ∑︁ ( 𝑝˜∗𝑖 ) 2
+                                                                                               𝑛
+                                                                   𝑖
+                                  =         𝑐𝑖                                =                             .
+                                      𝑖=1
+                                                               ′
+                                                    𝑝˜𝑖′ 𝐶 (𝑐𝑝𝑖 )                 𝐶 ( 𝑝 ′ ) 𝑖=1 𝑝˜𝑖′
+
+Substituting this simplified summation back into our original cost ratio:
+                                                                        !
+                         𝐽 ( 𝑝′)    𝐶 ( 𝑝 ′ ) 𝐶 ( 𝑝 ∗ ) 2 ∑︁ ( 𝑝˜∗𝑖 ) 2         ( 𝑝˜∗𝑖 ) 2
+                                                           𝑛                 𝑛
+                                                                            ∑︁
+                                  =                                       =                .
+                         𝐽 ( 𝑝 ∗ ) 𝐶 ( 𝑝 ∗ ) 2 𝐶 ( 𝑝 ′ ) 𝑖=1 𝑝˜𝑖′           𝑖=1
+                                                                                   𝑝˜𝑖′
+                                                                                                    Í 𝑃2
+Using the definition of the Pearson 𝜒2 -divergence, 𝐷 𝜒2 (𝑃||𝑄) =      𝑄 − 1, we arrive at the identity.
+                        ∗
+Theorem D.5. Let 𝑝 be the optimal cost-aware sampling distribution using the true gradient norms
+𝐺 𝑖 , and let√𝑝 ′ be the empirical sampling distribution using estimated gradient norms 𝐺 𝑖′ , such that
+𝑝 𝑖′ ∝ 𝐺 𝑖′ / 𝑐 𝑖 .Assume the estimates follow an additive noise model 𝐺 𝑖′ = 𝐺 𝑖 + 𝜖𝑖 , where 𝜖𝑖 are
+independent, zero-mean noise terms with variance 𝜎𝜖2 , independent of 𝑐 𝑖 . Let 𝜌 be the Pearson
+correlation coefficient between the true norms 𝐺 𝑖 and the estimates 𝐺 𝑖′ . Assuming the noise 𝜖𝑖 is
+relatively small compared to 𝐺 𝑖 , the expected optimality gap is approximately bounded by:
+                                                                   Í𝑛 √𝑐𝑖
+                                   𝔼[𝐽 ( 𝑝 ′ )]       1 − 𝜌2
+                                                            
+                                                                2    𝑖=1 𝐺𝑖
+                                                ≈1+            𝜎𝐺 Í𝑛      √
+                                    𝐽 ( 𝑝∗)             𝜌2         𝑖=1 𝐺 𝑖 𝑐 𝑖
+
+       2 is the variance of the true gradient norms.
+where 𝜎𝐺
+
+
+                                                                             22
+Proof. The cost objective     for a distribution 𝑝 is 𝐽 ( 𝑝) = 𝑆( 𝑝)𝐶 ( 𝑝). For the estimated distribution 𝑝 ′ ,
+                 𝐺 ′ /√ 𝑐
+we have 𝑝 𝑖′ = Í𝑛 𝑖𝐺 ′ /√𝑐 𝑗 . Substituting this into the cost objective yields:
+                         𝑖
+                  𝑗=1       𝑗
+
+                                                     √ ! 𝑛          !
+                                            1 ∑︁ 𝐺 2𝑖 𝑐 𝑖 ∑︁ ′ √
+                                               𝑛
+                                       ′
+                                    𝐽(𝑝 ) = 2                 𝐺 𝑖 𝑐𝑖 .
+                                           𝑛 𝑖=1 𝐺 𝑖′     𝑖=1
+
+Under the model 𝐺 𝑖′ = 𝐺 𝑖 + 𝜖 𝑖 , the covariance between 𝐺 and 𝐺 ′ is strictly the variance of 𝐺, namely
+𝐶𝑜𝑣(𝐺, 𝐺 ′ ) = 𝜎𝐺2 . The variance of 𝐺 ′ is 𝑉 𝑎𝑟 (𝐺 ′ ) = 𝜎 2 + 𝜎 2 . The Pearson correlation coefficient
+                                                            𝐺    𝜖
+𝜌 is defined as:
+                                                         2
+                                𝐶𝑜𝑣(𝐺, 𝐺 ′ )            𝜎𝐺              𝜎𝐺
+                         𝜌=                    =     √︃         = √︃
+                                    𝜎𝐺 𝜎𝐺 ′              2 + 𝜎2         2 + 𝜎2
+                                                 𝜎𝐺 𝜎𝐺        𝜖        𝜎𝐺      𝜖
+
+Solving for the noise variance 𝜎𝜖2 in terms of 𝜌:
+                                                               1 − 𝜌2
+                                                                     
+                                              𝜎𝜖2 = 𝜎𝐺
+                                                     2
+                                                                        .
+                                                                 𝜌2
+
+Because 𝐺 𝑖′ appears in the denominator of the second moment, we apply a second-order Taylor
+expansion of 1/𝐺 𝑖′ centered around 𝐺 𝑖 :
+
+                                               1      1   𝜖𝑖  𝜖2
+                                                    ≈   − 2 + 𝑖3
+                                           𝐺 𝑖 + 𝜖𝑖   𝐺𝑖 𝐺𝑖 𝐺𝑖
+Substituting this into the first term of 𝐽 ( 𝑝 ′ ) and taking the expectation with respect to the noise 𝜖:
+                        "√ #                                   !                √
+                     𝐺 2𝑖 𝑐 𝑖     2 √  1    𝔼[𝜖  𝑖 ]   𝔼[𝜖 𝑖
+                                                            2]
+                                                                      √       2 𝑐𝑖
+                   𝔼          ≈ 𝐺 𝑖 𝑐𝑖    −          +           = 𝐺 𝑖 𝑐 𝑖 + 𝜎𝜖    .
+                        𝐺 𝑖′           𝐺𝑖    𝐺 2𝑖       𝐺 3𝑖                    𝐺𝑖
+
+Taking the expectation of the full cost 𝐽 ( 𝑝 ′ ), noting that the two sums are weakly dependent for large
+𝑛 and 𝔼[𝐺 𝑖′ ] = 𝐺 𝑖 :
+                                             𝑛                  √  ! ∑︁ 𝑛
+                                                                                    !
+                              ′       1 ∑︁            √        2 𝑐𝑖             √
+                       𝔼[𝐽 ( 𝑝 )] ≈ 2              𝐺 𝑖 𝑐 𝑖 + 𝜎𝜖              𝐺 𝑖 𝑐𝑖
+                                     𝑛 𝑖=1                       𝐺𝑖      𝑖=1
+
+                                                            𝑛 √
+                                                 !2                  ! 𝑛          !
+                                                      𝜎𝜖2 ∑︁ 𝑐 𝑖 ∑︁ √
+                                        𝑛
+                                ′  1 ∑︁ √
+                    𝔼[𝐽 ( 𝑝 )] ≈ 2        𝐺 𝑖 𝑐𝑖 + 2                       𝐺 𝑖 𝑐𝑖
+                                  𝑛 𝑖=1                𝑛 𝑖=1 𝐺 𝑖       𝑖=1
+                                         √ 2
+Recognizing that 𝐽 ( 𝑝 ∗ ) = 𝑛12                                  ∗
+                                 Í𝑛
+                                  𝑖=1 𝐺 𝑖 𝑐 𝑖 , we divide by 𝐽 ( 𝑝 ):
+                                                                            √
+                                                                   Í𝑛     𝑐𝑖
+                                       𝔼[𝐽 ( 𝑝 ′ )]                  𝑖=1 𝐺𝑖
+                                                      ≈ 1 + 𝜎𝜖2 Í𝑛
+                                                               √ .
+                                   𝐽 ( 𝑝∗)              𝑖=1 𝐺 𝑖 𝑐 𝑖
+                                2
+                             2 1−𝜌
+Finally, substituting 𝜎𝜖2 = 𝜎𝐺         completes the proof.
+                                𝜌2
+
+
+
+
+                                                          23
+E    Lower bound
+We consider the minimization of a finite-sum objective:
+                                                            𝑛
+                                                       1 ∑︁
+                                        min 𝐹 (𝑥) =          𝑓𝑖 (𝑥).
+                                        𝑥∈X            𝑛 𝑖=1
+
+where each 𝑓𝑖 : X → ℝ is convex and 𝐺-Lipschitz continuous. We assume access to an exact
+first-order oracle: when queried at index 𝑖 and point 𝑥, the oracle returns the exact gradient ∇ 𝑓𝑖 (𝑥).
+Crucially, we assume there is a variable cost 𝑐 𝑖 > 0 to querying the 𝑖-th component (at any point 𝑥).
+The goal is to minimize the total expected accumulated cost required to output a point 𝑥ˆ such that
+𝔼[𝐹 ( ˆ𝑥) − 𝐹 (𝑥 ∗ )] ≤ 𝜖, where the expectation is taken over any randomization in the algorithm
+producing ˆ𝑥.
+Theorem E.1. Fix 𝜖, 𝐺 > 0. For any number of components 𝑛 ≥ 𝐺 2 /𝜖 2 , any set of nonnegative
+query costs {𝑐 𝑖 }𝑖=1
+                    𝑛 , and any (possibly randomized) algorithm with an expected error guarantee
+𝔼[𝐹 ( ˆ𝑥) − min 𝐹 (𝑥)] ≤ 𝜖, there exists a convex, 𝐺-Lipschitz finite-sum problem instance over
+X = [−1, 1] such that the algorithm’s expected total query cost is at least:
+                                                              !2
+                                          © 𝐺 2 1 ∑︁ √
+                                        Ω­ 2
+                                                                 ª
+                                                            𝑐𝑖 ® ,
+                                            𝜖      𝑛 𝑖 ∈𝑆 ∗
+                                          «                      ¬
+          ∗
+where 𝑆 ⊆ [𝑛] is any set of components such that following cost-uniformity condition holds:
+                                                    √
+                                         max𝑖 ∈𝑆 ∗ 𝑐 𝑖        𝐺
+                                         1 Í        √ ≤ 40𝜖 .                                 (13)
+                                         𝑛    𝑗 ∈𝑆 ∗ 𝑐 𝑗
+
+Remark. If we let the costs be sorted 𝑐 1 ≤ 𝑐 2 ≤ . . . ≤ 𝑐 𝑛 , then the set 𝑆 ∗ that maximizes the lower
+bound (if it is nonempty) must be of the form 𝑆 = [𝑘] for some 1 ≤ 𝑘 ≤ 𝑛, namely, the set of 𝑘
+cheapest costs. Indeed, if 𝑗 ∈ 𝑆 ∗ then also 𝑖 ∈ 𝑆 ∗ for any 𝑖 < 𝑗, since otherwise including 𝑖 into 𝑆 ∗
+increases the lower bound, while still satisfying Eq. (13): it can only increase the denominator on the
+LHS, while not affecting the numerator.
+For reasonably uniform costs, say perfectly uniform up to a small (constant) fraction of arbitrarily
+large outliers, the condition in Eq. (13) is satisfied by fixing 𝑆 ∗ to contain all components except for
+the outliers, as long as 𝐺/𝜖 is larger than a constant. It could be, however, that the maximal 𝑆 ∗ is
+empty (and the lower bound is zero) if the costs are highly non-uniform. For example, if the costs
+are exponentially increasing, say 𝑐 𝑖 = 4𝑖 for all 𝑖, then the ratio between the maximum and the sum
+   √
+of 𝑐 𝑖 over any set of the form 𝑆 ∗ = [𝑘] is between 12 and 1, and so the cost-uniformity condition
+implies that 𝜖 ≤ 20𝑛𝐺
+                      . Thus, for any larger value of 𝜖 there is no set 𝑆 ∗ for which the condition is
+satisfied.
+
+Proof of Theorem 4.3. The proof proceeds by constructing a hard distribution of instances based on
+linear functions and applying information-theoretic lower bounds. We break the argument into four
+steps.
+
+Step 1: Definition of hard instance. Consider the 1-dimensional domain X = [−1, 1]. We define
+the component functions as linear functions:
+                                     ∀ 𝑖 ∈ [𝑛] :          𝑓𝑖 (𝑥) = −𝑏 𝑖 𝑥,
+where 𝑏 𝑖 ∈ ℝ is a slope parameter. The global objective is 𝐹 (𝑥) = −𝑥 · ¯𝑏, where 𝑏¯ = 𝑛1 𝑖=1
+                                                                                             Í𝑛
+                                                                                                  𝑏𝑖 .
+The minimizer 𝑥 ∗ depends entirely on the sign of the average slope ¯𝑏; namely, 𝑥 ∗ = sign( ¯𝑏). The
+value of the minimum is 𝐹 (𝑥 ∗ ) = −| ¯𝑏|, and for any candidate 𝑥ˆ ∈ [−1, 1], the optimality gap is
+                     ¯ ∗ − ˆ𝑥). In particular, for any algorithm producing ˆ𝑥,
+𝐹 ( ˆ𝑥) − 𝐹 (𝑥 ∗ ) = 𝑏(𝑥
+                            𝔼[𝐹 ( ˆ𝑥) − 𝐹 (𝑥 ∗ )] ≥ 𝑏¯ · ℙ[sign( ˆ𝑥) ≠ sign( ¯𝑏)].                  (14)
+We define the hard distribution D as the uniform mixture of two priors, D0 and D1 , parameterized
+by Δ1 , . . . , Δ𝑛 ≥ 0:
+
+
+                                                     24
+        • Under D0 : 𝑏 𝑖 = clip(𝑧𝑖 ), where 𝑧 𝑖 ∼ N (+Δ𝑖 , 𝜎 2 ) are i.i.d., 𝜎 = 𝐺/2;
+        • Under D1 : 𝑏 𝑖 = clip(𝑧𝑖 ), where 𝑧 𝑖 ∼ N (−Δ𝑖 , 𝜎 2 ) are i.i.d., 𝜎 = 𝐺/2.
+
+Here, clip(𝑧 𝑖 ) = max(−𝐺, min(𝐺, 𝑧)) is a truncation to [−𝐺, 𝐺] that strictly enforces the Lipschitz
+condition (deterministically). The 𝑏 𝑖 are then distributed according to a truncated Gaussian distribu-
+tion with variance 𝜎 2 strictly smaller than 𝐺 2 . For reasons that will become apparent in later steps,
+we will set the parameters Δ𝑖 so that the following conditions are met:
+                              𝑛
+                           1 ∑︁                                        𝐺
+                                 Δ𝑖 = 20𝜖,          and        Δ𝑖 ≤            for all 𝑖 ∈ [𝑛].                  (15)
+                           𝑛 𝑖=1                                       2
+
+Step 2: Reduction to hypothesis testing.             Define the hypothesis testing error probability as
+           𝑝 𝑒𝑟𝑟 = 21 𝑝 0𝑒𝑟𝑟 + 12 𝑝 1𝑒𝑟𝑟 , where 𝑝 0𝑒𝑟𝑟 = ℙ D0 ( 𝑥ˆ < 0) and 𝑝 1𝑒𝑟𝑟 = ℙ D1 ( 𝑥ˆ > 0).
+We will next show that the expected error (Eq. (14)) is lower bounded in terms of 𝑝 𝑒𝑟𝑟 .
+Conditioning on D0 , a sufficient condition for the algorithm to fail is if 𝑥ˆ ≤ 0 and 𝑏¯ > 0, in which
+                                          ¯ thus
+case the optimization error is at least | 𝑏|;
+                           𝔼 D0 [𝐹 ( ˆ𝑥) − 𝐹 (𝑥 ∗ )] ≥ 𝔼 D0 [| ¯𝑏| · 𝕀( 𝑥ˆ ≤ 0) · 𝕀( 𝑏¯ > 0)].                   (16)
+We next bound the expected value (under D0 ) of the mean of truncate variables. Let 𝑔(𝛿) =
+𝔼[clip(𝑍 + 𝛿, −𝐺, 𝐺)] where 𝑍 ∼ N (0, 𝜎 2 ). The mean of the clipped variable is 𝔼[𝑏 𝑖 ] = 𝑔(Δ𝑖 ). By
+the mean value theorem, 𝑔(Δ𝑖 ) = 𝑔(0) + 𝑔 ′ (𝜉)Δ𝑖 = 𝑔 ′ (𝜉)Δ𝑖 for some 𝜉 ∈ (0, Δ𝑖 ). The derivative is
+𝑔 ′ (𝑡) = ℙ(−𝐺 ≤ 𝑍 + 𝑡 ≤ 𝐺). With 𝜎 = 𝐺/2 and Δ𝑖 ≤ 𝐺/2, the interval [−𝐺 − Δ𝑖 , 𝐺 − Δ𝑖 ] always
+contains [−𝐺/2, 𝐺/2] = [−𝜎, 𝜎]. The GaussianÍmass in this interval is > 0.5, thus 𝔼[𝑏 𝑖 ] ≥ 0.5Δ𝑖 .
+The aggregate mean then satisfies 𝔼[ ¯𝑏] ≥ 0.5( 𝑛1 𝑖=1
+                                                   𝑛
+                                                       Δ𝑖 ) = 10𝜖.
+The truncated variables 𝑏 𝑖 are independent and bounded in [−𝐺, 𝐺]. By Hoeffding’s inequality,
+𝑏¯ concentrates around its expectation: defining the event 𝐴 = { 𝑏¯ ≥ 5𝜖 }, the probability of the
+complement 𝛿 ′ = ℙ D0 ( 𝐴𝑐 ) is bounded by
+                                                     2𝑛2 (5𝜖) 2             3𝑛𝜖 2
+                                                                               
+             𝛿 ′ ≤ ℙ D0 𝑏¯ ≤ 𝔼 D0 [ ¯𝑏] − 5𝜖 ≤ exp −
+                                            
+                                                                  ≤ exp   −         ≤ 0.05,
+                                                      𝑛(2𝐿) 2                𝐺2
+where the final inequality is true since we assume 𝑛 ≥ 𝐺 2 /𝜖 2 . Conditioning on the event 𝐴 (where
+𝑏¯ ≥ 5𝜖 > 0) and recalling Eq. (16), we have
+                            𝔼 D0 [𝐹 ( ˆ𝑥) − 𝐹 (𝑥 ∗ )] ≥ 𝔼 D0 [| 𝑏|
+                                                                ¯ · 𝕀( 𝑥ˆ ≤ 0) · 𝕀( 𝐴)]
+                                                      ≥ 5𝜖 ℙ D0 ({𝑥ˆ ≤ 0} ∩ 𝐴)
+                                                      ≥ 5𝜖 (ℙ D0 ( 𝑥ˆ ≤ 0) − ℙ D0 ( 𝐴𝑐 ))
+                                                      = 5𝜖 ( 𝑝 0𝑒𝑟𝑟 − 𝛿 ′ ).
+Similarly, 𝔼 D1 [𝐹 ( ˆ𝑥)−𝐹 (𝑥 ∗ )] ≥ 5𝜖 ( 𝑝 1𝑒𝑟𝑟 −𝛿 ′ ), thus 𝔼 D [𝐹 ( ˆ𝑥)−𝐹 (𝑥 ∗ )] ≥ 5𝜖 ( 𝑝 𝑒𝑟𝑟 −𝛿 ′ ). The guarantee
+𝔼[𝐹 ( ˆ𝑥) − 𝐹 (𝑥 ∗ )] ≤ 𝜖 implies 5𝜖 ( 𝑝 𝑒𝑟𝑟 − 0.05) ≤ 𝜖, which leads to 𝑝 𝑒𝑟𝑟 ≤ 0.2 + 0.05 = 0.25. Thus,
+the algorithm must identify the correct hypothesis with probability at least 0.75.
+
+Step 3: Information-theoretic lower bound. Let 𝑃 and 𝑄 denote the probability distributions of
+the entire sequence of oracle responses observed by the algorithm when the instance is drawn from
+D0 and D1 , respectively. Let 𝑃′ and 𝑄 ′ denote the distributions of the underlying unclipped Gaussian
+vectors 𝑧 = (𝑧 1 , . . . , 𝑧 𝑛 ) under D0 and D1 . Since the observed gradients −𝑏 𝑖 are deterministic
+functions of 𝑧 𝑖 (specifically, 𝑏 𝑖 = clip(𝑧𝑖 )), the data processing inequality for KL divergences implies:
+                                        𝐷 𝐾 𝐿 (𝑃 ∥ 𝑄) ≤ 𝐷 𝐾 𝐿 (𝑃′ ∥ 𝑄 ′ ).
+The variables 𝑧𝑖 are independent, and 𝑧𝑖 ∼ N (Δ𝑖 , 𝜎 2 ) under D0 , while 𝑧 𝑖 ∼ N (−Δ𝑖 , 𝜎 2 ) under D1 .
+The KL divergence between two univariate Gaussians with means 𝜇1 , 𝜇2 and common variance 𝜎 2 is
+1           2   2                                   2       2
+2 (𝜇1 − 𝜇2 ) /𝜎 . Here, the separation is 2Δ𝑖 and 𝜎 = 𝐺 /4, so the KL divergence for 𝑧 𝑖 is upper
+                 2  2
+bounded by 8Δ𝑖 /𝐺 . Since the gradient oracles are exact and the objectives are linear, repeated
+queries to the same component yield identical results. Thus, information is gained only from the set
+
+
+                                                          25
+of distinct components queried. Let 𝑞 𝑖 be the probability (under D0 ) that component 𝑖 is queried at
+least once by the algorithm. By the chain rule for KL divergence (and linearity of expectation), the
+total divergence is bounded by:
+                                                                          𝑛
+                                                                         ∑︁         8Δ2𝑖
+                              𝐷 𝐾 𝐿 (𝑃 ∥ 𝑄) ≤ 𝐷 𝐾 𝐿 (𝑃′ ∥ 𝑄 ′ ) ≤              𝑞𝑖          .                (17)
+                                                                         𝑖=1
+                                                                                    𝐺2
+
+To relate the divergence to the error probability 𝑝 𝑒𝑟𝑟 , we use Le Cam’s argument, which states that
+for any hypothesis testing problem with uniform prior, 𝑝 𝑒𝑟𝑟 ≥ 12 (1 − 𝑇𝑉 (𝑃, 𝑄)) , where 𝑇𝑉 (𝑃, 𝑄)
+is the total variation distance. Given our requirement that 𝑝 𝑒𝑟𝑟 ≤ 14 , we must have:
+                               1   1
+                               4 ≥ 2 (1 − 𝑇𝑉 (𝑃, 𝑄))          =⇒ 𝑇𝑉 (𝑃, 𝑄) ≥ 12 .
+                                         √︃
+                                              1
+By Pinsker’s inequality, 𝑇𝑉 (𝑃, 𝑄) ≤          2 𝐷 𝐾 𝐿 (𝑃 ∥ 𝑄), which yields the required lower bound on the
+KL divergence:                  √︃
+                              1
+                              2 ≤
+                                     1
+                                     2 𝐷 𝐾 𝐿 (𝑃 ∥ 𝑄)      =⇒ 𝐷 𝐾 𝐿 (𝑃 ∥ 𝑄) ≥ 12 .
+Substituting the upper bound from Eq. (17) yields the condition:
+                                                 𝑛
+                                                ∑︁                𝐺2
+                                                      𝑞 𝑖 Δ2𝑖 ≥      .                                      (18)
+                                                𝑖=1
+                                                                  16
+
+Step 4: Optimizing the lower bound.                    From Eq. (18), any algorithm solving the problem must
+                                                  𝑞 𝑖 Δ2𝑖 ≥ 𝐺 2 /16. Since the total expected query cost C (under
+                                         Í𝑛
+satisfy the information constraint 𝑖=1
+the mixture distribution D) is lower bounded by half times the expected cost under D0 , we also have
+C ≥ 21 𝑖=1
+       Í𝑛
+             𝑞 𝑖 𝑐 𝑖 . For a fixed set of parameters Δ𝑖 , we can lower bound the algorithm’s expected cost
+in terms of the “information density” 𝜌𝑖 = Δ2𝑖 /𝑐 𝑖 of the components; indeed,
+                          𝑛            𝑛                     𝑛
+                                                                        !
+              𝐺 2 ∑︁              2
+                                      ∑︁                    ∑︁                               𝐺2
+                      ≤      𝑞 𝑖 Δ𝑖 =     (𝑞 𝑖 𝑐 𝑖 ) 𝜌𝑖 ≤        𝑞 𝑖 𝑐 𝑖 max 𝜌𝑖 =⇒ C ≥              .
+               16        𝑖=1          𝑖=1                   𝑖=1
+                                                                          𝑖              32 max𝑖 𝜌𝑖
+
+To maximize this lower bound, the adversary minimizes max 𝜌𝑖 subject to the constraints 𝑛1 𝑖=1
+                                                                                          Í𝑛
+                                                                                               Δ𝑖 =
+20𝜖 and Δ𝑖 ≤ 𝐺/2 for all 𝑖 (recall Eq. (15)). The minimum√is achieved when the ratios 𝜌𝑖 are
+equalized across the active components. Thus, we set Δ𝑖 = 𝛼 𝑐 𝑖 for components 𝑖 in an “active”
+subset 𝑆 ∗ ⊆ [𝑛], and Δ𝑖 = 0 otherwise. The scaling factor 𝛼 is determined using the constraint
+1 Í𝑛
+𝑛   𝑖=1 Δ𝑖 = 20𝜖:
+                            1 ∑︁ √                            20𝑛𝜖
+                                     (𝛼 𝑐 𝑖 ) = 20𝜖 =⇒ 𝛼 = Í      √ .                          (19)
+                            𝑛 𝑖 ∈𝑆 ∗                         𝑖∈𝑆 ∗ 𝑐 𝑖
+
+To certify the additional condition Δ𝑖 ≤ 𝐺/2 for all 𝑖, we require for all 𝑖 ∈ 𝑆 ∗ :
+                                              √                           √
+                    √      𝐺          20𝑛𝜖 𝑐 𝑖         𝐺      max𝑖 ∈𝑆 ∗ 𝑐 𝑖         𝐺
+                  𝛼 𝑐𝑖 ≤       ⇐⇒ Í            √     ≤   ⇐⇒    1 Í        √ ≤ 40𝜖 .
+                            2           𝑗 ∈𝑆 ∗   𝑐 𝑗   2       𝑛   𝑗 ∈𝑆 ∗  𝑐 𝑗
+
+This is the precisely the uniformity condition given in the theorem statement. The subset 𝑆 ∗ is defined
+as the largest set of cheapest components satisfying this condition. Finally, substituting 𝛼 back into
+the cost lower bound, we conclude:
+                                            √ 2                           !2
+                                𝐺2                       𝐺2
+                                    Í
+                                       𝑖∈𝑆 ∗ 𝑐 𝑖                 1 ∑︁ √
+                           C≥                      =                     𝑐𝑖 .
+                                32      20𝑛𝜖         12800𝜖 2 𝑛 𝑖∈𝑆 ∗
+                                                                                                               □
+
+
+
+
+                                                         26
+F     Extensions and Generality of the Theoretical Analysis
+In this section, we discuss the generality of the theory in Sections 4 and C. In particular, for the
+main paper we assume convexity in order to derive meaningful theoretical statements. Given that
+our empirical setting does not optimize a convex loss function, we address the differences here.
+Importantly, we emphasize that our theory does not strictly rely on convexity.
+
+F.1   Differences between Theory and Practice
+
+In the GRPO experiments, our training objective is not convex. Additionally, we do not use the
+averaged iterate but instead the last iterate for reporting final error. Furthermore, in GRPO, the
+objective changes every time a new set of rollouts is collected. As such, one can think of our
+implementation as many rounds of cost-aware learning. With every new set of rollouts, we define a
+new sampling distribution over the newly generated pool. The policy is then optimized by iterating
+over mini-batches sampled from this reweighted pool, ensuring the cost-aware distribution actively
+shapes the variance of the gradient updates at each step.
+
+F.2   Generality of the Cost Objective in Non-Convex Settings
+
+The mathematical optimality of 𝑝 ∗ is not strictly limited to the convex setting. Its derivation depends
+solely on the relationship between iteration complexity (𝑇) and estimator variance (𝑆( 𝑝)). Across
+various smoothness conditions, the number of iterations 𝑇 required to reach an 𝜖-stationary point is
+fundamentally bottlenecked by the stochastic gradient variance. Specifically:
+
+       • Non-Convex SGD: Reaching an 𝜖-stationary point requires an iteration complexity of
+         𝑇 ∝ 𝑆 𝜖( 𝑝)
+                  2  [Ghadimi and Lan, 2013].
+       • Adaptive Optimizers (Adam): Recent
+                                          √ theoretical
+                                                        analyses of Adam-type algorithms
+                                                       𝑆 ( 𝑝)
+         demonstrate a convergence rate of Õ          √        [Chen et al., 2018], implying 𝑇 ∝ 𝑆 𝜖( 𝑝)
+                                                                                                       2
+                                                        𝑇
+         (modulo sub-polynomial logarithmic factors).
+       • Generalized Smoothness: LLM loss landscapes exhibit generalized smoothness, where
+         local curvature grows proportionally with the gradient norm. Optimization theory establishes
+         that gradient clipping and adaptive methods guarantee convergence in this regime [Zhang
+         et al., 2020]. Crucially, this theory establishes
+                                                             that
+                                                                 the dominant stochastic term in the
+                                                         𝑆 ( 𝑝)
+         iteration complexity explicitly retains the O 𝜖 2 dependence on the variance 𝑆( 𝑝).
+
+Because the total expected training cost K is the product of iterations and the expected per-step cost
+(𝑇 · 𝐶 ( 𝑝)), the objective to minimize reduces to:
+                                          𝐽 ( 𝑝) = 𝑆( 𝑝)𝐶 ( 𝑝)
+Since this objective remains structurally identical across these diverse optimization settings, minimiz-
+ing the variance-cost √ product via 𝑝 ∗ continues to be the precise optimal strategy. Thus, the optimal
+               ∗
+distribution 𝑝 𝑖 ∝ 𝐺 𝑖 / 𝑐 𝑖 derived in Theorem 4.1 remains justified in non-convex regimes.
+
+F.3   Average Iterate (𝑥¯𝑇 ) vs. Last Iterate (𝑥𝑇 )
+
+While Algorithm 1 returns the average iterate 𝑥¯𝑇 following standard conventions in the SGD literature,
+the properties of the last iterate 𝑥𝑇 have also been extensively studied [Shamir and Zhang, 2013,
+Jain et al., 2019, Harvey et al., 2019]. As shown by Harvey et al. [2019], for a fixed step size, the
+last-iterate of SGD is a factor of log(𝑇) worse than the average. While the average iterate generally
+achieves superior performance—sometimes strictly so—specific step-size modification schemes
+[Jain et al., 2019] allow the expected suboptimality of the last iterate to enjoy the same convergence
+guarantees. Consequently, sampling with the optimal distribution 𝑝 ∗ derived in Theorem 4.1 provides
+similar theoretical guarantees for the last iterate as we establish for the averaged iterate.
+
+
+
+
+                                                  27
+G     Experimental Details and Ablations
+G.1   Experimental Details
+
+To ensure the reproducibility of our experiments, we provide a comprehensive overview of the
+hyperparameter configurations and the computational framework employed. Our implementation
+is built upon the Verl framework, utilizing vLLM [Kwon et al., 2023] for efficient inference and
+Flash-Attention [Dao et al., 2022] for optimized memory throughput.
+
+G.2   Implementation
+
+The primary modifications to the Verl codebase involve the construction of mini-batches for the
+policy gradient update and the integration of importance sampling. To maintain training stability, we
+re-center the importance weights around 1. This normalization allows us to maintain a consistent
+gradient norm across experiments. Crucially, this simply multiplies the training objective by a
+constant.
+
+G.3   Importance Weighting with GRPO
+
+Let 𝑃(𝑄) be the distribution over prompts and 𝜋 𝜃old (𝑞) be the distribution over responses from policy
+𝜋 𝜃old given prompt 𝑞. The objective contribution of a prompt 𝑞 and response 𝑜 is as follows:
+                   |𝑜|                                                                                    
+                1 ∑︁          𝜋 𝜃 (𝑜 𝑡 | 𝑞, 𝑜 <𝑡 ) (𝑡 )          𝜋 𝜃 (𝑜 𝑡 | 𝑞, 𝑜 <𝑡 )
+ℓ(𝑜; 𝜃, 𝑞) =           min                           𝐴 , clip                           , 1 − 𝜖, 1 + 𝜖 𝐴 (𝑡 ) −𝛽𝔻KL (𝜋 𝜃 ∥𝜋ref ).
+               |𝑜| 𝑡=1       𝜋 𝜃old (𝑜 𝑡 | 𝑞, 𝑜 <𝑡 )            𝜋 𝜃old (𝑜 𝑡 | 𝑞, 𝑜 <𝑡 )
+
+The GRPO objective for parameters 𝜃 is:
+                                                                     "      𝑀
+                                                                                        #
+                                                                         1 ∑︁
+                             JGRPO (𝜃) = 𝔼           𝑞∼𝑃 (𝑄)                   ℓ(𝑜𝑖 ; 𝜃) .                       (20)
+                                                {𝑜𝑖 }𝑖=1
+                                                     𝑀 ∼𝜋
+                                                          𝜃old (𝑞)
+                                                                         𝑀 𝑔=1
+
+Given 𝑛 prompts and 𝑀 rollouts per prompt, and letting 𝑜𝑖,𝑔 be the 𝑔’th rollout from the 𝑖’th prompt,
+the empirical objective is:
+                                                         𝑛 𝑀
+                                                      1 ∑︁ ∑︁                  
+                                    ĴGRPO (𝜃) =                ℓ 𝑜𝑖,𝑔 ; 𝜃, 𝑞 𝑖 .                                (21)
+                                                     𝑛𝑀 𝑖=1 𝑔=1
+
+In effect, the empirical GRPO objective is a finite sum objective over prompts and rollouts. If we
+sample according to another distribution 𝑝 ∈ Δ𝑛𝑀 , where we sample rollout pair (𝑞 𝑖 , 𝑜𝑖,𝑔 ) with
+probability 𝑝 (𝑖,𝑔) , the importance-weighted objective is:
+                                                     𝑛 𝑀
+                                   ( 𝑝)           1 ∑︁ ∑︁ 1                         
+                                ĴGRPO  (𝜃) =                       ℓ 𝑜 𝑖,𝑔 ; 𝜃, 𝑞 𝑖 .                           (22)
+                                                 𝑛𝑀 𝑖=1 𝑔=1 𝑝 (𝑖,𝑔)
+
+
+
+
+                                                           28
+G.4   Hyperparameters
+
+Table 2 summarizes the key hyperparameters used for both the GRPO baseline and our GRPO + ZVF
+method for the 1.5B experiments. For the Qwen3-8B experiments, we detail hyperparameters in the
+Table 4. We report Scale-RL hyperparameters in Table 5, largely influenced by the findings of [Khatri
+et al., 2025].
+
+            Hyperparameter                     Value
+            Base Model                         Qwen/Qwen2.5-Math-1.5B-Instruct
+            Algorithm                          GRPO
+            Learning Rate                      1 × 10−6
+            Weight Decay                       0.1
+            Train Batch Size                   256
+            Rollout Samples per Prompt (𝑛)     16
+            Rollout Temperature                1.0
+            PPO Mini-Batch Size                64
+            KL Loss Coefficient                0.001
+            Clip Ratio Low                     0.2
+            Clip Ratio High                    0.28
+       Table 2: Key Training Hyperparameters for 1.5B training, GRPO and GRPO + ZVF.
+
+
+                        Hyperparameter                     Value
+                        Base Model                         Qwen/Qwen3-4B
+                        Algorithm                          GRPO
+                        Learning Rate                      1 × 10−6
+                        Total Epochs                       15
+                        Train Batch Size                   512
+                        PPO Mini-Batch Size                256
+                        Rollout Samples per Prompt (𝑛)     8
+                        Rollout Temperature                1.0
+                        Max Prompt Length                  1024
+                        Max Response Length                4096
+                        KL Loss Coefficient                0.001
+                 Table 3: Key Training Hyperparameters for Qwen3-4B Training.
+
+
+
+
+                                                 29
+                      Hyperparameter                    Value
+                      Base Model                        Qwen/Qwen3-8B
+                      Algorithm                         GRPO
+                      Learning Rate                     1 × 10−6
+                      Total Epochs                      15
+                      Train Batch Size                  512
+                      PPO Mini-Batch Size               256
+                      Rollout Samples per Prompt (𝑛)    5
+                      Rollout Temperature               1.0
+                      Max Prompt Length                 1024
+                      Max Response Length               4096
+                      KL Loss Coefficient               0.001
+                Table 4: Key Training Hyperparameters for Qwen3-8B Training.
+
+                Hyperparameter          Value
+                Base Model              Qwen/Qwen2.5-Math-1.5B-Instruct
+                Advantage Estimator     GRPO
+                Policy Loss Type        CISPO
+                Learning Rate           5 × 10−7
+                LR Warmup Steps         100
+                Weight Decay            0.01
+                Train Batch Size        512
+                PPO Mini-Batch Size     128
+                Gradient Clipping       1.0
+                KL Loss Coefficient     0.001
+                Entropy Coefficient     0
+                Clip Ratio Low          0.0
+                Clip Ratio High         5.0
+                Clip Ratio C            3.0
+                LM Head Precision       FP32
+          Table 5: Key Training Hyperparameters for ScaleRL/CISPO Optimized Script
+
+
+G.5   Computational Requirements
+
+All experiments were conducted using the hardware configurations standard to the Verl framework.
+The training and evaluation durations are as follows:
+
+      • GRPO: Approximately 48 hours.
+      • GRPO + ZVF: Approximately 72 hours.
+      • Scale RL: Approximately 72 hours.
+
+For the Qwen3-4B experiments, we used 8 NVIDIA H100 GPUs per training run. The training runs
+required around 2 days each.
+For the Qwen3-8B experiments, we used 8 NVIDIA H100 GPUs per training run. The training runs
+required around 5 days each.
+
+
+
+
+                                              30
+ G.6                 Ablation on variants of 𝑝 ∗
+
+ In this section we ablate the different variants of 𝑝 ∗ . In particular, we also report 𝑝 ∗smooth for
+ 𝛼 = 0.05, 𝛼 = 0.1. Furthermore, we consider 𝑝 ∗LEN , in which ( 𝑝 ∗LEN )𝑖 = √1𝑐𝑖 . This sampling
+ distribution only considers the length of sequences in its distribution. We report these variants both
+ for GRPO and GRPO+ZVF. In particular with the GRPO setting, we see that 𝑝 ∗LEN does not attain very
+ strong performance. We hypothesize that this is because many shorter responses have 0 advantage,
+ and hence there is little training signal. As in the main paper, we also report final performance for all
+ methods.
+                                Accuracy vs. Token Count (GRPO)                                                  Accuracy vs. Token Count (GRPO+ZVF)
+                                                                                                     60
+               60
+                                                                                                     55
+
+                                                                                                     50
+                                                                  Method                                                                           Method
+
+
+Accuracy (%)                                                                          Accuracy (%)
+               50
+                                                              No sampling                            45                                          No sampling
+                                                              p*                                     40                                          p*
+               40                                               *
+                                                              psmooth ( = 0.01)                                                                    *
+                                                                                                                                                 psmooth ( = 0.01)
+                                                                                                     35
+                                                                *
+                                                              psmooth ( = 0.05)                                                                    *
+                                                                                                                                                 psmooth ( = 0.05)
+               30                                               *
+                                                              psmooth ( = 0.1)                       30                                            *
+                                                                                                                                                 psmooth ( = 0.1)
+                                                              p*-LEN                                 25                                          p*-LEN
+                    0.0   0.2     0.4   0.6    0.8    1.0   1.2      1.4    1.6                            0.0      0.2     0.4       0.6        0.8         1.0
+                                        Cumulative Tokens                      1e9                                         Cumulative Tokens                       1e9
+
+
+ Figure 7: Cumulative tokens compared with AIME pass@1/mean@32 accuracy throughout training
+ for both GRPO and GRPO+ZVF methods.
+
+
+                    Setting       Method                     AIME           AMC                           MATH500         GSM8K        Avg. Accuracy
+                    GRPO          No sampling                     61.3       64.1                            73.2          86.2                71.2
+                    GRPO          𝑝∗                              65.6       71.2                            73.2          86.0                74.0
+                    GRPO          𝑝 ∗smooth (𝛼 = 0.01)            65.3       68.1                            72.3          86.0                72.9
+                    GRPO          𝑝 ∗smooth (𝛼 = 0.05)            65.6       68.3                            72.8          86.1                73.2
+                    GRPO          𝑝 ∗smooth (𝛼 = 0.1)             65.4       66.0                            72.6          85.8                72.5
+                    GRPO          𝑝 ∗ -LEN                        60.3       64.8                            73.0          86.0                71.0
+                    ZVF           No sampling                     58.1       64.7                            73.2          86.1                70.6
+                    ZVF           𝑝∗                              57.6       63.0                            72.9          85.9                69.8
+                    ZVF           𝑝 ∗smooth (𝛼 = 0.01)            62.9       68.0                            73.3          85.8                72.5
+                    ZVF           𝑝 ∗smooth (𝛼 = 0.05)            60.5       65.9                            73.0          86.4                71.4
+                    ZVF           𝑝 ∗smooth (𝛼 = 0.1)             61.4       68.3                            72.9          86.0                72.2
+                    ZVF           𝑝 ∗ -LEN                        58.0       63.3                            73.9          86.2                70.3
+
+                                  Table 6: (Math-1.5B-Instruct, pass@1/mean@32): Complete results.
+
+
+                    Setting       Method                     AIME           AMC                           MATH500         GSM8K        Avg. Accuracy
+                    GRPO          No sampling                     58.3       72.8                            87.0          96.0                78.5
+                    GRPO          𝑝∗                              58.5       74.7                            86.7          95.2                78.8
+                    GRPO          𝑝 ∗smooth (𝛼 = 0.01)            58.5       74.0                            86.7          94.9                78.5
+                    GRPO          𝑝 ∗smooth (𝛼 = 0.05)            58.3       73.6                            86.6          95.6                78.5
+
+                                         Table 7: (8B-Base, pass@1/mean@32): Complete results.
+
+
+
+
+                                                                                     31
+G.7    Full CISPO results
+
+We report performance across benchmarks. The CISPO curves are reported in Figure 8 and the best
+checkpoint performance is reported in Table 8.
+
+
+
+
+Figure 8: Full CISPO objective results for Qwen2.5-Math-1.5B-Instruct on AIME. We see robustness
+to smoothed cost-aware learning.
+
+
+      Setting   Method                 AIME   AMC    MATH500     GSM8K      Avg. Accuracy
+      GRPO      No sampling            57.2   61.8     73.0        85.9          69.5
+      GRPO      𝑝∗                     61.3   65.7     73.6        86.2          71.7
+      GRPO      𝑝 ∗smooth (𝛼 = 0.01)   61.7   65.4     73.5        86.0          71.6
+      GRPO      𝑝 ∗smooth (𝛼 = 0.05)   60.5   66.0     73.0        86.1          71.4
+      GRPO      𝑝 ∗smooth (𝛼 = 0.1)    61.0   65.2     73.6        86.0          71.5
+
+          Table 8: (Math-1.5B-Instruct, pass@1/mean@32): Complete results for CISPO.
+
+
+
+
+                                                32
+G.8   Full sub-optimality results
+
+In the main paper, we report the sub-optimality metrics for the 8B and 1.5B models under the GRPO
+setting. Here, we also include the sub-optimality metrics for the GRPO+ZVF setting and the CISPO
+settings in Figures 9 and 10 respectively.
+
+
+
+
+Figure 9: Sub-optimality metrics for 1.5B                               Figure 10: Sub-optimality metrics for 1.5B
+GRPO+ZVF training run.                                                  CISPO training objective run.
+
+                                          Correlation, Divergence vs. Training Step (4B, GRPO)
+                                       0.10                                                     1.00
+
+
+
+
+                                                                                                   Pearson Correlation
+                                       0.08                                                     0.98
+
+
+                        2 Divergence
+                                       0.06                                                     0.96
+
+                                       0.04                                                     0.94
+
+                                       0.02                                                     0.92
+
+                                       0.00                                                     0.90
+                                              0   25   50     75    100       125   150   175
+                                                              Training Step
+
+                                  Figure 11: Sub-optimality metrics for 4B run.
+
+
+
+
+                                                                   33
+ G.9                 Additional results for Qwen2.5-Math-1.5B-Instruct
+
+We report AMC performance as a function of cumulative tokens in Figure 12.
+
+                                Accuracy vs. Token Count (GRPO)                                                 Accuracy vs. Token Count (GRPO+ZVF)
+               70
+                                                                                                     65
+               65
+                                                                                                     60
+
+
+
+Accuracy (%)                                                                          Accuracy (%)
+               60
+                                                                                                     55
+               55
+                                                                  Method                             50
+                                                                                                                                                Method
+               50                                             No sampling                                                                     No sampling
+                                                              p*                                                                              p*
+                                                                                                     45
+               45                                               *
+                                                              psmooth ( = 0.01)                                                                 *
+                                                                                                                                              psmooth ( = 0.01)
+                    0.0   0.2     0.4   0.6    0.8    1.0   1.2      1.4    1.6                           0.0     0.2      0.4       0.6      0.8         1.0
+                                        Cumulative Tokens                      1e9                                        Cumulative Tokens                     1e9
+
+
+ Figure 12: Cumulative tokens compared with AMC pass@1/mean@32 accuracy throughout training
+ for both GRPO and GRPO+ZVF settings for the 1.5B model.
+
+
+
+
+                                                                                     34
+G.10   Additional results for Qwen3-4B
+
+We report results for Qwen3-4B on AIME and AMC below. We plot up until peak accuracy is attained.
+We also report smoothed variants.
+
+                                                       Accuracy vs. Token Count (Qwen3-4B)
+
+
+                           55
+                                Method
+                                 GRPO
+
+            Accuracy (%)
+                                 CA-GRPO
+                           50                                                           (1) 35% fewer tokens
+
+
+                                                                                                 (2) 20% fewer tokens
+                           45
+
+                                       50M               100M                   150M             200M
+                                                                   Cumulative Tokens
+
+                                                Figure 13: Qwen3-4B on AIME.
+
+                                                       Accuracy vs. Token Count (Qwen3-4B)
+                           75
+
+
+
+                                Method
+                           70    No sampling
+
+            Accuracy (%)
+                                 p*
+
+
+                           65
+
+
+
+
+                                 50M           100M             150M           200M     250M            300M
+                                                                   Cumulative Tokens
+
+                                                Figure 14: Qwen3-4B on AMC.
+
+                                                       Accuracy vs. Token Count (Qwen3-4B)
+
+                           55
+
+
+
+
+            Accuracy (%)   50                                                                             Method
+                                                                                                         No sampling
+                                                                                                         p*
+                                                                                                           *
+                                                                                                         psmooth ( = 0.01)
+                           45                                                                              *
+                                                                                                         psmooth ( = 0.05)
+                                   50M                100M              150M           200M                250M
+                                                                   Cumulative Tokens
+
+                                Figure 15: Qwen3-4B and smoothed variants on AIME.
+
+
+
+
+                                                                       35
+G.11   Additional results for Qwen3-8B
+
+We present the results for the smoothed variants of the 8B model on AIME in Figure 16. Additionally,
+we plot AMC performance as a function of cumulative tokens in Figure 17. In Table 7, we report full
+results on best checkpoint accuracy for smoothed variants on four benchmarks.
+
+                                              Accuracy vs. Token Count (Qwen3-8B)
+                        60
+
+                        55
+
+                        50                                                                              Method
+
+         Accuracy (%)
+                                                                                                       No sampling
+                        45                                                                             p*
+                                                                                                         *
+                                                                                                       psmooth ( = 0.01)
+                        40                                                                               *
+                                                                                                       psmooth ( = 0.05)
+
+                        35
+
+                             0       100M               200M                  300M                     400M
+                                                          Cumulative Tokens
+
+                                 Figure 16: Qwen3-8B AIME results for all variants.
+
+                                            Accuracy vs. Token Count (Qwen3-8B, AMC)
+                        75
+
+
+                        70                                                                                  Method
+                                                                                                             GRPO
+
+
+         Accuracy (%)
+                                                                                                             CA-GRPO
+                        65
+
+                                                                    (1) 30% fewer tokens
+                        60
+                                                                                     (2) 47% fewer tokens
+                        55
+                             0     100M          200M               300M                   400M                  500M
+                                                          Cumulative Tokens
+
+                                    Figure 17: AMC results for Qwen3-8B Base.
+
+
+
+
+                                                               36
+

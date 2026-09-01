@@ -1,38 +1,37 @@
 % ============================================================================
-\section{Practical Use and Scope}
+\section{Practical Training Recipe}
 \label{sec:training_guide}
 % ============================================================================
 
-\paragraph{Choose the target mixture first.}
-Set $\lambda$ from deployment priorities or a capability target. Average each
-response loss over its generated tokens before applying the task weight.
-The target mixture then has a clear task-level meaning.
+The recipe uses one complete task batch and one optimizer step per rollout. Task
+selection occurs before generation, so each step calls one teacher or reward
+function.
 
-\paragraph{Use full-mixture updates when every teacher fits in one step.}
-A full-mixture update removes task-selection noise. GPAS is useful when an
-update uses one teacher, when teacher switching is expensive, or when the
-number of teachers makes full accumulation slow.
+\paragraph{1. Fix the task target.}
+Choose $\lambda$ from the intended capability priorities and record it before
+choosing a sampler. For frozen MOPD teachers, $\lambda$ is the teacher mixture.
 
-\paragraph{Warm up the task scores.}
-Start with a short round-robin period and collect several gradients from every
-task. Update each score after the sampled task finishes. A probability floor
-keeps rare-task scores fresh and limits the importance ratio.
+\paragraph{2. Define one task gradient.}
+Use a task-homogeneous batch. Average token gradients inside each response and
+then average responses to form $G_i$. Apply one shared task-gradient clip. Set a
+shared valid-token target, and record prompt count, token count, and GPU time.
 
-\paragraph{Apply the weight ratio before AdamW.}
-For sampled task $I$, multiply its response-normalized gradient by
-$\lambda_I/q_I$ before updating the AdamW moments. Log the target weight,
-proposal, correction factor, score, and score age at every step.
+\paragraph{3. Initialize the sampler.}
+Run a short round-robin warm start. Store a moving average of
+$\|\widetilde G_i\|_2^2$ for every task, where $\widetilde G_i$ uses AdamW's
+stored second moment before the sampling correction. Cost-GPAS also stores a
+moving average of task time. The four-task protocol uses 16 warm-start steps and
+$\gamma=0.95$.
 
-\paragraph{Select the score with a one-step test.}
-Raw GPAS has the simplest implementation. Adam GPAS is useful when the
-Adam-scaled norm ranks task-dependent parameter steps more accurately in the
-matched-state probe from Section~\ref{sec:exp_optimizer}. The one-step test
-provides a low-cost choice before an end-to-end run.
+\paragraph{4. Sample and optimize.}
+GPAS sets $q_i\propto\lambda_i\widehat s_i$. Cost-GPAS sets
+$q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$. Apply the probability
+floor, sample one task, compute and clip $G_i$, record its score, multiply by
+$\lambda_I/q_I$, and call AdamW. The four-task protocol uses
+$q_{\min}=0.05$.
 
-\paragraph{Scope.}
-The analysis covers fixed-token, task-homogeneous updates and a fixed teacher
-mixture. The gradient result is conditional on the current model and optimizer
-state. AdamW state, rollouts, and task gradients continue to change during
-training, so the end-to-end evaluation measures the final efficiency claim.
-The sampled-token and full-vocabulary estimators use the same GPAS rule and
-maintain separate task scores.
+\paragraph{5. Save and audit.}
+Checkpoint the score average, cost average, timestamps, proposal, task cursors,
+and random state. Log $I$, $q_I$, $\lambda_I/q_I$, valid tokens, prompt count,
+GPU time, and raw and AdamW-scaled gradient norms. A large inverse sampling
+factor or a stale task score triggers inspection of the probability floor.

@@ -1,19 +1,29 @@
 % ============================================================================
-\section{Conclusion}
+\section{Discussion and Conclusion}
 \label{sec:conclusion}
 % ============================================================================
 
-MOPD systems make two separate choices: the teacher mixture defines the
-training objective, and the task proposal allocates teacher and gradient
-evaluations. GPAS connects the two choices with a simple importance weight.
-The resulting gradient estimate preserves the selected mixture.
+Multi-task post-training needs separate controls for the target objective and
+compute allocation. Response-normalized task batches define the unit of the
+target; inverse sampling preserves its conditional mean. GPAS chooses proposals
+from a lagged optimizer metric, and Cost-GPAS also uses measured task time.
 
-GPAS allocates more updates to tasks with large optimizer-scaled gradient
-signals. The allocation minimizes task-level estimator error for the current
-model and AdamW state. Raw GPAS provides a simple default. Adam GPAS uses the
-optimizer state when AdamW changes the relative scale of task updates.
+The controlled experiment supports the local estimator claim. GPAS reduces the
+measured error by $30.3\%$, and Cost-GPAS reduces the time-weighted proxy by
+$10.7\%$. The constructed comparison shows that coordinate scale can matter.
+The planned gradient-bank and exact-step audits will measure whether the lagged
+AdamW score remains useful in LLM training.
 
-The experimental design tests the method at three levels: gradient estimator
-error, matched-state optimizer behavior, and end-to-end MOPD efficiency.
-The sampled-token and full-vocabulary study also shows how the distillation
-estimator changes the task scores used for allocation.
+Three boundaries guide interpretation. First, the correction preserves the
+conditional mean of the gradient delivered to AdamW. AdamW's moving averages
+can still produce different parameter paths under different task orders.
+Second, the score combines mean scale and batch variation. Compatibility and
+gradient-bank audits measure whether a large score carries a consistent
+training signal. Third, Cost-GPAS optimizes an uncentered local compute score.
+The GPU-hour curves provide the end-to-end efficiency measurement.
+
+The present draft contains controlled estimator evidence and a fixed
+large-model protocol. Completion of E1--E4 is required for a claim about MOPD
+training efficiency, and E5 is required for a GRPO transfer claim. The evidence
+boundary keeps the mathematical result, the MOPD hypothesis, and the eventual
+capability results distinct.
