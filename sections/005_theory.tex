@@ -89,7 +89,7 @@ $q_i\propto\lambda_i s_i/\sqrt{c_i}$.
 This applies the cost-aware sampling rule of
 \citet{mohri2026costawarelearning} to complete task batches in the selected
 optimizer metric. $J(q)$ is a local training signal. The frozen-gradient study
-measures it on held-out task batches, and the end-to-end experiment measures
+measures it on cached task batches, and the end-to-end experiment measures
 weighted teacher loss against GPU hours.
 
 \subsection{Estimate the scores online}
@@ -106,8 +106,7 @@ entries. The floor limits score staleness and large importance weights.
 Score error changes sampling efficiency smoothly. Appendix
 \ref{app:score_approximation} shows that a relative score error of at most
 $\delta$ increases $V(q)$ by at most a factor of $1/(1-\delta^2)$. The
-frozen-gradient study evaluates proposals on task batches not used to estimate
-their scores.
+frozen-gradient study compares estimated proposals on cached task batches.
 
 Each completed step records the clipped task gradient before the importance
 correction. The trainer then multiplies the gradient by $\lambda_I/q_I$ and

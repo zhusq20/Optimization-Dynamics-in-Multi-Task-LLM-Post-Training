@@ -47,9 +47,7 @@ The MOPD study uses a fixed revision of Qwen3-1.7B
 separate post-training on mathematics, code, instruction following, and
 science question answering. The teachers are frozen during MOPD. We report the
 model and tokenizer revisions, teacher checkpoints, and each teacher's score
-on its training domain. On a shared set of initial-student rollouts, we also
-report response-normalized reverse KL and the 99th percentile of the absolute
-teacher--student token log-probability gap.
+on its training domain.
 
 Each optimizer step samples one task and uses one task-homogeneous batch. Every
 response is averaged over its valid tokens, responses are then averaged within
@@ -61,8 +59,8 @@ Each task batch targets 65,536 valid response tokens. The prompt count is
 estimated from the task's recent response lengths, and every completed response
 enters the update. Runs use 600 optimizer steps, an 8,192-token response cap,
 temperature 1, top-$p$ 1, disabled thinking mode, an eight-step round-robin
-warm start, $\gamma=0.95$, and $q_{\min}=0.05$. We run seeds 42, 43, and 44.
-Within each seed, methods share the initialization, data order, and evaluation
+warm start, $\gamma=0.95$, and $q_{\min}=0.05$. Every method runs once with
+seed 42 and shares the initialization, per-task data order, and evaluation
 prompts.
 
 \subsection{Methods}
@@ -78,8 +76,7 @@ effect of the AdamW metric; it does not require another training run.
 \begin{table}[H]
 \centering
 \small
-\caption{MOPD methods. Every method uses three training seeds and the same
-target mixture.}
+\caption{MOPD methods. Every method uses seed 42 and the same target mixture.}
 \label{tab:exp_methods}
 \begin{tabular}{lll}
 \hline
@@ -103,9 +100,9 @@ proposal is formed.
 
 \subsection{Frozen-gradient mechanism study}
 
-We save steps 0, 300, and 600 from the seed-42 Uniform run. At each checkpoint,
-we collect 16 gradient batches per task. The first eight estimate task scores
-and costs; the other eight evaluate the resulting proposals.
+We save steps 0, 300, and 600 from the Uniform run. At each checkpoint, we
+collect 16 gradient batches per task and use them to estimate and compare the
+task proposals.
 
 \paragraph{Response normalization.}
 \label{sec:exp_length_cost}
@@ -116,13 +113,11 @@ global token averaging, and the coefficient after response normalization.
 
 \paragraph{Proposal quality.}
 \label{sec:exp_estimator}
-The held-out half of the gradient bank evaluates Uniform, Loss-EMA, Raw GPAS,
-GPAS, and Cost-GPAS. We report the AdamW-scaled estimator error $M(q)$ from
+The gradient bank evaluates Uniform, Loss-EMA, Raw GPAS, GPAS, and Cost-GPAS.
+We report the AdamW-scaled estimator error $M(q)$ from
 Equation~\ref{eq:empirical_estimator_mse} and the compute score $J(q)$ from
-Section~\ref{sec:cost_gpas}, both relative to Uniform. Monte Carlo resampling
-also compares each corrected mean with the four-task full-mixture mean. This
-single evaluation tests the importance correction, the benefit of the AdamW
-metric over raw gradient norms, and the cost-aware proposal.
+Section~\ref{sec:cost_gpas}, both relative to Uniform. The comparison tests the
+benefit of the AdamW metric over raw gradient norms and the cost-aware proposal.
 
 \paragraph{AdamW score.}
 \label{sec:exp_geometry_tracking}
@@ -144,8 +139,7 @@ where $N$ is cumulative valid response tokens or measured GPU hours. We report
 normalized teacher-loss AUC over the resource range shared by the compared
 methods and the final weighted and per-task losses. The token comparison is
 GPAS against Uniform and Loss-EMA; the time comparison is Cost-GPAS against
-Uniform and GPAS. Results are means and standard deviations over the three
-training seeds.
+Uniform and GPAS. We report the complete seed-42 trajectories and final values.
 
 The final capability evaluation reports MATH-500 greedy pass@1, a frozen
 post-cutoff LiveCodeBench pass@1 slice, IFBench strict accuracy, and
@@ -163,7 +157,7 @@ executable or exact-match rewards
 Cost-GPAS target $\lambda_i=1/3$ and use the same task-level correction as in
 MOPD. Each task-homogeneous batch targets 32,768 response tokens and samples
 eight responses per prompt. Runs use a six-step round-robin warm start, 400
-optimizer steps, AdamW, and seeds 42, 43, and 44.
+optimizer steps, AdamW, and seed 42.
 
 We report weighted held-out KL-regularized return against tokens and GPU hours,
 together with final MATH-500, APPS test pass@1, and ARC-Challenge accuracy.

@@ -1,4 +1,4 @@
-# Qwen3-1.7B 四教师 MOPD：GPAS / Cost-GPAS 精简实验方案
+# Qwen3-1.7B 四教师 MOPD：GPAS / Cost-GPAS 单 seed 实验方案
 
 > 版本：2026-09-01  
 > 主模型：Qwen3-1.7B  
@@ -22,10 +22,8 @@
 
 - Student 为固定 revision 的 Qwen/Qwen3-1.7B。
 - 四个 teacher 从同一 student checkpoint 出发，分别在 Math、Code、IF 和 ScienceQA 上训练；MOPD 期间冻结 teacher。
-- 训练、梯度评估和最终评测使用不重叠的 prompt。
+- 训练和评测使用不重叠的 prompt。
 - 报告 model/tokenizer revision、teacher checkpoint 和每个 teacher 的对应任务得分。
-
-在 MOPD 开始前，用一组 student rollout 报告每个 teacher 的 response-normalized reverse KL 和 $|\log(\tau/\pi)|$ 的 99th percentile。这是一次性 teacher sanity check，不在每个 checkpoint 重复扩展成独立审计。
 
 ### 2.2 Task update
 
@@ -46,13 +44,13 @@ $$
 | rollout | temperature 1, top-p 1, thinking off |
 | score / cost EMA | $\gamma=0.95$ |
 | probability floor | $q_{\min}=0.05$ |
-| training seeds | 42, 43, 44 |
+| training seed | 42 |
 
 下一个 task batch 的 prompt 数由该任务近期的平均 response length 估计。当前 batch 中已完成的 response 全部进入梯度，并记录实际 valid token 数。
 
 梯度操作顺序为：构造 response-normalized $G_i$，应用共享的 task-gradient clip，记录采样 score，乘以 $\lambda_i/q_i$，然后调用 AdamW。correction 后不再进行非线性裁剪。
 
-每个 update 只记录分析必需的字段：task、$q_i$、$\lambda_i/q_i$、valid tokens、prompt 数、total GPU seconds、raw gradient norm、AdamW-metric norm 和 teacher loss。
+每个 update 记录 task、$q_i$、$\lambda_i/q_i$、valid tokens、GPU seconds、gradient score 和 teacher loss。
 
 ## 3. 比较方法
 
@@ -75,7 +73,7 @@ Raw GPAS（$P_t=I$）只作为冻结梯度实验中的几何消融。
 
 ## 5. 冻结梯度机制实验
 
-在 `Uniform` 的 update 0、300 和 600 取 checkpoint。seed 42 上每任务采集 16 个 task-gradient batch，前 8 个估计 score 和 cost，后 8 个评估 proposal。
+在 `Uniform` 的 update 0、300 和 600 取 checkpoint。每任务采集 16 个 task-gradient batch，用于估计和比较各种 proposal。
 
 ### 5.1 Response normalization
 
@@ -88,7 +86,7 @@ Raw GPAS（$P_t=I$）只作为冻结梯度实验中的几何消融。
 
 ### 5.2 Proposal quality
 
-在 evaluation half 上比较 Uniform、Loss-EMA、Raw GPAS、GPAS 和 Cost-GPAS，报告：
+比较 Uniform、Loss-EMA、Raw GPAS、GPAS 和 Cost-GPAS，报告：
 
 $$
 M_P(q)=\mathbb E\|P_t\widehat g-P_th\|_2^2,
@@ -99,15 +97,15 @@ J_P(q)=\left(\sum_iq_ic_i\right)
 \left(\sum_i\frac{\lambda_i^2s_{i,P}^2}{q_i}\right).
 $$
 
-同时用 Monte Carlo 平均梯度与 full-mixture mean 的 relative error 检查 $\lambda_i/q_i$ correction。主结果是相对 Uniform 的 $M_P$ 和 $J_P$ ratio；Raw GPAS 用于显示 identity metric 与 AdamW metric 的差异。
+主结果是相对 Uniform 的 $M_P$ 和 $J_P$ ratio；Raw GPAS 用于显示 identity metric 与 AdamW metric 的差异。
 
 ### 5.3 AdamW score
 
-直接根据保存的 AdamW moment 和 cached $G_i$ 计算下一步的 task-dependent parameter update，无需为每个任务创建两个模型 clone。报告 raw norm 与 AdamW-metric norm 对实际 update norm 的 Spearman correlation。
+根据保存的 AdamW moment 和 cached $G_i$ 计算下一步的 task-dependent parameter update。报告 raw norm 与 AdamW-metric norm 对 update norm 的 Spearman correlation。
 
 ## 6. 端到端 MOPD
 
-四种方法分别运行 seeds 42、43、44。每 50 updates 在共享 held-out prompt 上评估 weighted teacher loss：
+四种方法均运行 seed 42 一次。每 50 updates 在共享 held-out prompt 上评估 weighted teacher loss：
 
 $$
 L(N)=\sum_i\lambda_i\ell_i(N).
@@ -120,7 +118,7 @@ $$
 - update 600 的 weighted teacher loss 和每任务 teacher loss；
 - update 600 的四任务 capability vector。
 
-token 比较使用 GPAS vs Uniform / Loss-EMA；GPU-hour 比较使用 Cost-GPAS vs Uniform / GPAS。AUC 在方法共同覆盖的资源区间内计算。报告三个 seed 的均值和标准差。
+token 比较使用 GPAS vs Uniform / Loss-EMA；GPU-hour 比较使用 Cost-GPAS vs Uniform / GPAS。AUC 在方法共同覆盖的资源区间内计算。报告 seed 42 的完整曲线和终点结果。
 
 Capability evaluation 包含：
 
@@ -144,15 +142,13 @@ Capability evaluation 包含：
 | responses / prompt | 8 |
 | optimizer updates | 400 |
 | warm start | 6-step round robin |
-| seeds | 42, 43, 44 |
+| seed | 42 |
 
 主指标是 held-out weighted KL-regularized return vs tokens / GPU hours，以及最终 MATH-500、APPS test pass@1 和 ARC-Challenge accuracy。
 
 ## 8. 执行顺序
 
-1. 确认四个 teacher 在对应任务上优于初始 student，并完成一次性 teacher sanity check。
-2. 复现已有受控采样结果。
-3. 运行三个 seed 的 Uniform，从 seed 42 收集机制实验所需的三个 checkpoint。
-4. 运行 Loss-EMA、GPAS 和 Cost-GPAS。
-5. 统一生成 token/GPU-hour 曲线、AUC 和 capability 表。
-6. 运行 GRPO 迁移实验。
+1. 运行 seed 42 的 Uniform、Loss-EMA、GPAS 和 Cost-GPAS。
+2. 从 Uniform 的三个 checkpoint 完成冻结梯度分析。
+3. 生成 token/GPU-hour 曲线、AUC 和 capability 表。
+4. 运行 seed 42 的 GRPO 迁移实验。

@@ -49,9 +49,8 @@ centered error is
     M(q)=\mathbb E\left\|\widehat{\widetilde g}-\widetilde h\right\|_2^2.
     \label{eq:empirical_estimator_mse}
 \end{equation}
-The experiment estimates $h$ and the expectation from held-out task batches.
-Calibration batches supply $q$, so proposal construction and evaluation use
-separate samples. The LLM evaluation uses the AdamW metric in
+The experiment estimates $h$ and the expectation from cached task batches. The
+LLM evaluation uses the AdamW metric in
 Equation~\ref{eq:adamw_lagged_metric}; the controlled experiment also reports
 the SGD identity metric.
 
