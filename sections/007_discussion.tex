@@ -1,33 +1,37 @@
 % ============================================================================
-\section{Discussion and Conclusion}
+\section{Limitations and Conclusion}
 \label{sec:conclusion}
 % ============================================================================
 
-Multi-task post-training needs separate controls for the target objective and
-compute allocation. Response-normalized task batches define the unit of the
-target; inverse sampling preserves its conditional mean. GPAS chooses proposals
-in an optimizer-induced metric, and Cost-GPAS also uses measured task time. The
-identity metric recovers the SGD gradient-norm rule; our LLM experiments focus
-on the lagged AdamW metric.
+The theory fixes the model and optimizer state before comparing proposals. In
+training, task order changes future gradients, so two unbiased samplers can
+follow different parameter paths. The population-target statement in
+Proposition~\ref{prop:conditional_preservation} gives a common local geometry
+rather than a shared trajectory.
 
-The controlled experiment supports the local estimator claim. GPAS reduces the
-measured error by $30.3\%$, and Cost-GPAS reduces the time-weighted proxy by
-$10.7\%$. The constructed comparison shows that coordinate scale can matter.
-The frozen-gradient study will measure whether the lagged AdamW score tracks
-the task-dependent AdamW update in LLM training.
+Online scale estimates receive partial feedback. A low estimate can grow stale
+while its task is sampled less often. The round-robin warm start, proposal
+floor, age logs, and periodic full refreshes make this loop visible, while the
+floor trades local allocation quality for exploration and bounded importance
+multipliers. More formal online guarantees would require assumptions about how
+quickly task gradients change during post-training.
 
-Three boundaries guide interpretation. First, the correction preserves the
-conditional mean of the gradient delivered to the optimizer. Stateful
-optimizers can still produce different parameter paths under different task
-orders.
-Second, the score combines mean scale and batch variation. Frozen-gradient
-measurements show how this local quantity behaves across tasks. Third,
-Cost-GPAS optimizes an uncentered local compute score.
-The GPU-hour curves provide the end-to-end efficiency measurement.
+GPAS allocates from the uncentered preconditioned second moment. In a
+mean-dominated large batch, this favors tasks that currently make a large
+AdamW-scaled update. Strong within-task noise changes that interpretation, so
+the gradient bank reports the mean and noise terms separately. Cost-GPAS adds
+another approximation: $J(q)$ is a smooth-optimization proxy built from a
+fixed preconditioner and average step times. Teacher-loss curves against GPU
+hours provide the deciding empirical test.
 
-The present draft contains controlled estimator evidence; the MOPD and GRPO
-results are still pending. The three-seed large-model study compares GPAS with
-uniform sampling, a corrected D$^3$ trajectory proposal, and classical
-gradient-norm importance sampling while holding the target mixture fixed. The
-mathematical estimator result and the end-to-end efficiency question remain
-separate empirical claims.
+Gradient clipping also changes the object being estimated. Importance
+correction remains exact for the clipped update field, while clip events move
+that field away from the original teacher-loss gradient. Per-task clip rates,
+update norms, and multiplier distributions define the practical scope of the
+fixed-objective interpretation.
+
+The central design is simple: state the teacher-loss objective, then allocate
+expensive task steps for that objective. Moment-consistent AdamW keeps the
+local second-moment target independent of the proposal, and GPAS chooses the
+proposal in that fixed geometry. Applying the allocation after each objective
+update also makes the method compatible with a curriculum.

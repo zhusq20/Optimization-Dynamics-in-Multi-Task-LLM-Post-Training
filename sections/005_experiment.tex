@@ -3,177 +3,198 @@
 \label{sec:experiments}
 % ============================================================================
 
-We use four studies. A controlled Gaussian problem verifies the sampling
-calculation. Frozen LLM gradients test response normalization and proposal
-quality without full training runs. Four-teacher MOPD runs measure progress per
-token and GPU hour, followed by a smaller GRPO transfer study. The controlled
-experiment is complete; the large-model experiments remain pending.
-
-\subsection{Controlled validation of the sampling rule}
-\label{sec:controlled_experiment}
-
-We construct three Gaussian task-gradient distributions with different raw
-gradient scales, AdamW coordinate scales, and task costs. All methods target
-$\lambda_i=1/3$ and apply the correction in
-Equation~\ref{eq:importance_estimator}. We draw 20,000 Monte Carlo trials, with
-16 corrected task gradients per trial. We omit the probability floor here so
-that the proposals match the closed-form calculation.
-
-Under the identity metric used by SGD, Gradient-Norm IS is optimal and attains
-calculated and Monte Carlo error ratios of $0.534$ relative to uniform
-sampling. Figure~\ref{fig:controlled_sampling} evaluates the same problem in
-the AdamW metric. The calculated GPAS error ratio is $0.698$, and the Monte
-Carlo ratio is $0.697$. The raw-gradient proposal reaches $7.178$ times the
-observed uniform error because its largest raw coordinates receive a small
-AdamW scale. Cost-GPAS reaches $0.893$ times the uniform time-weighted
-second-moment proxy. Every corrected proposal has a relative AdamW-scaled
-mean-gradient error below $2.1\%$.
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=\linewidth]{figures/controlled_optimizer_sampling.pdf}
-    \caption{Controlled sampling experiment. Bars show Monte Carlo results
-    normalized by the observed uniform baseline; black crosses show calculated
-    error ratios. Task costs are $5$, $2$, and $10$. Lower values are better
-    in the center and right panels.}
-    \label{fig:controlled_sampling}
-\end{figure}
+The experiments test one chain of claims. The warm start first measures
+whether tasks differ in preconditioned gradient scale and end-to-end step time.
+Frozen-gradient replay then checks the local moment and allocation predictions
+at real LLM states. Matched MOPD runs test whether those predictions translate
+to teacher-loss progress per token and GPU hour. Controlled problems serve as
+implementation checks and stress tests for the underlying formulas.
 
 \subsection{Four-teacher MOPD setup}
 \label{sec:exp_setup}
 
-The MOPD study uses a fixed revision of Qwen3-1.7B
-\citep{qwen2025qwen3}. Four teachers start from this checkpoint and receive
-separate post-training on mathematics, code, instruction following, and
-science question answering. The teachers are frozen during MOPD. We report the
-model and tokenizer revisions, teacher checkpoints, and each teacher's score
-on its training domain.
+The student is a fixed revision of Qwen3-1.7B \citep{qwen2025qwen3}. Four
+same-origin teachers specialize in mathematics, code, instruction following,
+and science question answering. The run manifest records model and tokenizer
+revisions, teacher checkpoints, data revisions, optimizer settings, hardware,
+and seeds. Each teacher is also evaluated on its own domain before distillation.
 
-Each optimizer step samples one task and uses one task-homogeneous batch. Every
-response is averaged over its valid tokens, responses are then averaged within
-the task, and one shared task-gradient clip is applied. The trainer records the
-sampling score before multiplying the gradient by $\lambda_i/q_i$ and calling
-AdamW. All methods target $\lambda_i=1/4$ and use the same data splits.
+Every step draws one task and builds a task-homogeneous batch with 65,536 valid
+response tokens. Tokens are averaged inside a response, followed by an average
+over responses. The logs retain response, prompt, and valid-token counts, which
+allows aggregation choices to be audited. The step timer covers rollout,
+teacher evaluation, backpropagation, and the optimizer update.
 
-Each task batch targets 65,536 valid response tokens. The prompt count is
-estimated from the task's recent response lengths, and every completed response
-enters the update. Runs use 600 optimizer steps, an 8,192-token response cap,
-temperature 1, top-$p$ 1, disabled thinking mode, an eight-step round-robin
-warm start, $\gamma=0.95$, and $q_{\min}=0.05$. Every method runs with each of
-three paired seeds and shares the initialization, per-task data order, and
-evaluation prompts within each seed.
+Training uses an 8,192-token response cap, temperature 1, top-$p$ 1, an
+eight-step round-robin warm start, $\gamma=0.95$, and $q_{\min}=0.05$. The
+shared emergency norm clip is applied to $G_i$ before importance correction.
+The optimizer receives the clipped task gradient and $w$ separately, uses
+$wG_i$ for its first moment, and uses $wG_i^2$ for its second moment. Clip
+events measure divergence from the original teacher-loss gradient field; the
+corrected estimate still targets the corresponding clipped update field.
 
-\subsection{Methods}
+A 300-step pilot pairs Uniform and GPAS under one seed. The main study runs 400
+steps and reuses the pilot checkpoints. The five fixed-objective methods use three
+paired seeds, and the moment comparison uses two. Runs within a seed share
+initialization, per-task data order, and evaluation prompts. Held-out teacher
+loss is evaluated every 50 steps, with capability benchmarks at the endpoint.
+
+\subsection{Matched methods}
 \label{sec:exp_methods}
 
-Table~\ref{tab:exp_methods} compares three fixed-target baselines with GPAS and
-Cost-GPAS. D$^3$-Proposal-IC adapts the normalized reverse-KL gap and descent
-velocity of D$^3$-MOPD \citep{sun2026d3mopd} to form only the task proposal;
-the importance correction leaves the target mixture fixed. Gradient-Norm IS is
-the classical gradient-norm importance sampler in the identity metric. Its
-end-to-end comparison with GPAS isolates the effect of the AdamW metric.
+Table~\ref{tab:exp_methods} separates fixed-objective allocation from a
+curriculum. Rows through D$^3$-Proposal-IC use $\lambda_i=1/4$ and moment-consistent
+AdamW. Gradient-Norm IS uses raw gradient scale. D$^3$-Proposal-IC converts the
+D$^3$ loss-gap and descent-velocity signal into $q$, followed by the same
+$\lambda_i/q_i$ correction as every fixed-objective method.
 
-\begin{table}[H]
+\begin{table}[t]
 \centering
 \small
-\caption{MOPD methods. Every method uses three paired seeds and the same target
-mixture.}
+\caption{Matched MOPD runs. The curriculum pair reuses the same realized
+objective-weight path.}
 \label{tab:exp_methods}
-\begin{tabular}{lll}
+\begin{tabular}{llll}
 \hline
-Method & Task proposal & Gradient factor \\
+Method & Objective $\lambda$ & Proposal $q$ & Seeds \\
 \hline
-Uniform & $q_i=1/4$ & $1$ \\
-D$^3$-Proposal-IC & $q_i=\operatorname{FloorSoftmax}(\widehat z_i/T)$
-    & $\lambda_i/q_i$ \\
-Gradient-Norm IS & $q_i\propto\lambda_i\widehat r_i$
-    & $\lambda_i/q_i$ \\
-GPAS & $q_i\propto\lambda_i\widehat s_i$
-    & $\lambda_i/q_i$ \\
-Cost-GPAS & $q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$
-    & $\lambda_i/q_i$ \\
+Uniform & $1/4$ & $1/4$ & 3 \\
+Gradient-Norm IS & $1/4$ & $\propto\lambda\widehat r$ & 3 \\
+GPAS & $1/4$ & $\propto\lambda\widehat s$ & 3 \\
+Cost-GPAS & $1/4$ & $\propto\lambda\widehat s/\sqrt{\widehat c}$ & 3 \\
+D$^3$-Proposal-IC & $1/4$ & D$^3$ signal + correction & 3 \\
+Native D$^3$ & $q_t$ & D$^3$ signal & 2 \\
+D$^3$ target + GPAS & replayed $\lambda_t$ & $\propto\lambda_t\widehat s$ & 2 \\
+GPAS + standard AdamW & $1/4$ & $\propto\lambda\widehat s$ & 2 \\
 \hline
 \end{tabular}
 \end{table}
 
-Here $\widehat z_i$ is the product of D$^3$-MOPD's normalized teacher-loss gap
-and recent nonnegative descent velocity, $\widehat r_i^2$ tracks
-$\|G_i\|_2^2$, $\widehat s_i^2$ tracks $\|A_tG_i\|_2^2$ in the AdamW metric,
-and $\widehat c_i$ tracks total task time. D$^3$-Proposal-IC uses the published
-cadence $n=10$, window $W=10$, $R=3$ windows, initial normalizer $S_0=5$,
-ten-step loss EMA, and temperature $T=0.5$. Mixed-batch jitter is omitted
-because this protocol samples one task per step. All proposals use the common
-probability floor.
+Native D$^3$ uses its schedule as both objective weights and sampling
+probabilities. For each seed, the paired D$^3$ target + GPAS run replays the
+recorded sequence $\lambda_1,\ldots,\lambda_T$ and changes only the task draws.
+This pairing holds the realized objective-weight path fixed. The final row keeps the GPAS
+proposal and first-moment correction and returns the second moment to
+$w^2G_i^2$.
 
-\subsection{Frozen-gradient mechanism study}
-
-We save steps 0, 300, and 600 from the Uniform run. At each checkpoint, we
-collect 16 gradient batches per task and use them to estimate and compare the
-task proposals.
-
-\paragraph{Response normalization.}
-\label{sec:exp_length_cost}
-Using the same cached responses, we compare a prompt-balanced batch with global
-token averaging against Equation~\ref{eq:response_normalized_update} followed
-by an equal task average. We report response length, the task share induced by
-global token averaging, and the coefficient after response normalization.
-
-\paragraph{Proposal quality.}
-\label{sec:exp_estimator}
-The gradient bank evaluates Uniform, D$^3$-Proposal-IC, Gradient-Norm IS, GPAS,
-and Cost-GPAS.
-We report the AdamW-scaled estimator error $M(q)$ from
-Equation~\ref{eq:empirical_estimator_mse} and the compute score $J(q)$ from
-Section~\ref{sec:cost_gpas}, both relative to Uniform. The comparison tests the
-benefit of the AdamW metric over raw gradient norms and the cost-aware proposal.
-
-\paragraph{AdamW score.}
-\label{sec:exp_geometry_tracking}
-For every cached task gradient, we compute the task-dependent part of the next
-AdamW parameter update from the saved first- and second-moment state. Spearman
-correlations compare the raw gradient norm and the lagged AdamW-metric norm
-with the resulting update norm.
-
-\subsection{End-to-end MOPD efficiency}
+\subsection{End-to-end endpoints}
 \label{sec:exp_allocation}
 
-Every 50 steps, evaluation on shared held-out prompts measures weighted teacher
-loss
+The primary endpoint is weighted held-out teacher loss
 \begin{equation}
     L(N)=\sum_i\lambda_i\ell_i(N),
     \label{eq:weighted_teacher_loss}
 \end{equation}
-where $N$ is cumulative valid response tokens or measured GPU hours. We report
-normalized teacher-loss AUC over the resource range shared by the compared
-methods and the final weighted and per-task losses. The token comparison is
-GPAS against Uniform, D$^3$-Proposal-IC, and Gradient-Norm IS; the time
-comparison is Cost-GPAS against Uniform and GPAS. We report mean trajectories
-and final values with standard errors over the three paired seeds.
+plotted against cumulative valid response tokens and measured GPU hours. We
+report normalized loss AUC on the common resource interval, final weighted
+loss, every per-task loss, and GPU hours needed to reach the final Uniform
+loss. Mean curves and standard errors use paired seeds.
 
-The final capability evaluation reports MATH-500 greedy pass@1, a frozen
-post-cutoff LiveCodeBench pass@1 slice, IFBench strict accuracy, and
-GPQA-Diamond average@4. The table includes all four task scores and their macro
-average. Training logs retain the sampled task, proposal probability,
-importance factor, valid-token count, prompt count, total GPU time, gradient
-scores, and teacher loss.
+The fixed-objective rows give direct mechanism comparisons. Gradient-Norm IS
+versus GPAS tests the optimizer metric. GPAS versus Cost-GPAS tests the runtime
+correction through token-efficiency and time-efficiency curves. GPAS versus its
+standard-AdamW arm tests the second-moment rule. The replayed D$^3$ pair tests
+allocation under one curriculum path.
 
-\subsection{Transfer to multi-task GRPO}
-\label{sec:exp_grpo}
+Capability reporting includes MATH-500 greedy pass@1, a frozen post-cutoff
+LiveCodeBench pass@1 slice, IFBench strict accuracy, and GPQA-Diamond
+average@4. Per-task teacher losses and capability scores remain primary for
+the native curriculum rows because their objective changes during training.
 
-The transfer study uses MATH train, APPS train, and ARC-Challenge train with
-executable or exact-match rewards
-\citep{hendrycks2021math,hendrycks2021apps,clark2018arc}. Uniform,
-SEC-Proposal-IC, GPAS, and Cost-GPAS target $\lambda_i=1/3$ and use the same
-task-level correction as in MOPD. SEC-Proposal-IC uses a moving average of the
-task's mean absolute group-relative advantage as its proposal signal, adapting
-the self-evolving curriculum baseline used in multi-task GRPO
-\citep{ramesh2026multitaskgrporeliablellm} while keeping the target fixed. Each
-task-homogeneous batch targets 32,768 response tokens and samples eight
-responses per prompt. Runs use a six-step round-robin warm start, 400 optimizer
-steps, AdamW, and three paired seeds.
+\subsection{Mechanism, feedback, and stability}
+\label{sec:frozen_gradient}
 
-We report weighted held-out KL-regularized return against tokens and GPU hours,
-together with final MATH-500, APPS test pass@1, and ARC-Challenge accuracy.
-This comparison changes only the task sampler and therefore tests whether the
-same allocation rule transfers from distillation gradients to reward-based
-updates.
+The Uniform run supplies checkpoints after the round-robin warm start, near
+the middle, and near the end of training. At each checkpoint we collect 16
+task batches per task. Eight batches estimate each proposal and eight evaluate
+it; swapping the folds and averaging removes the same-bank advantage. Rollouts
+and teacher log probabilities are cached so the accounting includes their
+collection cost.
+
+The gradient bank answers four practical questions. Raw and preconditioned
+gradient norms are compared with the exact task-dependent AdamW update,
+defined at a fixed state as
+$\Delta\theta(G_i)-\Delta\theta(0)$. Correlations are reported both within each
+task and after pooling tasks. The held-out fold evaluates $V(q)$ and $J(q)$ for
+every proposal. Sampled-coordinate replay compares the population
+second-moment targets and finite-memory state drift under standard and
+moment-consistent AdamW. Fixed random projections provide pairwise cosine
+similarities between task mean gradients.
+
+Microbatch resampling separates the squared preconditioned mean gradient from
+within-task noise, which tests whether the 65,536-token regime is mean-driven.
+Short branches from each checkpoint run the candidate proposals for the same
+small step budget and compare predicted $V(q)$ and $J(q)$ rankings with actual
+held-out loss decrease. This supplies the empirical bridge from a local
+second-moment criterion to training progress.
+
+An offline sampler replay sweeps $\gamma\in\{0.90,0.95,0.99\}$ and
+$q_{\min}\in\{0.01,0.025,0.05,0.10\}$. It reports scale age, full-refresh scale
+error, the contribution of the floor to $J(q)$, and the frequency of extreme
+importance multipliers. End-to-end runs report per-task warm-start ranges for
+$s_i$ and $c_i$, multiplier and corrected-update quantiles, clip rate, numerical
+overflow, and runtime-estimation error. A small optimizer microbenchmark also
+records step latency and peak memory for standard and moment-consistent AdamW.
+
+\subsection{Controlled checks}
+\label{sec:controlled_experiment}
+
+The first controlled problem uses three zero-mean Gaussian task gradients with
+deliberately misaligned raw and AdamW coordinate scales. Every proposal targets
+$\lambda_i=1/3$. The estimator calculation and 20,000 Monte Carlo trials use 16
+corrected task draws per trial. This construction is a worst-case illustration
+for raw-gradient sampling; its purpose is to expose the metric mismatch rather
+than model a typical LLM gradient.
+
+In this construction, the calculated and simulated AdamW-scaled error ratios
+are $0.717$ for GPAS and $6.861$ versus $6.868$ for Gradient-Norm IS, relative
+to Uniform. Cost-GPAS reaches a calculated $J(q)$ ratio of $0.893$ and a
+simulated ratio of $0.889$. The close calculation--simulation agreement checks
+the estimator implementation; the deliberately large raw-gradient ratio comes
+from the chosen coordinate mismatch.
+
+The final panel draws one million task gradients from a proposal different
+from $\lambda$. Relative second-moment bias is
+\begin{equation}
+    \frac{\|\mathbb E[O_q]-\mathbb E[O_{q=\lambda}]\|_2}
+         {\|\mathbb E[O_{q=\lambda}]\|_2},
+    \label{eq:relative_moment_bias}
+\end{equation}
+where $O_q=w^2G_I^2$ for standard AdamW and $O_q=wG_I^2$ for the
+moment-consistent rule. Agreement between calculation and simulation is an
+implementation check for Proposition~\ref{prop:conditional_preservation}.
+With one million draws, standard AdamW has second-moment bias $0.816$, close to
+the calculated $0.818$, while moment-consistent AdamW has bias $0.002$. Both
+first-moment estimates have bias $0.008$ under the same draws.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/controlled_optimizer_sampling.pdf}
+    \caption{A constructed three-task check. The first three panels compare
+    proposals, AdamW-scaled estimator error, and $J(q)$. Black markers show
+    calculated values. The last panel reports the relative bias from
+    Equation~\ref{eq:relative_moment_bias}. Lower values are better in the last
+    three panels.}
+    \label{fig:controlled_sampling}
+\end{figure}
+
+To measure sensitivity beyond one construction, a separate stress test draws
+10,000 four-task, 16-coordinate geometries from a fixed broad log-uniform
+distribution. It reports the full error-ratio distribution, quantiles, and the
+fraction of cases where raw-gradient sampling exceeds Uniform. The scan is a
+robustness check over synthetic geometries; MOPD gradients determine external
+validity.
+
+Raw-gradient sampling exceeds Uniform in $28.2\%$ of the sampled geometries,
+with median ratio $0.971$ and $95$th percentile $1.065$. GPAS attains the
+closed-form minimum in every geometry; its median ratio is $0.895$ and its
+$95$th percentile is $0.982$.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.82\linewidth]{figures/random_geometry_stress_scan.pdf}
+    \caption{Random-geometry stress test. Each point compares a proposal with
+    Uniform in the AdamW-scaled second-moment criterion. The fixed generation
+    distribution, seed, and all 10,000 outcomes are released with the figure.}
+    \label{fig:random_geometry_scan}
+\end{figure}

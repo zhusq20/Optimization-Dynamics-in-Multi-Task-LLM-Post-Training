@@ -3,36 +3,38 @@
 \label{sec:training_guide}
 % ============================================================================
 
-The recipe uses one complete task batch and one optimizer step per rollout. Task
-selection occurs before generation, so each step calls one teacher or reward
-function.
+The recipe uses one task-homogeneous batch and one optimizer step after each
+rollout. Task selection occurs before generation, so a step calls one teacher
+or reward service.
 
-\paragraph{1. Fix the task target.}
-Choose $\lambda$ from the intended capability priorities and record it before
-choosing a sampler. For frozen MOPD teachers, $\lambda$ is the teacher mixture.
+\paragraph{1. Fix the teacher-loss objective.}
+Choose $\lambda$ for the weighted teacher-loss objective and record it before
+choosing a sampler. Benchmark evaluation measures the resulting capability
+profile separately.
 
 \paragraph{2. Define one task gradient.}
-Use a task-homogeneous batch. Average token gradients inside each response and
-then average responses to form $G_i$. Apply one shared task-gradient clip. Set a
-shared valid-token target, and record prompt count, token count, and GPU time.
+Fix the token and response aggregation rule inside each task. Our MOPD setup
+averages tokens inside each response and then averages responses. It retains
+the existing fixed-token batch budget and records the realized response count,
+prompt count, valid-token count, and GPU time for each task.
 
 \paragraph{3. Initialize the sampler.}
-Run a short round-robin warm start. Store a moving average of
-$\|\widetilde G_i\|_2^2$ for every task in the selected optimizer metric. This
-is the raw gradient norm for SGD; the four-task protocol uses AdamW's stored
-second moment before the sampling correction. Cost-GPAS also stores a moving
-average of task time. The protocol uses eight warm-start steps and
-$\gamma=0.95$.
+Run a short round-robin warm start. For each task, store a moving average of raw
+gradient norm and preconditioned gradient scale. Cost-GPAS also stores a moving
+average of complete step time. The four-task protocol uses eight warm-start
+steps and $\gamma=0.95$.
 
-\paragraph{4. Sample and optimize.}
-GPAS sets $q_i\propto\lambda_i\widehat s_i$. Cost-GPAS sets
-$q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$. Apply the probability
-floor, sample one task, compute and clip $G_i$, record its score, multiply by
-$\lambda_I/q_I$, and call the optimizer. The four-task protocol uses AdamW and
-$q_{\min}=0.05$.
+\paragraph{4. Keep the raw gradient and weight separate.}
+After sampling task $I$, compute its raw task gradient $G_I$ and the factor
+$w=\lambda_I/q_I$. Moment-consistent AdamW uses $wG_I$ for the first moment and
+$wG_I^2$ for the second moment. Passing only $wG_I$ to an unchanged AdamW
+implementation produces the standard $w^2G_I^2$ second moment. The optimizer
+interface therefore accepts both $G_I$ and $w$.
 
-\paragraph{5. Save training state.}
-Checkpoint the score and cost averages with the model and optimizer. Log $I$,
-$q_I$, $\lambda_I/q_I$, valid tokens, prompt count, total GPU time, and the raw
-and optimizer-metric gradient norms. These fields are sufficient to resume a
-run and analyze the sampler.
+\paragraph{5. Update and save the sampler.}
+GPAS uses $q_i\propto\lambda_i\widehat s_i$; Cost-GPAS uses
+$q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$. For raw proposal $p$,
+apply $q_i=(1-Mq_{\min})p_i+q_{\min}$ before drawing a task. Save scale and cost
+averages with model and optimizer state. Log $I$, $p_I$, $q_I$, $w$, valid
+tokens, response count, complete step time, raw norm, preconditioned norm,
+corrected update norm, scale age, and clipping status.

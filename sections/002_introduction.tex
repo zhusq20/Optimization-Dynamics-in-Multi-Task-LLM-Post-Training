@@ -3,70 +3,70 @@
 \label{sec:intro}
 % ============================================================================
 
-Post-training one model on mathematics, code, instruction following, and science
-requires two decisions. Target weights state which capabilities the objective
-values. Sampling probabilities decide which task receives the next rollout,
-teacher call, and update. Keeping target weights and sampling probabilities
-separate makes both decisions visible.
+Post-training one student on several capabilities means choosing which teacher
+or reward service to call at every step. A task mixture usually controls two
+decisions at once: how much each task counts in the training objective and how
+often the system spends rollout, teacher, and optimizer time on that task. Once
+the mixture follows loss gaps, gradient norms, or a curriculum, the training
+target moves with the compute schedule.
 
-Many systems use the sampling ratio as the task weight. Sampling a weak or cheap
-task more often then changes the model objective, so the resulting capability
-trade-off can come from the objective, the compute schedule, or both. A coupled
-design makes optimization efficiency difficult to measure.
+We separate these decisions. Objective weights $\lambda$ define the weighted
+teacher-loss objective
+\begin{equation}
+    F(\theta)=\sum_i\lambda_i L_i(\theta).
+    \label{eq:fixed_multitask_objective}
+\end{equation}
+Sampling probabilities $q$ decide which task receives the next expensive
+step. This distinction also keeps capability evaluation conceptually separate:
+one teacher loss can affect several downstream domains
+\citep{li2026coinsidesdualnature}. An experiment can now change allocation
+while keeping the teacher-loss objective fixed.
 
-Adaptive curricula use task difficulty, learning progress, or domain-loss
-trajectories to change this mixture online
-\citep{corrado2026drats,sun2026d3mopd}. These methods ask which tasks should
-receive more weight during training. We study the complementary fixed-target
-question: can task frequency reduce optimization error and compute while the
-user-specified capability mixture remains unchanged?
+Our execution regime selects one task before generation and forms a
+task-homogeneous batch with a fixed valid-token budget. Equal token budgets
+still leave two differences that matter for allocation: the AdamW-scaled
+gradient produced by a task and the wall-clock time required for its step. Our
+warm start measures both quantities before adaptive sampling begins. The main
+study reports their taskwise range instead of using prompt or token share as a
+proxy for optimization compute. This regime matches a worker that keeps one
+teacher in memory or calls one task-specific reward service.
 
-Response length creates a second ambiguity. In a prompt-balanced mixed batch,
-global token averaging gives long-response tasks a larger coefficient. Recent
-MOPD work diagnoses this imbalance and changes domain loss weights
-\citep{gao2026openmopddiagnosingfixingcapability}. Our training objective gives
-each response equal weight inside a task-homogeneous batch.
+For task $i$, the factor $\lambda_i/q_i$ gives the standard unbiased gradient
+estimate. AdamW squares this factor when it updates its second moment, which
+makes the preconditioner depend on the proposal. Lahire
+\citep{lahire2023nonuniformadaptive} identified the broader issue: the
+gradient-norm proposal that is optimal for SGD loses that property under an
+adaptive optimizer. We give a constructive AdamW solution.
 
-Teacher selection is a prerequisite for OPD. A wide teacher--student gap can
-create extreme token log-ratios, whereas a narrow gap supplies little signal.
-Recent studies report stronger transfer at moderate distributional overlap
-\citep{ma2026mopdmultiteacheronpolicydistillation,
-wang2026demystifyingopd,mayingzi2026onestudentmanyteachers}. We train teachers
-from the student initialization, evaluate them on student rollouts, and study
-task allocation within the selected teacher set.
+Moment-consistent AdamW uses $(\lambda_i/q_i)G_i^2$ as its second-moment
+observation. At a frozen training state, the population target of this update
+is independent of $q$. GPAS measures each task's preconditioned gradient scale
+$s_i$ in the lagged AdamW geometry and selects
+$q_i\propto\lambda_i s_i$. If task $i$ costs $c_i$ seconds, Cost-GPAS selects
+$q_i\propto\lambda_i s_i/\sqrt{c_i}$. The second rule minimizes a simple
+cost--gradient product and is the one-draw form of cost-constrained Neyman
+allocation.
 
-Suppose task $i$ has target weight $\lambda_i$ and sampling probability $q_i$.
-Multiplying its sampled gradient by $\lambda_i/q_i$ keeps the conditional mean
-equal to the target mixture. The sampling probabilities can then allocate
-compute while the target mixture stays fixed.
+The evaluation mirrors the method. Fixed-$\lambda$ runs compare Uniform,
+raw-gradient importance sampling, GPAS, Cost-GPAS, and a corrected D$^3$
+proposal under one teacher-loss objective. A paired curriculum experiment
+replays the same $\lambda$ sequence with two allocation rules. A standard
+AdamW arm measures the role of the moment update. Teacher-loss curves provide
+the optimization endpoint, while capability benchmarks record the final model
+profile.
 
-Gradient-Preserving Adaptive Sampling (GPAS) applies classical importance
-sampling at the task-batch level. GPAS scores task gradients in a metric induced
-by the training optimizer, then assigns more probability to tasks with larger
-scores. The identity metric recovers raw-gradient sampling for SGD; for AdamW,
-we use the lagged preconditioner from its stored second moment. A moving average
-estimates each task score from completed updates. A probability floor limits
-stale scores and large importance weights. Cost-GPAS also uses measured task
-time.
-
-The controlled experiment checks the sampling formulas with known gradient
-distributions and costs. Frozen LLM gradients compare raw and AdamW-scaled
-scores without adding training runs. Matched three-seed MOPD runs then measure
-teacher-loss progress per token and GPU hour. A smaller three-seed GRPO
-experiment tests the same task sampler with reward-based updates.
-
-The paper makes three contributions:
+Our contributions are:
 \begin{itemize}
-    \item We define a response-normalized task-batch interface that separates a
-    fixed multi-task target from compute allocation in on-policy post-training.
-    \item We derive task allocation in an optimizer-induced metric, recovering
-    raw-gradient sampling for SGD and a lagged-preconditioned rule for AdamW. A
-    cost-aware version also uses measured end-to-end task time, and both
-    samplers estimate their scores online.
-    \item We validate the estimator calculation and specify direct MOPD and
-    GRPO tests that connect score quality to progress per token and GPU hour.
+    \item A fixed-objective protocol for one-task updates: standard importance
+    correction fixes the weighted gradient target, and a one-line AdamW change
+    gives the second moment a proposal-independent population target.
+    \item GPAS and Cost-GPAS, which allocate tasks using preconditioned
+    gradient scale and measured runtime. Each method reuses quantities already
+    produced by training and keeps at most two scalars per task.
+    \item A matched MOPD study that separates target schedules from compute
+    allocation, including a replayed D$^3$ objective-weight path and a standard-AdamW
+    ablation.
+    \item Controlled and frozen-gradient tests that connect each local claim
+    to moment drift, estimator error, staleness, clipping, and GPU-hour
+    efficiency.
 \end{itemize}
-
-Section~\ref{sec:preliminaries} defines the objective and sampling interface;
-Section~\ref{sec:theory} presents GPAS; Section~\ref{sec:experiments} gives the
-MOPD and GRPO studies. The appendix contains proofs and implementation details.

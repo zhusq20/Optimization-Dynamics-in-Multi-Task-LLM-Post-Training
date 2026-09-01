@@ -2,74 +2,65 @@
 \section{Related Work}
 % ============================================================================
 
-\paragraph{Multi-task optimization.}
-Multi-task methods often learn task weights or modify gradient directions to
-improve a capability trade-off
+\paragraph{Objective weights and multi-task optimization.}
+Multi-task methods often tune loss weights or edit gradient directions to
+change the capability trade-off
 \citep{sener2019multitasklearningmultiobjectiveoptimization,
 yu2020gradientsurgerymultitasklearning,
-liu2024conflictaversegradientdescentmultitask,chen2018gradnorm}. GPAS starts
-from task weights supplied by the user. GPAS changes the frequency of task
-batches and keeps the weighted gradient fixed in expectation. A fixed target
-makes optimization efficiency measurable under one capability objective.
+liu2024conflictaversegradientdescentmultitask,chen2018gradnorm}.
+Large empirical comparisons found carefully tuned scalarization competitive
+with specialized multi-task optimizers in their evaluated settings
+\citep{kurin2022defense,xin2022current}. These results support our decision to
+state the weighted objective explicitly and evaluate allocation under fixed
+weights. GPAS also accepts a time-varying objective supplied by a curriculum;
+the proposal is computed after each weight update.
 
-\paragraph{Multi-task RL for language models.}
-Joint RL post-training can show uneven gradients and uneven task progress
-\citep{ramesh2026multitaskgrporeliablellm,
-wu2025imbalancedgradientsrlposttraining}. Difficulty-based curricula sample
-weak or slowly improving tasks more often \citep{corrado2026drats}.
-Multi-Task GRPO learns robustness-oriented task weights and preserves its
-realized batch ratios \citep{ramesh2026multitaskgrporeliablellm}. Our experiments
-keep the target task weights fixed. Curriculum signals can still define a task
-proposal, but the sampled gradient receives the same inverse-probability
-correction as every other proposal.
-In the GRPO transfer study, we adapt the absolute-advantage signal used by
-self-evolving curricula as such a corrected proposal.
+\paragraph{Adaptive data and prompt schedules for language models.}
+Online Data Mixing uses a bandit to update pretraining-domain proportions
+\citep{albalak2023efficient}. Recent post-training methods schedule
+distributions from average advantage, skip low-value rollouts, or select
+prompts near the current learning frontier
+\citep{wang2025dump,zheng2025greso,gao2025promptcurriculum}.
+These methods optimize a domain or prompt policy with signals tied to learning
+progress. Our question concerns task-level teacher compute: given stated
+objective weights, which proposal gives an efficient unbiased gradient in the
+current optimizer geometry? The fixed-target comparisons place heuristic
+schedules and GPAS under the same objective.
 
-\paragraph{Multi-teacher on-policy distillation.}
-MOPD routes student rollouts to domain teachers and trains one shared student
-\citep{ma2026mopdmultiteacheronpolicydistillation}. Related systems use
-task-specific teacher interfaces and language-specialized teachers
-\citep{mayingzi2026onestudentmanyteachers,
-xie2026languagespecializedmopd}. Open-MOPD identifies response length,
-teacher--student gap, and reused rewards as sources of capability imbalance and
-changes domain loss weights
-\citep{gao2026openmopddiagnosingfixingcapability}. Other OPD studies report
-unreliable token guidance under large teacher--student distribution mismatch
-\citep{wang2026demystifyingopd,wang2026distilledrl}. Same-origin teachers and
-moderate next-token overlap improve training stability while preserving a
-useful learning signal
-\citep{ma2026mopdmultiteacheronpolicydistillation,
-mayingzi2026onestudentmanyteachers}. Our MOPD protocol uses four same-origin
-teachers, task-homogeneous fixed-token batches, and one optimizer use per
-rollout. D$^3$-MOPD adapts the domain mixture from normalized reverse-KL gap and
-recent descent velocity to exploit asynchronous domain convergence
-\citep{sun2026d3mopd}. In its formulation, the same mixture also weights the
-MOPD objective. We adapt its trajectory signal as a corrected task proposal,
-called D$^3$-Proposal-IC, so it can be compared with optimizer-aware sampling
-under one fixed target.
-GPAS changes the frequency of complete task batches and applies an inverse
-sampling factor. Cost-GPAS adds measured GPU time for generation, teacher
-evaluation, and model updates.
+\paragraph{Multi-teacher post-training.}
+MOPD routes student rollouts to task teachers and trains a shared student with
+dense token feedback \citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD identifies token count, reward scale, and stale rewards as sources of
+unequal update budgets \citep{gao2026openmopddiagnosingfixingcapability}.
+D$^3$-MOPD uses teacher-loss gap and descent velocity to update the domain
+mixture \citep{sun2026d3mopd}. Teacher mixtures can also create cross-domain
+capability transfer and a mixture-dependent seesaw
+\citep{li2026coinsidesdualnature}. The cross-domain transfer results motivate
+our use of teacher loss for objective comparisons and separate benchmark
+reporting for capability. We compare D$^3$ in two roles: as a proposal under a
+fixed objective and as a curriculum whose recorded objective-weight path is
+replayed with GPAS.
 
-\paragraph{Importance sampling for stochastic optimization.}
-Sampling examples from their gradient size and applying an inverse probability
-factor can reduce stochastic-gradient variance
+\paragraph{Adaptive importance sampling.}
+Gradient-norm importance sampling reduces the second moment of an SGD estimate
 \citep{alain2015variancereductionsgddistributed,
-katharopoulos2018samplescreatedequaldeep}. Cost-aware SGD further samples in
-proportion to gradient scale divided by the square root of evaluation cost and
-has been applied to GRPO \citep{mohri2026costawarelearning}. Non-uniform
-sampling can interact nonlinearly with adaptive optimizers
-\citep{lahire2023nonuniformadaptive}. PiKE adapts data-mixture weights
-using gradient magnitude, variance, and interactions
-\citep{li2025pikeadaptivedatamixing}.
+katharopoulos2018samplescreatedequaldeep}. Cost-aware sampling adds a square-root
+cost correction and provides convergence guarantees beyond convex objectives
+\citep{mohri2026costawarelearning}. The same allocation shape appears in
+classical Neyman allocation \citep{neyman1934representative,cochran1977sampling}.
+Online importance samplers face partial feedback because only the selected
+item receives a fresh scale observation. Bandit formulations provide exploration and
+regret controls for this setting
+\citep{namkoong2017adaptive,salehi2017stochastic,borsos2018online}. Our
+probability floor plays the practical exploration role and also bounds the
+importance multiplier; scale age and full-task refreshes measure the remaining
+feedback error.
 
-Cost-Aware GRPO decides which already-generated sequences enter policy updates.
-GPAS decides which task receives the next rollout, teacher call, and optimizer
-step while preserving a user-specified multi-task objective. GPAS evaluates
-complete task-batch gradients in an optimizer-induced metric and estimates task
-scores from completed updates. Its SGD instance recovers classical
-gradient-norm sampling; its AdamW instance uses a lagged preconditioner.
-Cost-GPAS applies the published cost-aware sampling identity to the same
-task-batch setting. Our contribution lies in fixed-target multi-task
-allocation, response-normalized task batches, and optimizer-aware online
-scores.
+\paragraph{Sampling with adaptive optimizers.}
+Lahire showed that the gradient-norm proposal for SGD loses its optimality for
+RMSProp and Adam and argued that sampling should match the optimizer
+\citep{lahire2023nonuniformadaptive}. GPAS gives a constructive answer for
+AdamW: a proposal-independent second-moment target followed by an allocation
+rule in the resulting preconditioned geometry. The short-memory intuition is
+related to Adam's sign and scale behavior described by
+\citet{balles2018dissecting}.

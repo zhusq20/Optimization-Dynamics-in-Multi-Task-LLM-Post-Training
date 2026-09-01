@@ -1,103 +1,88 @@
 % ============================================================================
-\section{Task Objective and Sampling}
+\section{A Fixed Objective under Task Sampling}
 \label{sec:preliminaries}
 % ============================================================================
 
-Task allocation starts with a clear definition of one task gradient. We first
-average responses inside a task-homogeneous batch. We then sample one task while
-preserving the user-selected mixture of task gradients.
+There are $M$ tasks. Task $i$ has loss $L_i$ and objective weight
+$\lambda_i\geq 0$, with $\sum_i\lambda_i=1$. These weights define
+Equation~\ref{eq:fixed_multitask_objective}. Each step draws one task
+$I\sim q$, forms a task-homogeneous batch, and computes a task gradient $G_I$.
+All expectations in this section condition on the model, optimizer state, and
+sampling information available before the draw.
 
-\subsection{Define a comparable task gradient}
-\label{sec:task_update}
+Our MOPD batches use a fixed valid-token budget. Tokens are averaged inside a
+response, followed by an average over responses. This gives one consistent
+definition of $G_i$ even when response lengths differ. The analysis also
+applies to other within-task aggregation rules once they are fixed in advance.
 
-Consider $M$ tasks. Task $i$ supplies prompts from $\mathcal D_i$ and has target
-weight $\lambda_i$, with $\sum_i\lambda_i=1$. One training draw selects a task
-and builds a task-homogeneous batch. For response $j$, let $L_j$ be its number
-of valid response tokens and let $g_{j,t}$ be its token gradient. The task-batch
-gradient is
+For every task with positive objective weight, we require $q_i>0$ and set
 \begin{equation}
-    G_i
-    =\frac{1}{n}\sum_{j=1}^{n}\frac{1}{L_j}
-      \sum_{t=1}^{L_j}g_{j,t}.
-    \label{eq:response_normalized_update}
-\end{equation}
-Each response receives equal weight inside its task. A long response supplies
-more token observations and keeps the same total coefficient as a short
-response. Every task batch targets a shared number of valid response tokens.
-Gradient variance can still differ by task, and GPAS measures task-dependent
-variance.
-GPU time is recorded separately because prompt length, generation, and teacher
-evaluation have task-dependent costs.
-
-For MOPD, $g_{j,t}$ is the sampled-token policy gradient. For GRPO, $g_{j,t}$
-comes from the clipped policy surrogate. Prefix sampling, token truncation,
-reward clipping, and gradient clipping are part of the implemented $G_i$. The
-sampler preserves the mean of the implemented $G_i$.
-Appendix~\ref{app:opd_estimators} gives the OPD gradient, and
-Appendix~\ref{app:grpo_update} describes the GRPO gradient. When
-the trainer applies task-level clipping, $G_i$ denotes the clipped gradient from
-Equation~\ref{eq:response_normalized_update}.
-
-The mean gradient of task $i$ and the target multi-task gradient are
-\begin{equation}
-    h_i=\mathbb E[G_i],
-    \qquad
-    h=\sum_i\lambda_i h_i.
-    \label{eq:target_update_field}
-\end{equation}
-For frozen teachers, $\lambda$ states the desired distillation mixture.
-
-A full estimate of $h$ requires one complete batch from every task. Sampling one
-task uses one rollout and one teacher or reward call per optimizer step. The
-response-normalized $G_i$ provides a common unit for task sampling.
-
-\subsection{Separate task priorities from sampling frequency}
-\label{sec:update_interface}
-
-Let $q_i$ be the probability that task $i$ supplies the next batch. After
-sampling task $I$, the trainer sends
-\begin{equation}
-    \widehat g=\frac{\lambda_I}{q_I}G_I,
-    \qquad I\sim q,
+    w_i=\frac{\lambda_i}{q_i},
+    \qquad \widehat g=w_I G_I.
     \label{eq:importance_estimator}
 \end{equation}
-to the optimizer. When $q_i=\lambda_i$, the multiplier equals one. Other
-sampling probabilities use the multiplier to keep the target gradient fixed.
-\begin{proposition}[Conditional objective preservation]
-\label{prop:conditional_preservation}
-Let $\mathcal H_t$ contain the training history before step $t$, let $q_t$ be
-determined by $\mathcal H_t$ with $q_{t,i}>0$, and define
-$h_{t,i}=\mathbb E[G_{t,i}\mid \mathcal H_t,I_t=i]$. The corrected update
-preserves the target conditional mean.
-\end{proposition}
-\begin{proof}
-Because $q_t$ is fixed conditional on $\mathcal H_t$, averaging over the task
-draw and its fresh batch gives
-\begin{align}
-    \mathbb E[\widehat g_t\mid\mathcal H_t]
-    &=\sum_i q_{t,i}\frac{\lambda_i}{q_{t,i}}
-      \mathbb E[G_{t,i}\mid\mathcal H_t,I_t=i]
-      =\sum_i\lambda_i h_{t,i}.
+
+\begin{lemma}[Standard importance correction]
+\label{lem:importance_correction}
+The corrected gradient has mean
+\begin{equation}
+    \mathbb E[\widehat g]
+    =\sum_i\lambda_i\mathbb E[G_i]
+    =\nabla F(\theta).
     \label{eq:importance_unbiased}
+\end{equation}
+\end{lemma}
+
+This familiar importance-sampling result fixes the weighted gradient target
+for any proposal. A curriculum may change $\lambda$ between steps; the same
+statement applies after each change.
+
+The correction interacts with AdamW through its second moment. We use
+$w_I G_I$ for the first-moment observation and $w_I G_I^2$ for the
+second-moment observation:
+\begin{align}
+    m^+&=\beta_1m+(1-\beta_1)w_I G_I,\notag\\
+    v^+&=\beta_2v+(1-\beta_2)w_I G_I^2,
+    \label{eq:moment_preserving_adamw}
 \end{align}
-\end{proof}
-The weights $\lambda$ define capability priorities. The probabilities $q$
-allocate task batches. Equation~\ref{eq:importance_unbiased} assigns a separate
-role to each quantity. The equality concerns the gradient passed to the
-optimizer. Stateful optimizers can still produce different parameter paths
-under different task orders.
+where the square is element-wise. Bias correction, weight decay, and the
+parameter update stay unchanged. We call this rule moment-consistent AdamW.
 
-An online sampler can use earlier gradients, measured costs, optimizer states,
-or task-loss trajectories to choose the next $q$. Every task keeps positive
-probability, and each new task batch uses fresh rollout randomness, so
-Proposition~\ref{prop:conditional_preservation} applies at every optimizer
-step. The correction therefore places gradient-based and curriculum-based
-proposals under the same target; their estimator error and compute cost can be
-compared directly.
+\begin{proposition}[Proposal-independent second-moment target]
+\label{prop:conditional_preservation}
+At a fixed training state, let $S_i=\mathbb E[G_i^2]$. The mean observation in
+the moment-consistent second-moment update is
+\begin{equation}
+    \sum_i\lambda_i S_i,
+    \label{eq:consistent_second_moment_target}
+\end{equation}
+which is independent of $q$. Standard AdamW observes $(w_I G_I)^2$ and has
+mean
+\begin{equation}
+    \sum_i\frac{\lambda_i^2}{q_i}S_i.
+    \label{eq:standard_adam_second_moment}
+\end{equation}
+If the task-gradient distributions and weights were held fixed, these two
+means would be the respective population targets of the exponential average.
+\end{proposition}
 
-Task allocation now has a measurable objective: choose $q$ so that one
-corrected task batch estimates $h$ accurately at low cost.
-Section~\ref{sec:theory} derives GPAS from gradient scale and Cost-GPAS from
-gradient scale plus GPU time. The frozen-gradient study tests the task-gradient
-definition and corrected estimator; the end-to-end MOPD experiment measures
-training efficiency.
+Appendix~\ref{app:moment_target_proof} gives the two-line calculation. The
+claim concerns the second-moment target at a fixed state. Task order can still
+produce different parameter paths, and the target moves as the model learns.
+
+The short-memory limit gives useful intuition. Ignore momentum, weight decay,
+and $\epsilon$, and let the current observation dominate $v$. For a positive
+importance multiplier, the two scaled updates become
+\begin{equation}
+  \frac{wG}{\sqrt{w^2G^2}}=\operatorname{sign}(G),
+  \qquad
+  \frac{wG}{\sqrt{wG^2}}=\sqrt{w}\,\operatorname{sign}(G).
+  \label{eq:two_adam_limits}
+\end{equation}
+Standard AdamW removes the multiplier in this idealized limit, while the
+moment-consistent rule retains its square root. With long second-moment memory,
+the moment-consistent denominator tracks
+Equation~\ref{eq:consistent_second_moment_target}; the standard denominator
+moves with $q$ through Equation~\ref{eq:standard_adam_second_moment}. This
+sign-and-scale view follows the Adam interpretation of
+\citet{balles2018dissecting}.

@@ -7,6 +7,8 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage{subcaption}
+\newfloat{algorithm}{t}{loa}
+\floatname{algorithm}{Algorithm}
 
 \usepackage{amsmath,amssymb,mathtools,bm}
 \usepackage{amsthm}
@@ -33,10 +35,11 @@
 \input{math_commands.tex}
 
 \usepackage{hyperref}
+\hypersetup{hidelinks}
 \usepackage{url}
 
 
-\title{Objective-Preserving, Optimizer-Aware Task Sampling for Multi-Task LLM Post-Training}
+\title{GPAS: Fixed-Objective, Optimizer-Aware Task Sampling for Multi-Task LLM Post-Training}
 
 \author{Anonymous Authors}
 

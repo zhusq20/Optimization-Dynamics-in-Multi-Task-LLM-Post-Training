@@ -1,0 +1,1359 @@
+Under review as a conference paper at ICLR 2027
+
+000
+001
+002
+003
+004
+005
+006
+007
+
+O BJECTIVE -P RESERVING , O PTIMIZER -AWARE TASK
+S AMPLING FOR M ULTI -TASK LLM P OST-T RAINING
+Anonymous authors
+Paper under double-blind review
+
+008
+009
+010
+011
+012
+013
+
+A BSTRACT
+Multi-task LLM post-training makes two separate decisions. Teacher-loss weights
+define the optimization target, while task probabilities allocate rollout and teacher
+compute. Using one mixture for both decisions changes the target whenever the
+task schedule changes.
+We study systems that draw one task before each task-homogeneous update. The
+sampled gradient receives its target weight divided by its sampling probability.
+Standard AdamW squares this factor in its second-moment update, so the optimizer state changes with the sampling proposal. We replace that square with
+a single factor. This one-line change makes the expected first- and secondmoment changes match the baseline whose task probabilities equal the target
+weights. Gradient-Preserving Adaptive Sampling (GPAS) then measures task gradient scale in the lagged AdamW metric and samples in proportion to target weight
+times measured scale. Cost-GPAS also divides by the square root of measured task
+time. The cost rule is the one-draw form of cost-constrained Neyman allocation.
+In a controlled three-task study, GPAS reduces AdamW-metric estimator error to
+0.697 of uniform sampling. Raw gradient-norm sampling reaches 7.178 times the
+uniform error in the same metric. A second controlled test verifies the AdamW
+moment correction under a proposal different from the target mixture. GPAS
+stores one scale and one runtime estimate per task and reuses the gradient and
+timing produced by each training step.
+
+014
+015
+016
+017
+018
+019
+020
+021
+022
+023
+024
+025
+026
+027
+028
+029
+030
+031
+032
+033
+034
+035
+036
+037
+038
+039
+040
+041
+042
+043
+044
+045
+046
+047
+048
+049
+050
+051
+052
+053
+
+1
+
+I NTRODUCTION
+
+Multi-task post-training spends very different amounts of optimization compute on tasks that appear
+equally often. In Open-MOPD, instruction-following data account for 20.3% of prompts and only
+0.99% of gradient tokens. Early per-token reward magnitudes also differ by a factor of 4.9 (Gao
+et al., 2026). A nominal data mixture can therefore provide a poor description of the updates received
+by each task.
+We separate two variables that are commonly tied together. Target weights λ define a teacher-loss
+objective
+X
+F (θ) =
+λi Li (θ).
+(1)
+i
+
+Sampling probabilities q decide which task receives the next rollout, teacher call, and optimizer
+step. The teacher-loss weights describe the chosen training objective. Capability priorities require
+separate benchmark evaluation because one teacher can move performance on several domains (Li
+et al., 2026). Keeping λ and q separate lets an experiment change compute allocation while holding
+the teacher-loss objective fixed.
+Our execution regime selects one task before generation and forms a task-homogeneous batch. This
+regime matches a worker that keeps one teacher in memory or calls one task-specific reward service.
+Generation and teacher evaluation account for most of the step cost. Systems that can serve several
+tasks in one step can use a mixed batch; Open-MOPD’s token-share weighting is a corresponding
+design for that regime. We focus on one-task sampling.
+If task i has target weight λi and proposal probability qi , the factor λi /qi gives an unbiased targetgradient estimate. Standard AdamW also squares this factor when it updates the second mo1
+
+Under review as a conference paper at ICLR 2027
+
+054
+055
+
+ment. The expected second-moment observation then contains λ2i /qi and changes with the proposal
+(Lahire, 2023). The sampler and the AdamW metric become coupled.
+
+056
+057
+058
+059
+060
+061
+
+We make one change to AdamW: its second-moment observation uses (λi /qi )G2i . Standard AdamW
+uses the square of the corrected gradient. The expected first- and second-moment changes now
+match the baseline q = λ. GPAS uses the lagged AdamW preconditioner to measure each task’s
+√
+update scale si and selects qi ∝ λi si . If task i costs ci seconds, Cost-GPAS selects qi ∝ λi si / ci ,
+the cost-constrained Neyman allocation for one task draw.
+
+062
+063
+064
+065
+066
+067
+
+Our evaluation follows the same separation. Fixed-λ runs compare uniform sampling, raw gradientnorm sampling, GPAS, Cost-GPAS, and a corrected D3 proposal. Two additional D3 runs share
+a time-varying target and isolate the benefit of GPAS allocation on top of a curriculum. A standard AdamW arm isolates the moment correction. Teacher loss is the primary metric; capability
+benchmarks provide a secondary endpoint.
+The paper makes three contributions:
+
+068
+069
+070
+071
+072
+073
+074
+075
+076
+077
+078
+079
+080
+081
+082
+083
+084
+085
+086
+087
+088
+089
+090
+091
+092
+093
+094
+095
+096
+097
+098
+099
+100
+101
+102
+103
+104
+105
+106
+107
+
+• We give a one-task-per-step protocol that keeps the teacher-loss objective fixed for any
+proposal and preserves the expected changes in both AdamW moments.
+√
+• We derive the optimizer-aware proposal qi ∝ λi si / ci from a cost-constrained sampling
+objective. The identity metric recovers classical gradient-norm sampling.
+• We define a matched MOPD comparison that measures target changes and compute allocation separately. The design also measures their composition.
+Section 3 defines the objective and optimizer update. Section 4 gives the allocation rule. Section 5
+connects each claim to a controlled or MOPD measurement.
+
+2
+
+R ELATED W ORK
+
+Changing the target and changing the allocation. Multi-task methods often change loss weights
+or gradient directions to improve a capability trade-off (Sener & Koltun, 2019; Yu et al., 2020; Liu
+et al., 2024; Chen et al., 2018). DRATS, D3 -MOPD, and Open-MOPD’s gap-following schedule
+use task progress to change the training target (Corrado et al., 2026; Sun et al., 2026; Gao et al.,
+2026). Importance-sampling methods keep a fixed target and change example frequency to reduce
+gradient error or compute (Alain et al., 2015; Katharopoulos & Fleuret, 2018; Mohri et al., 2026).
+GPAS is in the second group. A curriculum can supply a time-varying target first, after which GPAS
+allocates task draws for that target.
+Multi-teacher post-training. MOPD routes student rollouts to task teachers and trains a shared
+student with dense token feedback (Ma et al., 2026). Open-MOPD identifies token count, reward
+scale, and stale rewards as sources of unequal update budgets (Gao et al., 2026). D3 -MOPD uses
+teacher-loss gap and descent velocity to update the domain mixture (Sun et al., 2026). Teacher
+mixtures can also create cross-domain capability transfer and a mixture-dependent seesaw (Li et al.,
+2026). The cross-domain transfer results motivate our use of teacher loss for objective comparisons
+and separate benchmark reporting for capability.
+Sampling with optimizer state and cost. Gradient-norm importance sampling reduces the second moment of an SGD estimate (Alain et al., 2015; Katharopoulos & Fleuret, 2018). Cost-aware
+sampling adds a square-root cost correction and provides convergence guarantees beyond convex
+objectives (Mohri et al., 2026). The same allocation shape appears in classical Neyman allocation
+(Neyman, 1934; Cochran, 1977). Adaptive optimizers create an extra interaction because the sampling weight is squared in the second-moment state (Lahire, 2023). GPAS uses an AdamW metric
+whose population target remains fixed under proposal changes.
+
+3
+
+O BJECTIVE AND S AMPLING P ROTOCOL
+
+P
+There are M tasks. Task i has loss Li and target weight λi ≥ 0, with i λi = 1. The target is
+Equation 1. The weights specify a mixture of teacher losses. Downstream capabilities can respond
+to several teacher losses, so we evaluate capabilities separately (Li et al., 2026).
+2
+
+Under review as a conference paper at ICLR 2027
+
+108
+109
+110
+111
+112
+113
+114
+115
+116
+117
+118
+119
+
+Each step selects one task, generates a task-homogeneous batch, and produces a stochastic gradient
+Gi with mean hi = ∇Li (θ). Our MOPD batches use a fixed valid-token budget. We average tokens
+inside each response and then average responses. The logs report the realized response count for
+every task. Token averaging inside a task is also compatible with the analysis because the sampling
+result only requires a fixed definition of Gi .
+For MOPD, Li is the per-step teacher-loss surrogate on student-sampled prefixes. Rollout sampling
+sits outside backpropagation. Proposition 1 applies to the resulting task-gradient estimator at each
+step.
+The one-task regime applies when a step uses one resident teacher or one reward service and generation dominates its cost. A mixed batch is a different execution regime. Token-share weighting, as
+used by Open-MOPD, is a suitable way to specify task weights in that setting (Gao et al., 2026).
+
+120
+121
+122
+123
+124
+125
+
+Let Ht contain the model, optimizer state, and all observations before task It is drawn. The target
+λt and proposal qt may depend on Ht . Write ht,i = E[Gt,i | Ht ]. After drawing It ∼ qt , define
+
+126
+127
+128
+129
+130
+131
+
+Proposition 1 (Objective preservation through AdamW moments). Conditioned on Ht ,
+X
+E[b
+gt | Ht ] =
+λt,i ht,i .
+
+132
+133
+134
+135
+136
+137
+138
+139
+140
+141
+142
+143
+144
+145
+146
+147
+148
+149
+150
+151
+152
+153
+154
+155
+156
+157
+158
+159
+160
+161
+
+wt =
+
+λt,It
+,
+qt,It
+
+gbt = wt Gt,It .
+
+(2)
+
+We require qt,i > 0 for every task with λt,i > 0.
+
+(3)
+
+i
+
+Use gbt in AdamW’s first moment and use wt G2t,It in its second moment, where the square is elementwise:
+mt = β1 mt−1 + (1 − β1 )wt Gt,It ,
+
+(4)
+
+vt = β2 vt−1 + (1 − β2 )wt G2t,It .
+
+(5)
+
+The expected changes in mt and vt equal those of the baseline sampler qt = λt , conditioned on the
+same history.
+Proof. Summing qt,i (λt,i /qt,i )ht,i gives Equation 3. Replacing ht,i with E[G2t,i | Ht ] gives the
+matching second-moment observation. Substitution in the two recursions gives the stated moment
+changes.
+□
+We call Equation 5 moment-consistent AdamW. Bias correction, weight decay, and the parameter
+update remain unchanged. The implementation changes one line in the second-moment update.
+Remark 1 (Why the AdamW change is needed). Standard AdamW uses gbt2 in its second moment.
+Its conditional mean observation is
+X λ2t,i
+i
+
+qt,i
+
+E[G2t,i | Ht ],
+
+(6)
+
+which changes with qt and can partially absorb the sampling correction through AdamW’s denominator (Lahire, 2023). The once-weighted update gives the optimizer metric a proposal-independent
+population target. Section 5 measures this difference.
+
+4
+
+O PTIMIZER -AWARE TASK A LLOCATION
+
+We condition on the state before task selection and omit the step index. Let A apply the optimizer
+scale stored at that point. For SGD, A is the identity. For AdamW, we use the lagged preconditioner
+AGi = √
+
+Gi
+,
+v̄ + ϵ
+
+s2i = E∥AGi ∥22 ,
+
+(7)
+
+where v̄ is the bias-corrected second moment before the draw. The score si measures the scale of
+task i in the coordinates used by AdamW.
+3
+
+Under review as a conference paper at ICLR 2027
+
+162
+163
+164
+165
+166
+167
+168
+169
+170
+171
+172
+173
+174
+175
+176
+177
+178
+179
+180
+181
+182
+183
+184
+185
+186
+187
+188
+189
+190
+191
+192
+193
+194
+195
+196
+197
+198
+199
+200
+201
+202
+203
+204
+205
+206
+207
+208
+209
+210
+211
+212
+213
+214
+215
+
+P
+Proposition 2 (Optimizer-aware proposal). Let h =
+i λi hi . The mean squared error of one
+corrected draw is
+X λ2 s2
+i i
+M (q) = E∥A(b
+g − h)∥22 =
+− ∥Ah∥22 .
+(8)
+q
+i
+i
+Its minimum is attained by
+λi si
+qi∗ = P
+.
+j λj sj
+
+(9)
+
+P
+P
+Proof. Cauchy–Schwarz gives i λ2i s2i /qi ≥ ( i λi si )2 . Equality requires qi proportional to
+λi si . The second term in Equation 8 is fixed before the draw.
+□
+Corollary 1 (Cost-aware proposal). Let ci be the measured time for one task-i step. The proposal
+minimizing
+!
+!
+X
+X λ2 s2
+i i
+J(q) =
+qi ci
+(10)
+qi
+i
+i
+is
+λi si
+qi∗ ∝ √ .
+ci
+
+(11)
+
+P
+√
+For the corollary, Cauchy–Schwarz gives J(q) ≥ ( i λi si ci )2 , with equality at Equation 11. The
+resulting proposal is the cost-constrained Neyman rule with tasks as strata (Neyman, 1934; Cochran,
+1977; Mohri et al., 2026). Mohri et al. also justify the uncentered objective in Equation 10 through
+convergence rates for convex and non-convex optimization; Appendix F of their paper discusses the
+scope of that connection.
+For uniform target weights, the second-moment ratio has a simple range:
+P
+( i si )2
+P
+∈ [1/M, 1].
+M i s2i
+
+(12)
+
+With four tasks, score heterogeneity permits a speedup of up to four in this local measure. Equal
+scores recover uniform sampling.
+Online estimates.
+
+After a task-i step, GPAS updates
+sb2i ← γb
+s2i + (1 − γ)∥AGi ∥22 .
+
+(13)
+
+Cost-GPAS maintains the same moving average for runtime. A short round-robin warm start initializes every task. A probability floor limits importance weights and refreshes each task estimate
+regularly. The sampler needs one score and one optional runtime estimate per task.
+Remark
+P 2 (Measuring score error). For the cost rule, define the cost-biased probability qei =
+qi ci /( j qj cj ). Theorem 4.2 of Mohri et al. (2026) gives the exact diagnostic
+J(b
+q)
+= 1 + Dχ2 (e
+q∗ ∥ e
+qb).
+J(q ∗ )
+
+(14)
+
+The frozen-gradient bank computes the right side from an all-task score snapshot. During training,
+periodic all-task refreshes define the reference q ∗ , the online moving averages define qb, and the log
+records the reference age.
+
+5
+
+E XPERIMENTS
+
+The evaluation has three layers. A controlled problem checks the two propositions. Gradients cached
+from one Uniform run measure the mechanism on an LLM. Matched MOPD runs measure weighted
+teacher loss per token and GPU hour. Each measurement corresponds to one part of the method.
+4
+
+Under review as a conference paper at ICLR 2027
+
+216
+217
+
+5.1
+
+218
+219
+220
+221
+222
+223
+
+We construct three Gaussian task-gradient distributions with different raw scales, AdamW coordinate scales, and task costs. Every proposal targets λi = 1/3 and uses the factor in Equation 2. The
+estimator experiment uses 20,000 Monte Carlo trials and 16 corrected task gradients per trial.
+
+Task proposals
+0.8
+
+253
+254
+255
+256
+257
+258
+259
+260
+261
+262
+263
+264
+265
+266
+267
+268
+269
+
+GPAS
+Cost-GPAS
+
+7
+
+0.6
+
+0.4
+
+0.2
+
+6
+5
+4
+3
+2
+1
+
+241
+242
+243
+244
+245
+246
+
+0.0
+
+0
+task 1
+
+task 2
+
+task 3
+
+form
+
+Uni
+
+Cost objective J(q)
+
+Gra
+
+rm
+
+dNo
+
+t
+Cos
+
+S
+
+GPA
+
+Expected moment change
+
+6
+
+relative to Uniform
+
+247
+248
+249
+250
+251
+252
+
+Uniform
+Gradient-Norm IS
+
+AdamW-metric error
+
+relative to Uniform
+
+235
+236
+237
+238
+239
+240
+
+The fourth panel draws tasks from a proposal different from λ. Both optimizers update the first
+moment with wGI . Standard AdamW updates the second moment with w2 G2I , while momentconsistent AdamW uses wG2I . We report each expected moment change relative to the baseline
+q = λ. The moment-bias comparison directly checks Proposition 1. With one million draws, both
+methods have first-moment bias 0.008. Standard AdamW has second-moment bias 0.816, close to
+the calculated value 0.818. Moment-consistent AdamW has measured bias 0.002, consistent with
+Monte Carlo error around zero.
+
+0.8
+
+5
+
+relative bias
+
+230
+231
+232
+233
+234
+
+Under the identity metric, Gradient-Norm IS reaches a calculated and measured error ratio of 0.534
+relative to Uniform. In the AdamW metric, GPAS reaches 0.698 by calculation and 0.697 by simulation. The raw-norm proposal reaches 7.178 times the Uniform error because its largest raw
+coordinates receive a small AdamW scale. Cost-GPAS reaches 0.893 of Uniform on J(q).
+
+sampling probability
+
+224
+225
+226
+227
+228
+229
+
+C ONTROLLED VALIDATION
+
+4
+3
+2
+
+Standard
+Moment-consistent
+
+0.6
+
+0.4
+
+0.2
+1
+0
+
+0.0
+
+form
+Uni
+
+Gr
+
+orm
+adN
+
+S
+
+GPA
+
+first
+
+t
+Cos
+
+second
+
+Figure 1: Controlled validation. The first three panels compare task proposals, AdamW-metric
+estimator error, and the cost objective J(q). Black markers show calculated values. The fourth
+panel reports relative bias in the expected AdamW moment changes for q ̸= λ. Lower values are
+better in the last three panels.
+5.2
+
+F ROZEN - GRADIENT MECHANISM STUDY
+
+The Uniform run supplies checkpoints at the start, middle, and end of training. At each checkpoint,
+we collect 16 task batches per task. Collection stores sufficient statistics in place of full gradient
+copies whenever a scalar or fixed projection is enough.
+The study answers four questions. First, Pearson and Spearman correlations compare raw gradient
+norm and AdamW-metric norm with the task-dependent part of the next AdamW update. Second,
+the cached gradients give M (q), J(q), and the χ2 gap in Equation 14 for every proposal. Third, gradient replay measures proposal-dependent drift in v under standard and moment-consistent AdamW.
+5
+
+Under review as a conference paper at ICLR 2027
+
+270
+271
+272
+273
+274
+275
+276
+277
+278
+279
+280
+281
+282
+283
+284
+285
+286
+287
+288
+289
+290
+291
+292
+293
+294
+295
+296
+297
+298
+299
+300
+
+Fourth, pairwise cosine similarity of task mean gradients separates direction differences from scale
+differences. The cosine matrix appears as one subpanel of the mechanism figure.
+These measurements use the same saved model and optimizer state for every proposal. They require
+one training run and add backward passes only at the three saved checkpoints.
+5.3
+
+The student is a fixed revision of Qwen3-1.7B (Qwen Team, 2025). Four same-origin teachers
+specialize in mathematics, code, instruction following, and science question answering. The paper
+reports the model and tokenizer revisions, teacher checkpoints, and each teacher’s score on its own
+domain.
+Each optimizer step samples one task and uses one task-homogeneous batch. A batch targets 65,536
+valid response tokens; the logs also report the realized number of responses for each task. Every
+response is averaged over its valid tokens, followed by an average over responses. A shared norm
+clip is applied to Gi before sampling correction. The optimizer receives Gi and w separately, uses
+wGi for m, and uses wG2i for v.
+Runs use an 8,192-token response cap, temperature 1, top-p 1, an eight-step round-robin warm start,
+γ = 0.95, and qmin = 0.05. A 300-step pilot uses one paired seed for Uniform and GPAS. The main
+comparison uses 400 steps, with the pilot checkpoints reused. The five primary fixed-target methods
+use three paired seeds; the moment ablation uses two. Methods within a seed share initialization,
+per-task data order, and evaluation prompts. Teacher loss is evaluated every 50 steps, and capability
+benchmarks are evaluated at the endpoint.
+5.4
+
+312
+313
+314
+315
+316
+317
+318
+319
+320
+321
+322
+323
+
+M ETHODS AND DECOMPOSITION
+
+Table 1 separates fixed-target allocation from curriculum target changes. The first five rows use
+λi = 1/4 and moment-consistent AdamW. Gradient-Norm IS uses the identity metric. D3 -ProposalIC uses the D3 loss-gap and descent-velocity signal only as q, followed by importance correction.
+Its target stays fixed.
+Table 1: MOPD comparisons. The eight rows require 21 runs.
+
+301
+302
+303
+304
+305
+306
+307
+308
+309
+310
+311
+
+F OUR - TEACHER MOPD STUDY
+
+Method
+Uniform
+Gradient-Norm IS
+GPAS
+Cost-GPAS
+D3 -Proposal-IC
+Native D3
+D3 target + GPAS
+GPAS + standard AdamW
+
+Target λ
+1/4
+1/4
+1/4
+1/4
+1/4
+qt
+replayed λt
+1/4
+
+Proposal q
+1/4
+∝ λb
+r
+∝ λb
+s √
+∝ λb
+s/ cb
+D3 signal + correction
+D3 signal
+∝ λt sb
+∝ λb
+s
+
+Seeds
+3
+3
+3
+3
+3
+2
+2
+2
+
+Native D3 uses its proposal as its target and applies a unit gradient factor. For each seed, the D3
+target + GPAS run replays the exact λt sequence recorded by the Native D3 run. This pairing fixes
+the realized target path and changes only task allocation. The last row uses the same GPAS proposal
+rule and wGi first moment as GPAS, with w2 G2i in the second moment.
+5.5
+
+M ETRICS AND COMPARISONS
+
+The primary metric is weighted held-out teacher loss
+X
+L(N ) =
+λi ℓi (N ),
+
+(15)
+
+i
+
+plotted against cumulative valid response tokens and measured GPU hours. We report normalized
+loss AUC on the common resource interval, final weighted loss, and every per-task loss. Mean
+curves and standard errors use the three paired seeds for the five fixed-target methods.
+6
+
+Under review as a conference paper at ICLR 2027
+
+324
+325
+326
+327
+328
+329
+330
+331
+332
+333
+334
+335
+336
+337
+338
+339
+340
+341
+342
+343
+344
+345
+346
+347
+348
+349
+350
+351
+352
+353
+354
+355
+356
+357
+358
+359
+360
+361
+362
+363
+364
+365
+366
+367
+368
+369
+370
+371
+372
+373
+374
+375
+376
+377
+
+The fixed-target rows compare allocation quality under one teacher-loss objective. Gradient-Norm
+IS versus GPAS isolates the optimizer metric. D3 -Proposal-IC versus GPAS compares proposal
+signals. GPAS versus its standard AdamW ablation isolates the moment correction. Native D3
+versus D3 target + GPAS shares the same target sequence and isolates allocation on top of curriculum
+weights.
+Capability evaluation is secondary. It reports MATH-500 greedy pass@1, a frozen post-cutoff LiveCodeBench pass@1 slice, IFBench strict accuracy, and GPQA-Diamond average@4. The native D3
+rows use per-task losses and capability scores because their target changes over time. Every run logs
+task identity, qi , λi /qi , valid tokens, response count, GPU time, raw and AdamW-metric gradient
+norms, score age, and teacher loss.
+
+6
+
+D ISCUSSION AND C ONCLUSION
+
+GPAS separates the weighted teacher-loss target from compute allocation. Moment-consistent
+AdamW keeps the expected first- and second-moment changes equal to the baseline q = λ. GPAS
+then allocates task draws using gradient scale in AdamW’s lagged metric, and Cost-GPAS also accounts for task time. The identity metric recovers gradient-norm importance sampling.
+The controlled estimator study supports the local allocation result. GPAS reduces AdamW-metric
+error by 30.3%, while raw gradient-norm sampling performs poorly in the constructed AdamW
+geometry. The moment-state experiment checks the one-line AdamW change directly. Frozengradient replay applies the same measurements to LLM gradients. The matched MOPD design
+measures the connection between local error and teacher-loss efficiency.
+Three boundaries guide interpretation. First, matching expected moment changes still allows different parameter paths because task order changes the realized gradients. Low-discrepancy task
+schedules may reduce this path dependence and are a useful direction for future work. Second,
+GPAS uses recent gradients and a lagged optimizer state. Score-age logs and frozen-gradient replay
+measure the quality of this approximation. Third, Cost-GPAS minimizes the uncentered secondmoment objective in Equation 10. Appendix F of Mohri et al. (2026) connects this objective to
+optimization rates, while GPU-hour curves measure its practical value.
+The main design principle is simple: choose the teacher-loss objective first, then allocate expensive
+task steps for that objective. The same separation lets GPAS compose with a curriculum by applying
+the allocation rule after each target update.
+AI USE STATEMENT
+We used generative AI tools for language editing and manuscript organization. The authors reviewed every AI-assisted revision and take responsibility for the final text, claims, proofs, code, and
+experimental results.
+E THICS STATEMENT
+The study evaluates optimization methods for existing language models with established reasoning
+and instruction-following datasets and automated verifiers. Model and dataset biases can affect
+the reported capability scores. We record data provenance, invalid outputs, and verifier failures to
+support careful interpretation of the results.
+R EPRODUCIBILITY STATEMENT
+Section 5 specifies the model family, task setup, update budget, evaluation points, and evaluation
+protocol. The appendix gives the sampling derivations and implementation details. The repository
+includes the AdamW moment experiment code, numerical results for both controlled studies, and
+figure-generation code. Each reported large-model result is accompanied by its data manifest, model
+and tokenizer revisions, optimizer settings, task-sampling log, saved model state, and per-prompt
+evaluation output.
+7
+
+Under review as a conference paper at ICLR 2027
+
+378
+379
+
+R EFERENCES
+
+380
+381
+382
+383
+384
+385
+
+Guillaume Alain, Alex Lamb, Chinnadhurai Sankar, Aaron Courville, and Yoshua Bengio. Variance
+reduction in sgd by distributed importance sampling, 2015. URL https://arxiv.org/
+abs/1511.06481.
+
+386
+387
+388
+389
+390
+391
+392
+393
+394
+395
+396
+397
+398
+399
+400
+401
+402
+403
+404
+405
+406
+407
+408
+409
+410
+411
+412
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+
+Zhao Chen, Vijay Badrinarayanan, Chen-Yu Lee, and Andrew Rabinovich. Gradnorm: Gradient normalization for adaptive loss balancing in deep multitask networks. In Proceedings of
+the 35th International Conference on Machine Learning, pp. 794–803, 2018. URL https:
+//proceedings.mlr.press/v80/chen18a.html.
+William G. Cochran. Sampling Techniques. Wiley, 3 edition, 1977.
+Nicholas E. Corrado, Wenyuan Huang, and Josiah P. Hanna. Distributionally robust multi-task
+reinforcement learning via adaptive task sampling, 2026. URL https://arxiv.org/abs/
+2605.14350.
+Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang, Bingxiang He,
+Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou. Open-mopd: Diagnosing and fixing capability
+imbalance in multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/
+2608.19098.
+Angelos Katharopoulos and François Fleuret. Not all samples are created equal: Deep learning with importance sampling. In Proceedings of the 35th International Conference on Machine Learning, pp. 2525–2534, 2018. URL https://proceedings.mlr.press/v80/
+katharopoulos18a.html.
+Thibault Lahire. Non-uniform sampling and adaptive optimizers in deep learning. OPT 2023:
+Optimization for Machine Learning, 2023. URL https://opt-ml.org/papers/2023/
+paper20.pdf.
+Zhaoyi Li, Deyang Kong, Yuan Wei, Evan Yang, Ranran Shen, Mahardika Krisna Ihsani, Ming
+Yang, Wei Zhang, Chuan Hao, Jian Yang, Ran Tao, Bryan Dai, Shikun Zhang, Wei Ye, Ying
+Wei, and Defu Lian. Every coin has two sides: On the dual nature of generalization in onpolicy distillation of large language models, 2026. URL https://arxiv.org/abs/2608.
+16647.
+Bo Liu, Xingchao Liu, Xiaojie Jin, Peter Stone, and Qiang Liu. Conflict-averse gradient descent for
+multi-task learning, 2024. URL https://arxiv.org/abs/2110.14048.
+Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli Luo. Mopd: Multi-teacher on-policy
+distillation for capability integration in llm post-training, 2026. URL https://arxiv.org/
+abs/2606.30406.
+Clara Mohri, Amir Globerson, Haim Kaplan, Tomer Koren, and Yishay Mansour. Cost-aware learning, 2026. URL https://arxiv.org/abs/2604.28020.
+Jerzy Neyman. On the two different aspects of the representative method: The method of stratified
+sampling and the method of purposive selection. Journal of the Royal Statistical Society, 97(4):
+558–625, 1934. doi: 10.2307/2342192.
+Qwen Team. Qwen3 technical report, 2025. URL https://arxiv.org/abs/2505.09388.
+Ozan Sener and Vladlen Koltun. Multi-task learning as multi-objective optimization, 2019. URL
+https://arxiv.org/abs/1810.04650.
+Zechen Sun, Zhiwei Zhang, Fei Zhao, Juntao Li, Mu Chuan, Huayu Deng, Guojian Zhan, Wenliang
+Chen, Yao Hu, and Min Zhang. D3 -mopd: Adaptive dynamic domain scheduling for efficient
+multi-teacher distillation, 2026. URL https://arxiv.org/abs/2608.24987.
+Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine, Karol Hausman, and Chelsea Finn.
+Gradient surgery for multi-task learning, 2020. URL https://arxiv.org/abs/2001.
+06782.
+
+8
+
+Under review as a conference paper at ICLR 2027
+
+432
+433
+
+A
+
+434
+435
+436
+437
+438
+439
+
+The recipe uses one task-homogeneous batch and one optimizer step after each rollout. Task selection occurs before generation, so a step calls one teacher or reward service.
+
+440
+441
+442
+443
+444
+445
+
+2. Define one task gradient. Fix the token and response aggregation rule inside each task. Our
+MOPD setup averages tokens inside each response and then averages responses. It retains the existing fixed-token batch budget and records the realized response count, prompt count, valid-token
+count, and GPU time for each task.
+
+446
+447
+448
+449
+450
+451
+452
+453
+454
+455
+456
+457
+458
+459
+460
+461
+462
+463
+464
+465
+466
+467
+468
+469
+470
+471
+472
+473
+474
+475
+476
+477
+478
+479
+480
+481
+482
+483
+484
+485
+
+P RACTICAL T RAINING R ECIPE
+
+1. Fix the teacher-loss target. Choose λ for the weighted teacher-loss objective and record it before choosing a sampler. Benchmark evaluation measures the resulting capability profile separately.
+
+3. Initialize the sampler. Run a short round-robin warm start. For each task, store a moving
+average of raw gradient norm and AdamW-metric norm. Cost-GPAS also stores a moving average
+of task time. The four-task protocol uses eight warm-start steps and γ = 0.95.
+4. Keep the raw gradient and weight separate. After sampling task I, compute its raw task
+gradient GI and the factor w = λI /qI . Moment-consistent AdamW uses wGI for the first moment
+and wG2I for the second moment. Passing only wGI to an unchanged AdamW implementation
+produces the standard w2 G2I second moment. The optimizer interface therefore accepts both GI
+and w.
+√
+5. Update and save the sampler. GPAS uses qi ∝ λi sbi ; Cost-GPAS uses qi ∝ λi sbi / cbi . Apply
+the probability floor before drawing a task. Save score and cost averages with model and optimizer
+state. Log I, qI , w, valid tokens, response count, GPU time, raw norm, AdamW-metric norm, score
+age, and clipping status.
+
+B
+
+G RADIENT AND E VALUATION D ETAILS
+
+B.1
+
+S AMPLED - TOKEN MOPD GRADIENT
+
+Fix a student-generated prefix z. Write pv = πθ (v | z) and τv = Ti (v | z). The reverse-KL ascent
+gradient at that prefix is
+X
+τv
+ui (z) =
+pv log ∇θ log pv .
+(16)
+p
+v
+v
+For V ∼ p, the sampled-token update
+
+
+τV
+∇θ log pV
+Ui (z, V ) = sg log
+pV
+
+(17)
+
+has conditional mean ui (z). The implementation averages these token updates inside each response
+and then averages responses to form Gi .
+B.2
+
+F ROZEN - GRADIENT EVALUATION METRICS
+
+At one checkpoint, the gradient bank estimates each task mean hi , raw second moment, AdamWmetric second moment s2i , and runtime ci . For every proposal, it reports M (q) from Equation 8 and
+J(q) from Equation 10, both relative to Uniform.
+To evaluate the metric, each cached Gi is inserted into the saved AdamW state while all other
+quantities are held fixed. Pearson and Spearman correlations compare the resulting update norm with
+∥Gi ∥2 and ∥AGi ∥2 . Pairwise cosine similarity uses task mean gradients at the same checkpoint. A
+fixed random projection can replace full mean-gradient storage; the projection seed and dimension
+are shared by all tasks.
+For the state replay, a task sequence is drawn from each proposal. Standard AdamW accumulates
+w2 G2i , and moment-consistent AdamW accumulates wG2i . The reported drift is the distance from
+the state produced by the baseline q = λ, normalized by the baseline state norm.
+9
+
+Under review as a conference paper at ICLR 2027
+
+486
+487
+488
+489
+490
+491
+492
+493
+494
+495
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+
+B.3
+
+E XACT SCORE - ERROR DIAGNOSTIC
+P
+√
+∗
+2
+Let B =
+i λi si ci . The optimal cost-aware proposal has J(q ) = B . For the cost-biased
+probabilities in Equation 14, direct substitution gives
+q∗ ∥ e
+qb) =
+1 + Dχ2 (e
+
+X (e
+q ∗ )2
+i
+
+i
+
+e
+qbi
+
+=
+
+J(b
+q)
+J(b
+q)
+=
+.
+B2
+J(q ∗ )
+
+(18)
+
+The frozen bank estimates q ∗ from all tasks at one saved state. During training, periodic full-task
+refreshes provide the reference scores; the log records the divergence, the reference age, and the
+contribution of the probability floor.
+B.4
+
+S TRICT CURRICULUM DECOMPOSITION
+
+An online curriculum can generate different target sequences after a proposal changes the training
+path. Our paired decomposition fixes this source of variation. Native D3 first records its target
+sequence λ1 , . . . , λT for each seed. The paired D3 target + GPAS run replays that sequence and
+changes only qt . Both runs share initialization, per-task data order, and evaluation prompts.
+D3 -Proposal-IC serves a separate purpose. It keeps λi = 1/4, forms qt from the published lossgap and descent-velocity signal, and applies λi /qt,i . Its comparison with GPAS measures proposal
+quality under one fixed teacher-loss target.
+B.5
+
+S AMPLER STATE AND OPTIMIZER INTERFACE
+
+Each checkpoint stores the score average, runtime average, observation count, score age, probability
+floor, and current proposal for every task. The optimizer checkpoint stores the usual AdamW state
+and a flag identifying the second-moment rule. Resume tests compare the next proposal and the next
+optimizer state before and after serialization.
+The main theory uses the task gradient before norm clipping. The training code uses a shared emergency clip before importance correction and reports the clip rate by task and method. A triggered
+clip defines a clipped update field for that step. The fixed-objective interpretation is reported together
+with this rate.
+
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+
+10
+
+

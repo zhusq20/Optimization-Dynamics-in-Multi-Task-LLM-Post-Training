@@ -1,84 +1,173 @@
 % ============================================================================
-\section{Derivations and Implementation Details}
+\section{Derivations and Evaluation Details}
 % ============================================================================
 
-\subsection{Sampled-token OPD}
+\subsection{Moment targets}
+\label{app:moment_target_proof}
+
+For Lemma~\ref{lem:importance_correction}, conditioning on the state before the
+draw gives
+\begin{equation}
+\mathbb E[w_I G_I]
+=\sum_i q_i\frac{\lambda_i}{q_i}\mathbb E[G_i]
+=\sum_i\lambda_i\mathbb E[G_i].
+\end{equation}
+The same calculation with an element-wise square gives
+\begin{equation}
+\mathbb E[w_I G_I^2]=\sum_i\lambda_i S_i.
+\end{equation}
+Standard AdamW squares the complete corrected gradient, so
+\begin{equation}
+\mathbb E[w_I^2 G_I^2]
+=\sum_i\frac{\lambda_i^2}{q_i}S_i.
+\end{equation}
+These are the observations entering the exponential average in
+Proposition~\ref{prop:conditional_preservation}.
+
+\subsection{GPAS derivation and the descent connection}
+\label{app:gpas_proof}
+
+Let $A$ be the fixed diagonal scale with entries
+$1/(\sqrt{\bar v}+\epsilon)$, let
+$h_i=\mathbb E[G_i]$, and let $h=\sum_i\lambda_i h_i$. The centered scaled
+error of one corrected draw is
+\begin{equation}
+\mathbb E\|A(\widehat g-h)\|_2^2
+=\sum_i\frac{\lambda_i^2s_i^2}{q_i}-\|Ah\|_2^2.
+\label{eq:centered_optimizer_mse}
+\end{equation}
+The final term is fixed before sampling. Cauchy--Schwarz gives
+\begin{equation}
+\sum_i\frac{\lambda_i^2s_i^2}{q_i}
+\geq \left(\sum_i\lambda_i s_i\right)^2,
+\end{equation}
+with equality when $q_i$ is proportional to $\lambda_i s_i$.
+
+For the local optimization connection, consider the preconditioned update
+$\theta^+=\theta-\eta A\widehat g$ and an $L$-smooth objective. The descent
+lemma and unbiasedness give
+\begin{equation}
+\mathbb E[F(\theta^+)]
+\leq F(\theta)-\eta\langle h,Ah\rangle
++\frac{L\eta^2}{2}
+\sum_i\frac{\lambda_i^2s_i^2}{q_i}.
+\label{eq:descent_connection}
+\end{equation}
+At a fixed state and learning rate, the last term contains all dependence on
+the proposal. AdamW momentum, changing preconditioners, and weight decay make
+this a local comparison rather than a trajectory theorem.
+
+\subsection{Cost connection}
+\label{app:cost_connection}
+
+Write $\bar c(q)=\sum_iq_ic_i$. A time budget $B$ gives approximately
+$T=B/\bar c(q)$ steps. A standard smooth non-convex stochastic bound has the
+form
+\begin{equation}
+\frac{1}{T}\sum_{t=1}^{T}\mathbb E\|\nabla F(\theta_t)\|^2
+\leq \frac{C_1}{\eta T}+C_2\eta V(q),
+\end{equation}
+for constants independent of $q$ under a fixed, bounded preconditioner. Tuning
+$\eta$ in this bound leaves a $q$-dependent factor proportional to
+$\sqrt{\bar c(q)V(q)/B}$. This motivates the product $J(q)$ as a
+compute-efficiency proxy.
+
+A second Cauchy--Schwarz calculation gives
+\begin{equation}
+J(q)=\left(\sum_iq_ic_i\right)
+\left(\sum_i\frac{\lambda_i^2s_i^2}{q_i}\right)
+\geq\left(\sum_i\lambda_i s_i\sqrt{c_i}\right)^2.
+\end{equation}
+Equality holds at
+$q_i\propto\lambda_i s_i/\sqrt{c_i}$.
+
+\subsection{Sampled-token MOPD gradient}
 \label{app:opd_estimators}
 
 Fix a student-generated prefix $z$. Write
-$p_v=\pi_\theta(v\mid z)$ and $\tau_v=T_i(v\mid z)$. The reverse-KL ascent
-gradient at prefix $z$ is
+$p_v=\pi_\theta(v\mid z)$ and $\tau_v=T_i(v\mid z)$. The reverse-KL loss
+gradient at that prefix is
 \begin{equation}
-    u_i(z)
-    =
-    \sum_v p_v\log\frac{\tau_v}{p_v}
+    g_i(z)=\sum_v p_v\log\frac{p_v}{\tau_v}
     \nabla_\theta\log p_v.
     \label{eq:full_token_rkl_update}
 \end{equation}
-For a token $V$ sampled from $p$, the sampled-token gradient is
+For $V\sim p$, the sampled-token gradient
 \begin{equation}
-    U_i(z,V)
-    =
-    \operatorname{sg}\!\left[\log\frac{\tau_V}{p_V}\right]
-    \nabla_\theta\log p_V,
-    \qquad
-    \mathbb E[U_i(z,V)\mid z]=u_i(z).
+    G_i(z,V)=
+    \operatorname{sg}\!\left[\log\frac{p_V}{\tau_V}\right]
+    \nabla_\theta\log p_V
     \label{eq:pg_prefix_unbiased}
 \end{equation}
-Response normalization averages the prefix gradients according to
-Equation~\ref{eq:response_normalized_update}.
+has conditional mean $g_i(z)$. The implementation averages these token
+gradients inside each response and then averages responses to form $G_i$.
 
-\subsection{Task-homogeneous GRPO gradient}
-\label{app:grpo_update}
+\subsection{Frozen-gradient evaluation}
+\label{app:frozen_metrics}
 
-For task $i$, GRPO samples response groups from one prompt, computes
-within-prompt advantages, and applies the standard clipped policy surrogate
-\citep{shao2024deepseekmathpushinglimitsmathematical}. The implementation first
-averages token terms inside each response and then averages responses inside the
-task batch. The resulting clipped task gradient is $G_i$. The GRPO policy ratio
-handles behavior-policy change inside a task, while $\lambda_i/q_i$ handles task
-sampling.
+At one checkpoint, the gradient bank estimates each task mean $h_i$, raw
+second moment, preconditioned second moment $s_i^2$, and runtime $c_i$.
+Proposal scales are estimated on one fold and evaluated on the other. Reversing
+the folds and averaging uses every batch while preserving held-out evaluation.
+The primary local quantities are $V(q)$ and $J(q)$ because they avoid the
+upward bias of a sample mean norm in centered MSE. A split estimate of
+Equation~\ref{eq:centered_optimizer_mse} is reported as a secondary check.
 
-\subsection{Frozen-gradient evaluation metric}
+To evaluate update prediction, each held-out $G_i$ is inserted into the saved
+AdamW state while every other input is held fixed. The task-dependent update is
+$\Delta\theta(G_i)-\Delta\theta(0)$, which removes weight decay and state-only
+terms. Pearson and Spearman correlations are computed within tasks and on the
+pooled bank. Pairwise cosine similarity uses task mean gradients under one
+shared random projection.
 
-For an evaluation bank, let $\widetilde h=A_th$ be the full-mixture mean in the
-selected optimizer metric, and let
-$\widehat{\widetilde g}=A_t\widehat g$ be the transformed corrected draw. The
-centered error is
-\begin{equation}
-    M(q)=\mathbb E\left\|\widehat{\widetilde g}-\widetilde h\right\|_2^2.
-    \label{eq:empirical_estimator_mse}
-\end{equation}
-The experiment estimates $h$ and the expectation from cached task batches. The
-LLM evaluation uses the AdamW metric in
-Equation~\ref{eq:adamw_lagged_metric}; the controlled experiment also reports
-the SGD identity metric.
+For state replay, a task sequence is drawn from each proposal. Standard AdamW
+accumulates $w^2G_i^2$, and moment-consistent AdamW accumulates $wG_i^2$.
+Population-target error is computed directly from taskwise second moments;
+finite-memory drift compares the replayed state with the state from
+$q=\lambda$, normalized by the baseline state norm. A fixed sampled set of
+parameter coordinates keeps storage bounded.
 
-\subsection{Approximate-score penalty}
+\subsection{Scale-estimation error and online feedback}
 \label{app:score_approximation}
 
-Let $q_i^*=\lambda_i s_i/Z$, where $Z=\sum_i\lambda_i s_i$, and let
-$\widehat q_i=\lambda_i\widehat s_i/\widehat Z$. Write
-$w_i=\lambda_i s_i/Z$ and $r_i=\widehat s_i/s_i$. Then
+For positive costs and a proposal before flooring, define
+$\widetilde q_i=q_ic_i/(\sum_jq_jc_j)$. Let $q^*$ use current all-task scales
+and let $\widehat q$ use online estimates. Direct substitution gives
 \begin{equation}
-    \frac{V(\widehat q)}{V(q^*)}
-    =\left(\sum_iw_ir_i\right)
-     \left(\sum_i\frac{w_i}{r_i}\right).
+    \frac{J(\widehat q)}{J(q^*)}
+    =1+D_{\chi^2}(\widetilde q^*\,\|\,\widetilde{\widehat q}).
+    \label{eq:chi_square_gap}
 \end{equation}
-If $r_i\in[1-\delta,1+\delta]$, the Kantorovich inequality gives
-\begin{equation}
-    \frac{V(\widehat q)}{V(q^*)}
-    \leq
-    \frac{\big((1-\delta)+(1+\delta)\big)^2}
-         {4(1-\delta)(1+\delta)}
-    =\frac{1}{1-\delta^2}.
-\end{equation}
-The result concerns proposal quality for fixed scores. Model drift, observation
-noise, and the probability floor are measured separately.
+This identity diagnoses scale-estimation error at one fixed state. Online training moves
+the reference scales, and the probability floor adds a separate allocation
+cost. We log reference age and report the floor contribution separately.
 
-\subsection{Probability floor and sampler state}
+\subsection{Strict curriculum decomposition}
+\label{app:curriculum_decomposition}
 
-The online sampler fixes entries below $q_{\min}$ and renormalizes the remaining
-active entries. Each checkpoint stores the score average, cost average,
-observation count, and current proposal for every task together with the model
-and optimizer state.
+An online curriculum can generate a different objective sequence after the
+training path changes. Native D$^3$ first records its sequence
+$\lambda_1,\ldots,\lambda_T$ for each seed. The paired D$^3$ target + GPAS run
+replays that sequence and changes only $q_t$. Both runs share initialization,
+per-task data order, and evaluation prompts.
+
+D$^3$-Proposal-IC serves a different comparison. It keeps
+$\lambda_i=1/4$, forms $q_t$ from the published loss-gap and descent-velocity
+signal, and applies $\lambda_i/q_{t,i}$. Its comparison with GPAS measures two
+proposal signals under one weighted teacher-loss objective.
+
+\subsection{Sampler state, clipping, and resume}
+\label{app:sampler_state}
+
+Each checkpoint stores the scale average, runtime average, observation count,
+scale age, probability floor, and current proposal for every task. The
+optimizer checkpoint stores the usual AdamW state and a flag identifying the
+second-moment rule. Resume tests compare the next proposal and optimizer state
+before and after serialization.
+
+The theory concerns the raw teacher-loss gradient. Training applies one shared
+emergency clip before importance correction. This nonlinear map changes the
+mean relative to the original loss gradient when clipping fires, while the
+$\lambda/q$ correction stays unbiased for the clipped update field. Every
+method reports clip rate by task, multiplier quantiles, corrected-update norm
+quantiles, and the fraction of steps affected.
