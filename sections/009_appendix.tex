@@ -2,172 +2,113 @@
 \section{Derivations and Evaluation Details}
 % ============================================================================
 
-\subsection{Moment targets}
+\subsection{Importance correction and taskwise moments}
 \label{app:moment_target_proof}
 
-For Lemma~\ref{lem:importance_correction}, conditioning on the state before the
-draw gives
+Let $Z_i$ indicate that task $i$ enters the selected set. Selection precedes
+generation, so $Z_i$ and the potential task-unit gradient $g_i$ are conditionally
+independent. Since $\mathbb E[Z_i]=p_i$,
 \begin{equation}
-\mathbb E[w_I G_I]
-=\sum_i q_i\frac{\lambda_i}{q_i}\mathbb E[G_i]
-=\sum_i\lambda_i\mathbb E[G_i].
+\mathbb E\!\left[\sum_i Z_i\frac{w_i}{p_i}g_i\right]
+=\sum_i w_i\mathbb E[g_i].
 \end{equation}
-The same calculation with an element-wise square gives
+Replacing $g_i$ with its element-wise square gives
 \begin{equation}
-\mathbb E[w_I G_I^2]=\sum_i\lambda_i S_i.
+\mathbb E\!\left[\sum_i Z_i\frac{w_i}{p_i}g_i^2\right]
+=\sum_i w_i\mathbb E[g_i^2].
 \end{equation}
-Standard AdamW squares the complete corrected gradient, so
-\begin{equation}
-\mathbb E[w_I^2 G_I^2]
-=\sum_i\frac{\lambda_i^2}{q_i}S_i.
-\end{equation}
-These are the observations entering the exponential average in
-Proposition~\ref{prop:conditional_preservation}.
+Both identities hold for any fixed-size design with the stated marginals.
 
-\subsection{GPAS derivation and the descent connection}
-\label{app:gpas_proof}
-
-Let $A$ be the fixed diagonal scale with entries
-$1/(\sqrt{\bar v}+\epsilon)$, let
-$h_i=\mathbb E[G_i]$, and let $h=\sum_i\lambda_i h_i$. The centered scaled
-error of one corrected draw is
+At $K=M$, write $\bar g=\sum_i w_i g_i$. The difference between taskwise and
+conventional mixed-batch square observations is
 \begin{equation}
-\mathbb E\|A(\widehat g-h)\|_2^2
-=\sum_i\frac{\lambda_i^2s_i^2}{q_i}-\|Ah\|_2^2.
-\label{eq:centered_optimizer_mse}
+    \sum_i w_i g_i^2-\bar g^2
+    =\sum_i w_i(g_i-\bar g)^2\geq0
+    \label{eq:mixed_moment_dispersion}
 \end{equation}
-The final term is fixed before sampling. Cauchy--Schwarz gives
+coordinate by coordinate. This task-dispersion term explains why the two AdamW
+variants can use different effective step sizes.
+
+\subsection{Estimator error for fixed-size task sets}
+\label{app:variance}
+
+Let $h_i=\mathbb E[g_i]$, $h=\sum_iw_i h_i$, and
+$e_i=\mathbb E\|D(g_i-h_i)\|_2^2$. An independent-inclusion calculation gives
 \begin{equation}
-\sum_i\frac{\lambda_i^2s_i^2}{q_i}
-\geq \left(\sum_i\lambda_i s_i\right)^2,
+\mathbb E\|D(\widehat g-h)\|_2^2
+=\sum_i w_i^2\left[
+\frac{1-p_i}{p_i}\|Dh_i\|_2^2+\frac{e_i}{p_i}\right].
+\label{eq:independent_variance}
 \end{equation}
-with equality when $q_i$ is proportional to $\lambda_i s_i$.
+Since $r_i^2=\|Dh_i\|_2^2+e_i$, the part controlled by $p$ equals
+$V(p)$ plus a constant.
 
-For the local optimization connection, consider the preconditioned update
-$\theta^+=\theta-\eta A\widehat g$ and an $L$-smooth objective. The descent
-lemma and unbiasedness give
+For an exact-$K$ set, let $p_{ij}$ be the probability that tasks $i$ and $j$
+enter together. The complete error adds
 \begin{equation}
-\mathbb E[F(\theta^+)]
-\leq F(\theta)-\eta\langle h,Ah\rangle
-+\frac{L\eta^2}{2}
-\sum_i\frac{\lambda_i^2s_i^2}{q_i}.
-\label{eq:descent_connection}
+2\sum_{i<j}w_iw_j
+\left(\frac{p_{ij}}{p_ip_j}-1\right)
+\langle Dh_i,Dh_j\rangle.
+\label{eq:fixed_size_variance}
 \end{equation}
-At a fixed state and learning rate, the last term contains all dependence on
-the proposal. AdamW momentum, changing preconditioners, and weight decay make
-this a local comparison rather than a trajectory theorem.
+This term depends on task alignment and the subset design. The experiment
+enumerates every subset for four tasks and evaluates Equations
+\ref{eq:independent_variance}--\ref{eq:fixed_size_variance} together.
 
-\subsection{Cost connection}
-\label{app:cost_connection}
+\subsection{GPAS and Cost-GPAS solutions}
+\label{app:allocation_proofs}
 
-Write $\bar c(q)=\sum_iq_ic_i$. A time budget $B$ gives approximately
-$T=B/\bar c(q)$ steps. A standard smooth non-convex stochastic bound has the
-form
+Write $a_i=w_i r_i$. For $V(p)=\sum_i a_i^2/p_i$, the interior optimality
+condition gives $p_i=a_i/z$. Coordinates that reach either probability limit
+stay at that limit, and the same condition applies to the remaining coordinates.
+This is Equation~\ref{eq:gpas_proposal}.
+
+For task times $t_i>0$, Cauchy--Schwarz gives
 \begin{equation}
-\frac{1}{T}\sum_{t=1}^{T}\mathbb E\|\nabla F(\theta_t)\|^2
-\leq \frac{C_1}{\eta T}+C_2\eta V(q),
+\left(\sum_i p_i t_i\right)
+\left(\sum_i\frac{a_i^2}{p_i}\right)
+\geq\left(\sum_i a_i\sqrt{t_i}\right)^2.
 \end{equation}
-for constants independent of $q$ under a fixed, bounded preconditioner. Tuning
-$\eta$ in this bound leaves a $q$-dependent factor proportional to
-$\sqrt{\bar c(q)V(q)/B}$. This motivates the product $J(q)$ as a
-compute-efficiency proxy.
+Equality holds at $p_i\propto a_i/\sqrt{t_i}$, which gives
+Equation~\ref{eq:cost_gpas_proposal}. The implementation numerically solves the
+small constrained problem when a probability limit is active.
 
-A second Cauchy--Schwarz calculation gives
-\begin{equation}
-J(q)=\left(\sum_iq_ic_i\right)
-\left(\sum_i\frac{\lambda_i^2s_i^2}{q_i}\right)
-\geq\left(\sum_i\lambda_i s_i\sqrt{c_i}\right)^2.
-\end{equation}
-Equality holds at
-$q_i\propto\lambda_i s_i/\sqrt{c_i}$.
-
-\subsection{Sampled-token MOPD gradient}
+\subsection{MOPD gradient and probe scaling}
 \label{app:opd_estimators}
 
-Fix a student-generated prefix $z$. Write
-$p_v=\pi_\theta(v\mid z)$ and $\tau_v=T_i(v\mid z)$. The reverse-KL loss
-gradient at that prefix is
+For a student-generated prefix $z$, write
+$q_v=\pi_\theta(v\mid z)$ and $t_v=T_i(v\mid z)$. The sampled-token reverse-KL
+score is
 \begin{equation}
-    g_i(z)=\sum_v p_v\log\frac{p_v}{\tau_v}
-    \nabla_\theta\log p_v.
-    \label{eq:full_token_rkl_update}
+    \operatorname{sg}\!\left[\log\frac{q_V}{t_V}\right]
+    \nabla_\theta\log q_V,\qquad V\sim q.
 \end{equation}
-For $V\sim p$, the sampled-token gradient
+The implementation averages token contributions within a response and then
+over the fixed task unit. All allocation claims use this conditional,
+rollout-fixed surrogate gradient.
+
+The full task unit averages 16 prompt groups. An eight-response probe contains
+two groups. For task mean $h_i$ and prompt-group noise $b_i^2$, the full-unit
+score is
 \begin{equation}
-    G_i(z,V)=
-    \operatorname{sg}\!\left[\log\frac{p_V}{\tau_V}\right]
-    \nabla_\theta\log p_V
-    \label{eq:pg_prefix_unbiased}
+    r_i^2=\|Dh_i\|_2^2+b_i^2/16.
 \end{equation}
-has conditional mean $g_i(z)$. The implementation averages these token
-gradients inside each response and then averages responses to form $G_i$.
+The probe refreshes the maintained mean and group-noise estimates. Probe time is
+tracked in its own resource counter.
 
-\subsection{Frozen-gradient evaluation}
-\label{app:frozen_metrics}
-
-At one checkpoint, the gradient bank estimates each task mean $h_i$, raw
-second moment, preconditioned second moment $s_i^2$, and runtime $c_i$.
-Proposal scales are estimated on one fold and evaluated on the other. Reversing
-the folds and averaging uses every batch while preserving held-out evaluation.
-The primary local quantities are $V(q)$ and $J(q)$ because they avoid the
-upward bias of a sample mean norm in centered MSE. A split estimate of
-Equation~\ref{eq:centered_optimizer_mse} is reported as a secondary check.
-
-To evaluate update prediction, each held-out $G_i$ is inserted into the saved
-AdamW state while every other input is held fixed. The task-dependent update is
-$\Delta\theta(G_i)-\Delta\theta(0)$, which removes weight decay and state-only
-terms. Pearson and Spearman correlations are computed within tasks and on the
-pooled bank. Pairwise cosine similarity uses task mean gradients under one
-shared random projection.
-
-For state replay, a task sequence is drawn from each proposal. Standard AdamW
-accumulates $w^2G_i^2$, and moment-consistent AdamW accumulates $wG_i^2$.
-Population-target error is computed directly from taskwise second moments;
-finite-memory drift compares the replayed state with the state from
-$q=\lambda$, normalized by the baseline state norm. A fixed sampled set of
-parameter coordinates keeps storage bounded.
-
-\subsection{Scale-estimation error and online feedback}
-\label{app:score_approximation}
-
-For positive costs and a proposal before flooring, define
-$\widetilde q_i=q_ic_i/(\sum_jq_jc_j)$. Let $q^*$ use current all-task scales
-and let $\widehat q$ use online estimates. Direct substitution gives
-\begin{equation}
-    \frac{J(\widehat q)}{J(q^*)}
-    =1+D_{\chi^2}(\widetilde q^*\,\|\,\widetilde{\widehat q}).
-    \label{eq:chi_square_gap}
-\end{equation}
-This identity diagnoses scale-estimation error at one fixed state. Online training moves
-the reference scales, and the probability floor adds a separate allocation
-cost. We log reference age and report the floor contribution separately.
-
-\subsection{Strict curriculum decomposition}
-\label{app:curriculum_decomposition}
-
-An online curriculum can generate a different objective sequence after the
-training path changes. Native D$^3$ first records its sequence
-$\lambda_1,\ldots,\lambda_T$ for each seed. The paired D$^3$ target + GPAS run
-replays that sequence and changes only $q_t$. Both runs share initialization,
-per-task data order, and evaluation prompts.
-
-D$^3$-Proposal-IC serves a different comparison. It keeps
-$\lambda_i=1/4$, forms $q_t$ from the published loss-gap and descent-velocity
-signal, and applies $\lambda_i/q_{t,i}$. Its comparison with GPAS measures two
-proposal signals under one weighted teacher-loss objective.
-
-\subsection{Sampler state, clipping, and resume}
+\subsection{Response-clock AdamW and system logs}
 \label{app:sampler_state}
 
-Each checkpoint stores the scale average, runtime average, observation count,
-scale age, probability floor, and current proposal for every task. The
-optimizer checkpoint stores the usual AdamW state and a flag identifying the
-second-moment rule. Resume tests compare the next proposal and optimizer state
-before and after serialization.
+If $\beta$ denotes the AdamW decay after one task unit, a $K$-task combined
+update uses $\beta^K$. This matches the total decay assigned to $K$ processed
+units. Decoupled weight decay uses the matching compounded coefficient. A unit
+test compares the decay of stored moments and parameters against $K$ repeated
+clock advances. A resume test reproduces the next selected set, task order,
+moment observation, and parameter update.
 
-The theory concerns the raw teacher-loss gradient. Training applies one shared
-emergency clip before importance correction. This nonlinear map changes the
-mean relative to the original loss gradient when clipping fires, while the
-$\lambda/q$ correction stays unbiased for the clipped update field. Every
-method reports clip rate by task, multiplier quantiles, corrected-update norm
-quantiles, and the fraction of steps affected.
+Every checkpoint stores $K$, inclusion probabilities, selected set and order,
+scale and time averages, observation ages, probes, resident teacher, and AdamW
+variant. Each task unit logs prompt, response, and token counts; gradient norm,
+clipping, and overflow; transfer phases; rollout, scoring, backward, and
+optimizer time; GPU count; and peak HBM. Frozen-bank source units, proposals,
+and held-out errors are released with the run data.

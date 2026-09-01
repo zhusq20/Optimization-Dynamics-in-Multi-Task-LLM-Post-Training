@@ -3,38 +3,29 @@
 \label{sec:training_guide}
 % ============================================================================
 
-The recipe uses one task-homogeneous batch and one optimizer step after each
-rollout. Task selection occurs before generation, so a step calls one teacher
-or reward service.
+\paragraph{1. Fix the objective.}
+Define a task unit with fixed prompt and response counts. Average token loss
+within each response. Measure each initial task loss at the shared checkpoint
+and freeze the normalized objective weights.
 
-\paragraph{1. Fix the teacher-loss objective.}
-Choose $\lambda$ for the weighted teacher-loss objective and record it before
-choosing a sampler. Benchmark evaluation measures the resulting capability
-profile separately.
+\paragraph{2. Profile the candidate task widths.}
+Run a round-robin warm start. Measure optimizer-scaled gradient magnitude and
+critical-path time for every task. Compute $H_K$ for each candidate $K$ and
+record memory and transfer traces.
 
-\paragraph{2. Define one task gradient.}
-Fix the token and response aggregation rule inside each task. Our MOPD setup
-averages tokens inside each response and then averages responses. It retains
-the existing fixed-token batch budget and records the realized response count,
-prompt count, valid-token count, and GPU time for each task.
+\paragraph{3. Draw an exact-$K$ set.}
+Compute bounded GPAS or Cost-GPAS inclusion probabilities. Draw exactly $K$
+tasks with those marginals. Add $w_i g_i/p_i$ to the gradient accumulator and
+$w_i g_i^2/p_i$ to the taskwise second-moment accumulator as each unit finishes.
 
-\paragraph{3. Initialize the sampler.}
-Run a short round-robin warm start. For each task, store a moving average of raw
-gradient norm and preconditioned gradient scale. Cost-GPAS also stores a moving
-average of complete step time. The four-task protocol uses eight warm-start
-steps and $\gamma=0.95$.
+\paragraph{4. Stream teachers.}
+Use the same residency policy for every $K$. With one slot, serve the resident
+teacher first, prefetch the next teacher when memory permits, and keep the final
+teacher resident. Record every transfer phase and the end-to-end critical path.
 
-\paragraph{4. Keep the raw gradient and weight separate.}
-After sampling task $I$, compute its raw task gradient $G_I$ and the factor
-$w=\lambda_I/q_I$. Moment-consistent AdamW uses $wG_I$ for the first moment and
-$wG_I^2$ for the second moment. Passing only $wG_I$ to an unchanged AdamW
-implementation produces the standard $w^2G_I^2$ second moment. The optimizer
-interface therefore accepts both $G_I$ and $w$.
+\paragraph{5. Refresh and save sampler state.}
+Run a counted probe when a score reaches the age limit. Save probabilities,
+selected sets, score and time averages, ages, probe state, response counts,
+transfer state, and both optimizer accumulators. A resume test reproduces the
+next set and optimizer update.
 
-\paragraph{5. Update and save the sampler.}
-GPAS uses $q_i\propto\lambda_i\widehat s_i$; Cost-GPAS uses
-$q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$. For raw proposal $p$,
-apply $q_i=(1-Mq_{\min})p_i+q_{\min}$ before drawing a task. Save scale and cost
-averages with model and optimizer state. Log $I$, $p_I$, $q_I$, $w$, valid
-tokens, response count, complete step time, raw norm, preconditioned norm,
-corrected update norm, scale age, and clipping status.

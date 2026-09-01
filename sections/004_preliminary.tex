@@ -1,88 +1,55 @@
 % ============================================================================
-\section{A Fixed Objective under Task Sampling}
+\section{A Fixed Objective and a Common AdamW State}
 \label{sec:preliminaries}
 % ============================================================================
 
-There are $M$ tasks. Task $i$ has loss $L_i$ and objective weight
-$\lambda_i\geq 0$, with $\sum_i\lambda_i=1$. These weights define
-Equation~\ref{eq:fixed_multitask_objective}. Each step draws one task
-$I\sim q$, forms a task-homogeneous batch, and computes a task gradient $G_I$.
-All expectations in this section condition on the model, optimizer state, and
-sampling information available before the draw.
-
-Our MOPD batches use a fixed valid-token budget. Tokens are averaged inside a
-response, followed by an average over responses. This gives one consistent
-definition of $G_i$ even when response lengths differ. The analysis also
-applies to other within-task aggregation rules once they are fixed in advance.
-
-For every task with positive objective weight, we require $q_i>0$ and set
+Assume $M$ teacher tasks. Let $L_i(\theta)$ be task $i$'s reverse-KL loss,
+averaged within each response and then over responses and prompts. Positive
+weights $w_i$ sum to one and define the training objective
 \begin{equation}
-    w_i=\frac{\lambda_i}{q_i},
-    \qquad \widehat g=w_I G_I.
+    F(\theta)=\sum_i w_i L_i(\theta).
+    \label{eq:fixed_multitask_objective}
+\end{equation}
+The main MOPD study uses $L_i=\ell_i/\ell_i(0)$ and $w_i=1/M$. Each initial
+loss $\ell_i(0)$ is measured once at the shared starting checkpoint. This choice
+gives equal weight to relative improvement on each task.
+
+A \emph{task unit} contains a fixed number of prompts and student responses.
+Let $g_i$ be its average gradient. An optimizer update selects a set $B$ of
+exactly $K$ tasks. The inclusion probability of task $i$ is $p_i$, with
+$\sum_i p_i=K$. The corrected update gradient is
+\begin{equation}
+    \widehat g=\sum_{i\in B}\frac{w_i}{p_i}g_i.
     \label{eq:importance_estimator}
 \end{equation}
-
-\begin{lemma}[Standard importance correction]
-\label{lem:importance_correction}
-The corrected gradient has mean
+Task selection happens before rollout generation. Conditional on the current
+student state,
 \begin{equation}
-    \mathbb E[\widehat g]
-    =\sum_i\lambda_i\mathbb E[G_i]
-    =\nabla F(\theta).
+    \mathbb E[\widehat g]=\sum_i w_i\mathbb E[g_i].
     \label{eq:importance_unbiased}
 \end{equation}
-\end{lemma}
+The objective gradient is therefore fixed for every allocation rule and every
+$K$. At $K=1$, $p_i$ is a standard task-sampling probability. At $K=M$, each
+task enters the update.
 
-This familiar importance-sampling result fixes the weighted gradient target
-for any proposal. A curriculum may change $\lambda$ between steps; the same
-statement applies after each change.
-
-The correction interacts with AdamW through its second moment. We use
-$w_I G_I$ for the first-moment observation and $w_I G_I^2$ for the
-second-moment observation:
-\begin{align}
-    m^+&=\beta_1m+(1-\beta_1)w_I G_I,\notag\\
-    v^+&=\beta_2v+(1-\beta_2)w_I G_I^2,
-    \label{eq:moment_preserving_adamw}
-\end{align}
-where the square is element-wise. Bias correction, weight decay, and the
-parameter update stay unchanged. We call this rule moment-consistent AdamW.
-
-\begin{proposition}[Proposal-independent second-moment target]
-\label{prop:conditional_preservation}
-At a fixed training state, let $S_i=\mathbb E[G_i^2]$. The mean observation in
-the moment-consistent second-moment update is
+\paragraph{Taskwise AdamW second moment.}
+Conventional AdamW inserts $\widehat g^2$ into its second-moment average. The
+expectation of this square changes with $p_i$. That change also alters future
+AdamW scaling, which makes sampler comparisons harder to interpret. We use
 \begin{equation}
-    \sum_i\lambda_i S_i,
+    \widehat u=\sum_{i\in B}\frac{w_i}{p_i}g_i^2,
+    \label{eq:taskwise_square_observation}
+\end{equation}
+where the square is element-wise. The first-moment average receives
+$\widehat g$, and the second-moment average receives $\widehat u$. Its
+conditional target is
+\begin{equation}
+    \mathbb E[\widehat u]=\sum_i w_i\mathbb E[g_i^2],
     \label{eq:consistent_second_moment_target}
 \end{equation}
-which is independent of $q$. Standard AdamW observes $(w_I G_I)^2$ and has
-mean
-\begin{equation}
-    \sum_i\frac{\lambda_i^2}{q_i}S_i.
-    \label{eq:standard_adam_second_moment}
-\end{equation}
-If the task-gradient distributions and weights were held fixed, these two
-means would be the respective population targets of the exponential average.
-\end{proposition}
+which stays fixed as $p_i$ and $K$ change. We call this update
+\emph{taskwise AdamW}. Bias correction, learning-rate scheduling, clipping, and
+weight decay follow the same implementation used by the baseline. The
+experiments include conventional AdamW at $K=1$ and $K=M$ because its different
+second moment can change model quality.
 
-Appendix~\ref{app:moment_target_proof} gives the two-line calculation. The
-claim concerns the second-moment target at a fixed state. Task order can still
-produce different parameter paths, and the target moves as the model learns.
-
-The short-memory limit gives useful intuition. Ignore momentum, weight decay,
-and $\epsilon$, and let the current observation dominate $v$. For a positive
-importance multiplier, the two scaled updates become
-\begin{equation}
-  \frac{wG}{\sqrt{w^2G^2}}=\operatorname{sign}(G),
-  \qquad
-  \frac{wG}{\sqrt{wG^2}}=\sqrt{w}\,\operatorname{sign}(G).
-  \label{eq:two_adam_limits}
-\end{equation}
-Standard AdamW removes the multiplier in this idealized limit, while the
-moment-consistent rule retains its square root. With long second-moment memory,
-the moment-consistent denominator tracks
-Equation~\ref{eq:consistent_second_moment_target}; the standard denominator
-moves with $q$ through Equation~\ref{eq:standard_adam_second_moment}. This
-sign-and-scale view follows the Adam interpretation of
-\citet{balles2018dissecting}.

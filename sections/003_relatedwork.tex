@@ -2,65 +2,40 @@
 \section{Related Work}
 % ============================================================================
 
-\paragraph{Objective weights and multi-task optimization.}
-Multi-task methods often tune loss weights or edit gradient directions to
-change the capability trade-off
+\paragraph{Task weighting and data allocation.}
+Multi-task methods tune loss weights, alter gradient directions, or adapt data
+schedules
 \citep{sener2019multitasklearningmultiobjectiveoptimization,
 yu2020gradientsurgerymultitasklearning,
 liu2024conflictaversegradientdescentmultitask,chen2018gradnorm}.
-Large empirical comparisons found carefully tuned scalarization competitive
-with specialized multi-task optimizers in their evaluated settings
-\citep{kurin2022defense,xin2022current}. These results support our decision to
-state the weighted objective explicitly and evaluate allocation under fixed
-weights. GPAS also accepts a time-varying objective supplied by a curriculum;
-the proposal is computed after each weight update.
+Carefully tuned scalarization is competitive with specialized multi-task methods
+in several settings \citep{kurin2022defense,xin2022current}. Language-model
+training also adapts domain, rollout, or prompt distributions using learning
+progress \citep{albalak2023efficient,wang2025dump,zheng2025greso,
+gao2025promptcurriculum}. GPAS keeps task importance fixed and changes the data
+and compute allocation.
 
-\paragraph{Adaptive data and prompt schedules for language models.}
-Online Data Mixing uses a bandit to update pretraining-domain proportions
-\citep{albalak2023efficient}. Recent post-training methods schedule
-distributions from average advantage, skip low-value rollouts, or select
-prompts near the current learning frontier
-\citep{wang2025dump,zheng2025greso,gao2025promptcurriculum}.
-These methods optimize a domain or prompt policy with signals tied to learning
-progress. Our question concerns task-level teacher compute: given stated
-objective weights, which proposal gives an efficient unbiased gradient in the
-current optimizer geometry? The fixed-target comparisons place heuristic
-schedules and GPAS under the same objective.
-
-\paragraph{Multi-teacher post-training.}
+\paragraph{Multi-teacher on-policy distillation.}
 MOPD routes student rollouts to task teachers and trains a shared student with
 dense token feedback \citep{ma2026mopdmultiteacheronpolicydistillation}.
-Open-MOPD identifies token count, reward scale, and stale rewards as sources of
-unequal update budgets \citep{gao2026openmopddiagnosingfixingcapability}.
-D$^3$-MOPD uses teacher-loss gap and descent velocity to update the domain
-mixture \citep{sun2026d3mopd}. Teacher mixtures can also create cross-domain
-capability transfer and a mixture-dependent seesaw
-\citep{li2026coinsidesdualnature}. The cross-domain transfer results motivate
-our use of teacher loss for objective comparisons and separate benchmark
-reporting for capability. We compare D$^3$ in two roles: as a proposal under a
-fixed objective and as a curriculum whose recorded objective-weight path is
-replayed with GPAS.
+Open-MOPD studies unequal token budgets, reward scales, and stale rewards
+\citep{gao2026openmopddiagnosingfixingcapability}. D$^3$-MOPD updates the domain
+mixture using teacher-loss gap and descent velocity \citep{sun2026d3mopd}.
+Teacher mixtures can also create transfer and task trade-offs
+\citep{li2026coinsidesdualnature}. These methods motivate reporting downstream
+capability separately from the fixed teacher-loss objective used in our study.
 
-\paragraph{Adaptive importance sampling.}
-Gradient-norm importance sampling reduces the second moment of an SGD estimate
+\paragraph{Importance sampling for optimization.}
+Gradient-norm sampling reduces the second moment of an SGD estimate
 \citep{alain2015variancereductionsgddistributed,
-katharopoulos2018samplescreatedequaldeep}. Cost-aware sampling adds a square-root
-cost correction and provides convergence guarantees beyond convex objectives
-\citep{mohri2026costawarelearning}. The same allocation shape appears in
-classical Neyman allocation \citep{neyman1934representative,cochran1977sampling}.
-Online importance samplers face partial feedback because only the selected
-item receives a fresh scale observation. Bandit formulations provide exploration and
-regret controls for this setting
-\citep{namkoong2017adaptive,salehi2017stochastic,borsos2018online}. Our
-probability floor plays the practical exploration role and also bounds the
-importance multiplier; scale age and full-task refreshes measure the remaining
-feedback error.
-
-\paragraph{Sampling with adaptive optimizers.}
-Lahire showed that the gradient-norm proposal for SGD loses its optimality for
-RMSProp and Adam and argued that sampling should match the optimizer
-\citep{lahire2023nonuniformadaptive}. GPAS gives a constructive answer for
-AdamW: a proposal-independent second-moment target followed by an allocation
-rule in the resulting preconditioned geometry. The short-memory intuition is
-related to Adam's sign and scale behavior described by
-\citet{balles2018dissecting}.
+katharopoulos2018samplescreatedequaldeep}. Cost-aware sampling adds a
+square-root time correction \citep{mohri2026costawarelearning}; the same form
+appears in Neyman allocation \citep{neyman1934representative,cochran1977sampling}.
+Online samplers receive fresh information only for selected tasks, a setting
+studied with bandit feedback
+\citep{namkoong2017adaptive,salehi2017stochastic,borsos2018online}.
+The useful scale depends on the optimizer: Euclidean gradient norm fits SGD,
+while adaptive optimizers rescale coordinates \citep{lahire2023nonuniformadaptive}.
+GPAS applies this observation to multi-teacher MOPD and pairs it with a fixed
+task objective, taskwise AdamW moments, exact-$K$ task sets, and measured teacher
+serving time.

@@ -35,11 +35,17 @@
 \input{math_commands.tex}
 
 \usepackage{hyperref}
-\hypersetup{hidelinks}
+\hypersetup{
+    colorlinks=false,
+    linkbordercolor={1 0 0},
+    citebordercolor={0 1 0},
+    urlbordercolor={0 1 1},
+    pdfborder={0 0 1}
+}
 \usepackage{url}
 
 
-\title{GPAS: Fixed-Objective, Optimizer-Aware Task Sampling for Multi-Task LLM Post-Training}
+\title{GPAS: Optimizer-Aware Task Allocation for Multi-Teacher On-Policy Distillation}
 
 \author{Anonymous Authors}
 

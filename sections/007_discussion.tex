@@ -3,35 +3,31 @@
 \label{sec:conclusion}
 % ============================================================================
 
-The theory fixes the model and optimizer state before comparing proposals. In
-training, task order changes future gradients, so two unbiased samplers can
-follow different parameter paths. The population-target statement in
-Proposition~\ref{prop:conditional_preservation} gives a common local geometry
-rather than a shared trajectory.
+GPAS uses a local view of training. The current AdamW scaling, task gradients,
+and task times can change as the student learns. Bounded-age probes expose the
+cost of refreshing these measurements. Frozen banks at three checkpoints show
+whether the allocation score remains predictive during training.
 
-Online scale estimates receive partial feedback. A low estimate can grow stale
-while its task is sampled less often. The round-robin warm start, proposal
-floor, age logs, and periodic full refreshes make this loop visible, while the
-floor trades local allocation quality for exploration and bounded importance
-multipliers. More formal online guarantees would require assumptions about how
-quickly task gradients change during post-training.
+The simple allocation objective prices first-order inclusion probabilities.
+An exact-$K$ task set also depends on pairwise task inclusion and gradient
+alignment. Four-task enumeration lets us measure this term directly. The
+water-filled probabilities serve as a compact allocation rule, while the
+held-out exact-set error supplies the empirical check.
 
-GPAS allocates from the uncentered preconditioned second moment. In a
-mean-dominated large batch, this favors tasks that currently make a large
-AdamW-scaled update. Strong within-task noise changes that interpretation, so
-the gradient bank reports the mean and noise terms separately. Cost-GPAS adds
-another approximation: $J(q)$ is a smooth-optimization proxy built from a
-fixed preconditioner and average step times. Teacher-loss curves against GPU
-hours provide the deciding empirical test.
+Taskwise AdamW creates a proposal-independent local second-moment target. It is
+a different optimizer-state update from conventional AdamW and can change the
+effective step size. The endpoint baselines and capability evaluations measure
+that practical difference.
 
-Gradient clipping also changes the object being estimated. Importance
-correction remains exact for the clipped update field, while clip events move
-that field away from the original teacher-loss gradient. Per-task clip rates,
-update norms, and multiplier distributions define the practical scope of the
-fixed-objective interpretation.
+Cost-GPAS uses recent critical-path measurements and the current resident
+teacher. Transfer contention and cache state can still create prediction error.
+End-to-end GPU hours and teacher traces decide the systems result. The additive
+time model serves as the online allocation score.
 
-The central design is simple: state the teacher-loss objective, then allocate
-expensive task steps for that objective. Moment-consistent AdamW keeps the
-local second-moment target independent of the proposal, and GPAS chooses the
-proposal in that fixed geometry. Applying the allocation after each objective
-update also makes the method compatible with a curriculum.
+The central MOPD design principle is simple: state the teacher-loss objective,
+keep its weights fixed during method comparison, measure gradients in the
+optimizer's local geometry, and charge every response and teacher switch. GPAS
+implements this principle for a chosen task width. Cost-GPAS adds measured
+serving time. The $K=1,2,4$ study determines when local estimator gains translate
+into faster MOPD training.
+

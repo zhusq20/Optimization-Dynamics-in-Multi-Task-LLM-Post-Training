@@ -1,134 +1,82 @@
 % ============================================================================
-\section{Optimizer-Aware Task Allocation}
+\section{GPAS Task Allocation}
 \label{sec:theory}
 % ============================================================================
 
-Once the second-moment target is independent of the proposal, task allocation
-can be compared in one fixed AdamW geometry. Let $\bar v$ be the
-bias-corrected second moment before the task draw. We define the
-preconditioned gradient scale of task $i$ as
+\subsection{Optimizer-scaled task scores}
+
+Let $D$ be the current diagonal scaling applied by the optimizer, excluding the
+shared learning rate. For SGD, $D$ is the identity. For AdamW, $D$ comes from
+the current second-moment state. GPAS summarizes task $i$ with
 \begin{equation}
-    s_i^2=\mathbb E\left\|
-    \frac{G_i}{\sqrt{\bar v}+\epsilon}
-    \right\|_2^2.
+    r_i^2=\mathbb E\|Dg_i\|_2^2.
     \label{eq:optimizer_metric}
 \end{equation}
-This is the squared gradient norm after AdamW's coordinate scaling and before
-the importance multiplier.
+This score is measured from completed task units. It includes both the task's
+mean gradient and sampling noise inside a task unit.
 
-For one corrected task draw, the proposal-dependent part of the scaled
-gradient's second moment is
+For a fixed expected task width, the part of the scaled estimator error that
+depends on the inclusion probabilities has the simple form
 \begin{equation}
-    V(q)=\sum_i\frac{\lambda_i^2s_i^2}{q_i}.
+    V(p)=\sum_i\frac{(w_i r_i)^2}{p_i},
+    \qquad \sum_i p_i=K.
     \label{eq:optimizer_metric_mse}
 \end{equation}
-Its minimum occurs at
+Appendix~\ref{app:variance} gives the calculation and the pairwise correction
+for exact-$K$ sets. The frozen-gradient experiment measures the complete error,
+so the empirical test includes that correction.
+
+We limit every inclusion probability to $p_{\min}\leq p_i\leq1$. Minimizing
+Equation~\ref{eq:optimizer_metric_mse} gives
 \begin{equation}
-    q_i^{\mathrm{GPAS}}
-    =\frac{\lambda_i s_i}{\sum_j\lambda_j s_j}.
+    p_i=\operatorname{clip}\!\left(\frac{w_i r_i}{z},
+    p_{\min},1\right),
     \label{eq:gpas_proposal}
 \end{equation}
-We call this rule Gradient-Preconditioned Adaptive Sampling (GPAS). Under the
-identity scale it reduces to gradient-norm importance sampling. The derivation
-and its centered-error form appear in Appendix~\ref{app:gpas_proof}.
+where the scalar $z$ makes the probabilities sum to $K$. A fixed-size sampler
+then draws exactly $K$ tasks with these marginals. We call this rule GPAS. The
+four-task study uses the maximum-entropy distribution over all possible task
+sets with the required marginals. Enumeration gives exact marginals and
+pairwise probabilities.
 
-This local quantity connects directly to optimization progress. For a smooth
-loss and a fixed diagonal preconditioner, the usual one-step descent bound
-contains $V(q)$ as its only proposal-dependent term. The bound uses the
-uncentered second moment, which explains the definition in
-Equation~\ref{eq:optimizer_metric_mse}. Frozen-gradient replay tests whether
-the proposal ranking from $V(q)$ predicts short-horizon teacher-loss decrease.
-
-Task time changes the useful allocation. Let $c_i$ be the measured duration of
-a task-$i$ step. The expected time per draw is $\sum_iq_ic_i$, so a GPU budget
-$B$ permits about $B/(\sum_iq_ic_i)$ steps. Substituting this count into the
-standard stochastic-rate bound leaves the proposal-dependent product
+The warm-start diagnostic is
 \begin{equation}
-    J(q)=\left(\sum_iq_ic_i\right)V(q).
+    H_K=\frac{V(p^{\rm uniform})}{V(p^{\rm GPAS})}.
+    \label{eq:effect_headroom}
+\end{equation}
+$H_K$ is a local estimator-error ratio. A value near one predicts little room
+for adaptive allocation at that checkpoint. Training curves determine whether
+the local difference improves loss.
+
+\subsection{Cost-GPAS and online measurement}
+
+Let $t_i$ be the predicted critical-path time of task $i$. With one resident
+teacher slot, the predictor uses the current resident teacher, recent transfer
+tail, rollout, scoring, and backward times. The additive time model leads to
+\begin{equation}
+    J(p)=\left(\sum_i p_i t_i\right)V(p).
     \label{eq:cost_objective}
 \end{equation}
-Minimizing this compute-efficiency proxy gives
+When the probability limits are inactive, the solution is
 \begin{equation}
-    q_i^{\mathrm{Cost\text{-}GPAS}}
-    \propto\frac{\lambda_i s_i}{\sqrt{c_i}}.
+    p_i\ \propto\ \frac{w_i r_i}{\sqrt{t_i}}.
     \label{eq:cost_gpas_proposal}
 \end{equation}
-This is cost-constrained Neyman allocation with tasks as strata
-\citep{neyman1934representative,cochran1977sampling,mohri2026costawarelearning}.
-Appendix~\ref{app:cost_connection} states the smoothness argument and the
-closed-form calculation. GPU-hour curves test the proxy against end-to-end
-training.
+We solve the bounded problem directly for the four-task setting. At $K>1$, the
+solver scores every possible task set with its predicted time under the fixed
+teacher order and optimizes the distribution over those sets. Importance
+weights use the resulting inclusion probabilities. We call this allocation
+Cost-GPAS. The final systems comparison uses measured GPU hours.
 
-The scale contains a mean-update term and within-task gradient noise. A large
-token batch may make the mean term dominant, in which case GPAS spends more
-steps on tasks that currently move the student farther in AdamW coordinates.
-Correlated tokens and variable response counts can keep the noise term large.
-Our gradient-bank experiment estimates both terms with microbatch resampling
-instead of assuming either regime.
+Selected task units update exponential averages of $r_i^2$ and task time. A
+round-robin warm start initializes every task. An estimate older than
+$A_{\max}$ processed task units triggers a small, counted probe. The probe runs
+rollout, teacher scoring, and backward and leaves the student parameters fixed.
+Its response count and GPU time enter the resource totals. Section~\ref{sec:experiments}
+tests the price of these refreshes directly.
 
-\paragraph{Online estimates and exploration.}
-After a task-$i$ step, GPAS updates a moving average of the observed squared
-scale,
-\begin{equation}
-    \widehat s_i^2\leftarrow
-    \gamma\widehat s_i^2+(1-\gamma)
-    \left\|\frac{G_i}{\sqrt{\bar v}+\epsilon}\right\|_2^2.
-    \label{eq:gpas_score_ema}
-\end{equation}
-Cost-GPAS maintains the same type of average for step time. Because only the
-selected task receives a fresh observation, stale low estimates can reinforce
-low sampling probabilities. A round-robin warm start and an explicit floor
-provide exploration. If $p$ is the raw GPAS proposal, we use
-\begin{equation}
-    q_i=(1-Mq_{\min})p_i+q_{\min},
-    \qquad 0<q_{\min}<1/M.
-    \label{eq:proposal_floor}
-\end{equation}
-This rule gives $q_i\geq q_{\min}$ and
-$w_i\leq \max_i\lambda_i/q_{\min}$. For four uniform objective weights and
-$q_{\min}=0.05$, the largest possible multiplier is $5$. The experiments sweep
-the floor and report scale age, multiplier distributions, update norms, and
-clip rates.
-
-\begin{table}[t]
-\centering
-\small
-\caption{The comparison separates the objective, proposal signal, cost term,
-and AdamW second-moment rule. ``MC'' denotes moment-consistent AdamW.}
-\label{tab:design_space}
-\resizebox{\linewidth}{!}{%
-\begin{tabular}{lllll}
-\hline
-Method & Objective weights & Proposal signal & Step time & Second moment \\
-\hline
-Uniform & fixed $\lambda$ & uniform & --- & MC \\
-Gradient-Norm IS & fixed $\lambda$ & raw gradient scale & --- & MC \\
-GPAS & fixed $\lambda$ & preconditioned scale & --- & MC \\
-Cost-GPAS & fixed $\lambda$ & preconditioned scale & measured & MC \\
-D$^3$-Proposal-IC & fixed $\lambda$ & loss gap and velocity & --- & MC \\
-Native D$^3$ & scheduled $\lambda$ & loss gap and velocity & --- & native \\
-D$^3$ target + GPAS & replayed $\lambda$ & preconditioned scale & --- & MC \\
-GPAS + standard AdamW & fixed $\lambda$ & preconditioned scale & --- & squared weight \\
-\hline
-\end{tabular}}
-\end{table}
-
-\begin{algorithm}[t]
-\centering
-\fbox{\begin{minipage}{0.94\linewidth}
-Run a round-robin warm start to initialize one scale estimate and one optional
-time estimate per task. At each step: (1) form the raw proposal from
-Equation~\ref{eq:gpas_proposal} or \ref{eq:cost_gpas_proposal}; (2) apply
-Equation~\ref{eq:proposal_floor} and draw one task; (3) run rollout, teacher
-evaluation, and backpropagation for that task; (4) compute $w=\lambda_I/q_I$
-and take a moment-consistent AdamW step; (5) update the selected task's scale
-and time averages. Save these averages with the optimizer state.
-\end{minipage}}
-\caption{Online GPAS / Cost-GPAS. GPAS adds task selection and scalar tracking to an existing
-task-homogeneous MOPD loop. The current backward pass supplies every statistic
-used by the next proposal.}
-\label{alg:gpas}
-\end{algorithm}
-
-Drawing several independent tasks in one step gives the same proposal for each
-draw; their corrected gradients are averaged before the optimizer update.
+GPAS training repeats four steps: refresh an expired score, compute bounded
+inclusion probabilities, draw an exact-$K$ task set, and apply
+Equations~\ref{eq:importance_estimator} and
+\ref{eq:taskwise_square_observation}. The sampler state is saved with the
+optimizer state for exact resumption.

@@ -1,27 +1,23 @@
 
-
 \subsection*{AI use statement}
 
 We used generative AI tools for language editing and manuscript organization.
-The authors reviewed every AI-assisted revision and take responsibility for the
-final text, claims, proofs, code, and experimental results.
+The authors reviewed every assisted revision and take responsibility for the
+text, claims, proofs, code, and experimental results.
 
 \subsection*{Ethics statement}
 
 The study evaluates optimization methods for existing language models with
-established reasoning and instruction-following datasets and automated
-verifiers. Model and dataset biases can affect the reported capability scores.
-We record data provenance, invalid outputs, and verifier failures to support
-careful interpretation of the results.
+reasoning and instruction-following datasets and automated verifiers. Model and
+dataset biases can affect capability scores. We record data provenance, invalid
+outputs, and verifier failures to support careful interpretation.
 
 \subsection*{Reproducibility statement}
 
-Section~\ref{sec:experiments} specifies the model family, task setup, update
-budget, evaluation points, and evaluation protocol. The appendix gives the
-sampling derivations and implementation details. The repository includes the
-controlled experiment code, all generated CSV files, and figure-generation
-code. This draft limits its numerical claims to the controlled studies because
-its MOPD checkpoints, gradient bank, and logs are outside the current artifact. Every
-large-model number added to the paper will be paired with a data manifest,
-model and tokenizer revisions, optimizer settings, task-sampling log, saved
-model state, and per-prompt evaluation output.
+Section~\ref{sec:experiments} specifies task units, objective normalization,
+exact-$K$ sampling, teacher streaming, resource accounting, baselines, and
+matched evaluation streams. The released artifact includes controlled-check
+code and seeds, the run manifest, model and tokenizer revisions, objective
+denominators, prompt streams, optimizer and sampler states, inclusion and probe
+logs, transfer traces, per-prompt evaluation output, and source data for every
+figure and table.

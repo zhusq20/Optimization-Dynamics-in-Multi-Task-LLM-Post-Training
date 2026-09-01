@@ -1,29 +1,21 @@
 \begin{abstract}
 
-Multi-task LLM post-training uses a task mixture for two jobs. Objective
-weights say how much each teacher loss counts, while sampling probabilities
-decide where rollout and teacher compute go. An adaptive mixture changes both
-at once, which makes compute efficiency and target choice hard to separate.
-
-We study task-homogeneous updates that draw one task per step. The sampled
-gradient is multiplied by its objective weight divided by its sampling
-probability, the standard unbiased estimator for a fixed weighted objective.
-Standard AdamW squares the same multiplier in its second-moment update, so a
-new proposal also changes the preconditioner's population target. A one-line
-variant, moment-consistent AdamW, uses the multiplier once. At a frozen
-training state, its second-moment target depends on the objective weights and
-task gradients and stays independent of the proposal. Gradient-Preconditioned
-Adaptive Sampling (GPAS) then samples each task in proportion to its objective
-weight and preconditioned gradient scale. Cost-GPAS adds an inverse
-square-root correction for measured step time. Both methods reuse the gradient
-and timing from the current step and keep at most two scalars per task.
-
-We pair these rules with a matched four-teacher MOPD protocol that holds the
-objective weights fixed and compares teacher loss per token and GPU hour. A
-separate curriculum pairing replays the same objective-weight path so that
-only allocation changes. Controlled tests and frozen-gradient replay measure
-moment drift, estimator error, scale staleness, importance weights, and
-clipping. These measurements test when the local allocation rule predicts
-end-to-end MOPD efficiency.
+Multi-teacher on-policy distillation (MOPD) uses several specialist teachers to
+train one student. Existing task mixtures often combine two choices: the
+importance of each task in the training objective and the compute assigned to
+that task. We separate these choices and keep a per-response teacher-loss
+objective fixed. We then introduce Gradient-Preconditioned Adaptive Sampling
+(GPAS), which samples tasks using gradient scale after the current optimizer's
+diagonal scaling. Cost-GPAS also uses the measured critical-path time of each
+teacher task. A taskwise AdamW second moment keeps the local optimizer geometry
+comparable when task probabilities or the number of tasks per update change.
+Controlled experiments verify the estimator calculations: GPAS reduces
+AdamW-scaled error by 28.3\% relative to uniform sampling, and Cost-GPAS reduces
+the time-weighted error by 11.1\% in the same construction. We connect each
+theoretical prediction to a four-teacher MOPD measurement at task widths
+$K\in\{1,2,4\}$. The evaluation uses matched response budgets, end-to-end GPU
+hours, teacher-switch traces, and conventional AdamW baselines. This design
+tests when adaptive task allocation improves MOPD efficiency under a fixed
+learning objective.
 
 \end{abstract}

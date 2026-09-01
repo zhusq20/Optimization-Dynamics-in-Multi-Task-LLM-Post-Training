@@ -3,70 +3,48 @@
 \label{sec:intro}
 % ============================================================================
 
-Post-training one student on several capabilities means choosing which teacher
-or reward service to call at every step. A task mixture usually controls two
-decisions at once: how much each task counts in the training objective and how
-often the system spends rollout, teacher, and optimizer time on that task. Once
-the mixture follows loss gaps, gradient norms, or a curriculum, the training
-target moves with the compute schedule.
+Multi-teacher on-policy distillation (MOPD) uses specialist teachers to train a
+single student on several domains
+\citep{ma2026mopdmultiteacheronpolicydistillation}. A task mixture usually
+specifies both the learning objective and the share of training compute. An
+adaptive schedule can therefore change what the student learns while changing
+where compute is spent. Differences in teacher-loss scale, response length, and
+serving time make the two effects difficult to separate
+\citep{gao2026openmopddiagnosingfixingcapability,sun2026d3mopd}.
 
-We separate these decisions. Objective weights $\lambda$ define the weighted
-teacher-loss objective
-\begin{equation}
-    F(\theta)=\sum_i\lambda_i L_i(\theta).
-    \label{eq:fixed_multitask_objective}
-\end{equation}
-Sampling probabilities $q$ decide which task receives the next expensive
-step. This distinction also keeps capability evaluation conceptually separate:
-one teacher loss can affect several downstream domains
-\citep{li2026coinsidesdualnature}. An experiment can now change allocation
-while keeping the teacher-loss objective fixed.
+We study a focused question: given a fixed MOPD objective, how should a training
+run allocate teacher tasks? We separate an objective weight from a task's
+inclusion probability. Importance correction preserves the weighted gradient
+when the execution policy changes. We also treat the number of tasks in one
+optimizer update, denoted by $K$, as a system and optimization choice. A small
+$K$ permits teacher reuse and frequent updates. A large $K$ covers more tasks
+per update and reduces task-selection noise; full coverage removes it.
 
-Our execution regime selects one task before generation and forms a
-task-homogeneous batch with a fixed valid-token budget. Equal token budgets
-still leave two differences that matter for allocation: the AdamW-scaled
-gradient produced by a task and the wall-clock time required for its step. Our
-warm start measures both quantities before adaptive sampling begins. The main
-study reports their taskwise range instead of using prompt or token share as a
-proxy for optimization compute. This regime matches a worker that keeps one
-teacher in memory or calls one task-specific reward service.
+Our method, Gradient-Preconditioned Adaptive Sampling (GPAS), measures each
+task's gradient after the diagonal scaling used by the current optimizer. It
+assigns more task units to gradients with larger scaled magnitude. Cost-GPAS
+also favors tasks with shorter measured critical paths. Both rules leave the
+declared task objective unchanged. Figure~\ref{fig:controlled_checks} gives a
+controlled example in which raw gradient norms select the wrong tasks for
+AdamW, while GPAS reduces error in AdamW's local geometry.
 
-For task $i$, the factor $\lambda_i/q_i$ gives the standard unbiased gradient
-estimate. AdamW squares this factor when it updates its second moment, which
-makes the preconditioner depend on the proposal. Lahire
-\citep{lahire2023nonuniformadaptive} identified the broader issue: the
-gradient-norm proposal that is optimal for SGD loses that property under an
-adaptive optimizer. We give a constructive AdamW solution.
+Adaptive task sampling also changes the squared gradients seen by conventional
+AdamW. We use a taskwise second-moment observation whose conditional mean stays
+fixed when the task proposal changes. This creates a common local AdamW geometry
+for comparing Uniform, GPAS, and Cost-GPAS. Conventional AdamW remains an
+experimental baseline because the two moment definitions can produce different
+training paths.
 
-Moment-consistent AdamW uses $(\lambda_i/q_i)G_i^2$ as its second-moment
-observation. At a frozen training state, the population target of this update
-is independent of $q$. GPAS measures each task's preconditioned gradient scale
-$s_i$ in the lagged AdamW geometry and selects
-$q_i\propto\lambda_i s_i$. If task $i$ costs $c_i$ seconds, Cost-GPAS selects
-$q_i\propto\lambda_i s_i/\sqrt{c_i}$. The second rule minimizes a simple
-cost--gradient product and is the one-draw form of cost-constrained Neyman
-allocation.
-
-The evaluation mirrors the method. Fixed-$\lambda$ runs compare Uniform,
-raw-gradient importance sampling, GPAS, Cost-GPAS, and a corrected D$^3$
-proposal under one teacher-loss objective. A paired curriculum experiment
-replays the same $\lambda$ sequence with two allocation rules. A standard
-AdamW arm measures the role of the moment update. Teacher-loss curves provide
-the optimization endpoint, while capability benchmarks record the final model
-profile.
-
-Our contributions are:
+The paper makes three contributions:
 \begin{itemize}
-    \item A fixed-objective protocol for one-task updates: standard importance
-    correction fixes the weighted gradient target, and a one-line AdamW change
-    gives the second moment a proposal-independent population target.
-    \item GPAS and Cost-GPAS, which allocate tasks using preconditioned
-    gradient scale and measured runtime. Each method reuses quantities already
-    produced by training and keeps at most two scalars per task.
-    \item A matched MOPD study that separates target schedules from compute
-    allocation, including a replayed D$^3$ objective-weight path and a standard-AdamW
-    ablation.
-    \item Controlled and frozen-gradient tests that connect each local claim
-    to moment drift, estimator error, staleness, clipping, and GPU-hour
-    efficiency.
+    \item We define MOPD task allocation as an execution policy under a fixed
+    per-response teacher-loss objective, with exact importance correction for
+    updates containing $K$ tasks.
+    \item We propose GPAS and Cost-GPAS, two simple allocation rules based on
+    optimizer-scaled gradient magnitude and measured task time. We give each
+    formula a direct frozen-checkpoint or end-to-end test.
+    \item We provide controlled evidence for the estimator and AdamW moment
+    calculations, together with a four-teacher evaluation at
+    $K\in\{1,2,4\}$ that measures loss per response, loss per GPU hour, memory,
+    and teacher switching.
 \end{itemize}
