@@ -51,7 +51,7 @@ def proposals(weights, preconditioner, means, stds, costs):
     cost_gpas = cost_gpas_score / np.sum(cost_gpas_score)
     return raw_scale, update_scale, {
         "Uniform": uniform,
-        "Raw-gradient GPAS": raw_gpas,
+        "Gradient-Norm IS": raw_gpas,
         "GPAS": gpas,
         "Cost-GPAS": cost_gpas,
     }
@@ -175,7 +175,7 @@ def main():
         label="theory", zorder=3,
     )
     axes[1].axhline(1.0, color="black", linewidth=0.8, linestyle="--")
-    short_names = ["Uniform", "Raw", "GPAS", "Cost"]
+    short_names = ["Uniform", "GradNorm", "GPAS", "Cost"]
     axes[1].set_xticks(np.arange(len(names)), short_names)
     axes[1].set_ylabel("scaled gradient MSE\n(relative to uniform)")
     axes[1].set_title(f"{BATCH_SIZE}-sample estimator")

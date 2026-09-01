@@ -22,6 +22,8 @@ realized batch ratios \citep{ramesh2026multitaskgrporeliablellm}. Our experiment
 keep the target task weights fixed. Curriculum signals can still define a task
 proposal, but the sampled gradient receives the same inverse-probability
 correction as every other proposal.
+In the GRPO transfer study, we adapt the absolute-advantage signal used by
+self-evolving curricula as such a corrected proposal.
 
 \paragraph{Multi-teacher on-policy distillation.}
 MOPD routes student rollouts to domain teachers and trains one shared student
@@ -43,7 +45,8 @@ rollout. D$^3$-MOPD adapts the domain mixture from normalized reverse-KL gap and
 recent descent velocity to exploit asynchronous domain convergence
 \citep{sun2026d3mopd}. In its formulation, the same mixture also weights the
 MOPD objective. We adapt its trajectory signal as a corrected task proposal,
-so it can be compared with optimizer-aware sampling under one fixed target.
+called D$^3$-Proposal-IC, so it can be compared with optimizer-aware sampling
+under one fixed target.
 GPAS changes the frequency of complete task batches and applies an inverse
 sampling factor. Cost-GPAS adds measured GPU time for generation, teacher
 evaluation, and model updates.

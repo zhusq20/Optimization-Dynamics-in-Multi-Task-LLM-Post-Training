@@ -21,7 +21,7 @@ Suppressing the step index, define
     \label{eq:optimizer_metric}
 \end{equation}
 For SGD, $A_t=I$; its scalar learning rate does not change the proposal. Thus
-the SGD instance is Raw GPAS. For AdamW, raw gradient norms can be misleading
+the SGD instance is Gradient-Norm IS. For AdamW, raw gradient norms can be misleading
 because parameter coordinates have different effective step sizes. Let
 $\bar v_{\mathrm{prev}}$ be AdamW's stored, bias-corrected second moment before
 task selection. Its lagged metric is

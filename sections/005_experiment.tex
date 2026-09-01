@@ -3,7 +3,7 @@
 \label{sec:experiments}
 % ============================================================================
 
-We use three experiments. A controlled Gaussian problem verifies the sampling
+We use four studies. A controlled Gaussian problem verifies the sampling
 calculation. Frozen LLM gradients test response normalization and proposal
 quality without full training runs. Four-teacher MOPD runs measure progress per
 token and GPU hour, followed by a smaller GRPO transfer study. The controlled
@@ -19,7 +19,7 @@ Equation~\ref{eq:importance_estimator}. We draw 20,000 Monte Carlo trials, with
 16 corrected task gradients per trial. We omit the probability floor here so
 that the proposals match the closed-form calculation.
 
-Under the identity metric used by SGD, Raw GPAS is optimal and attains
+Under the identity metric used by SGD, Gradient-Norm IS is optimal and attains
 calculated and Monte Carlo error ratios of $0.534$ relative to uniform
 sampling. Figure~\ref{fig:controlled_sampling} evaluates the same problem in
 the AdamW metric. The calculated GPAS error ratio is $0.698$, and the Monte
@@ -59,31 +59,34 @@ Each task batch targets 65,536 valid response tokens. The prompt count is
 estimated from the task's recent response lengths, and every completed response
 enters the update. Runs use 600 optimizer steps, an 8,192-token response cap,
 temperature 1, top-$p$ 1, disabled thinking mode, an eight-step round-robin
-warm start, $\gamma=0.95$, and $q_{\min}=0.05$. Every method runs once with
-seed 42 and shares the initialization, per-task data order, and evaluation
-prompts.
+warm start, $\gamma=0.95$, and $q_{\min}=0.05$. Every method runs with each of
+three paired seeds and shares the initialization, per-task data order, and
+evaluation prompts within each seed.
 
 \subsection{Methods}
 \label{sec:exp_methods}
 
-Table~\ref{tab:exp_methods} compares two fixed-target baselines with GPAS and
-Cost-GPAS. Loss-EMA is a simple difficulty sampler based on the current
-response-normalized teacher loss. It uses the same moving-average rate and
-probability floor as GPAS, and the same importance correction keeps its target
-mixture fixed. Raw GPAS is evaluated only on frozen gradients to isolate the
-effect of the AdamW metric; it does not require another training run.
+Table~\ref{tab:exp_methods} compares three fixed-target baselines with GPAS and
+Cost-GPAS. D$^3$-Proposal-IC adapts the normalized reverse-KL gap and descent
+velocity of D$^3$-MOPD \citep{sun2026d3mopd} to form only the task proposal;
+the importance correction leaves the target mixture fixed. Gradient-Norm IS is
+the classical gradient-norm importance sampler in the identity metric. Its
+end-to-end comparison with GPAS isolates the effect of the AdamW metric.
 
 \begin{table}[H]
 \centering
 \small
-\caption{MOPD methods. Every method uses seed 42 and the same target mixture.}
+\caption{MOPD methods. Every method uses three paired seeds and the same target
+mixture.}
 \label{tab:exp_methods}
 \begin{tabular}{lll}
 \hline
 Method & Task proposal & Gradient factor \\
 \hline
 Uniform & $q_i=1/4$ & $1$ \\
-Loss-EMA & $q_i\propto\lambda_i\widehat\ell_i$
+D$^3$-Proposal-IC & $q_i=\operatorname{FloorSoftmax}(\widehat z_i/T)$
+    & $\lambda_i/q_i$ \\
+Gradient-Norm IS & $q_i\propto\lambda_i\widehat r_i$
     & $\lambda_i/q_i$ \\
 GPAS & $q_i\propto\lambda_i\widehat s_i$
     & $\lambda_i/q_i$ \\
@@ -93,10 +96,14 @@ Cost-GPAS & $q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$
 \end{tabular}
 \end{table}
 
-Here $\widehat\ell_i$ is the moving average of response-normalized teacher
-loss, $\widehat s_i^2$ tracks $\|A_tG_i\|_2^2$ in the AdamW metric, and
-$\widehat c_i$ tracks total task time. The common floor is applied after each
-proposal is formed.
+Here $\widehat z_i$ is the product of D$^3$-MOPD's normalized teacher-loss gap
+and recent nonnegative descent velocity, $\widehat r_i^2$ tracks
+$\|G_i\|_2^2$, $\widehat s_i^2$ tracks $\|A_tG_i\|_2^2$ in the AdamW metric,
+and $\widehat c_i$ tracks total task time. D$^3$-Proposal-IC uses the published
+cadence $n=10$, window $W=10$, $R=3$ windows, initial normalizer $S_0=5$,
+ten-step loss EMA, and temperature $T=0.5$. Mixed-batch jitter is omitted
+because this protocol samples one task per step. All proposals use the common
+probability floor.
 
 \subsection{Frozen-gradient mechanism study}
 
@@ -113,7 +120,8 @@ global token averaging, and the coefficient after response normalization.
 
 \paragraph{Proposal quality.}
 \label{sec:exp_estimator}
-The gradient bank evaluates Uniform, Loss-EMA, Raw GPAS, GPAS, and Cost-GPAS.
+The gradient bank evaluates Uniform, D$^3$-Proposal-IC, Gradient-Norm IS, GPAS,
+and Cost-GPAS.
 We report the AdamW-scaled estimator error $M(q)$ from
 Equation~\ref{eq:empirical_estimator_mse} and the compute score $J(q)$ from
 Section~\ref{sec:cost_gpas}, both relative to Uniform. The comparison tests the
@@ -138,8 +146,9 @@ loss
 where $N$ is cumulative valid response tokens or measured GPU hours. We report
 normalized teacher-loss AUC over the resource range shared by the compared
 methods and the final weighted and per-task losses. The token comparison is
-GPAS against Uniform and Loss-EMA; the time comparison is Cost-GPAS against
-Uniform and GPAS. We report the complete seed-42 trajectories and final values.
+GPAS against Uniform, D$^3$-Proposal-IC, and Gradient-Norm IS; the time
+comparison is Cost-GPAS against Uniform and GPAS. We report mean trajectories
+and final values with standard errors over the three paired seeds.
 
 The final capability evaluation reports MATH-500 greedy pass@1, a frozen
 post-cutoff LiveCodeBench pass@1 slice, IFBench strict accuracy, and
@@ -153,11 +162,15 @@ scores, and teacher loss.
 
 The transfer study uses MATH train, APPS train, and ARC-Challenge train with
 executable or exact-match rewards
-\citep{hendrycks2021math,hendrycks2021apps,clark2018arc}. Uniform, GPAS, and
-Cost-GPAS target $\lambda_i=1/3$ and use the same task-level correction as in
-MOPD. Each task-homogeneous batch targets 32,768 response tokens and samples
-eight responses per prompt. Runs use a six-step round-robin warm start, 400
-optimizer steps, AdamW, and seed 42.
+\citep{hendrycks2021math,hendrycks2021apps,clark2018arc}. Uniform,
+SEC-Proposal-IC, GPAS, and Cost-GPAS target $\lambda_i=1/3$ and use the same
+task-level correction as in MOPD. SEC-Proposal-IC uses a moving average of the
+task's mean absolute group-relative advantage as its proposal signal, adapting
+the self-evolving curriculum baseline used in multi-task GRPO
+\citep{ramesh2026multitaskgrporeliablellm} while keeping the target fixed. Each
+task-homogeneous batch targets 32,768 response tokens and samples eight
+responses per prompt. Runs use a six-step round-robin warm start, 400 optimizer
+steps, AdamW, and three paired seeds.
 
 We report weighted held-out KL-regularized return against tokens and GPU hours,
 together with final MATH-500, APPS test pass@1, and ARC-Challenge accuracy.

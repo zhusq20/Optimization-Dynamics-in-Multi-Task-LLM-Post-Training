@@ -26,7 +26,8 @@ Cost-GPAS optimizes an uncentered local compute score.
 The GPU-hour curves provide the end-to-end efficiency measurement.
 
 The present draft contains controlled estimator evidence; the MOPD and GRPO
-results are still pending. The large-model study compares GPAS with uniform
-sampling and a simple loss-based adaptive sampler while holding the target
-mixture fixed. The mathematical estimator result and the end-to-end efficiency
-question remain separate empirical claims.
+results are still pending. The three-seed large-model study compares GPAS with
+uniform sampling, a corrected D$^3$ trajectory proposal, and classical
+gradient-norm importance sampling while holding the target mixture fixed. The
+mathematical estimator result and the end-to-end efficiency question remain
+separate empirical claims.

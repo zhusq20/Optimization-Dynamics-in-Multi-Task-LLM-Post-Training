@@ -57,19 +57,20 @@ $$
 | 方法 | Proposal | Update factor | 作用 |
 |---|---|---|---|
 | Uniform | $q_i=1/4$ | 1 | 固定频率 baseline |
-| Loss-EMA | $q_i\propto\lambda_i\widehat\ell_i$ | $\lambda_i/q_i$ | 简单的难度自适应 baseline |
+| D$^3$-Proposal-IC | D$^3$ trajectory signal 的 floor-softmax | $\lambda_i/q_i$ | 近期 loss-trajectory scheduler baseline |
+| Gradient-Norm IS | $q_i\propto\lambda_i\widehat r_i$ | $\lambda_i/q_i$ | 经典 gradient-norm importance-sampling baseline |
 | GPAS | $q_i\propto\lambda_i\widehat s_i$ | $\lambda_i/q_i$ | token-efficiency 方法 |
 | Cost-GPAS | $q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$ | $\lambda_i/q_i$ | GPU-hour-efficiency 方法 |
 
-$\widehat\ell_i$ 是 response-normalized teacher loss 的 EMA，$\widehat s_i^2$ 是 $\|P_tG_i\|_2^2$ 的 EMA，$\widehat c_i$ 是 total GPU seconds 的 EMA。四种方法使用相同的 $\gamma$、probability floor、目标权重和训练预算。
+$\widehat r_i^2$ 是 $\|G_i\|_2^2$ 的 EMA，$\widehat s_i^2$ 是 $\|P_tG_i\|_2^2$ 的 EMA，$\widehat c_i$ 是 total GPU seconds 的 EMA。五种方法使用相同的 probability floor、目标权重和训练预算。
 
-Raw GPAS（$P_t=I$）只作为冻结梯度实验中的几何消融。
+D$^3$-Proposal-IC 使用 normalized teacher-loss gap 与 recent nonnegative descent velocity 的乘积。执行参数直接固定为公开的主实验配置：watcher cadence $n=10$、window $W=10$、$R=3$、initial normalizer $S_0=5$、loss EMA window $10$、temperature $T=0.5$。不使用 mixed-batch jitter；task-homogeneous batch 本身由 proposal 随机抽样。概率下限统一使用本实验的 $q_{\min}=0.05$。
 
 ## 4. 受控采样实验
 
 现有 Gaussian task-gradient 实验保留。它直接比较 SGD identity metric 和 AdamW metric 下的理论/Monte Carlo MSE，以及 Cost-GPAS 的 time-weighted second moment。
 
-已有结果：SGD identity metric 下 Raw GPAS 的理论/Monte Carlo MSE ratio 为 $0.534/0.534$；AdamW metric 下 GPAS 为 $0.698/0.697$。这一实验用于检查公式和实现，不承担大模型效率结论。
+已有结果：SGD identity metric 下 Gradient-Norm IS 的理论/Monte Carlo MSE ratio 为 $0.534/0.534$；AdamW metric 下 GPAS 为 $0.698/0.697$。这一实验用于检查公式和实现，不承担大模型效率结论。
 
 ## 5. 冻结梯度机制实验
 
@@ -86,7 +87,7 @@ Raw GPAS（$P_t=I$）只作为冻结梯度实验中的几何消融。
 
 ### 5.2 Proposal quality
 
-比较 Uniform、Loss-EMA、Raw GPAS、GPAS 和 Cost-GPAS，报告：
+比较 Uniform、D$^3$-Proposal-IC、Gradient-Norm IS、GPAS 和 Cost-GPAS，报告：
 
 $$
 M_P(q)=\mathbb E\|P_t\widehat g-P_th\|_2^2,
@@ -97,7 +98,7 @@ J_P(q)=\left(\sum_iq_ic_i\right)
 \left(\sum_i\frac{\lambda_i^2s_{i,P}^2}{q_i}\right).
 $$
 
-主结果是相对 Uniform 的 $M_P$ 和 $J_P$ ratio；Raw GPAS 用于显示 identity metric 与 AdamW metric 的差异。
+主结果是相对 Uniform 的 $M_P$ 和 $J_P$ ratio；Gradient-Norm IS 用于显示 identity metric 与 AdamW metric 的差异。
 
 ### 5.3 AdamW score
 
@@ -105,7 +106,7 @@ $$
 
 ## 6. 端到端 MOPD
 
-四种方法均运行 seed 42 一次。每 50 updates 在共享 held-out prompt 上评估 weighted teacher loss：
+五种方法均运行 seed 42 一次。本执行文档只覆盖这一个 seed。每 50 updates 在共享 held-out prompt 上评估 weighted teacher loss：
 
 $$
 L(N)=\sum_i\lambda_i\ell_i(N).
@@ -118,7 +119,7 @@ $$
 - update 600 的 weighted teacher loss 和每任务 teacher loss；
 - update 600 的四任务 capability vector。
 
-token 比较使用 GPAS vs Uniform / Loss-EMA；GPU-hour 比较使用 Cost-GPAS vs Uniform / GPAS。AUC 在方法共同覆盖的资源区间内计算。报告 seed 42 的完整曲线和终点结果。
+token 比较使用 GPAS vs Uniform / D$^3$-Proposal-IC / Gradient-Norm IS；GPU-hour 比较使用 Cost-GPAS vs Uniform / GPAS。AUC 在方法共同覆盖的资源区间内计算。报告 seed 42 的完整曲线和终点结果。
 
 Capability evaluation 包含：
 
@@ -133,7 +134,7 @@ Capability evaluation 包含：
 
 ## 7. Multi-task GRPO 迁移
 
-迁移实验使用 MATH、APPS 和 ARC-Challenge，只比较 Uniform、GPAS 和 Cost-GPAS。
+迁移实验使用 MATH、APPS 和 ARC-Challenge，比较 Uniform、SEC-Proposal-IC、GPAS 和 Cost-GPAS。SEC-Proposal-IC 使用每任务 mean absolute group-relative advantage 的 EMA 形成 proposal，并使用 $\lambda_i/q_i$ 保持固定目标。
 
 | 项目 | 设置 |
 |---|---|
@@ -148,7 +149,7 @@ Capability evaluation 包含：
 
 ## 8. 执行顺序
 
-1. 运行 seed 42 的 Uniform、Loss-EMA、GPAS 和 Cost-GPAS。
+1. 运行 seed 42 的 Uniform、D$^3$-Proposal-IC、Gradient-Norm IS、GPAS 和 Cost-GPAS。
 2. 从 Uniform 的三个 checkpoint 完成冻结梯度分析。
 3. 生成 token/GPU-hour 曲线、AUC 和 capability 表。
-4. 运行 seed 42 的 GRPO 迁移实验。
+4. 运行 seed 42 的 Uniform、SEC-Proposal-IC、GPAS 和 Cost-GPAS GRPO 迁移实验。
