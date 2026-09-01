@@ -8,28 +8,45 @@ sampling probabilities available for compute allocation. Every expectation in
 this section conditions on the model, optimizer, and sampler state before the
 next task is selected.
 
-\subsection{Sample tasks from optimizer-scaled gradients}
+\subsection{Sample tasks in the optimizer metric}
 
-Raw gradient norms can be misleading under AdamW because the optimizer gives
-different parameter coordinates different effective step sizes. Let
-$\bar v_{\mathrm{prev}}$ be AdamW's stored, bias-corrected second moment before
-task selection. We define the scaled task gradient by element-wise division:
+Let $A_t$ be a linear map determined by the optimizer state before task
+selection. It maps gradients into the local update geometry whose estimation
+error we seek to reduce. Conditional on the training history, $A_t$ is fixed.
+Suppressing the step index, define
 \begin{equation}
-    \widetilde G_i
+    \widetilde G_i=A_tG_i,
+    \qquad
+    s_i=\sqrt{\mathbb E\|\widetilde G_i\|_2^2}.
+    \label{eq:optimizer_metric}
+\end{equation}
+For SGD, $A_t=I$; its scalar learning rate does not change the proposal. Thus
+the SGD instance is Raw GPAS. For AdamW, raw gradient norms can be misleading
+because parameter coordinates have different effective step sizes. Let
+$\bar v_{\mathrm{prev}}$ be AdamW's stored, bias-corrected second moment before
+task selection. Its lagged metric is
+\begin{equation}
+    A_t^{\mathrm{AdamW}}G_i
     =\frac{G_i}{\sqrt{\bar v_{\mathrm{prev}}}+\epsilon_{\mathrm{Adam}}},
     \label{eq:adamw_lagged_metric}
 \end{equation}
-and summarize task $i$ by
-$s_i=\sqrt{\mathbb E\|\widetilde G_i\|_2^2}$.
+where division is element-wise. The LLM experiments use this instance and call
+it GPAS unless stated otherwise.
 
 For the corrected task gradient in
-Equation~\ref{eq:importance_estimator}, the part of the scaled mean-squared
-error that depends on the proposal is
+Equation~\ref{eq:importance_estimator}, the optimizer-metric mean-squared error
+is
+\begin{equation}
+    \mathbb E\|A_t(\widehat g-h)\|_2^2
+    =\sum_i\frac{\lambda_i^2s_i^2}{q_i}-\|A_th\|_2^2.
+    \label{eq:optimizer_metric_mse}
+\end{equation}
+The part that depends on the proposal is
 \begin{equation}
     V(q)=\sum_i\frac{\lambda_i^2s_i^2}{q_i}.
     \label{eq:preconditioned_second_moment}
 \end{equation}
-\begin{proposition}[Variance-optimal task proposal]
+\begin{proposition}[Optimizer-metric-optimal task proposal]
 \label{prop:gpas_optimality}
 If $\lambda_i s_i>0$ for every task, $V(q)$ over the probability simplex is
 minimized by $q_i^\star=\lambda_i s_i/\sum_j\lambda_j s_j$.
@@ -45,10 +62,10 @@ Cauchy--Schwarz and $\sum_iq_i=1$ give
 \end{equation}
 Equality requires $q_i\propto\lambda_i s_i$, which proves the claim.
 \end{proof}
-GPAS uses the stored AdamW state because the score must be available before
-task selection. The score approximates the task-dependent part of the next
-AdamW step. The E3 audit compares this approximation with a measured AdamW
-task step.
+The identity metric makes the result the classical SGD gradient-norm rule. For
+AdamW, GPAS uses the stored state because the score must be available before
+task selection. This lagged score approximates the task-dependent part of the
+next AdamW step; E3 compares it with a measured AdamW task step.
 
 \subsection{Include measured task cost}
 \label{sec:cost_gpas}
@@ -69,8 +86,8 @@ $J(q)\geq(\sum_i\lambda_i s_i\sqrt{c_i})^2$, with equality exactly when
 $q_i\propto\lambda_i s_i/\sqrt{c_i}$.
 \end{proof}
 This applies the cost-aware sampling rule of
-\citet{mohri2026costawarelearning} to complete task batches and AdamW-scaled
-gradients. $J(q)$ is a local training signal. E2 measures it on held-out
+\citet{mohri2026costawarelearning} to complete task batches in the selected
+optimizer metric. $J(q)$ is a local training signal. E2 measures it on held-out
 gradient banks, and the end-to-end experiment measures weighted teacher loss
 against GPU hours.
 
@@ -93,6 +110,7 @@ with fresh task scores.
 
 Each completed step records the clipped task gradient before the importance
 correction. The trainer then multiplies the gradient by $\lambda_I/q_I$ and
-calls AdamW. Gradient clipping is applied before the correction so the
-conditional mean in Equation~\ref{eq:importance_unbiased} matches the stated
-training objective.
+passes it to the optimizer. Gradient clipping is applied before the correction
+so the conditional mean in Equation~\ref{eq:importance_unbiased} matches the
+stated training objective. The experiments use AdamW; changing the optimizer
+changes the metric, not the correction.

@@ -41,16 +41,19 @@ sampling.
 
 \subsection{Frozen-gradient evaluation metric}
 
-For an evaluation bank, let $\widetilde h$ be the full-mixture mean after the
-element-wise AdamW scaling in Equation~\ref{eq:adamw_lagged_metric}, and let
-$\widehat{\widetilde g}$ be the scaled corrected draw. The centered error is
+For an evaluation bank, let $\widetilde h=A_th$ be the full-mixture mean in the
+selected optimizer metric, and let
+$\widehat{\widetilde g}=A_t\widehat g$ be the transformed corrected draw. The
+centered error is
 \begin{equation}
     M(q)=\mathbb E\left\|\widehat{\widetilde g}-\widetilde h\right\|_2^2.
     \label{eq:empirical_estimator_mse}
 \end{equation}
 The experiment estimates $h$ and the expectation from held-out task batches.
 Calibration batches supply $q$, so proposal construction and evaluation use
-separate samples.
+separate samples. The LLM evaluation uses the AdamW metric in
+Equation~\ref{eq:adamw_lagged_metric}; the controlled experiment also reports
+the SGD identity metric.
 
 \subsection{Approximate-score penalty}
 \label{app:score_approximation}
@@ -92,3 +95,6 @@ clone with task gradient $G_i$ and one clone with a zero gradient. Both clones
 use the same model, AdamW state, learning rate, and moment decay. The difference
 between the two parameter vectors isolates the increment associated with the
 current task gradient.
+For SGD, the corresponding matched-state difference is a shared scalar times
+$G_i$, so the identity metric introduces no lagged-preconditioner
+approximation.

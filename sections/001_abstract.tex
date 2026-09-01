@@ -8,12 +8,13 @@ tasks unintended weight.
 We present Gradient-Preserving Adaptive Sampling (GPAS) for multi-teacher
 on-policy distillation and multi-task reinforcement learning. Each update uses
 a task-homogeneous batch and gives every response equal weight. GPAS measures
-task gradients after scaling each parameter coordinate by AdamW's stored
-second moment. GPAS samples high-impact tasks more often and rescales every
-sampled gradient by its target weight divided by its sampling probability. The
+task gradients in a metric induced by the optimizer: it recovers raw-gradient
+sampling for SGD, while our LLM instantiation uses AdamW's stored second
+moment. GPAS samples high-impact tasks more often and rescales every sampled
+gradient by its target weight divided by its sampling probability. The
 conditional expected gradient remains equal to the user-specified task mixture.
-The online sampler reuses completed gradients and stores one score per task.
-Cost-GPAS also uses measured task time.
+The online sampler stores one score per task, and Cost-GPAS also uses measured
+task time.
 
 In a controlled three-task experiment, GPAS attains a calculated error ratio of
 $0.698$ and a Monte Carlo ratio of $0.697$ relative to uniform sampling; the

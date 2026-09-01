@@ -1,8 +1,8 @@
 """Controlled check of GPAS and Cost-GPAS.
 
-This local-gradient sanity check compares task proposals for estimating one
-fixed, optimizer-scaled multi-task update. End-to-end LLM runs remain the main
-test of training efficiency.
+This local-gradient sanity check compares task proposals under the identity
+(SGD) and lagged-preconditioned (AdamW) metrics. End-to-end LLM runs remain the
+main test of training efficiency.
 """
 
 import csv
@@ -114,7 +114,11 @@ def main():
     empirical = {}
     errors = {}
     mean_errors = {}
+    sgd_theory = {}
+    sgd_empirical = {}
+    sgd_mean_errors = {}
     compute = {}
+    identity_metric = np.ones_like(preconditioner)
     for index, (name, proposal) in enumerate(proposal_map.items()):
         theory[name] = theoretical_mse(
             proposal, weights, preconditioner, means, stds
@@ -122,12 +126,21 @@ def main():
         empirical[name], errors[name], mean_errors[name] = empirical_mse(
             proposal, weights, preconditioner, means, stds, SEED + index + 1
         )
+        sgd_theory[name] = theoretical_mse(
+            proposal, weights, identity_metric, means, stds
+        )
+        sgd_empirical[name], _, sgd_mean_errors[name] = empirical_mse(
+            proposal, weights, identity_metric, means, stds,
+            SEED + index + 100,
+        )
         compute[name] = compute_criterion(
             proposal, weights, preconditioner, means, stds, costs
         )
 
     theory_baseline = theory["Uniform"]
     empirical_baseline = empirical["Uniform"]
+    sgd_theory_baseline = sgd_theory["Uniform"]
+    sgd_empirical_baseline = sgd_empirical["Uniform"]
     compute_baseline = compute["Uniform"]
     names = list(proposal_map)
     colors = ["#7f8c8d", "#d95f5f", "#2a9d8f", "#3f72af"]
@@ -193,15 +206,21 @@ def main():
             "prob_task_1",
             "prob_task_2",
             "prob_task_3",
-            "theory_mse_ratio",
-            "empirical_mse_ratio",
-            "relative_mean_error",
+            "sgd_theory_mse_ratio",
+            "sgd_empirical_mse_ratio",
+            "sgd_relative_mean_error",
+            "adamw_theory_mse_ratio",
+            "adamw_empirical_mse_ratio",
+            "adamw_relative_mean_error",
             "compute_proxy_ratio",
         ])
         for name in names:
             writer.writerow([
                 name,
                 *proposal_map[name],
+                sgd_theory[name] / sgd_theory_baseline,
+                sgd_empirical[name] / sgd_empirical_baseline,
+                sgd_mean_errors[name],
                 theory[name] / theory_baseline,
                 empirical[name] / empirical_baseline,
                 mean_errors[name],
@@ -213,6 +232,8 @@ def main():
         probs = np.array2string(proposal_map[name], precision=3)
         print(
             f"{name:21s} probabilities={probs} "
+            f"sgd_theory={sgd_theory[name] / sgd_theory_baseline:.3f} "
+            f"sgd_empirical={sgd_empirical[name] / sgd_empirical_baseline:.3f} "
             f"theory_ratio={theory[name] / theory_baseline:.3f} "
             f"empirical_ratio={empirical[name] / empirical_baseline:.3f} "
             f"mean_error={mean_errors[name]:.3f} "

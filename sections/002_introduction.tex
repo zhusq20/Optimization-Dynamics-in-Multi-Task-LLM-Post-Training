@@ -34,11 +34,13 @@ equal to the target mixture. The sampling probabilities can then allocate
 compute while the target mixture stays fixed.
 
 Gradient-Preserving Adaptive Sampling (GPAS) applies classical importance
-sampling at the task-batch level. GPAS first scales task gradients with AdamW's
-stored second moment, then assigns more probability to tasks with larger scaled
-gradients. A moving average estimates each task score from completed updates.
-A probability floor limits stale scores and large importance weights.
-Cost-GPAS also uses measured task time.
+sampling at the task-batch level. GPAS scores task gradients in a metric induced
+by the training optimizer, then assigns more probability to tasks with larger
+scores. The identity metric recovers raw-gradient sampling for SGD; for AdamW,
+we use the lagged preconditioner from its stored second moment. A moving average
+estimates each task score from completed updates. A probability floor limits
+stale scores and large importance weights. Cost-GPAS also uses measured task
+time.
 
 The controlled experiment checks the sampling formulas with known gradient
 distributions and costs. The large-model experiments use frozen gradient banks
@@ -50,9 +52,10 @@ The paper makes three contributions:
 \begin{itemize}
     \item We define a response-normalized task-batch interface that separates a
     fixed multi-task target from compute allocation in on-policy post-training.
-    \item We use AdamW-scaled task gradients to allocate updates. A cost-aware
-    version also uses measured end-to-end task time. Both samplers estimate
-    their task scores online from completed updates.
+    \item We derive task allocation in an optimizer-induced metric, recovering
+    raw-gradient sampling for SGD and a lagged-preconditioned rule for AdamW. A
+    cost-aware version also uses measured end-to-end task time, and both
+    samplers estimate their scores online.
     \item We validate the estimator calculation and specify direct MOPD and
     GRPO tests that connect score quality to progress per token and GPU hour.
 \end{itemize}

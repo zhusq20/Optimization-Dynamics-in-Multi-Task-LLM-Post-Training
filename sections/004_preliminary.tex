@@ -83,9 +83,9 @@ draw and its fresh batch gives
 \end{proof}
 The weights $\lambda$ define capability priorities. The probabilities $q$
 allocate task batches. Equation~\ref{eq:importance_unbiased} assigns a separate
-role to each quantity. The equality concerns the gradient passed to AdamW.
-AdamW's moving averages can produce different parameter paths under different
-task orders.
+role to each quantity. The equality concerns the gradient passed to the
+optimizer. Stateful optimizers can still produce different parameter paths
+under different task orders.
 
 An online sampler can use earlier gradients, measured costs, and optimizer
 states to choose the next $q$. Every task keeps positive probability, and each

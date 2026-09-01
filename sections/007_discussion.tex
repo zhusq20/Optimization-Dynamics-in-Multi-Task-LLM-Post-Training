@@ -6,7 +6,9 @@
 Multi-task post-training needs separate controls for the target objective and
 compute allocation. Response-normalized task batches define the unit of the
 target; inverse sampling preserves its conditional mean. GPAS chooses proposals
-from a lagged optimizer metric, and Cost-GPAS also uses measured task time.
+in an optimizer-induced metric, and Cost-GPAS also uses measured task time. The
+identity metric recovers the SGD gradient-norm rule; our LLM experiments focus
+on the lagged AdamW metric.
 
 The controlled experiment supports the local estimator claim. GPAS reduces the
 measured error by $30.3\%$, and Cost-GPAS reduces the time-weighted proxy by
@@ -15,8 +17,9 @@ The planned gradient-bank and exact-step audits will measure whether the lagged
 AdamW score remains useful in LLM training.
 
 Three boundaries guide interpretation. First, the correction preserves the
-conditional mean of the gradient delivered to AdamW. AdamW's moving averages
-can still produce different parameter paths under different task orders.
+conditional mean of the gradient delivered to the optimizer. Stateful
+optimizers can still produce different parameter paths under different task
+orders.
 Second, the score combines mean scale and batch variation. Compatibility and
 gradient-bank audits measure whether a large score carries a consistent
 training signal. Third, Cost-GPAS optimizes an uncentered local compute score.

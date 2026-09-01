@@ -3,10 +3,10 @@
 \label{sec:experiments}
 % ============================================================================
 
-The controlled experiment checks the GPAS and Cost-GPAS calculations. Frozen
+The controlled experiment checks GPAS under the SGD and AdamW metrics. Frozen
 gradient banks test response normalization, proposal quality, and the AdamW
-score. Paired MOPD runs measure end-to-end efficiency. A final experiment
-applies the task sampler to GRPO.
+instantiation. Paired MOPD runs measure end-to-end efficiency. A final
+experiment applies the task sampler to GRPO.
 
 \paragraph{Evidence status.}
 The controlled experiment is complete and reproducible from the released
@@ -25,14 +25,17 @@ Equation~\ref{eq:importance_estimator}. We draw 20,000 Monte Carlo trials, with
 The controlled comparison omits the probability floor so its proposals match
 the closed-form calculation.
 
-Figure~\ref{fig:controlled_sampling} reports three results. The calculated GPAS
-error ratio is $0.698$, and the Monte Carlo ratio is $0.697$, relative to
-uniform sampling. The raw-gradient proposal reaches $7.178$ times the observed
-uniform error because its largest raw coordinates receive a small AdamW scale.
-Cost-GPAS reaches $0.893$ times the uniform time-weighted second-moment proxy.
-Every corrected proposal has a relative mean-gradient error below $2.1\%$. The
-controlled experiment checks the estimator and implementation. The LLM study
-tests score quality, teacher compatibility, and training progress.
+Under the identity metric used by SGD, Raw GPAS is optimal and attains
+calculated and Monte Carlo error ratios of $0.534$ relative to uniform
+sampling. Figure~\ref{fig:controlled_sampling} evaluates the same problem in
+the AdamW metric. The calculated GPAS error ratio is $0.698$, and the Monte
+Carlo ratio is $0.697$. The raw-gradient proposal reaches $7.178$ times the
+observed uniform error because its largest raw coordinates receive a small
+AdamW scale. Cost-GPAS reaches $0.893$ times the uniform time-weighted
+second-moment proxy. Every corrected proposal has a relative AdamW-scaled
+mean-gradient error below $2.1\%$. The controlled experiment checks the
+estimator and implementation. The LLM study tests score quality, teacher
+compatibility, and training progress.
 
 \begin{figure}[H]
     \centering
@@ -109,6 +112,9 @@ Here $\widehat r_i^2$ tracks $\mathbb E\|G_i\|_2^2$. Additional diagnostic runs
 include a corrected teacher-loss gap sampler, Raw Cost-Aware, round robin, and a
 full-mixture reference. The full-mixture reference computes four
 response-normalized microbatches and averages them before one AdamW step.
+Raw GPAS is the GPAS rule for the SGD identity metric, but here it supplies a
+cross-metric proposal while every method still trains with AdamW. This isolates
+the value of AdamW scaling without confounding it with an optimizer change.
 
 \subsection{Mechanism audits}
 
@@ -154,6 +160,11 @@ parameter change. The measured changes also define an exact-step oracle
 proposal, which bounds the improvement available from a better optimizer
 metric. A held-out teacher-loss batch records the immediate loss change from
 each task gradient.
+
+The same cached gradients provide the SGD check: under its identity metric,
+the raw gradient norm is the exact current-step score up to a shared scalar.
+This is a metric sanity check rather than a separate end-to-end optimizer
+comparison.
 
 An excluded uniform pilot compares the online score moving average with fresh
 gradient-bank scores every 25 steps. A parallel cost audit compares the cost

@@ -58,8 +58,10 @@ using gradient magnitude, variance, and interactions
 Cost-Aware GRPO decides which already-generated sequences enter policy updates.
 GPAS decides which task receives the next rollout, teacher call, and optimizer
 step while preserving a user-specified multi-task objective. GPAS evaluates
-complete task-batch gradients in a lagged AdamW scale and estimates task scores
-from completed updates. Cost-GPAS applies the published cost-aware sampling
-identity to the same task-batch setting. Our contribution lies in fixed-target
-multi-task allocation, response-normalized task batches, and optimizer-aware
-online scores.
+complete task-batch gradients in an optimizer-induced metric and estimates task
+scores from completed updates. Its SGD instance recovers classical
+gradient-norm sampling; its AdamW instance uses a lagged preconditioner.
+Cost-GPAS applies the published cost-aware sampling identity to the same
+task-batch setting. Our contribution lies in fixed-target multi-task
+allocation, response-normalized task batches, and optimizer-aware online
+scores.
