@@ -4,9 +4,9 @@
 > 主模型：Qwen3-1.7B  
 > 任务：Math、Code、Instruction Following、ScienceQA  
 > 全局随机种子：42  
-> 重复策略：每个实验配置只运行一次，不做独立 seed 重复  
+> 重复策略：每个实验配置只运行 seed 42 一次，不做独立 seed 重复  
 > 当前状态：受控采样实验已完成；E1--E5 大模型实验待运行  
-> 原则：每个理论结论对应一个直接测量，端到端结果用于验证训练效率；单 seed 结果按探索性、条件性证据解读。  
+> 原则：每个理论结论对应一个直接测量，端到端结果用于验证训练效率；所有大模型训练结果按单 seed、探索性和条件性证据解读。  
 > 优化器范围：主训练统一使用 AdamW；SGD 作为 identity-metric 特例在受控实验和 cached-gradient audit 中验证，不建立第二套端到端训练矩阵。
 
 ## 1. 论文需要回答的问题
@@ -16,7 +16,7 @@
 1. **Teacher--student compatibility**：同源 teacher 是否在 student rollout 上保持稳定的 next-token overlap、log-ratio tail 和 task-gradient coherence？
 2. **长度稳定的任务更新**：response-normalized task batch 能否避免回答长度隐式改变任务权重？
 3. **固定目标下的自适应采样**：乘以 $\lambda_I/q_I$ 后，自适应 proposal 的平均梯度能否保持为 $\sum_i\lambda_i h_i$？
-4. **优化器度量下的分配**：对 $\widetilde G_i=A_tG_i$，$q_i\propto\lambda_i s_i$ 能否降低 one-task estimator 在所选度量下的 MSE？SGD 取 $A_t=I$，AdamW 取 lagged preconditioner。
+4. **优化器度量下的分配**：对 $\widetilde G_i=A_tG_i$，$q_i\propto\lambda_i s_i$ 能否降低 one-task estimator 在所选度量下的 MSE，并优于在同一固定目标下使用 reverse-KL gap--velocity 的轨迹 proposal？SGD 取 $A_t=I$，AdamW 取 lagged preconditioner。
 5. **成本感知分配**：$q_i\propto\lambda_i s_i/\sqrt{c_i}$ 能否降低“optimizer-metric second moment $\times$ GPU time”？
 6. **端到端效率**：局部 estimator 改善能否转化为更低的 teacher-loss AUC，以及更好的 token / GPU-hour efficiency？
 
@@ -30,6 +30,7 @@
 | 长度归一化移除隐式任务权重 | E1 | raw token share、normalized task coefficient、每任务梯度贡献 | 四任务 loss / capability vector |
 | $\lambda_I/q_I$ 保持平均梯度 | 受控采样、E2 | corrected mean 对 full-mixture mean 的 error / cosine | Uncorrected GPAS 的 capability shift |
 | GPAS 降低所选优化器度量下的 estimator MSE | 受控采样（SGD / AdamW）、E2（AdamW 为主） | 理论/Monte Carlo $M_I(q)$、$M_P(q)$ | teacher loss vs valid tokens |
+| optimizer-aware score 优于一般学习进度信号 | E2、E4 | GPAS vs corrected KL-Trajectory 的 $M_P(q)$ | weighted teacher loss vs valid tokens |
 | score 应与实际优化器几何匹配 | 受控采样、E3 | SGD/raw 和 AdamW-scaled MSE、task-pair ranking、Spearman correlation | GPAS vs Raw-GPAS 附录消融 |
 | Cost-GPAS 改善局部计算代理指标 | 受控采样、E1、E2 | cost EMA error、time-weighted second moment | teacher loss vs GPU hours |
 | 方法可迁移到 reward-based update | E5 | GRPO estimator audit | weighted return vs tokens / GPU hours |
@@ -108,34 +109,48 @@ Cost-GPAS 对 total GPU seconds 使用与 score 相同的 EMA。它不增加新�
 ### 3.5 单 seed 与可复现策略
 
 - 所有训练、calibration、evaluation、bootstrap 和 Monte Carlo 过程的根 seed 统一为 42。
-- 对 `(42, stage, task, checkpoint, prompt_id, sample_id)` 做稳定 hash 派生 RNG stream；方法间的 held-out prompt、decoding stream 和评测顺序保持配对。
-- 方法名而非 seed 用于区分 run，例如 `Uniform-s42`、`GPAS-s42`、`Cost-GPAS-s42`。
+- 对 `(42, stage, task, checkpoint, prompt_id, sample_id)` 做稳定 hash 派生 RNG stream；方法间共享初始化、AdamW state、held-out prompt、decoding stream 和评测顺序。
+- Run ID 同时包含方法和 seed，例如 `Uniform-s42`、`KL-Trajectory-s42`、`GPAS-s42`、`Cost-GPAS-s42`。
 - 中断后只允许从确定性 checkpoint 续训。若必须从头重跑，旧 run 标记为 superseded，不将两次结果当作独立重复或择优。
-- 评测集 bootstrap interval 只描述“给定这一次训练轨迹”的 prompt / batch 抽样不确定性，不代表跨 seed 的训练方差。
-- 不报告跨 seed 显著性检验，不宣称已证明稳定性或可复现性。
+- 评测集 bootstrap interval 只描述给定这一次训练轨迹的 prompt / batch 抽样不确定性，不代表跨 seed 训练方差。
+- 不报告跨 seed 显著性检验，不使用“稳定优于”“显著提升”或“可复现”等跨 seed 措辞。
 
 ## 4. 端到端方法
 
 | 优先级 | 方法 | Proposal | Update factor | Run | 作用 |
 |---|---|---|---|---|---|
 | P0 | Uniform | $q_i=1/4$ | 1 | `Uniform-s42` | 主 baseline |
+| P0 | KL-Trajectory | $q_i=\operatorname{FloorSoftmax}(\widehat z_i)$ | $\lambda_i/q_i$ | `KL-Trajectory-s42` | 固定目标下的 reverse-KL 学习进度 baseline |
 | P0 | GPAS | $q_i\propto\lambda_i\widehat s_i$ | $\lambda_i/q_i$ | `GPAS-s42` | token-efficiency 方法 |
 | P0 | Cost-GPAS | $q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$ | $\lambda_i/q_i$ | `Cost-GPAS-s42` | GPU-hour-efficiency 方法 |
 | P1 | Raw GPAS | $q_i\propto\lambda_i\widehat r_i$ | $\lambda_i/q_i$ | `Raw-GPAS-s42` | SGD/identity-metric proposal；检验 AdamW scaling |
 | P1 | Cost-only | $q_i\propto\lambda_i/\sqrt{\widehat c_i}$ | $\lambda_i/q_i$ | `Cost-only-s42` | 检验只偏向低成本任务是否足够 |
 | P1 | Uncorrected GPAS | 与 GPAS 相同 | 1 | `Uncorrected-GPAS-s42` | objective-shift 诊断 |
 
-P0 是主结论所需的最小端到端矩阵，所有方法均使用 AdamW。Raw GPAS 在这里是 cross-metric proposal，不是 SGD 端到端 run；它用于隔离 score geometry 的作用，避免将优化器更换与采样策略混在一起。P1 在 E1--E3 机制检查通过且 P0 轨迹出现对应解释需求时按需选择，不默认全部运行。所有配置均只运行 seed 42 一次。
+P0 是主结论所需的最小端到端矩阵，四个方法均使用 AdamW、相同的固定目标 $\lambda_i=1/4$ 和 seed 42。KL-Trajectory 只改变 proposal，并通过 $\lambda_i/q_i$ 保持目标；它不是对 mixed-batch D$^3$-MOPD 系统的逐项复现。Raw GPAS 在这里是 cross-metric proposal，不是 SGD 端到端 run；它用于隔离 score geometry 的作用，避免将优化器更换与采样策略混在一起。P1 在 E1--E3 机制检查通过且 P0 轨迹出现对应解释需求时按需选择，不默认全部运行。所有配置均只运行 seed 42 一次。
 $\widehat r_i$ 跟踪 identity-metric RMS $s_{i,I}$，$\widehat s_i$ 跟踪 AdamW-metric RMS $s_{i,P}$。
+
+### 4.1 Corrected KL-Trajectory 定义
+
+令 $\bar\ell_{i,m}$ 表示任务 $i$ 第 $m$ 个已观测 task batch 后的 response-normalized reverse-KL EMA，$\ell_i^{(0)}$ 为 round-robin warm start 均值。窗口长度为 $W$，使用 $R$ 个不重叠窗口：
+
+$$
+z_{i,m}
+=\frac{\bar\ell_{i,m}}{\ell_i^{(0)}}
+\left[
+\frac1R\sum_{r=0}^{R-1}
+\frac{\bar\ell_{i,m-(r+1)W}-\bar\ell_{i,m-rW}}
+{\bar\ell_{i,m-(r+1)W}+\epsilon_{\mathrm{KL}}}
+\right]_+.
+$$
+
+Warmup 期间使用已有窗口数。对 $z_i$ 做跨任务 max-normalization；全零时回退为 uniform。随后使用 temperature $T$ 的 softmax 和共同的 $q_{\min}=0.05$ 得到 proposal。$W$、$R$、$T$ 和 $\epsilon_{\mathrm{KL}}$ 在 `Uniform-s42` 启动前随其余协议一起冻结；主结果可见后不再调整。训练时仍按 $\lambda_i/q_i$ 校正。
 
 附录 P2 消融（仅在 P0 完整、相关 P1 问题仍未解决时按需运行，每项仍只运行 seed 42 一次）：
 
 - Round robin；
-- corrected / uncorrected gap sampler；
 - Raw Cost-Aware；
 - full-mixture reference：四个 task microbatch 分别归一化后以 $1/4$ 累积。
-
-Gap score 使用 response-normalized teacher loss，并除以 warm-start task mean。Gap sampler 与 GPAS 使用相同的 EMA、warm start 和 probability floor。
 
 ## 5. E1：Response length 和 task cost audit
 
@@ -165,16 +180,17 @@ Gap score 使用 response-normalized teacher loss，并除以 warm-start task me
 
 主 audit 使用 `Uniform-s42` 的五个冻结 checkpoint。每任务生成 16 个 calibration gradient batch 和 16 个独立 evaluation gradient batch。任一任务的 RMS bootstrap relative standard error 超过 10% 时，所有任务统一增加到 32 个 batch。样本量规则在查看方法间差异之前执行，且 bootstrap 与 Monte Carlo 均使用从全局 seed 42 派生的固定 RNG stream。
 
-Calibration bank 构造：
+候选 proposal 包括：
 
 - Uniform proposal；
+- KL-Trajectory proposal（由该 checkpoint 之前保存的 reverse-KL history 构造，不读取 evaluation gradient bank）；
 - Raw GPAS proposal（$A_t=I$，即 SGD identity metric）；
 - GPAS proposal（$A_t=P_t$，即 lagged AdamW metric）；
 - Cost-only proposal；
 - Cost-GPAS proposal；
 - floor-constrained evaluation-bank oracle。
 
-其中 $P_t=\operatorname{Diag}((\sqrt{\bar v_{t-1}}+\epsilon)^{-1})$，$s_{i,A}^2=\mathbb E\|AG_i\|_2^2$。两种 metric 使用同一批 cached gradients，不增加 rollout 或 backward。
+其中 $P_t=\operatorname{Diag}((\sqrt{\bar v_{t-1}}+\epsilon)^{-1})$，$s_{i,A}^2=\mathbb E\|AG_i\|_2^2$。gradient- 和 cost-based proposal 由 calibration bank 构造；KL-Trajectory 只使用截至当前 checkpoint 的训练日志。两种 gradient metric 使用同一批 cached gradients，不增加 rollout 或 backward。
 
 Evaluation bank 报告：
 
@@ -212,16 +228,16 @@ $$
 - 同源 teacher 应保持非平凡 top-16 overlap，log-ratio tail 不应随训练恶化；
 - reverse KL 下降的任务通常应伴随 $s_{i,P}$ 下降；
 - 高 AdamW-metric gradient coherence 应与 E3 中正向的 one-step teacher-loss change 一致；
-- Corrected GPAS / Cost-GPAS 的 empirical mean 接近 full-mixture mean；
+- Corrected KL-Trajectory / GPAS / Cost-GPAS 的 empirical mean 接近 full-mixture mean；
 - Uncorrected proposal 的 mean 朝长期高采样任务偏移；
 - Raw GPAS 在 identity metric 下的 held-out $M_I(q)$ 低于 Uniform 和 AdamW-metric GPAS；
-- GPAS 在 AdamW metric 下的 held-out $M_P(q)$ 低于 Uniform 和 Raw GPAS；
+- GPAS 在 AdamW metric 下的 held-out $M_P(q)$ 低于 Uniform、KL-Trajectory 和 Raw GPAS；
 - Cost-GPAS 的 AdamW-metric compute criterion 低于 Uniform、GPAS 和 Cost-only。
 
 ### 机制验收口径
 
-- **Correction**：GPAS 和 Cost-GPAS 的 corrected mean 在至少 4/5 个 checkpoint 上同时满足 cosine $\geq0.99$ 且 relative $\ell_2$ error $\leq0.10$。
-- **Estimator**：主 gate 使用实际训练优化器的 AdamW metric：GPAS 的 held-out $M_P(q)$ 低于 Uniform；Cost-GPAS 的 held-out $J_P(q)$ 低于 Uniform，且对比 GPAS 的方向单独报告。Identity-metric 结果作机制校验，不改变 gate。
+- **Correction**：KL-Trajectory、GPAS 和 Cost-GPAS 的 corrected mean 在至少 4/5 个 checkpoint 上同时满足 cosine $\geq0.99$ 且 relative $\ell_2$ error $\leq0.10$。
+- **Estimator**：主 gate 使用实际训练优化器的 AdamW metric：GPAS 的 held-out $M_P(q)$ 低于 Uniform 和 KL-Trajectory；Cost-GPAS 的 held-out $J_P(q)$ 低于 Uniform，且对比 GPAS 的方向单独报告。Identity-metric 结果作机制校验，不改变 gate。
 - **Accounting**：total GPU seconds 与四个分项之和的 relative error $\leq2\%$，valid-token / prompt counter 与原始 log 完全一致。
 - **Proposal replay**：用保存的 EMA 状态离线重算每次 $q_i$ 与 $\lambda_i/q_i$，与训练 log 在数值容差内逐 update 一致。
 
@@ -284,10 +300,11 @@ $$
 
 主比较：
 
-- GPAS vs Uniform：token-efficiency；
+- GPAS vs Uniform / KL-Trajectory：token-efficiency 与 optimizer-aware score 的增益；
+- KL-Trajectory vs Uniform：学习进度 proposal 的描述性比较；
 - Cost-GPAS vs Uniform / GPAS：GPU-hour-efficiency。
 
-三个 P0 方法均使用 AdamW；E4 比较的是 task proposal，不是 optimizer choice。
+四个 P0 方法均使用 AdamW、seed 42 和相同的固定目标；E4 比较的是 task proposal，不是 optimizer choice 或目标重加权。
 
 不再使用独立 Uniform pilot 选 target。在任何端到端结果可见之前，预注册两个相对 weighted teacher-loss target：$L(N)/L(0)=0.90$ 和 $0.80$。正文报告：
 
@@ -296,14 +313,14 @@ $$
 
 单 seed 下，每个方法只产生一条训练轨迹。比较报告：
 
-- 相对 `Uniform-s42` 的 teacher-loss AUC 差；
+- 相对 `Uniform-s42` 的 teacher-loss AUC 差，以及 `GPAS-s42` 相对 `KL-Trajectory-s42` 的 AUC 差；
 - 达到两个预注册 target 的 token / GPU-hour 差，未达到时明确标记 NR；
 - 在共享资源区间 25%/50%/75%/100% 位置的配对 loss 差，作为轨迹方向一致性检查，不将这四个位置当作独立重复；
 - teacher-loss 在任务内对 held-out prompt 做 paired stratified bootstrap，E2 estimator 指标对 gradient batch 做配对 bootstrap；两者的 95% interval 都明确标注不包含训练 seed 不确定性。
 
-正文只在以下条件同时满足时写“在 seed 42 上观察到效率改善”：
+正文只在以下条件同时满足时写“在 seed 42 的单次训练轨迹上观察到效率改善”：
 
-- 对应资源坐标下的 AUC 优于预先指定的对照：GPAS 对 Uniform，Cost-GPAS 对 Uniform 和 GPAS；
+- 对应资源坐标下的 AUC 优于预先指定的对照：GPAS 对 Uniform 和 KL-Trajectory，Cost-GPAS 对 Uniform 和 GPAS；
 - 四个共享资源位置中至少 3/4 个方向一致；
 - E2 的 estimator 指标方向一致；
 - 没有额外 teacher calls 或 backward。
@@ -357,13 +374,13 @@ Multi-Task GRPO 使用其公开 task-weight rule，作为 P1 capability-oriented
 
 ## 10. 执行顺序与停止条件
 
-最小主证据预算是 3 个 P0 MOPD run，共 $3\times600=1{,}800$ 个 optimizer updates，加上 E1--E3 的冻结 checkpoint audit。P1、P2 和 E5 不预留为默认连续队列；它们必须通过下述 gate 再单独批准，以免诊断实验先于主证据消耗算力。
+最小主证据预算是 4 个 seed-42 P0 MOPD run，共 $4\times600=2{,}400$ 个 optimizer updates，加上 E1--E3 的冻结 checkpoint audit。P1、P2 和 E5 不预留为默认连续队列；它们必须通过下述 gate 再单独批准，以免诊断实验先于主证据消耗算力。
 
 1. **冻结协议**：固定数据 manifest、checkpoint hash、seed 42、RNG 派生规则、评测集和主指标。
 2. **完成受控实验复核**：确认 SGD identity metric 和 AdamW metric 下的 correction、MSE、floor 和 cost criterion 与公式一致。
 3. **运行 `Uniform-s42`**：同步采集 E1--E3 所需 checkpoint 和缓存，避免额外 baseline / pilot 重跑。
 4. **机制 gate**：按 E2 预注册的 correction、accounting 和 proposal-replay 口径验收。任一实现 gate 失败都停止启动自适应主 run，先修复实现；estimator 方向不符合预测则保留为负结果。
-5. **运行 P0 自适应方法**：依次完成 `GPAS-s42` 和 `Cost-GPAS-s42`，不中途根据曲线改超参。
+5. **运行 P0 自适应方法**：使用冻结配置完成 `KL-Trajectory-s42`、`GPAS-s42` 和 `Cost-GPAS-s42`，不中途根据曲线修改 $W$、$R$、$T$、EMA、floor 或其他超参。
 6. **冻结 E4 结果**：先产出 P0 表格、曲线和失败案例，再决定哪个 P1 对照能解决具体归因问题。
 7. **条件性扩展**：P1/P2 不用于在多个对照中事后挑选最有利结果；E5 只在 MOPD 主证据链完整后运行。
 
@@ -375,6 +392,7 @@ Multi-Task GRPO 使用其公开 task-weight rule，作为 P1 capability-oriented
 - [ ] 数据 manifests 与去重记录冻结；
 - [ ] 全局 seed 42 和所有 RNG namespace 冻结；
 - [ ] $\lambda$、$\gamma$、$q_{\min}$、clip 和 token target 冻结；
+- [ ] KL-Trajectory 的 $W$、$R$、$T$、$\epsilon_{\mathrm{KL}}$ 和全零回退规则冻结；
 - [ ] training optimizer 固定为 AdamW，identity / AdamW metric 定义已冻结；
 - [ ] protocol version、run ID 和完整配置已保存；
 - [ ] raw / AdamW score 均在 $\lambda_i/q_i$ 之前记录；

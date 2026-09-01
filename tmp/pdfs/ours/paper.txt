@@ -1,0 +1,978 @@
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+000
+001
+      O BJECTIVE -P RESERVING , O PTIMIZER -AWARE TASK
+002   S AMPLING FOR M ULTI -TASK LLM P OST-T RAINING
+003
+004
+005    Anonymous authors
+006    Paper under double-blind review
+007
+008
+009                                               A BSTRACT
+010
+011
+               Multi-task LLM post-training uses task weights to specify capability priorities and
+012
+               task sampling to allocate compute. Conflating the two makes efficiency claims
+013            hard to interpret; global token averaging can also give long-response tasks unin-
+014            tended weight.
+015
+               We present Gradient-Preserving Adaptive Sampling (GPAS) for multi-teacher on-
+016
+               policy distillation and multi-task reinforcement learning. Each update uses a task-
+017            homogeneous batch and gives every response equal weight. GPAS measures task
+018            gradients in a metric induced by the optimizer: it recovers raw-gradient sampling
+019            for SGD, while our LLM instantiation uses AdamW’s stored second moment.
+020            GPAS samples high-impact tasks more often and rescales every sampled gradient
+021            by its target weight divided by its sampling probability. The conditional expected
+022            gradient remains equal to the user-specified task mixture. The online sampler
+023            stores one score per task, and Cost-GPAS also uses measured task time.
+024            In a controlled three-task experiment, GPAS attains a calculated error ratio of
+025            0.698 and a Monte Carlo ratio of 0.697 relative to uniform sampling; the cost-
+026            aware proposal lowers its local compute proxy by 10.7%. The completed ex-
+027            periment verifies the estimator calculation. Four-teacher MOPD and three-task
+028            GRPO experiments will test the AdamW score, online tracking, teacher compati-
+029
+               bility, and progress per token and GPU hour. The large-model experiments remain
+               pending in this draft.
+030
+031
+032
+033   1   I NTRODUCTION
+034
+035   Post-training one model on mathematics, code, instruction following, and science requires two de-
+036   cisions. Target weights state which capabilities the objective values. Sampling probabilities decide
+037   which task receives the next rollout, teacher call, and update. Keeping target weights and sampling
+038   probabilities separate makes both decisions visible.
+039
+      Many systems use the sampling ratio as the task weight. Sampling a weak or cheap task more often
+040
+      then changes the model objective, so the resulting capability trade-off can come from the objective,
+041   the compute schedule, or both. A coupled design makes optimization efficiency difficult to measure.
+042
+043   Response length creates a second ambiguity. In a prompt-balanced mixed batch, global token aver-
+044
+      aging gives long-response tasks a larger coefficient. Recent MOPD work diagnoses this imbalance
+      and changes domain loss weights (Gao et al., 2026). Our training objective gives each response
+045
+      equal weight inside a task-homogeneous batch.
+046
+047   Teacher selection is a prerequisite for OPD. A wide teacher–student gap can create extreme token
+048   log-ratios, whereas a narrow gap supplies little signal. Recent studies report stronger transfer at
+049   moderate distributional overlap (Ma et al., 2026a; Wang et al., 2026b; Ma et al., 2026b). We train
+050
+      teachers from the student initialization, audit them on student rollouts, and study task allocation only
+      within the selected teacher set.
+051
+052   Suppose task i has target weight λi and sampling probability qi . Multiplying its sampled gradient by
+053   λi /qi keeps the conditional mean equal to the target mixture. The sampling probabilities can then
+      allocate compute while the target mixture stays fixed.
+
+
+                                                         1
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+054
+      Gradient-Preserving Adaptive Sampling (GPAS) applies classical importance sampling at the task-
+055   batch level. GPAS scores task gradients in a metric induced by the training optimizer, then assigns
+056   more probability to tasks with larger scores. The identity metric recovers raw-gradient sampling
+057   for SGD; for AdamW, we use the lagged preconditioner from its stored second moment. A moving
+058   average estimates each task score from completed updates. A probability floor limits stale scores
+059   and large importance weights. Cost-GPAS also uses measured task time.
+060
+      The controlled experiment checks the sampling formulas with known gradient distributions and
+061   costs. The large-model experiments use frozen gradient banks to compare raw gradients, GPAS
+062   scores, and measured AdamW task steps. Paired training runs then measure teacher-loss progress
+063   per token and GPU hour. A GRPO experiment tests the same task sampler with reward-based
+064   updates.
+065
+      The paper makes three contributions:
+066
+067          • We define a response-normalized task-batch interface that separates a fixed multi-task target
+068            from compute allocation in on-policy post-training.
+069
+             • We derive task allocation in an optimizer-induced metric, recovering raw-gradient sampling
+070
+               for SGD and a lagged-preconditioned rule for AdamW. A cost-aware version also uses
+071            measured end-to-end task time, and both samplers estimate their scores online.
+072
+             • We validate the estimator calculation and specify direct MOPD and GRPO tests that con-
+073
+               nect score quality to progress per token and GPU hour.
+074
+075   Section 3 defines the objective and sampling interface; Section 4 presents GPAS; Section 5 gives the
+076   MOPD and GRPO studies. The appendix contains proofs and implementation details.
+077
+078
+079
+      2   R ELATED W ORK
+080
+081
+      Multi-task optimization. Multi-task methods often learn task weights or modify gradient direc-
+      tions to improve a capability trade-off (Sener & Koltun, 2019; Yu et al., 2020; Liu et al., 2024; Chen
+082
+      et al., 2018). GPAS starts from task weights supplied by the user. GPAS changes the frequency of
+083
+      task batches and keeps the weighted gradient fixed in expectation. A fixed target makes optimization
+084   efficiency measurable under one capability objective.
+085
+086   Multi-task RL for language models. Joint RL post-training can show uneven gradients and un-
+087   even task progress (Ramesh et al., 2026; Wu et al., 2025). Difficulty-based curricula sample weak
+088   or slowly improving tasks more often (Corrado et al., 2026). Multi-Task GRPO learns robustness-
+089   oriented task weights and preserves its realized batch ratios (Ramesh et al., 2026). Our experiments
+090   keep the target task weights fixed. A corrected gap sampler measures the value of a loss-gap signal
+091   under the same target objective. An uncorrected version measures the capability shift caused by
+092   changing task priorities.
+093
+094   Multi-teacher on-policy distillation. MOPD routes student rollouts to domain teachers and trains
+095   one shared student (Ma et al., 2026a). Related systems use task-specific teacher interfaces and
+096
+      language-specialized teachers (Ma et al., 2026b; Xie et al., 2026). Open-MOPD identifies response
+      length, teacher–student gap, and reused rewards as sources of capability imbalance and changes
+097
+      domain loss weights (Gao et al., 2026). Other OPD studies report unreliable token guidance un-
+098
+      der large teacher–student distribution mismatch (Wang et al., 2026b;a). Same-origin teachers and
+099   moderate next-token overlap improve training stability while preserving a useful learning signal (Ma
+100   et al., 2026a;b). Our MOPD protocol uses four same-origin teachers, task-homogeneous fixed-token
+101   batches, and one optimizer use per rollout. GPAS changes the frequency of complete task batches
+102   and applies an inverse sampling factor. Cost-GPAS adds measured GPU time for generation, teacher
+103   evaluation, and model updates.
+104
+105   Importance sampling for stochastic optimization. Sampling examples from their gradient size
+106   and applying an inverse probability factor can reduce stochastic-gradient variance (Alain et al., 2015;
+107   Katharopoulos & Fleuret, 2018). Cost-aware SGD further samples in proportion to gradient scale di-
+      vided by the square root of evaluation cost and has been applied to GRPO (Mohri et al., 2026). Non-
+
+
+                                                        2
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+108
+      uniform sampling can interact nonlinearly with adaptive optimizers (Lahire, 2023). PiKE adapts
+109   data-mixture weights using gradient magnitude, variance, and interactions (Li et al., 2025).
+110
+111   Cost-Aware GRPO decides which already-generated sequences enter policy updates. GPAS decides
+112
+      which task receives the next rollout, teacher call, and optimizer step while preserving a user-specified
+      multi-task objective. GPAS evaluates complete task-batch gradients in an optimizer-induced metric
+113
+      and estimates task scores from completed updates. Its SGD instance recovers classical gradient-
+114
+      norm sampling; its AdamW instance uses a lagged preconditioner. Cost-GPAS applies the published
+115   cost-aware sampling identity to the same task-batch setting. Our contribution lies in fixed-target
+116   multi-task allocation, response-normalized task batches, and optimizer-aware online scores.
+117
+118
+119
+      3     TASK O BJECTIVE AND S AMPLING
+120
+121
+      Task allocation starts with a clear definition of one task gradient. We first average responses inside
+      a task-homogeneous batch. We then sample one task while preserving the user-selected mixture of
+122
+      task gradients.
+123
+124
+      3.1   D EFINE A COMPARABLE TASK GRADIENT
+125
+126
+                                                                                              P
+      Consider M tasks. Task i supplies prompts from Di and has target weight λi , with i λi = 1.
+127   One training draw selects a task and builds a task-homogeneous batch. For response j, let Lj be its
+128   number of valid response tokens and let gj,t be its token gradient. The task-batch gradient is
+129
+                                                     n      Lj
+130                                               1X 1 X
+                                             Gi =              gj,t .                                     (1)
+131                                               n j=1 Lj t=1
+132
+133   Each response receives equal weight inside its task. A long response supplies more token obser-
+134   vations and keeps the same total coefficient as a short response. Every task batch targets a shared
+135   number of valid response tokens. Gradient variance can still differ by task, and GPAS measures
+136
+      task-dependent variance. GPU time is recorded separately because prompt length, generation, and
+      teacher evaluation have task-dependent costs.
+137
+138   For MOPD, gj,t is the sampled-token policy gradient. For GRPO, gj,t comes from the clipped policy
+139   surrogate. Prefix sampling, token truncation, reward clipping, and gradient clipping are part of the
+140   implemented Gi . The sampler preserves the mean of the implemented Gi . Appendix B.1 gives the
+141   OPD gradient, and Appendix B.2 describes the GRPO gradient. When the trainer applies task-level
+142
+      clipping, Gi denotes the clipped gradient from Equation 1.
+143   The mean gradient of task i and the target multi-task gradient are
+144                                                            X
+145                                     hi = E[Gi ],      h=       λi hi .                                (2)
+                                                                  i
+146
+147   For frozen teachers, λ states the desired distillation mixture.
+148   A full estimate of h requires one complete batch from every task. Sampling one task uses one rollout
+149   and one teacher or reward call per optimizer step. The response-normalized Gi provides a common
+150   unit for task sampling.
+151
+152   3.2   S EPARATE TASK PRIORITIES FROM SAMPLING FREQUENCY
+153
+154   Let qi be the probability that task i supplies the next batch. After sampling task I, the trainer sends
+155                                                 λI
+156                                          gb =      GI ,    I ∼ q,                                     (3)
+                                                    qI
+157
+158   to the optimizer. When qi = λi , the multiplier equals one. Other sampling probabilities use the
+159   multiplier to keep the target gradient fixed.
+160   Proposition 1 (Conditional objective preservation). Let Ht contain the training history before step
+161   t, let qt be determined by Ht with qt,i > 0, and define ht,i = E[Gt,i | Ht , It = i]. The corrected
+      update preserves the target conditional mean.
+
+
+                                                          3
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+162
+      Proof. Because qt is fixed conditional on Ht , averaging over the task draw and its fresh batch gives
+163                                      X       λi                           X
+164                       E[bgt | Ht ] =    qt,i      E[Gt,i | Ht , It = i] =   λi ht,i .               (4)
+165                                      i
+                                                 qt,i                         i
+166
+167
+168   The weights λ define capability priorities. The probabilities q allocate task batches. Equation 4
+169   assigns a separate role to each quantity. The equality concerns the gradient passed to the optimizer.
+170   Stateful optimizers can still produce different parameter paths under different task orders.
+171
+      An online sampler can use earlier gradients, measured costs, and optimizer states to choose the next
+172   q. Every task keeps positive probability, and each new task batch uses fresh rollout randomness, so
+173   Proposition 1 applies at every optimizer step.
+174
+175
+      Task allocation now has a measurable objective: choose q so that one corrected task batch estimates
+      h accurately at low cost. Section 4 derives GPAS from gradient scale and Cost-GPAS from gradient
+176
+      scale plus GPU time. Experiment E1 tests the definition of Gi , E2 tests the corrected estimator, and
+177
+      the end-to-end MOPD experiment measures training efficiency.
+178
+179
+180   4     G RADIENT-P RESERVING A DAPTIVE S AMPLING
+181
+182
+      Section 3.2 fixes the target task mixture and leaves the sampling probabilities available for compute
+      allocation. Every expectation in this section conditions on the model, optimizer, and sampler state
+183
+      before the next task is selected.
+184
+185
+      4.1   S AMPLE TASKS IN THE OPTIMIZER METRIC
+186
+187   Let At be a linear map determined by the optimizer state before task selection. It maps gradients
+188   into the local update geometry whose estimation error we seek to reduce. Conditional on the training
+189   history, At is fixed. Suppressing the step index, define
+190                                                            q
+                                       Ge i = At Gi ,     si = E∥G e i ∥2 .                            (5)
+191                                                                     2
+192   For SGD, At = I; its scalar learning rate does not change the proposal. Thus the SGD instance
+193   is Raw GPAS. For AdamW, raw gradient norms can be misleading because parameter coordinates
+194   have different effective step sizes. Let v̄prev be AdamW’s stored, bias-corrected second moment
+195   before task selection. Its lagged metric is
+196                                                             Gi
+                                        AAdamW
+                                          t       Gi = √                 ,                        (6)
+197                                                       v̄prev + ϵAdam
+198
+      where division is element-wise. The LLM experiments use this instance and call it GPAS unless
+199   stated otherwise.
+200
+201   For the corrected task gradient in Equation 3, the optimizer-metric mean-squared error is
+202                                                     X λ2 s2
+                                                              i i
+                                    E∥At (bg − h)∥22 =            − ∥At h∥22 .                           (7)
+203
+                                                         i
+                                                              q i
+204
+      The part that depends on the proposal is
+205
+                                                           X λ2 s2
+206                                                             i i
+                                                 V (q) =              .                                  (8)
+207                                                         i
+                                                                qi
+208
+      Proposition 2 (Optimizer-metric-optimal task proposal).     If λi si > 0 for every task, V (q) over the
+209   probability simplex is minimized by qi⋆ = λi si / j λj sj .
+                                                       P
+210
+211                              P
+      Proof. Cauchy–Schwarz and i qi = 1 give
+212                             !2                 !2                              !
+213                    X             X √ λi si                        X
+214                       λi si    =       qi √       ≤                       qi       V (q) = V (q).    (9)
+                        i             i
+                                                qi                        i
+215
+      Equality requires qi ∝ λi si , which proves the claim.
+
+
+                                                           4
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+216
+      The identity metric makes the result the classical SGD gradient-norm rule. For AdamW, GPAS
+217   uses the stored state because the score must be available before task selection. This lagged score
+218   approximates the task-dependent part of the next AdamW step; E3 compares it with a measured
+219   AdamW task step.
+220
+221   4.2   I NCLUDE MEASURED TASK COST
+222
+223   Fixed-token task batches can have different runtimes. Let ci be the measured time for generation,
+224   teacher or reward evaluation,
+                              P actor training, and the optimizer step. Cost-GPAS minimizes the local
+225   compute score J(q) = ( i qi ci )V (q).
+226   Corollary
+              √ 1P  (Cost-aware task proposal). If additionally ci > 0, the minimizer of J(q) is qi⋆ =
+227
+                               √
+      (λi si / ci )/ j (λj sj / cj ).
+228
+229                                                         √                                                  √
+                                                                ci )2 , with equality exactly when qi ∝ λi si / ci .
+                                               P
+      Proof. Cauchy–Schwarz gives J(q) ≥ (        i λi si
+230
+231
+232
+233   This applies the cost-aware sampling rule of Mohri et al. (2026) to complete task batches in the
+234
+      selected optimizer metric. J(q) is a local training signal. E2 measures it on held-out gradient banks,
+      and the end-to-end experiment measures weighted teacher loss against GPU hours.
+235
+236
+237   4.3   E STIMATE THE SCORES ONLINE
+238
+      After task i completes, GPAS updates one moving average, sb2i ← γb  s2i + (1 − γ)∥G
+                                                                                        e i ∥2 . Cost-GPAS
+                                                                                             2
+239
+      applies the same update to measured task time. A round-robin warm start observes every task.
+240   After computing the proposal, the implementation sets probabilities below qmin to the floor and
+241   renormalizes the remaining entries. The floor limits score staleness and large importance weights.
+242
+243
+      Score error changes sampling efficiency smoothly. Appendix B.4 shows that a relative score error of
+      at most δ increases V (q) by at most a factor of 1/(1 − δ 2 ). E2 evaluates the proposal with held-out
+244
+      gradients, and E3 compares the online moving average with fresh task scores.
+245
+246   Each completed step records the clipped task gradient before the importance correction. The trainer
+247   then multiplies the gradient by λI /qI and passes it to the optimizer. Gradient clipping is applied
+248   before the correction so the conditional mean in Equation 4 matches the stated training objective.
+249
+      The experiments use AdamW; changing the optimizer changes the metric, not the correction.
+250
+251   5     E XPERIMENTS
+252
+253   The controlled experiment checks GPAS under the SGD and AdamW metrics. Frozen gradient
+254   banks test response normalization, proposal quality, and the AdamW instantiation. Paired MOPD
+255   runs measure end-to-end efficiency. A final experiment applies the task sampler to GRPO.
+256
+257   Evidence status. The controlled experiment is complete and reproducible from the released script.
+258   The four-teacher MOPD and GRPO runs require a multi-GPU training setup and remain pending in
+259   this draft. The protocol below assigns a measurement and a success rule to each planned large-model
+260   claim.
+261
+262   5.1   C ONTROLLED VALIDATION OF THE SAMPLING RULE
+263
+264   We construct three Gaussian task-gradient distributions with different raw gradient scales, AdamW
+265   coordinate scales, and task costs. All methods target λi = 1/3 and apply the correction in Equa-
+266
+      tion 3. We draw 20,000 Monte Carlo trials, with 16 corrected task gradients per trial. The controlled
+      comparison omits the probability floor so its proposals match the closed-form calculation.
+267
+268   Under the identity metric used by SGD, Raw GPAS is optimal and attains calculated and Monte
+269   Carlo error ratios of 0.534 relative to uniform sampling. Figure 1 evaluates the same problem in the
+      AdamW metric. The calculated GPAS error ratio is 0.698, and the Monte Carlo ratio is 0.697. The
+
+
+                                                            5
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+270
+      raw-gradient proposal reaches 7.178 times the observed uniform error because its largest raw coor-
+271   dinates receive a small AdamW scale. Cost-GPAS reaches 0.893 times the uniform time-weighted
+272   second-moment proxy. Every corrected proposal has a relative AdamW-scaled mean-gradient error
+273   below 2.1%. The controlled experiment checks the estimator and implementation. The LLM study
+274   tests score quality, teacher compatibility, and training progress.
+275
+276                                          Task proposals                                                  16-sample estimator                                              Compute criterion
+                             0.8
+277                                             Uniform                                                                            theory
+                                                Raw-gradient GPAS
+
+
+
+
+                                                                                                                                            second moment × cost
+                                                                                                                                                                     5
+
+
+
+
+      sampling probability
+                                                                             scaled gradient MSE
+                                                GPAS
+278                          0.6                Cost-GPAS
+                                                                                                     6
+                                                                                                                                                                     4
+279
+280                          0.4                                                                     4                                                               3
+
+
+                                                                             (relative to uniform)
+                                                                                                                                             (relative to uniform)
+281                                                                                                                                                                  2
+                             0.2                                                                     2
+282                                                                                                                                                                  1
+283
+                             0.0                                                                     0                                                               0
+284                                 task 1        task 2            task 3                               Uniform   Raw   GPAS   Cost                                     Uniform   Raw   GPAS     Cost
+
+285
+286   Figure 1: Controlled sampling experiment. Bars show Monte Carlo results normalized by the ob-
+287   served uniform baseline; black crosses show calculated error ratios. Task costs are 5, 2, and 10.
+288
+      Lower values are better in the center and right panels.
+289
+290   5.2                          F OUR - TEACHER MOPD SETUP
+291
+292   The planned MOPD study uses a frozen revision of Qwen3-1.7B (Qwen Team, 2025). Four teachers
+293   start from the Qwen3 checkpoint and receive separate post-training on mathematics, code, instruc-
+294   tion following, and science question answering. Teacher selection occurs before the multi-teacher
+295   runs. The release specification requires model revisions, teacher hashes, data splits, and the four
+296
+      capability scores of every teacher.
+297   Each optimizer step samples one task, generates a task-homogeneous batch, calls one frozen teacher,
+298   and consumes the rollout once. Every task batch targets 65,536 valid response tokens. Prompt count
+299   is estimated from earlier response lengths, and every completed response enters the gradient. The
+300   logs record the actual token count and overshoot.
+301   The primary loss uses the sampled-token OPD gradient in Appendix B.1. Each response is averaged
+302   by its valid-token count, followed by an average over responses and one shared task-gradient clip.
+303   The trainer records the raw and AdamW-scaled scores, applies λi /qi , and calls AdamW. The target
+304   mixture is λi = 1/4.
+305
+      All methods use 600 optimizer steps, an 8,192-token response cap, temperature 1, top-p 1, and
+306   disabled thinking mode. A uniform pilot fixes the learning rate, warmup, clipping threshold, batch
+307   target, moving-average rate γ = 0.95, and probability floor qi ≥ 0.05. Every paired seed shares a
+308   16-step round-robin warm start, model state, AdamW state, task cursors, and random streams.
+309
+310   5.3                          M ETHODS
+311
+312   Table 1 contains the three main methods and three diagnostic controls. Raw GPAS tests the AdamW
+313   scaling. Cost-only tests whether cheap-task preference explains the gains. Uncorrected GPAS mea-
+314   sures the objective shift caused by using the proposal as the task weight.
+315
+316
+      Table 1: Planned MOPD methods. Primary comparisons use five paired seeds; diagnostic controls
+      use three.
+317
+318                                                    Method                                            Task proposal       Gradient factor                             Seeds
+319                                                    Uniform                                           qi = 1/4            1                                           41–45
+320                                                    GPAS                                              qi ∝ λi sbi √       λi /qi                                      41–45
+321                                                    Cost-GPAS                                         qi ∝ λi sbi / cbi   λi /qi                                      41–45
+322                                                    Raw GPAS                                          qi ∝ λi rbi√        λi /qi                                      41–43
+323
+                                                       Cost-only                                         qi ∝ λi / cbi       λi /qi                                      41–43
+                                                       Uncorrected GPAS                                  GPAS proposal       1                                           41–43
+
+
+                                                                                                                    6
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+324
+      Here rbi2 tracks E∥Gi ∥22 . Additional diagnostic runs include a corrected teacher-loss gap sampler,
+325   Raw Cost-Aware, round robin, and a full-mixture reference. The full-mixture reference computes
+326   four response-normalized microbatches and averages them before one AdamW step. Raw GPAS is
+327   the GPAS rule for the SGD identity metric, but here it supplies a cross-metric proposal while every
+328   method still trains with AdamW. This isolates the value of AdamW scaling without confounding it
+329   with an optimizer change.
+330
+331   5.4   M ECHANISM AUDITS
+332
+333   E1: response length and task cost. At steps 0, 150, 300, 450, and 600 of a uniform run, cached
+334   rollouts measure each task’s response length, prompt count for a fixed-token batch, token share in
+335   a prompt-balanced mixed batch, and GPU time. Cached responses form two gradient estimates:
+336
+      global token averaging and response normalization followed by a weighted task average. E1 tests
+      whether global token averaging follows response length and whether response normalization keeps
+337
+      the explicit coefficient at 1/4. Timing separates rollout, teacher forward, actor forward/backward,
+338
+      and optimizer work.
+339
+340
+      E2: corrected-gradient and cost audit. Each checkpoint supplies independent calibration and
+341   evaluation gradient banks. The calibration bank builds each proposal. The evaluation bank mea-
+342   sures the distance and cosine similarity between the resampled mean gradient and the four-task
+343   full-mixture gradient. The evaluation bank also measures the AdamW-scaled estimator error M (q)
+344   from Equation 11 and the compute score J(q) defined in Section 4.2. Each result includes its ratio to
+345   a proposal built from held-out task gradients and costs. The preregistered predictions are: corrected
+346   methods match the full-mixture mean, GPAS improves on Uniform and Raw GPAS in M (q), and
+347   Cost-GPAS improves on Uniform, GPAS, and Cost-only in J(q).
+348   E2 also measures teacher–student reverse KL, the fraction of shared tokens in the teacher and stu-
+349   dent top-16 sets, and the 95th and 99th percentiles of the absolute token log-probability gap. The
+350   compatibility metrics show whether a large gradient score comes with a usable teacher signal or an
+351   extreme log-ratio tail. Each measure is reported by task and checkpoint.
+352
+353   E3: AdamW score and online tracking. For each task, one model clone applies Gi and another
+354   applies a zero gradient from the same model and AdamW state. The difference between the two
+355   parameter vectors isolates the task-dependent part of one AdamW step. Task-pair accuracy and
+356   Spearman correlation compare raw gradient size and ∥G   e i ∥2 with the measured parameter change.
+357   The measured changes also define an exact-step oracle proposal, which bounds the improvement
+358   available from a better optimizer metric. A held-out teacher-loss batch records the immediate loss
+359
+      change from each task gradient.
+360   The same cached gradients provide the SGD check: under its identity metric, the raw gradient norm
+361   is the exact current-step score up to a shared scalar. This is a metric sanity check rather than a
+362   separate end-to-end optimizer comparison.
+363   An excluded uniform pilot compares the online score moving average with fresh gradient-bank
+364   scores every 25 steps. A parallel cost audit compares the cost moving average with the next observed
+365   task time. The score and cost comparisons test the fixed γ = 0.95 configuration before the primary
+366   runs.
+367
+368   5.5   E ND - TO - END MOPD EFFICIENCY
+369
+370   Every 25 steps, fresh student rollouts on a fixed prompt set measure the weighted teacher loss
+371                                                    X
+372                                           L(N ) =      λi ℓi (N ),                               (10)
+373                                                     i
+
+374   where N denotes cumulative valid response tokens or measured GPU hours. The token comparison
+375   is GPAS versus Uniform. The GPU-hour comparison is Cost-GPAS versus Uniform and GPAS.
+376   Curves use the shortest budget completed by every method in a comparison. An excluded Uniform
+377   pilot fixes two teacher-loss targets before the main runs. We report the budget required to reach each
+      target and the area under the loss curve over the shared budget.
+
+
+                                                        7
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+378
+      Each comparison reports all five paired differences, their mean, a paired effect size, and a 95%
+379   paired interval. An efficiency claim requires four of five seeds in the predicted direction, an interval
+380   excluding zero, and the matching E2 metric in the predicted direction. We separately verify that
+381   the methods use the same number of model evaluations per step and report sampler synchronization
+382   overhead.
+383
+      The run record includes response tokens, teacher-scored tokens, prompts, optimizer steps, GPU
+384
+      hours, wall-clock time, truncation, invalid outputs, sampling probabilities, inverse sampling factors,
+385   infrastructure failures, and every task’s teacher loss.
+386
+387
+388   Capability evaluation. The capability evaluation covers the initial student and checkpoints at
+389   steps 300 and 600. Metrics are MATH-500 greedy pass@1, a frozen post-cutoff LiveCodeBench
+390
+      pass@1 slice, IFBench strict accuracy, and GPQA-Diamond averaged over four samples. The ca-
+      pability table contains all four scores, their macro average, and the lowest score. The full vector
+391
+      displays the trade-off behind each aggregate.
+392
+393
+394   5.6   T RANSFER TO MULTI - TASK GRPO
+395
+396   The GRPO study uses MATH train, APPS train, and ARC-Challenge train with executable or exact-
+397   match rewards (Hendrycks et al., 2021b;a; Clark et al., 2018). The target is λi = 1/3. Each
+398   task-homogeneous batch targets 32,768 response tokens and samples eight responses per prompt.
+399   Uniform, sequence-level Cost-Aware GRPO, GPAS, and Cost-GPAS share a 12-step round-robin
+400   warm start and run for 400 optimizer steps. The Cost-Aware GRPO baseline first samples tasks with
+401
+      qi = λi , then resamples completed responses inside the selected task in proportion to advantage
+      magnitude divided by the square root of prompt-plus-response length (Mohri et al., 2026). A small
+402
+      uniform mixture gives every completed response positive sampling probability. Importance weights
+403
+      preserve the empirical task objective. GPAS and Cost-GPAS select the task before generation and
+404   use the task-level correction in Equation 3.
+405
+406   The primary curves report weighted held-out KL-regularized return over tokens and GPU hours.
+407
+      MATH-500, APPS test pass@1, and ARC-Challenge accuracy provide the task vector. Multi-Task
+      GRPO supplies a capability-oriented reference using its published task-weight rule (Ramesh et al.,
+408
+      2026).
+409
+410
+411
+      6     D ISCUSSION AND C ONCLUSION
+412
+413
+414   Multi-task post-training needs separate controls for the target objective and compute allocation.
+415   Response-normalized task batches define the unit of the target; inverse sampling preserves its con-
+416
+      ditional mean. GPAS chooses proposals in an optimizer-induced metric, and Cost-GPAS also uses
+      measured task time. The identity metric recovers the SGD gradient-norm rule; our LLM experiments
+417
+      focus on the lagged AdamW metric.
+418
+419   The controlled experiment supports the local estimator claim. GPAS reduces the measured error
+420   by 30.3%, and Cost-GPAS reduces the time-weighted proxy by 10.7%. The constructed compari-
+421   son shows that coordinate scale can matter. The planned gradient-bank and exact-step audits will
+422
+      measure whether the lagged AdamW score remains useful in LLM training.
+423   Three boundaries guide interpretation. First, the correction preserves the conditional mean of the
+424   gradient delivered to the optimizer. Stateful optimizers can still produce different parameter paths
+425   under different task orders. Second, the score combines mean scale and batch variation. Compat-
+426   ibility and gradient-bank audits measure whether a large score carries a consistent training signal.
+427   Third, Cost-GPAS optimizes an uncentered local compute score. The GPU-hour curves provide the
+428
+      end-to-end efficiency measurement.
+429   The present draft contains controlled estimator evidence and a fixed large-model protocol. Com-
+430   pletion of E1–E4 is required for a claim about MOPD training efficiency, and E5 is required for a
+431   GRPO transfer claim. The evidence boundary keeps the mathematical result, the MOPD hypothesis,
+      and the eventual capability results distinct.
+
+
+                                                         8
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+432
+      AI USE STATEMENT
+433
+434   We used generative AI tools for language editing and manuscript organization. The authors re-
+435   viewed every AI-assisted revision and take responsibility for the final text, claims, proofs, code, and
+436   experimental results.
+437
+438   E THICS STATEMENT
+439
+440   The study evaluates optimization methods for existing language models with established reasoning
+441
+      and instruction-following datasets and automated verifiers. Model and dataset biases can affect
+      the reported capability scores. We record data provenance, invalid outputs, and verifier failures to
+442
+      support careful interpretation of the results.
+443
+444
+      R EPRODUCIBILITY STATEMENT
+445
+446   Section 5 specifies the model family, task setup, update budget, evaluation points, and evaluation
+447   protocol. The appendix gives the sampling derivations and implementation details. The repository
+448   includes the controlled experiment code and generated figure. The release specification for E1–E5
+449   requires frozen data manifests, model and tokenizer revisions, random seeds, optimizer settings,
+450   task-sampling logs, saved parameter and optimizer states, and per-prompt evaluation outputs.
+451
+452   R EFERENCES
+453
+454   Guillaume Alain, Alex Lamb, Chinnadhurai Sankar, Aaron Courville, and Yoshua Bengio. Variance
+455
+        reduction in sgd by distributed importance sampling, 2015. URL https://arxiv.org/
+        abs/1511.06481.
+456
+457   Zhao Chen, Vijay Badrinarayanan, Chen-Yu Lee, and Andrew Rabinovich. Gradnorm: Gradi-
+458     ent normalization for adaptive loss balancing in deep multitask networks. In Proceedings of
+459     the 35th International Conference on Machine Learning, pp. 794–803, 2018. URL https:
+460     //proceedings.mlr.press/v80/chen18a.html.
+461   Peter Clark, Isaac Cowhey, Oren Etzioni, Tushar Khot, Ashish Sabharwal, Carissa Schoenick, and
+462     Oyvind Tafjord. Think you have solved question answering? try ARC, the AI2 reasoning chal-
+463     lenge, 2018. URL https://arxiv.org/abs/1803.05457.
+464
+      Nicholas E. Corrado, Wenyuan Huang, and Josiah P. Hanna. Distributionally robust multi-task
+465
+        reinforcement learning via adaptive task sampling, 2026. URL https://arxiv.org/abs/
+466
+        2605.14350.
+467
+468   Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang, Bingxiang He,
+469     Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou. Open-mopd: Diagnosing and fixing capability
+470     imbalance in multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/
+471
+        2608.19098.
+472   Dan Hendrycks, Steven Basart, Saurav Kadavath, Mantas Mazeika, Akul Arora, Ethan Guo, Collin
+473     Burns, Samir Puranik, Horace He, Dawn Song, and Jacob Steinhardt. Measuring coding challenge
+474     competence with APPS, 2021a. URL https://arxiv.org/abs/2105.09938.
+475
+      Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric Tang, Dawn Song,
+476
+        and Jacob Steinhardt. Measuring mathematical problem solving with the MATH dataset. In
+477     Advances in Neural Information Processing Systems, 2021b. URL https://arxiv.org/
+478     abs/2103.03874.
+479
+480   Angelos Katharopoulos and François Fleuret. Not all samples are created equal: Deep learn-
+481
+        ing with importance sampling. In Proceedings of the 35th International Conference on Ma-
+        chine Learning, pp. 2525–2534, 2018. URL https://proceedings.mlr.press/v80/
+482
+        katharopoulos18a.html.
+483
+484   Thibault Lahire. Non-uniform sampling and adaptive optimizers in deep learning. OPT 2023:
+485     Optimization for Machine Learning, 2023. URL https://opt-ml.org/papers/2023/
+        paper20.pdf.
+
+
+                                                        9
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+486
+      Zeman Li, Yuan Deng, Peilin Zhong, Meisam Razaviyayn, and Vahab Mirrokni. Pike: Adaptive data
+487     mixing for large-scale multi-task learning under low gradient conflicts. In Advances in Neural
+488     Information Processing Systems, 2025. URL https://arxiv.org/abs/2502.06244.
+489
+490   Bo Liu, Xingchao Liu, Xiaojie Jin, Peter Stone, and Qiang Liu. Conflict-averse gradient descent for
+491     multi-task learning, 2024. URL https://arxiv.org/abs/2110.14048.
+492
+      Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+493
+       Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli Luo. Mopd: Multi-teacher on-policy
+494    distillation for capability integration in llm post-training, 2026a. URL https://arxiv.org/
+495    abs/2606.30406.
+496
+497   Yingzi Ma, Zichen Zhu, Ming Jiang, and Chaowei Xiao. One student, many teachers: Multi-task
+498     on-policy distillation via soft-prompt privileged context, 2026b. URL https://arxiv.org/
+499     abs/2607.18293.
+500
+      Clara Mohri, Amir Globerson, Haim Kaplan, Tomer Koren, and Yishay Mansour. Cost-aware learn-
+501     ing, 2026. URL https://arxiv.org/abs/2604.28020.
+502
+503   Qwen Team. Qwen3 technical report, 2025. URL https://arxiv.org/abs/2505.09388.
+504
+505
+      Shyam Sundhar Ramesh, Xiaotong Ji, Matthieu Zimmer, Sangwoong Yoon, Zhiyong Wang,
+        Haitham Bou Ammar, Aurelien Lucchi, and Ilija Bogunovic. Multi-task grpo: Reliable llm rea-
+506
+        soning across tasks, 2026. URL https://arxiv.org/abs/2602.05547.
+507
+508   Ozan Sener and Vladlen Koltun. Multi-task learning as multi-objective optimization, 2019. URL
+509     https://arxiv.org/abs/1810.04650.
+510
+511   Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang,
+512
+        Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. Deepseekmath: Pushing the limits of mathe-
+        matical reasoning in open language models, 2024. URL https://arxiv.org/abs/2402.
+513
+        03300.
+514
+515   Chen Wang, Zhaochun Li, Jionghao Bai, Yining Zhang, Hexuan Deng, Ge Lan, and Yue Wang.
+516     Distilled reinforcement learning for llm post-training, 2026a. URL https://arxiv.org/
+517     abs/2607.17247.
+518
+519
+      Rui Wang, Hongru Wang, Yi Chen, Boyang Xue, Tianqing Fang, Wenhao Yu, and Kam-Fai Wong.
+        Demystifying on-policy distillation: Roles, pathologies, and regulations, 2026b. URL https:
+520
+        //arxiv.org/abs/2607.13399.
+521
+522   Runzhe Wu, Ankur Samanta, Ayush Jain, Scott Fujimoto, Jeongyeol Kwon, Ben Kretzu, Youliang
+523     Yu, Kaveh Hassani, Boris Vidolov, and Yonathan Efroni. Imbalanced gradients in rl post-training
+524     of multi-task llms, 2025. URL https://arxiv.org/abs/2510.19178.
+525
+526
+      Yuan Xie, Jiaqi Song, Xianliang Wang, Ming Lei, Jie Gao, and Jie Wu. Language-specialized multi-
+        teacher on-policy distillation for multilingual llm-based asr, 2026. URL https://arxiv.
+527
+        org/abs/2608.03610.
+528
+529   Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine, Karol Hausman, and Chelsea Finn.
+530     Gradient surgery for multi-task learning, 2020. URL https://arxiv.org/abs/2001.
+531     06782.
+532
+533
+534   A    P RACTICAL T RAINING R ECIPE
+535
+536   The recipe uses one complete task batch and one optimizer step per rollout. Task selection occurs
+537   before generation, so each step calls one teacher or reward function.
+538
+539   1. Fix the task target. Choose λ from the intended capability priorities and record it before
+      choosing a sampler. For frozen MOPD teachers, λ is the teacher mixture.
+
+
+                                                      10
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+540
+      2. Define one task gradient. Use a task-homogeneous batch. Average token gradients inside each
+541   response and then average responses to form Gi . Apply one shared task-gradient clip. Set a shared
+542   valid-token target, and record prompt count, token count, and GPU time.
+543
+544   3. Initialize the sampler. Run a short round-robin warm start. Store a moving average of ∥G     e i ∥2
+                                                                                                           2
+545   for every task in the selected optimizer metric. This is the raw gradient norm for SGD; the four-task
+546   protocol uses AdamW’s stored second moment before the sampling correction. Cost-GPAS also
+547   stores a moving average of task time. The protocol uses 16 warm-start steps and γ = 0.95.
+548
+                                                                                         √
+549   4. Sample and optimize. GPAS sets qi ∝ λi sbi . Cost-GPAS sets qi ∝ λi sbi / cbi . Apply the
+550   probability floor, sample one task, compute and clip Gi , record its score, multiply by λI /qI , and
+551   call the optimizer. The four-task protocol uses AdamW and qmin = 0.05.
+552
+553   5. Save and audit. Checkpoint the score average, cost average, timestamps, proposal, task cur-
+554   sors, and random state. Log I, qI , λI /qI , valid tokens, prompt count, GPU time, and the raw
+555
+      and optimizer-metric gradient norms. A large inverse sampling factor or a stale task score triggers
+      inspection of the probability floor.
+556
+557
+558   B     D ERIVATIONS AND I MPLEMENTATION D ETAILS
+559
+560   B.1   S AMPLED - TOKEN OPD
+561
+562
+      Fix a student-generated prefix z. Write pv = πθ (v | z) and τv = Ti (v | z). The reverse-KL ascent
+      gradient at prefix z is
+563                                              X         τv
+564                                     ui (z) =   pv log ∇θ log pv .                               (11)
+                                                 v
+                                                           pv
+565
+566
+      For a token V sampled from p, the sampled-token gradient is
+                                            
+567                                       τV
+                      Ui (z, V ) = sg log      ∇θ log pV ,   E[Ui (z, V ) | z] = ui (z).                (12)
+568                                       pV
+569   Response normalization averages the prefix gradients according to Equation 1.
+570
+571
+      B.2   TASK - HOMOGENEOUS GRPO GRADIENT
+572
+573   For task i, GRPO samples response groups from one prompt, computes within-prompt advantages,
+574   and applies the standard clipped policy surrogate (Shao et al., 2024). The implementation first
+575   averages token terms inside each response and then averages responses inside the task batch. The
+576   resulting clipped task gradient is Gi . The GRPO policy ratio handles behavior-policy change inside
+577   a task, while λi /qi handles task sampling.
+578
+579   B.3   F ROZEN - GRADIENT EVALUATION METRIC
+580
+      For an evaluation bank, let e h = At h be the full-mixture mean in the selected optimizer metric, and
+581
+582
+      let ge = At gb be the transformed corrected draw. The centered error is
+          b
+                                                                  2
+583
+                                                        ge − e
+                                              M (q) = E b    h        .                                 (13)
+584                                                               2
+585   The experiment estimates h and the expectation from held-out task batches. Calibration batches
+586   supply q, so proposal construction and evaluation use separate samples. The LLM evaluation uses
+587   the AdamW metric in Equation 5; the controlled experiment also reports the SGD identity metric.
+588
+589   B.4    A PPROXIMATE - SCORE PENALTY
+590
+      Let qi∗ = λi si /Z, where Z = i λi si , and let qbi = λi sbi /Z.
+                                   P                                 b Write wi = λi si /Z and ri = sbi /si .
+591
+      Then
+592                                                         !
+                                                                 X wi
+                                                                         !
+                                    V (bq)       X
+593                                          =        wi ri                .                           (14)
+                                    V (q ∗ )       i               i
+                                                                      ri
+
+
+                                                        11
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+594
+      If ri ∈ [1 − δ, 1 + δ], the Kantorovich inequality gives
+595
+                                                                  2
+596                                V (bq)     (1 − δ) + (1 + δ)              1
+597                                         ≤                          =          .                    (15)
+                                   V (q ∗ )    4(1 − δ)(1 + δ)             1 − δ2
+598
+599   The result concerns proposal quality for fixed scores. Model drift, observation noise, and the proba-
+600   bility floor are measured separately.
+601
+602   B.5   P ROBABILITY FLOOR AND SAVED STATE
+603
+      The online sampler fixes entries below qmin and renormalizes the remaining active entries. A check-
+604
+      point stores every task’s score average, cost average, observation count, last-step time, task cursor,
+605   and current proposal. Restoring the random state and task cursors reproduces the next task draw and
+606   batch.
+607
+608
+      B.6   A DAM W TASK - STEP MEASUREMENT
+609
+610   Equation 5 uses the previous bias-corrected second moment and omits the current gradient’s effect
+611   on AdamW’s denominator. AdamW momentum can also move parameters when the current task
+612   gradient is zero. The matched-state measurement in Section 5.4 runs one clone with task gradient
+613   Gi and one clone with a zero gradient. Both clones use the same model, AdamW state, learning
+614   rate, and moment decay. The difference between the two parameter vectors isolates the increment
+615
+      associated with the current task gradient. For SGD, the corresponding matched-state difference is a
+      shared scalar times Gi , so the identity metric introduces no lagged-preconditioner approximation.
+616
+617
+618
+619
+620
+621
+622
+623
+624
+625
+626
+627
+628
+629
+630
+631
+632
+633
+634
+635
+636
+637
+638
+639
+640
+641
+642
+643
+644
+645
+646
+647
+
+
+
+                                                       12
+

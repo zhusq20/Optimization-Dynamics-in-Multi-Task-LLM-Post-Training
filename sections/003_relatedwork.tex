@@ -19,9 +19,9 @@ wu2025imbalancedgradientsrlposttraining}. Difficulty-based curricula sample
 weak or slowly improving tasks more often \citep{corrado2026drats}.
 Multi-Task GRPO learns robustness-oriented task weights and preserves its
 realized batch ratios \citep{ramesh2026multitaskgrporeliablellm}. Our experiments
-keep the target task weights fixed. A corrected gap sampler measures the value
-of a loss-gap signal under the same target objective. An uncorrected version
-measures the capability shift caused by changing task priorities.
+keep the target task weights fixed. Curriculum signals can still define a task
+proposal, but the sampled gradient receives the same inverse-probability
+correction as every other proposal.
 
 \paragraph{Multi-teacher on-policy distillation.}
 MOPD routes student rollouts to domain teachers and trains one shared student
@@ -39,9 +39,14 @@ useful learning signal
 \citep{ma2026mopdmultiteacheronpolicydistillation,
 mayingzi2026onestudentmanyteachers}. Our MOPD protocol uses four same-origin
 teachers, task-homogeneous fixed-token batches, and one optimizer use per
-rollout. GPAS changes the frequency of complete task batches and applies an
-inverse sampling factor. Cost-GPAS adds measured GPU time for generation,
-teacher evaluation, and model updates.
+rollout. D$^3$-MOPD adapts the domain mixture from normalized reverse-KL gap and
+recent descent velocity to exploit asynchronous domain convergence
+\citep{sun2026d3mopd}. In its formulation, the same mixture also weights the
+MOPD objective. We adapt its trajectory signal as a corrected task proposal,
+so it can be compared with optimizer-aware sampling under one fixed target.
+GPAS changes the frequency of complete task batches and applies an inverse
+sampling factor. Cost-GPAS adds measured GPU time for generation, teacher
+evaluation, and model updates.
 
 \paragraph{Importance sampling for stochastic optimization.}
 Sampling examples from their gradient size and applying an inverse probability

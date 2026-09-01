@@ -5,7 +5,7 @@
 
 The controlled experiment checks GPAS under the SGD and AdamW metrics. Frozen
 gradient banks test response normalization, proposal quality, and the AdamW
-instantiation. Paired MOPD runs measure end-to-end efficiency. A final
+instantiation. Matched seed-42 MOPD runs measure end-to-end efficiency. A final
 experiment applies the task sampler to GRPO.
 
 \paragraph{Evidence status.}
@@ -70,47 +70,54 @@ The trainer records the raw and AdamW-scaled scores, applies
 $\lambda_i/q_i$, and calls AdamW. The target mixture is $\lambda_i=1/4$.
 
 All methods use 600 optimizer steps, an 8,192-token response cap, temperature
-1, top-$p$ 1, and disabled thinking mode. A uniform pilot fixes the learning
-rate, warmup, clipping threshold, batch target, moving-average rate
-$\gamma=0.95$, and probability floor $q_i\geq0.05$. Every paired seed shares a
-16-step round-robin warm start, model state, AdamW state, task cursors, and
-random streams.
+1, top-$p$ 1, and disabled thinking mode. The pre-run specification fixes the
+learning rate, warmup, clipping threshold, batch target, moving-average rate
+$\gamma=0.95$, probability floor $q_i\geq0.05$, and the KL-trajectory
+hyperparameters. All runs use seed 42 and share a 16-step round-robin warm
+start, model state, AdamW state, task cursors, and random streams.
 
 \subsection{Methods}
 \label{sec:exp_methods}
 
-Table~\ref{tab:exp_methods} contains the three main methods and three diagnostic
-controls. Raw GPAS tests the AdamW scaling. Cost-only tests whether cheap-task
-preference explains the gains. Uncorrected GPAS measures the objective shift
-caused by using the proposal as the task weight.
+Table~\ref{tab:exp_methods} contains four main methods and three diagnostic
+controls. KL-Trajectory adapts the normalized reverse-KL gap--velocity signal
+of D$^3$-MOPD \citep{sun2026d3mopd} to the task-homogeneous interface and
+applies the same target-preserving correction as GPAS. It tests a low-cost
+learning-progress signal without changing the target mixture. Raw GPAS tests
+the AdamW scaling, Cost-only tests whether cheap-task preference explains the
+gains, and Uncorrected GPAS measures the objective shift caused by using the
+proposal as the task weight.
 
 \begin{table}[H]
 \centering
 \small
-\caption{Planned MOPD methods. Primary comparisons use five paired seeds;
-diagnostic controls use three.}
+\caption{Planned MOPD methods. Every listed configuration uses one run with
+seed 42; diagnostic controls are conditional.}
 \label{tab:exp_methods}
 \begin{tabular}{llll}
 \hline
-Method & Task proposal & Gradient factor & Seeds \\
+Method & Task proposal & Gradient factor & Seed \\
 \hline
-Uniform & $q_i=1/4$ & $1$ & 41--45 \\
+Uniform & $q_i=1/4$ & $1$ & 42 \\
+KL-Trajectory & $q_i=\operatorname{FloorSoftmax}(\widehat z_i)$
+    & $\lambda_i/q_i$ & 42 \\
 GPAS & $q_i\propto\lambda_i\widehat s_i$
-    & $\lambda_i/q_i$ & 41--45 \\
+    & $\lambda_i/q_i$ & 42 \\
 Cost-GPAS & $q_i\propto\lambda_i\widehat s_i/\sqrt{\widehat c_i}$
-    & $\lambda_i/q_i$ & 41--45 \\
+    & $\lambda_i/q_i$ & 42 \\
 Raw GPAS & $q_i\propto\lambda_i\widehat r_i$
-    & $\lambda_i/q_i$ & 41--43 \\
+    & $\lambda_i/q_i$ & 42 \\
 Cost-only & $q_i\propto\lambda_i/\sqrt{\widehat c_i}$
-    & $\lambda_i/q_i$ & 41--43 \\
-Uncorrected GPAS & GPAS proposal & $1$ & 41--43 \\
+    & $\lambda_i/q_i$ & 42 \\
+Uncorrected GPAS & GPAS proposal & $1$ & 42 \\
 \hline
 \end{tabular}
 \end{table}
 
-Here $\widehat r_i^2$ tracks $\mathbb E\|G_i\|_2^2$. Additional diagnostic runs
-include a corrected teacher-loss gap sampler, Raw Cost-Aware, round robin, and a
-full-mixture reference. The full-mixture reference computes four
+Here $\widehat z_i$ is the normalized reverse-KL gap--velocity score defined in
+Appendix~\ref{app:kl_trajectory}, and $\widehat r_i^2$ tracks
+$\mathbb E\|G_i\|_2^2$. Additional diagnostic runs include Raw Cost-Aware,
+round robin, and a full-mixture reference. The full-mixture reference computes four
 response-normalized microbatches and averages them before one AdamW step.
 Raw GPAS is the GPAS rule for the SGD identity metric, but here it supplies a
 cross-metric proposal while every method still trains with AdamW. This isolates
@@ -132,7 +139,8 @@ optimizer work.
 \paragraph{E2: corrected-gradient and cost audit.}
 \label{sec:exp_estimator}
 Each checkpoint supplies independent calibration and evaluation gradient banks.
-The calibration bank builds each proposal. The evaluation bank measures the
+The calibration bank builds the gradient- and cost-based proposals; the logged
+reverse-KL history builds KL-Trajectory. The evaluation bank measures the
 distance and cosine similarity between the resampled mean gradient and the
 four-task full-mixture gradient. The evaluation bank also measures the
 AdamW-scaled estimator error $M(q)$ from
@@ -140,8 +148,8 @@ Equation~\ref{eq:empirical_estimator_mse} and the compute score $J(q)$ defined
 in Section~\ref{sec:cost_gpas}. Each result includes its ratio to a
 proposal built from held-out task gradients and costs. The preregistered
 predictions are: corrected methods match the full-mixture mean, GPAS improves on
-Uniform and Raw GPAS in $M(q)$, and Cost-GPAS improves on Uniform, GPAS, and
-Cost-only in $J(q)$.
+Uniform, KL-Trajectory, and Raw GPAS in $M(q)$, and Cost-GPAS improves on
+Uniform, GPAS, and Cost-only in $J(q)$.
 
 E2 also measures teacher--student reverse KL, the fraction of shared tokens in
 the teacher and student top-16 sets, and the 95th and 99th percentiles of the
@@ -166,10 +174,10 @@ the raw gradient norm is the exact current-step score up to a shared scalar.
 This is a metric sanity check rather than a separate end-to-end optimizer
 comparison.
 
-An excluded uniform pilot compares the online score moving average with fresh
+The Uniform run compares the online score moving average with fresh
 gradient-bank scores every 25 steps. A parallel cost audit compares the cost
-moving average with the next observed task time. The score and cost comparisons test the fixed
-$\gamma=0.95$ configuration before the primary runs.
+moving average with the next observed task time. These are diagnostic checks of
+the pre-specified $\gamma=0.95$ configuration, not opportunities to retune it.
 
 \subsection{End-to-end MOPD efficiency}
 \label{sec:exp_allocation}
@@ -181,18 +189,21 @@ teacher loss
     \label{eq:weighted_teacher_loss}
 \end{equation}
 where $N$ denotes cumulative valid response tokens or measured GPU hours. The
-token comparison is GPAS versus Uniform. The GPU-hour comparison is Cost-GPAS
-versus Uniform and GPAS. Curves use the shortest budget completed by every
-method in a comparison. An excluded Uniform pilot fixes two teacher-loss
-targets before the main runs. We report the budget required to reach each target
-and the area under the loss curve over the shared budget.
+token comparisons are GPAS versus Uniform and KL-Trajectory. The GPU-hour
+comparisons are Cost-GPAS versus Uniform and GPAS. Curves use the shortest
+budget completed by every method in a comparison. An excluded Uniform pilot
+fixes two teacher-loss targets before the main runs. We report the budget
+required to reach each target and the area under the loss curve over the shared
+budget.
 
-Each comparison reports all five paired differences, their mean, a paired
-effect size, and a 95\% paired interval. An efficiency claim requires four of
-five seeds in the predicted direction, an interval excluding zero, and the
-matching E2 metric in the predicted direction. We separately verify that the
-methods use the same number of model evaluations per step and report sampler
-synchronization overhead.
+Each method produces one seed-42 training trajectory. We report teacher-loss
+AUC differences, the token or GPU-hour difference needed to reach each target,
+and prompt-level paired bootstrap intervals that explicitly exclude training-
+seed uncertainty. Efficiency language is restricted to the observed seed-42
+trajectory and requires the matching E2 metric in the predicted direction. We
+do not make stability or cross-seed significance claims. We separately verify
+that the methods use the same number of model evaluations per step and report
+sampler synchronization overhead.
 
 The run record includes response tokens, teacher-scored tokens, prompts,
 optimizer steps, GPU hours, wall-clock time, truncation, invalid outputs,

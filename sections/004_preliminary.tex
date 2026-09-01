@@ -87,11 +87,13 @@ role to each quantity. The equality concerns the gradient passed to the
 optimizer. Stateful optimizers can still produce different parameter paths
 under different task orders.
 
-An online sampler can use earlier gradients, measured costs, and optimizer
-states to choose the next $q$. Every task keeps positive probability, and each
-new task batch uses fresh rollout randomness, so
+An online sampler can use earlier gradients, measured costs, optimizer states,
+or task-loss trajectories to choose the next $q$. Every task keeps positive
+probability, and each new task batch uses fresh rollout randomness, so
 Proposition~\ref{prop:conditional_preservation} applies at every optimizer
-step.
+step. The correction therefore places gradient-based and curriculum-based
+proposals under the same target; their estimator error and compute cost can be
+compared directly.
 
 Task allocation now has a measurable objective: choose $q$ so that one
 corrected task batch estimates $h$ accurately at low cost.

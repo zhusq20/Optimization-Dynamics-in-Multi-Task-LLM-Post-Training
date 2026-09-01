@@ -1,0 +1,1197 @@
+                                                         D3-MOPD: Adaptive Dynamic Domain
+                                                         ScheDuling for Efficient Multi-Teacher
+                                                                      Distillation
+                                                                                            AllSpark Team
+                                              Multi-teacher on-policy distillation (MOPD) distills several domain-expert teachers into a single
+                                              student by minimizing per-domain reverse-KL divergence on the student’s own rollouts. Existing
+                                              approaches typically ﬁx the per-domain data mixture before training, overlooking the fact that
+                                              different domains converge at substantially different rates: some plateau early while others con-
+
+
+
+
+arXiv:2608.24987v1 [cs.LG] 25 Aug 2026
+                                              tinue to improve throughout the training budget. A ﬁxed mixture therefore wastes compute on
+                                              fast-converging domains and undertrains slower-converging ones. To address this, we propose
+                                              D3 -MOPD (Dynamic Domain ScheDuling for MOPD), a zero-overhead scheduler that repurposes
+                                              the per-domain reverse-KL signal already produced during training to adapt the domain mixture
+                                              online. Running asynchronously outside the training process, an off-process watcher periodically
+                                              tracks each domain’s KL trajectory, estimates remaining headroom and current improvement rate,
+                                              and accordingly adjusts the domain sampling ratios without altering the core training loop. Our
+                                              D3 -MOPD scales naturally to arbitrary numbers of domains, and the expected beneﬁt grows as
+                                              more domains introduce more diverse convergence patterns for the scheduler to exploit. On a
+                                              Qwen3.6-35B-A3B student distilled from four domain-expert teachers, D3 -MOPD closes 97% of
+                                              the average student-to-teacher performance gap, compared with 63% for vanilla MOPD, reaches
+                                              the same peak performance with an approximately 3× reduction in rollout steps, and surpasses
+                                              the specialist teachers on three of seven benchmarks.
+
+                                              Date: August 22, 2026                                                                                                  AllSpark
+
+
+                                         1   Introduction
+                                         Multi-teacher on-policy distillation (MOPD) has recently                                                ⚠ Fast domains: Over-trained
+                                                                                                                   Vanilla MOPD                  ⚠ Slow domains: Insufficient trained
+                                         emerged as an effective framework for combining the capa-
+                                                                                                                   Initial course schedule         Training
+                                         bilities of several domain-expert teacher models into a single                  (unchanged)
+                                                                                                                                                     Early          Later
+                                         student [15, 4]. At each rollout step, the student generates                                      33%                …
+                                                                                                                           Math
+                                         on-policy trajectories from a K-domain prompt set [28, 31, 25],                                                      …
+                                                                                                                                                                                    63%
+                                                                                                                           Code            33%
+                                         and each domain teacher preﬁlls on the corresponding trajec-                                                                             Final Proximity
+                                                                                                                                                              …                     to Teachers
+                                         tories to produce its per-token distribution. The student then                    IF              33%
+                                                                                                                                                      student-teacher gap
+                                         minimizes the per-token reverse-KL divergence [1, 7] between
+                                         its own distribution and the teacher’s along the trajectory. The          D3 MOPD (ours) ✅ Allocate more to hard-but-learnable domains
+                                                                                                                                  ✅ Reduce for easy-and-saturated domains
+
+                                         result is a uniﬁed model that inherits the strengths of all teach-            Warm-up
+                                                                                                                     (train for a while)
+                                                                                                                                                 Gap & Descent Velocity
+                                                                                                                                                      (via per-domain r-KL)
+                                         ers, without requiring all of them to be served at inference.
+                                                                                                                        Math                     r-KLMath     33%           30%
+                                         Current MOPD implementations typically rely on a static do-                                                     97%
+                                                                                                                Code         r-KL        33%  10%
+                                         main mixture { pk }, ﬁxed before training to match the prompt
+                                                                                                                                                     Code
+                                                                                                                                                    Final Proximity
+                                                                                                                                                       to Teachers
+                                                                                                                IF           r-KL        33%  60%
+                                         pool sizes. However, the student rarely learns each domain                                                  IF
+
+
+
+                                         at the same rate [3, 16]: some domains plateau early as the            Math: medium    Code: fastest     IF: slowest
+                                         student quickly closes the performance gap to the teacher,
+                                         whereas others remain far from convergence throughout the Figure 1: Comparison of vanilla MOPD
+                                         entire training budget. Consequently, a ﬁxed mixture wastes
+                                                                                                            and D3 -MOPD with K = 3 domains.
+                                         signiﬁcant compute on converged domains while limiting the
+                                         training budget for actively learning domains (Figure 1). Since the per-domain reverse-KL is already com-
+                                         puted by the loss objective at every rollout step, a natural and promising solution is to repurpose it as a
+                                         readily available signal for identifying and correcting this training imbalance.
+                                         In this paper, we propose Dynamic Domain ScheDuling for MOPD (D3 -MOPD), a lightweight scheduler that
+                                         repurposes the per-domain reverse-KL signal already produced by the training loop to update the mixture
+                                         { pk } online. An asynchronous watcher periodically converts each domain’s KL history into a composite sig-
+nal that combines its remaining gap to the teacher with its recent descent velocity, and maps this signal to a
+valid mixture via a temperature-controlled softmax with a per-domain ﬂoor. It then passes the updated mix-
+ture to the stratiﬁed data source, ensuring the core training loop remains strictly unmodiﬁed. By conﬁning
+modiﬁcations to the data loader and running the watcher detached, D3 -MOPD remains compatible with
+advances in loss functions [27, 32, 10] and teacher training [24, 6], without additional training overhead.
+We validate D3 -MOPD on a Qwen3.6-35B-A3B [21] student distilled from four domain-expert teachers span-
+ning Math, Code, Instruction Following, and Tool-use. Experimental results highlight that D3 -MOPD out-
+performs vanilla MOPD, closing 97% of the average student-to-teacher performance gap (compared to 63%
+for the baseline) while achieving a higher peak accuracy across all tasks, surpassing the specialist teachers
+on three of seven benchmarks. It also improves training efﬁciency by reaching the baseline’s optimal per-
+formance in just 47 rollout steps, approximately 3× faster than vanilla MOPD (143 steps). Furthermore, we
+argue that the expected beneﬁts of D3 -MOPD will naturally scale with K, as more domains introduce more
+diverse convergence patterns for the scheduler to exploit. Overall, this paper ﬁrst identiﬁes a systematic
+mismatch between MOPD’s static mixture and the student’s asynchronous per-domain convergence, and
+resolves it with D3 -MOPD, a zero-overhead scheduler that turns the reverse-KL signal already computed
+by the training loop into a dynamic data mixture to improve both peak quality and training efﬁciency.
+
+2     Motivation: Limitations of Fixed Domain Mixtures
+In this section, we begin by formalizing vanilla MOPD and its ﬁxed mixture (§2.1), then analyze per-domain
+learning dynamics in isolation (§2.2), and ﬁnally demonstrate how their disparate convergence rates waste
+compute under a static mixture (§2.3).
+
+2.1   Vanilla MOPD and Fixed Mixtures
+
+On-policy distillation (OPD) trains a student policy πθ on its own generations, supervising them with
+a teacher π T under a reverse Kullback-Leibler (KL) objective. Multi-teacher OPD (MOPD) extends this
+paradigm to K domains, where each domain is associated with a prompt distribution Dk and an expert
+teacher π Tk . MOPD minimizes a weighted sum of per-domain losses:
+                                K                        h                                   i
+                   JMOPD (θ ) = ∑ pk E x∼Dk , y∼πθ (·| x) DKL πθ (· | x, y) ∥ π Tk (· | x, y) ,            (1)
+                                   k =1
+
+where the KL divergence is summed over the generated tokens of y, and the mixture weight pk satisﬁes
+pk ≥ 0 with ∑k pk = 1. In vanilla MOPD, the per-domain datasets Dk are pooled and shufﬂed, resulting
+in an expected per-batch share for domain k of pk = Nk / ∑i Ni , where Nk = |Dk |. Crucially, this expected
+share remains strictly deﬁned prior to training and is held constant throughout the run. Pool-and-shufﬂe
+sampling ﬁxes only this expectation, and each batch’s realized share ﬂuctuates around pk .
+
+2.2   Domain-Speciﬁc Learning Dynamics
+
+To understand the inefﬁciency of a static pk , we analyze each domain. Speciﬁcally, we train the student
+separately on Math, Code, and Instruction Following (IF) using single-domain OPD, with identical initial-
+izations and the corresponding expert teacher for each domain. Figure 2 reports the per-step reverse-KL
+on a held-out evaluation set. Math drops sharply during the ﬁrst quarter of the training budget before
+plateauing near a ﬂoor. Code declines steadily at a slower rate, showing no signs of convergence within the
+budget. Meanwhile, IF continues to reduce its loss throughout, yet its absolute reverse-KL remains one to
+two orders of magnitude above the other domains at every step. In conclusion, these domains reach their
+plateau phases at different stages, with their absolute KL signals varying by orders of magnitude.
+
+2.3   Computational Inefﬁciency of Fixed Mixtures
+
+When these same three domains are trained jointly under vanilla MOPD with a uniform mixture (pmath =
+pcode = pif = 1/3), the varying convergence rates documented in §2.2 translate into a substantial waste
+of training compute. As illustrated in Figure 3, the three domains enter their low-KL phases at markedly
+different points: Code by roughly step 48, Math by step 96, and IF only around step 144. Yet the ﬁxed
+mixture allocates one-third of every batch to each domain for the remainder of training. Consequently,
+
+
+                                               2
+                                Math                                     Code                                Instruction Following                          All three (shared axis)
+             0.010                       raw                                       raw            0.8                         raw             0.8                   Math
+                                         EMA ( = 0.1)   0.03                       EMA ( = 0.1)                               EMA ( = 0.1)                          Code
+                                                                                                  0.6                                         0.6                   Instruction Following
+
+
+Reverse-KL
+             0.005                                      0.02                                                                                  0.4
+                                                                                                  0.4
+                                                        0.01                                      0.2                                         0.2
+             0.000
+                                                        0.00                                                                                  0.0
+                         0          50                          0             50                         0               50                             0               50
+                             Rollout step                             Rollout step                                Rollout step                                   Rollout step
+Figure 2: Per-domain OPD reverse-KL on Math, Code, and IF. The three domains converge at widely differ-
+ent rates, with the absolute KL of IF remaining one to two orders of magnitude above the others throughout
+the training process.
+                 Math                       Code               Instruction Following        Average
+             0.004
+                                         raw                                       raw            0.24                        raw            0.24                        raw
+                                         EMA ( = 0.1)   0.012                      EMA ( = 0.1)                               EMA ( = 0.1)                               EMA ( = 0.1)
+             0.003
+
+
+Reverse-KL
+                                plateau                 0.008       plateau                       0.16                         plateau       0.16
+                                   step 96                             step 48                                                    step 144
+             0.002
+                                                        0.004                                     0.08                                       0.08
+             0.001
+
+                     0        100             200               0       100              200             0         100             200              0             100           200
+                             Rollout step                              Rollout step                               Rollout step                                   Rollout step
+Figure 3: Vanilla MOPD with a ﬁxed uniform mixture (pk = 1/3). The three domains reach their low-
+KL phases at markedly different points, yet the static mixture allocates one-third of every batch to each
+throughout the remaining training (shaded regions).
+
+valuable training compute is wasted on domains long past the point where additional samples yield further
+KL reductions. This waste stems not from the data or the teachers themselves, but from holding pk ﬁxed.
+
+Takeaway. Under vanilla MOPD, distinct domains enter low-KL plateau phases at entirely different train-
+ing stages (§2.2). A ﬁxed mixture inevitably wastes compute on domains that have ceased to improve (§2.3).
+This highlights the necessity for a dynamic sampling ratio pk that smoothly adapts to native training signals,
+motivating the design of our method in §3.
+
+3              Method
+
+Based on these observations, we propose Dynamic Domain ScheDuling for MOPD (D3 -MOPD), a
+lightweight scheduler that adapts the per-domain sampling ratio { pk } using the reverse-KL signal. §3.1
+describes the framework, which consists of an off-process watcher and a stratiﬁed data source. §3.2 then
+details how the per-domain KL history is converted into a dynamic mixture.
+3.1             Framework
+
+D3 -MOPD introduces two components to a vanilla MOPD training loop, as illustrated in Figure 4: an off-
+process watcher that computes the per-domain mixture pk from the reverse-KL signals already produced by
+the trainer, and a stratiﬁed data source that reads pk to assemble each batch with the target mixture. This
+pipeline generalizes to any number of domains K.
+The trainer follows vanilla MOPD: at each rollout step, the student generates responses from prompts
+drawn by the data source. Each response is dispatched to its corresponding domain teacher, which preﬁlls
+on the trajectory to produce its per-token distribution. The resulting per-domain reverse-KL is appended
+to a shared log. Since vanilla MOPD typically logs only the domain-averaged reverse-KL, the watcher
+groups per-sample KL values by domain to recover per-domain signals. It runs as a separate process that
+periodically computes a new mixture pk following §3.2 and writes it to a status ﬁle that the data source
+reads between updates so that the trainer never blocks.
+We replace the conventional pool-and-shufﬂe loader with the stratiﬁed data source. Given a batch size B and
+per-batch mixture { p̃k } (obtained by applying the batch-level jitter below to the watcher-supplied { pk }),
+
+
+                                                                                 3
+                                 Trainer (main process)                                                                                        Watcher (off-process)
+                                                                                                                                               Input                     per-domain reverse-KL
+  A. Data pools                 B.Dynamic Batch Composer                                            C. Rollout                                                                  history
+                                                                                                                                               4 domains
+                                     Uniform mixture (vanilla MOPD)                                                      𝜋!
+                                                                                                             student                           descend
+                                    Math         Code        IF           Tool
+                DMath               25%          25%        25%           25%                                4         on-policy rollout       asynchronously                      math
+                                                                                                                                                                                   plateau
+                                                                          𝑁!                  trajectory y = 𝑦2 , 𝑦3 , . . . , 𝑦1
+                                                            static 𝑝! =     %∑ 𝑁
+                                                                              " "                 𝑦2    𝑦3    ...        𝑦1                                                      rollout step
+                                                                                                                                           5
+                DCode            Ratio-driven data source                                        per-domain reverse-KL                         Compute Module
+                            1          𝑝𝑘 with 𝑗𝑖𝑡𝑡𝑒𝑟 η                                 3
+                                                                                                  𝜋 1!"#$        ...           𝜋 1%&&'         Remaining gap           Descent velocity           Score
+                                     no batch-level sampling noise
+                   DIF                                                                                                                           𝑔! =
+                                                                                                                                                      KL! 𝑡
+                                                                                                                                                                   ×     𝑣! = recent            𝑠! = 𝑔! ×𝑣!
+                                                        2                                   𝑦! 𝑦" . . . 𝑦#       ...     𝑦! 𝑦" . . . 𝑦#               KL! 0              descent rate
+                                                                                                                                                normalized gap
+                                     Dynamic mini-batch composition                         ℓ78                  ...   (𝑛𝑜𝑡 𝑟𝑒𝑞𝑢𝑒𝑟𝑖𝑒𝑑)
+                                                                                             $456 𝑦2:1
+                DTool               Math    Code IF                 Tool
+                                                                                                                                               max-norm across k          softmax + floor 𝜖
+                                                                                                                                                               minimum floor 𝜖 prevents domain starvation
+               …                    24%     15% 15%                 43%                     dispatch y to its domain teacher
+                                                                                                                                                                               mixture 𝑝𝑘
+                                                                                                (only that teacher is queried)
+                                                     mixture 𝑝𝑘 from watcher                                                                   Output
+                                                      (updated every n steps)
+                                                                                            OPD reverse-KL loss(token-level)
+                                    three consecutive batches                                                                                  each 𝑝! ≥ 𝜖
+             Any Domain                                                                     ℓ OPD (y)=DKL ( 𝜋 #! (·|y<t ), πθ (·|y<t ))
+                                     28%     13% 16%            43%
+                                                                                                        for t=1,...,T                          8 𝑝! = 1
+                                    21%     20%    16%          43%
+      domain-partitioned            25%     16% 12%            47%                                     Student update                           !
+
+        prompt pools                                                                               minimize OPD loss on y                                                                                   𝜖
+                                                      same 𝑝𝑘 , 𝑗𝑖𝑡𝑡𝑒𝑟 η = 0.3                                                                      status. json
+                                                                                        6                                                                           𝑝$%&'     𝑝)*+,      𝑝-.       𝑝/**0
+  shown with K=4; 𝐷# 𝑀𝑂𝑃𝐷 is defined for any K                                      Feedback: new mixture for the next batch
+
+
+
+Figure 4: The framework of D3 -MOPD. At each rollout step, the student generates responses that the teach-
+ers preﬁll on to produce per-domain reverse-KL signals. A watcher periodically maps these signals into a
+continuous per-domain mixture pk that shapes subsequent batches.
+
+
+it ﬁrst assigns ⌊ B · p̃k ⌋ samples to each domain, then distributes the remaining B − ∑k ⌊ B · p̃k ⌋ samples to
+the domains with the largest fractional parts. This strictly aligns each domain’s per-batch share with the
+target mixture, replacing the uncontrolled variance of pooled shufﬂing with the purposeful batch-level jitter
+described below.
+Batch-level jitter. Because the watcher updates the mixture only every n rollout steps, consecutive batches
+would otherwise share identical domain proportions. The data source therefore perturbs each batch’s pro-
+portions via p̃k = pk (1 + uk )/ ∑ j p j (1 + u j ) with uk ∼ Uniform(−η, η ), restoring batch-to-batch variation
+while keeping the long-run mean close to { pk } (E [uk ] = 0).
+Integration with existing MOPD. All modiﬁcations are strictly conﬁned to the data path, leaving the
+rollout, teacher preﬁll, and student update operations untouched. An existing MOPD implementation can
+adopt D3 -MOPD by replacing the standard loader with the stratiﬁed data source and launching a watcher
+process alongside the trainer.
+
+3.2     Composite Ratio from Remaining Gap and Descent Velocity
+
+The watcher translates the per-domain reverse-KL history into a mixture { pk } at each update. Our goal
+is to allocate more samples to domains exhibiting ongoing improvement and fewer to those that have
+converged. We quantify this improvement along two axes: the remaining gap KL        f k (the proportion of the
+initial KL left to close) and the descent velocity vk (the recent rate of KL reduction). Relying on either axis
+alone is insufﬁcient. A domain might exhibit a large remaining gap but plateau, rendering further samples
+ineffective. Conversely, a nearly converged domain might descend rapidly within the current window, yet
+its minimal room for improvement makes additional samples redundant. Their product ensures that a
+domain receives a large share only when it has room to improve and is actively doing so.
+
+Remaining gap.                  We deﬁne the remaining gap by normalizing the current smoothed KL by its initial
+value,
+                                                        f k (t) = KLk (t) ,                                                   1 S0
+                                                                                                                              S0 t∑
+                                                                                                             (0)
+                                                        KL           (0)
+                                                                                                      KLk              =             KLk (t),                                                                   (2)
+                                                                  KLk                                                             =1
+
+where KLk (t) is the exponential moving average (EMA) of domain-k reverse-KL up to rollout step t, and
+      (0)
+KLk         is the mean of the ﬁrst S0 observations seeded once at the start of training. Under normal training,
+
+
+                                                                                    4
+f k (t) ∈ (0, 1] and approaches zero as the domain converges. As documented in §2.2, this normalization
+KL
+enables fair comparison across domains whose absolute KL values may differ by orders of magnitude.
+
+Descent velocity. To determine whether a domain’s KL continues to decrease, we measure its recent rate
+of change. Let W be a ﬁxed window length in rollout steps and R the number of non-overlapping windows
+used for averaging. We deﬁne the single-window relative change as
+
+                         (i )         KLk (t − iW ) − KLk (t − (i + 1)W )
+                        δk (t) =                                          ,                  i = 0, . . . , R − 1,   (3)
+                                              KLk (t − (i + 1)W )
+        (0)
+ where δk represents the most recent window. The descent velocity takes the negative average of these R
+changes and clips the result at zero,
+                                                               1 R −1 ( i ) 
+                                               vk (t) = max 0, − ∑ δk (t) ,                                          (4)
+                                                                R i =0
+
+meaning vk (t) > 0 strictly requires the domain’s KL to decrease on average over the last R windows.
+
+Composite signal. We compute the composite signal via the product of these two metrics,
+                                                                                         
+                                         f k ( t ) · v k ( t ),
+                                sk (t) = KL                           s̃k (t) = sk (t)       max s j (t),            (5)
+                                                                                                  j
+
+ ensuring sk remains large only when a domain is both far from convergence and steadily descending. The
+max-normalization brings s̃k into [0, 1], making the softmax temperature T independent of the raw signal
+magnitude. In the degenerate case where all domains plateau and max j s j (t) = 0, we set s̃k (t) = 0 for all k,
+and the mapping defaults to a uniform mixture. Appendix E provides a theoretical analysis showing that
+under an exponential decay model, sk approximates the normalized marginal KL reduction, justifying the
+gap-velocity product as a greedy allocation rule.
+
+Mapping to a valid mixture. We map s̃k to a probability mixture through a softmax function parameter-
+ized by temperature T and a per-domain ﬂoor ϵ,
+                                                                                              
+                                                                          exp s̃k (t)/T
+                                      pk (t) = ϵ + 1 − Kϵ ·                                           ,             (6)
+                                                                        ∑Kj=1 exp s̃ j (t)/T
+
+ guaranteeing that pk (t) ≥ ϵ for every domain and ∑k pk (t) = 1. The watcher recomputes this mixture at
+every update and delivers it to the data source via the status ﬁle described in §3.1.
+
+Why average over R windows. With R = 1, the velocity estimate is highly sensitive to random noise
+in the KL signal. Because Eq. 4 clips the sum at zero, a short-term KL spike in an actively learning do-
+main would wrongly push vk to zero, cutting off its sample allocation. Averaging the changes over R
+non-overlapping windows prevents these brief spikes from accidentally triggering the cutoff. As a result,
+vk becomes zero only when the domain remains ﬂat or rises over a longer period, making it a reliable sign
+of actual convergence.
+
+Warmup. The composite signal becomes available once 2W observations of KLk are recorded. At this
+       f k relies on the seeded KL , and computing a single δ requires the two window endpoints at
+point, KL
+                                         (0)                                       (0)
+                                     k                              k
+t−W and t. Eq. 4 represents the standard formulation with a full history of R windows. During the warmup
+phase 2W ≤ t < ( R+1)W, the algorithm replaces R with the available window count R′ (t) = ⌊t/W ⌋ − 1.
+From t = ( R+1)W onward, R′ (t) is capped at R, and the standard form of Eq. 4 takes over. Prior to t = 2W,
+the watcher provides no mixture updates, causing the data source to default to a uniform mixture pk = 1/K.
+The batch-level jitter (§3.1) remains active throughout this initial period.
+
+Design rationale. The temperature T modulates how sharply the sampling share is redirected: as T → ∞,
+the mixture becomes uniform, whereas as T → 0, the mixture concentrates on the argmax of s̃. Finally, the
+ﬂoor ϵ prevents any domain from being completely discarded, ensuring already-converged domains retain
+a minimal presence to mitigate catastrophic forgetting. Algorithm 1 summarizes the scheduling process.
+
+                                                       5
+Algorithm 1 Dynamic Domain ScheDuling for MOPD (D3 -MOPD).
+Require: Domain pools {Dk }kK=1 ; hyperparameters T, ϵ, S0 , R, W, n, η, B; shared KL log and status ﬁle.
+                                 (0)
+ 1: Initialize at step t = S0 : KLk ← S10 ∑Sτ0=1 KLk (τ ) for all k                                   ▷ Eq. 2; seeded once
+ 2: function WATCHERT ICK(t)                                                     ▷ invoked at rollout step t, every n steps
+ 3:     if t < 2W then return                                        ▷ initial warmup; data source uses uniform fallback
+ 4:     end if                         
+ 5:     R′ ← min R, ⌊t/W ⌋ − 1                                                                ▷ R′ = R once t ≥ ( R+1)W
+ 6:     for k = 1, . . . , K do
+ 7:           f
+             KLk ← KLk (t)/KLk
+                                    (0)
+                                                                                                                    ▷ Eq. 2
+               (i )                                                                  ′
+ 8:          δk ← KLk (t−iW ) − KLk (t−(i +1)W ) /KLk (t−(i +1)W ) for i = 0, . . . , R −1
+                                        (i ) 
+ 9:          vk ← max 0, − R1′ ∑i δk                                                                                ▷ Eq. 4
+10:          sk ← KLf k · vk
+11:     end for
+12:     if max j s j = 0 then                                                   ▷ degenerate case: all domains plateaued
+13:          s̃k ← 0 for all k
+14:     else
+15:          s̃k ← sk / max j s j for all k                                                                         ▷ Eq. 5
+16:     end if
+                                 exp(s̃k /T )
+17:     pk ← ϵ + (1−Kϵ)                          for all k                                                          ▷ Eq. 6
+                               ∑ j exp(s̃ j /T )
+18:     Atomically write { pk } to the status ﬁle
+19: end function
+20: function G ET B ATCH(B)                                                               ▷ invoked at every rollout step
+21:     { pk } ← status ﬁle (fallback pk ← 1/K) 
+22:     uk ∼ Uniform(−η, η ); p̃k ← pk (1+uk ) ∑ j p j (1+u j )                                     ▷ jitter + renormalize
+23:     Assign nk ← ⌊ B p̃k ⌋; distribute the remaining B − ∑k nk samples to the domains with the largest fractional parts
+    so ∑k nk = B
+24:     return nk prompts sampled from Dk for each k
+25: end function
+
+
+
+4     Experiments
+4.1   Training Setup
+
+We validate D3 -MOPD using Qwen3.6-35B-A3B [21] as the student model and K =4 domain-expert teachers
+that share the same backbone but are individually ﬁne-tuned via GRPO [22] on a single domain: Math,
+Code, Instruction Following, or Tool-use, extending the three-domain analysis of §2 with a fourth do-
+main. We optimize the student using the vanilla MOPD [16] per-token reverse-KL (r-KL) objective on the
+slime [35] framework, which employs an asynchronous rollout-update loop that overlaps teacher preﬁll
+with student generation. The composite signal watcher operates as an off-process job alongside the trainer
+following §3.1. It recomputes the mixture { pk } every n = 10 rollout steps and delivers it to the stratiﬁed
+data source via a status ﬁle. All main runs use a rollout batch size of 128 over 256 rollout steps. Other
+training details are provided in Appendix B.
+
+Training data. We construct a prompt set of ∼4k prompts per domain, formatted as single-turn message
+lists in JSONL with per-sample domain tags. The Math and Code splits come from DAPO-Math-17K [30]
+and CodeI/O [12], respectively. The Instruction Following split is ﬁltered from Nemotron-Cascade 2 [28],
+and the Tool-use split uses the Fission-GRPO [33] training set.
+
+4.2   Evaluation Setup
+
+We evaluate on seven benchmarks covering the four training domains: AIME 2025 [17] (avg@64) and
+HMMT November 2025 [5] (avg@32) for mathematics; LiveCodeBench Code Generation [9] (avg@6) and
+OJBench C++ [26] (default protocol) for code; IFBench [19] and IFEval [34] for instruction following; and
+BFCL v3 Multi-Turn (Base) [18] for tool-use. We generate responses in non-thinking mode with temperature
+0.7, top-p 0.8, top-k 20, and presence penalty 1.5, following the ofﬁcial Qwen3.6-35B-A3B recommendations.
+
+
+                                                   6
+                                 AIME 2025 (Avg@64)                                   HMMT Nov 2025 (Avg@32)                                             IFBench                                                   IFEval
+                 74                                                                                                                48
+                                                                          73                                                                +2.8                                            92
+
+                                                                                                                                   45                                                       91
+                 73
+
+
+
+
+Percentage (%)
+                                                                                                                                   42
+                                                                          72                                                                                                                90
+                 72                                                                                                                39
+                                                                                                                                                                                            89
+                                                                                                                                   36
+                 71
+                                                                                                                                                                                            88
+                                                                          71                                                       33
+                                                     Vanilla MOPD                                             Vanilla MOPD                                             Vanilla MOPD                                             Vanilla MOPD
+                 70                                  D3 -MOPD (Ours)                                          D3 -MOPD (Ours)                                          D3 -MOPD (Ours)      87                                  D3 -MOPD (Ours)
+                                                                                                                                   30
+                      0          63       127         191           255        0          63       127         191           255        0          63       127         191           255        0          63       127         191           255
+                             LiveCodeBench v6 (Avg@6)                                          OJBench C++                                     BFCL v3 Multi-Turn (Base)                                           Average
+                 63                                                                                                                                                                         62
+                                                                                                                                   62                                                                +1.0
+                                                                          29
+                          +1.6                                                     +2.1
+                                                                                                                                                                                            61
+                                                                                                                                   61
+
+
+
+Percentage (%)
+                 62                                                       28
+                                                                                                                                                                                            60
+                                                                          27                                                       60
+
+                 61                                                                                                                                                                         59
+                                                                          26                                                       59
+
+                                                                                                                                                                                            58
+                                                     Vanilla MOPD         25                                  Vanilla MOPD         58                                  Vanilla MOPD                                             Vanilla MOPD
+                 60                                  D3 -MOPD (Ours)                                          D3 -MOPD (Ours)                                          D3 -MOPD (Ours)                                          D3 -MOPD (Ours)
+                                                                                                                                                                                            57
+                      0          63       127         191           255        0          63       127         191           255        0          63       127         191           255        0          63       127         191           255
+                                      Rollout Step                                             Rollout Step                                             Rollout Step                                             Rollout Step
+Figure 5: Per-benchmark accuracy of vanilla MOPD and D3 -MOPD across the 16 evaluated rollout check-
+points, spanning seven benchmarks plus their unweighted average. D3 -MOPD matches or outperforms the
+vanilla baseline on every benchmark at almost every checkpoint.
+
+We evaluate every 16 rollout steps starting from step 15. D3 -MOPD and vanilla MOPD are trained under
+identical settings except for the mixture policy: ﬁxed { pk } vs. online-updated { pk }. Since raw student-to-
+teacher performance gaps differ across domains, averaging standard accuracies over-weights domains with
+larger margins. We therefore report a per-benchmark normalized score ŝb = (sb − sstu b ) / ( sb − sb ), which
+                                                                                               tea  stu
+scales the initial student to 0 and the domain-expert teacher to 1, and compute its uniform average across
+benchmarks. Values above 1.0 indicate improvement beyond the respective specialist teacher.
+
+4.3                   Main Results
+
+Figure 5 shows the per-benchmark accuracy of D3 -MOPD and vanilla MOPD over the training budget. As
+shown in the average panel, both methods improve rapidly during the ﬁrst ∼50 steps before plateauing,
+with D3 -MOPD consistently maintaining a higher overall trajectory. The composite signal ﬁrst activates at
+step 20 (remaining-gap component only) and integrates the velocity component from step 40. Consequently,
+the initial evaluation at step 15 shows minimal performance differences. Overall, D3 -MOPD outperforms
+vanilla MOPD in both peak performance and training efﬁciency. We highlight three primary ﬁndings:
+
+• D3 -MOPD peaks higher on all benchmarks. The vanilla baseline reaches its optimal average of 61.4 at
+  step 143. In contrast, D3 -MOPD attains a higher peak of 62.3 as early as step 95, demonstrating individ-
+  ual benchmark gains ranging from +0.2 on AIME 2025 (74.1 vs 73.9) to +2.8 on IFBench (48.9 vs 46.1).
+  The early peak in average accuracy occurs because code benchmarks (LiveCodeBench and OJBench) con-
+  verge and begin degrading after ∼80 steps, consistent with the domain over-optimization observed in §2
+  (Figure 3). By reducing the share of these converging domains, the scheduler redirects the rollout budget
+  toward domains with active growth, raising the overall peak accuracy.
+• D3 -MOPD reaches the vanilla peak with 3× fewer steps. While vanilla MOPD requires 143 steps to
+  reach its average score of 61.4, D3 -MOPD surpasses this threshold by step 47 (scoring 62.1). Furthermore,
+  vanilla MOPD fails to establish its per-benchmark peaks until as late as step 207 (AIME 2025). Notably,
+  D3 -MOPD matches or exceeds every one of these individual peaks within the ﬁrst 79 steps. Because the
+  scheduler continuously shifts prompt sampling from converging domains to those still improving, each
+  rollout step yields a larger marginal gain, accelerating overall convergence.
+• Domain convergence order aligns with r-KL. Code benchmarks peak earliest (LiveCodeBench by
+  step 79, OJBench by step 95), whereas instruction-following benchmarks peak latest (IFBench at step 175,
+
+
+                                                                                                         7
+Table 1: Ablation results. Best-S denotes the rollout step whose checkpoint achieves the highest average
+across the evaluated benchmarks over the full 256-step run. All variants differ from D3 -MOPD in only the
+ablated variable; other settings are identical.
+                                           Math            IF               Code        Tool
+       Method               Best-S AIME25 HMMT(N) IFBench IFEval LCB v6 OJB C++ BFCL(B)             Avg
+       Vanilla MOPD          143   73.17      71.04   45.74     91.04   60.95   27.59   60.00      61.36
+       w/o velocity        127     72.66      71.15   45.17     90.91   59.52   28.45   62.00   61.41 (+0.05)
+       w/o gap             255     71.72      71.46   49.01     90.83   60.10   24.57   62.50   61.46 (+0.10)
+       w/o jitter (η =0)   95      72.66      71.15   46.58     89.90   60.95   27.16   63.00   61.63 (+0.27)
+       w/o smoothing (R=1) 95      73.07      71.46   46.94     92.14   61.81   26.29   63.50   62.17 (+0.81)
+       D3 -MOPD
+                              95   74.01      71.35   45.07     91.16   62.52   29.74   62.50   62.34 (+0.98)
+       (η =0.30, R=3)
+
+  IFEval at step 191), while mathematics falls in between. This progression aligns with the r-KL conver-
+  gence pattern in Figure 3, where code r-KL plateaus ﬁrst and IF r-KL last. This consistent alignment
+  validates r-KL as an effective monitoring signal: a domain with a plateaued r-KL has likely approached
+  its peak accuracy, and further budget allocation risks computational waste and model degradation.
+
+4.4   Ablation Studies
+
+Table 1 evaluates the individual contributions of three design choices in D3 -MOPD. The per-domain ratio
+trajectories of each variant are provided in Appendix G.
+
+Composite signal vs. single-signal variants. Although both single-signal variants outperform vanilla
+MOPD (w/o velocity 61.41, w/o gap 61.46) and validate r-KL-driven dynamic scheduling, neither matches
+the composite formulation (62.34). The two signals differ in convergence speed. The w/o velocity variant
+peaks early at step 127 because it uses the current normalized r-KL levels to identify plateauing domains.
+In contrast, the w/o gap variant peaks at step 255. Since all domains’ KL drops rapidly during early train-
+ing, the velocity signal cannot differentiate them until descent rates diverge. Notably, the w/o gap variant
+records the highest IFBench score (49.01), consistent with IF converging last (§4.3). A velocity-driven sched-
+uler allocates budget to IF since its descent rate remains high, enabling prolonged capability growth.
+
+Effectiveness of batch jitter. Removing jitter (η =0) does not alter the peak step (both at 95) but reduces
+the peak average by 0.71 (61.63 vs 62.34), with the most severe drops on code benchmarks (OJBench −2.6,
+LiveCodeBench −1.6). We hypothesize that the proportion variation from jitter acts as a form of exploration:
+for domains nearing their r-KL plateau, a ﬁxed sampling ratio yields only weak gradients, and the random-
+ized bursts from jitter may deliver stronger updates. This would explain why the rapidly plateauing code
+benchmarks beneﬁt the most. The identical peak step conﬁrms that jitter improves overall training quality
+without altering convergence speed.
+
+Effectiveness of velocity smoothing. The hyperparameter R controls how many non-overlapping obser-
+vation windows are averaged to estimate descent velocity: R=1 relies on a single window (reactive but
+noisy), whereas D3 -MOPD adopts R=3 for smoother estimates. Both variants peak at step 95, and R=1
+already achieves 62.17 (+0.81 over vanilla), indicating that even a single-window velocity captures useful
+convergence information. R=3 further improves the average to 62.34 by mitigating random r-KL variance.
+This smoothing prevents a single noise-induced r-KL ﬂuctuation from temporarily zeroing the velocity sig-
+nal and cutting off budget to actively learning domains. Interestingly, R=1 surpasses D3 -MOPD on BFCL
+(63.50 vs 62.50), likely because tool-use exhibits high cross-checkpoint variance, where a noisier estimate
+encourages beneﬁcial exploration.
+
+4.5   Supplementary Analysis
+
+D3 -MOPD closes 97% of the student-teacher gap. Table 2 compares peak accuracy against the student
+baseline and domain-expert teachers. Vanilla MOPD closes 63% of the average student-to-teacher gap (ŝ¯ =
+
+
+                                              8
+Table 2: Per-benchmark peak accuracy (%) and normalized score (§4.2) over 256 rollout steps. Each value
+represents the maximum across all 16 checkpoints. ∆ rows show gaps to the domain-expert teacher. Bold
+marks the column best, underline the runner-up.
+                                               Math              Instruction Following                    Code         Tool-use
+             Method                  AIME25 HMMT(N) IFBench                              IFEval   LCB-v6 OJB-C++ BFCL(B) Norm.
+             Teacher                    76.2         72.3          52.1                   91.9     64.8         28.5     67.0     1.00
+             Student                    69.8         70.7          30.0                   86.8     60.0         25.9     57.5     0.00
+             ∆(Student − Teacher)       −6.4         −1.6         −22.1                   −5.1     −4.8         −2.6     −9.5     −1.00
+
+             Vanilla MOPD               73.9         72.0          46.1                   91.1     61.5         27.6     61.5     0.63
+             ∆(Vanilla − Teacher)       −2.3         −0.3          −6.0                   −0.8     −3.3         −0.9     −5.5     −0.37
+
+             D3 -MOPD (Ours)            74.1         73.2          48.9                   92.3     63.2         29.7     62.5     0.97
+             ∆(D3 -MOPD − Teacher)      −2.1         +0.9          −3.2                   +0.4     −1.6         +1.2     −4.5     −0.03
+
+
+0.63), whereas D3 -MOPD closes 97% of this gap (ŝ¯ = 0.97). Consistent with ﬁndings by Ma et al. [16], both
+methods generally remain below the maximum performance of the domain-expert teachers, indicating that
+distillation primarily closes existing capability gaps rather than generating novel skills. Notably, D3 -MOPD
+surpasses the teacher on three benchmarks (HMMT(N), IFEval, and OJBench C++, ŝb > 1.0), whereas
+vanilla MOPD remains below the teacher on all tasks. Because these three benchmarks exhibit small initial
+student-to-teacher absolute accuracy gaps (∆ ≤ 5.1), even modest absolute improvements translate into
+normalized scores exceeding 1.0. Appendix C further compares the two methods at their respective best-
+average checkpoints, conﬁrming that D3 -MOPD’s improvement persists under this setting.
+
+                                                                            Math                                        Code
+D3 -MOPD shifts budget from converging to ac-
+                                                         0.5                                                0.5
+tive domains. Figure 6 shows the per-domain
+                                                         0.4                                                0.4
+sampling ratio throughout training. While vanilla
+                                                                          Domain Ratio
+                                                         0.3                                                0.3
+MOPD maintains all four domains near 0.25 with
+only batch-level noise, D3 -MOPD dynamically             0.2                                                0.2
+
+                                                         0.1                                                0.1
+adapts this allocation, closely tracking domain con-                                       Vanilla MOPD
+                                                                                           D -MOPD          3
+                                                                                                                                    Vanilla MOPD
+                                                                                                                                          3
+                                                                                                                                    D -MOPD
+                                                         0.0                                                0.0
+vergence. Code converges fastest (its r-KL plateaus          0   63           127        191            255     0 63     127      191            255
+
+ﬁrst in Figure 3) and is steadily downsampled from                  Instruction Following                             Tool-use
+0.25 to ∼0.15 throughout training. The freed bud-        0.5                                                0.5
+
+                                                         0.4                                                0.4
+get ﬂows initially to Math, whose ratio rises to
+                                                                          Domain Ratio
+∼0.50 during steps 60–127 as the composite signal        0.3                                                0.3
+
+                                                         0.2                                                0.2
+identiﬁes Math as the domain with the largest re-
+maining gap and active descent. Once Math con-           0.1                               Vanilla MOPD
+                                                                                           D -MOPD
+                                                                                                            0.1
+                                                                                                            3
+                                                                                                                                    Vanilla MOPD
+                                                                                                                                          3
+                                                                                                                                    D -MOPD
+verges after step 127, its ratio recedes, and the        0.0
+                                                             0   63           127        191            255
+                                                                                                            0.0
+                                                                                                                0 63     127      191            255
+                                                                         Rollout Step                                Rollout Step
+scheduler redirects budget toward Instruction Fol-
+lowing and Tool-use, pushing their ratios to ∼0.55
+                                                       Figure 6: Per-domain sampling ratio of vanilla MOPD
+and ∼0.50 after step 150. Because these two do-                3                       3
+mains exhibit the slowest r-KL convergence, this and D -MOPD. D -MOPD dynamically reallocates
+late-stage budget increase enables the student to budget as domains converge.
+sustain progress where capacity for improvement remains high. Ultimately, this dynamic reallocation func-
+tions as an implicit curriculum: each domain receives concentrated training during the window when it
+can still improve, rather than having the budget split uniformly regardless of learning state.
+
+5     Related Work
+
+5.1    On-Policy Distillation
+
+On-policy distillation (OPD) trains a student on its own generations, supervised by the teacher’s distribu-
+tion under a reverse Kullback-Leibler objective [7, 1]. Recent work reﬁnes this supervision at the token
+or sample level: Jin et al. [11] switch between forward and reverse KL based on the teacher’s entropy, Li
+et al. [14] ﬁlter and reweight tokens to suppress noisy gradients, and Hou et al. [8] correct the mismatch
+between per-token KL and sequence-level outcomes. Other directions stabilize the learning target [10], dis-
+till selectively from reasoning preﬁxes [32], or extend beyond the teacher via reward signals [27]. Li et al.
+
+
+                                                             9
+[13] provide a systematic analysis of these design choices. These methods operate on the local supervision
+signal, improving which tokens or samples the student learns from. In this paper, we address a comple-
+mentary dimension: instead of reﬁning per-token supervision, we dynamically adjust the per-domain data
+allocation when multiple teachers are involved.
+
+5.2   Multi-Teacher On-Policy Distillation
+
+Multi-teacher OPD (MOPD) extends the single-teacher setting by distilling several domain-expert teachers
+into one student [16]. Recent large-scale post-training pipelines adopt MOPD-style distillation: MiMo-
+V2-Flash [15] and DeepSeek-V4 [4] use it for capability integration, while Baichuan-M3 [25], Nemotron-
+Cascade 2 [28], and GLM-5 [31] apply it in vertical-domain or staged pipelines. Chen et al. [3] further
+observe that domain teachers can pull the student in conﬂicting directions, and mitigate this through alter-
+nating per-domain training; Shen et al. [23] and Yin et al. [29] address failure modes such as tool-call bound-
+ary drift and heterogeneous teacher conﬁdence. However, all existing methods keep the per-domain data
+ratio ﬁxed throughout training and therefore cannot react to the asynchronous convergence documented in
+§2. In this paper, we revisit MOPD from a scheduling perspective: the per-domain data ratio is treated as a
+continuous variable, updated online from the reverse-KL signal the training loop already produces.
+
+
+6     Conclusion
+
+This paper identiﬁes and addresses a systematic inefﬁciency in multi-teacher on-policy distillation (MOPD)
+arising from the mismatch between its static domain mixture and the student’s asynchronous per-domain
+convergence rates. D3 -MOPD resolves this by combining each domain’s remaining KL gap with its descent
+velocity into a composite signal and mapping the result to an updated sampling ratio through a softmax-
+ﬂoor formulation, all without modifying the core training loop. Experiments across four domains with
+a Qwen3.6-35B-A3B student show that D3 -MOPD closes 97% of the student-teacher performance gap (vs.
+63% for vanilla MOPD) while reaching the baseline’s peak accuracy in 3× fewer rollout steps. Ablation
+studies conﬁrm that each design choice, namely the composite signal, batch jitter, and velocity smoothing,
+contributes to both peak accuracy and convergence speed. Trajectory analysis reveals an emergent implicit
+curriculum in which the scheduler concentrates budget on each domain during its active learning window.
+
+
+References
+ [1] Rishabh Agarwal, Nino Vieillard, Yongchao Zhou, Piotr Stanczyk, Sabela Ramos Garea, Matthieu
+     Geist, and Olivier Bachem. On-policy distillation of language models: Learning from self-generated
+     mistakes. In International Conference on Learning Representations, volume 2024, pp. 21246–21263, 2024.
+
+ [2] Aili Chen, Aonian Li, Bangwei Gong, Binyang Jiang, Bo Fei, Bo Yang, Boji Shan, Changqing Yu, Chao
+     Wang, Cheng Zhu, et al. Minimax-m1: Scaling test-time compute efﬁciently with lightning attention.
+     arXiv preprint arXiv:2506.13585, 2025.
+
+ [3] Tianlei Chen, Jiao Ou, Ziyuan Liu, Ruiming Tang, Jian Liang, and Han Li. Counteraction-aware multi-
+     teacher on-policy distillation for general capability recovery with domain preservation. arXiv preprint
+     arXiv:2605.27115, 2026.
+
+ [4] DeepSeek-AI. Deepseek-v4: Towards highly efﬁcient million-token context intelligence, 2026. URL
+     https://arxiv.org/abs/2606.19348.
+
+ [5] Jasper Dekoninck, Nikola Jovanović, Tim Gehrunger, Kári Rögnvaldsson, Ivo Petrov, Chenhao Sun,
+     and Martin Vechev. Beyond benchmarks: Matharena as an evaluation platform for mathematics with
+     llms. arXiv preprint arXiv:2605.00674, 2026.
+
+ [6] Zhen Fang, Wenxuan Huang, Yu Zeng, Yiming Zhao, Shuang Chen, Kaituo Feng, Yunlong Lin, Lin
+     Chen, Zehui Chen, Shaosheng Cao, and Feng Zhao. Flow-opd: On-policy distillation for ﬂow match-
+     ing models, 2026. URL https://arxiv.org/abs/2605.08063.
+
+ [7] Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang. Minillm: Knowledge distillation of large language
+     models. In International Conference on Learning Representations, volume 2024, pp. 32694–32717, 2024.
+
+
+                                             10
+ [8] Wenjin Hou, Shangpin Peng, Weinong Wang, Zheng Ruan, Yue Zhang, Zhenglin Zhou, Mingqi Gao,
+     Yifei Chen, Kaiqi Wang, Hongming Yang, et al. Uni-opd: Unifying on-policy distillation with a dual-
+     perspective recipe. arXiv preprint arXiv:2605.03677, 2026.
+ [9] Naman Jain, Alex Gu, Wen-Ding Li, Fanjia Yan, Tianjun Zhang, Sida Wang, Armando Solar-Lezama,
+     Koushik Sen, and Ion Stoica. Livecodebench: Holistic and contamination free evaluation of large
+     language models for code. In International Conference on Learning Representations, volume 2025, pp.
+     58791–58831, 2025.
+[10] Ijun Jang, Jewon Yeom, Juan Yeo, Hyunggyu Lim, and Taesup Kim. Stable on-policy distillation
+     through adaptive target reformulation. In Maria Liakata, Viviane P. Moreira, Jiajun Zhang, and David
+     Jurgens (eds.), Findings of the Association for Computational Linguistics: ACL 2026, pp. 42217–42227,
+     San Diego, California, United States, July 2026. Association for Computational Linguistics. ISBN
+     979-8-89176-395-1. doi: 10.18653/v1/2026.ﬁndings-acl.2094. URL https://aclanthology.org/2026.
+     findings-acl.2094/.
+[11] Woogyeol Jin, Taywon Min, Yongjin Yang, Swanand Ravindra Kadhe, Yi Zhou, Dennis Wei, Nathalie
+     Baracaldo, and Kimin Lee. Entropy-aware on-policy distillation of language models. arXiv preprint
+     arXiv:2603.07079, 2026.
+[12] Junlong Li, Daya Guo, Dejian Yang, Runxin Xu, Yu Wu, and Junxian He. Codeio: Condensing rea-
+     soning patterns via code input-output prediction. In International Conference on Machine Learning, pp.
+     34471–34489. PMLR, 2025.
+[13] Yaxuan Li, Yuxin Zuo, Bingxiang He, Jinqian Zhang, Chaojun Xiao, Cheng Qian, Tianyu Yu, Huan ang
+     Gao, Wenkai Yang, Zhiyuan Liu, and Ning Ding. Rethinking on-policy distillation of large language
+     models: Phenomenology, mechanism, and recipe, 2026. URL https://arxiv.org/abs/2604.13016.
+[14] Yuying Li, Leqi Zheng, Yongzi Yu, Wenrui Zhou, Xuchang Zhong, Xing Hu, Jing Jin, Huangjie Yuan,
+     and Tao Feng. Filter, then reweight: Rethinking optimization granularity in on-policy distillation.
+     arXiv preprint arXiv:2606.02684, 2026.
+[15] LLM-Core Xiaomi. Mimo-v2-ﬂash technical report, 2026. URL https://arxiv.org/abs/2601.02780.
+[16] Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+     Yudong Wang, Rang Li, et al. Mopd: Multi-teacher on-policy distillation for capability integration in
+     llm post-training. arXiv preprint arXiv:2606.30406, 2026.
+[17] Mathematical Association of America. 2025 American Invitational Mathematics Examination I. https:
+     //artofproblemsolving.com/wiki/index.php/2025_AIME_I, 2025. Held on February 6, 2025.
+[18] Shishir G Patil, Huanzhi Mao, Fanjia Yan, Charlie Cheng-Jie Ji, Vishnu Suresh, Ion Stoica, and Joseph E
+     Gonzalez. The berkeley function calling leaderboard (bfcl): From tool use to agentic evaluation of large
+     language models. In Forty-second International Conference on Machine Learning, 2025.
+[19] Valentina Pyatkin, Saumya Malik, Victoria Graf, Hamish Ivison, Shengyi Huang, Pradeep Dasigi,
+     Nathan Lambert, and Hanna Hajishirzi. Generalizing veriﬁable instruction following. Advances in
+     Neural Information Processing Systems, 38, 2026.
+[20] Qwen Team. Qwen3.5: Towards native multimodal agents, February 2026. URL https://qwen.ai/
+     blog?id=qwen3.5.
+[21] Qwen Team. Qwen3.6-35B-A3B: Agentic coding power, now open to all, April 2026. URL https:
+     //qwen.ai/blog?id=qwen3.6-35b-a3b.
+[22] Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan
+     Zhang, YK Li, et al. Deepseekmath: Pushing the limits of mathematical reasoning in open language
+     models. arXiv preprint arXiv:2402.03300, 2024.
+[23] Jiabin Shen, Guang Chen, and Chengjun Mao. Diagnosing and calibrating tool-call boundary drift in
+     multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/2607.07050.
+[24] Mingyang Song and Mao Zheng. A survey of on-policy distillation for large language models, 2026.
+     URL https://arxiv.org/abs/2604.00626.
+
+
+                                            11
+[25] M3 Team, Chengfeng Dou, Fan Yang, Fei Li, Jiyuan Jia, Qiang Ju, Shuai Wang, Tianpeng Li, Xiangrong
+     Zeng, Yijie Zhou, Hongda Zhang, Jinyang Tai, Linzhuang Sun, Peidong Guo, Yichuan Mo, Xiaochuan
+     Wang, Hengfu Cui, and Zhishou Zhang. Baichuan-m3: Modeling clinical inquiry for reliable medical
+     decision-making, 2026. URL https://arxiv.org/abs/2602.06570.
+[26] Zhexu Wang, Yiping Liu, Yejie Wang, Wenyang He, Bofei Gao, Muxi Diao, Yanxu Chen, Kelin Fu,
+     Flood Sung, Zhilin Yang, et al. Ojbench: A competition level code benchmark for large language
+     models. arXiv preprint arXiv:2506.16395, 2025.
+[27] Wenkai Yang, Weijie Liu, Ruobing Xie, Kai Yang, Saiyong Yang, and Yankai Lin. Learning beyond
+     teacher: Generalized on-policy distillation with reward extrapolation, 2026. URL https://arxiv.org/
+     abs/2602.12125.
+[28] Zhuolin Yang, Zihan Liu, Yang Chen, Wenliang Dai, Boxin Wang, Sheng-Chieh Lin, Chankyu Lee,
+     Yangyi Chen, Dongfu Jiang, Jiafan He, et al. Nemotron-cascade 2: Post-training llms with cascade rl
+     and multi-domain on-policy distillation. arXiv preprint arXiv:2603.19220, 2026.
+[29] Qixiang Yin, Huanjin Yao, Yuchen Cai, Jianghao Chen, Ziyi Wang, Min Yang, Fei Su, and Zhicheng
+     Zhao. H-opd: Conﬁdence aware heterogeneous multi-teacher multimodal on-policy distillation, 2026.
+     URL https://arxiv.org/abs/2607.02592.
+[30] Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan,
+     Gaohong Liu, Lingjun Liu, et al. Dapo: An open-source llm reinforcement learning system at scale.
+     Advances in Neural Information Processing Systems, 38:113222–113244, 2025.
+[31] Aohan Zeng, Xin Lv, Zhenyu Hou, Zhengxiao Du, Qinkai Zheng, Bin Chen, Da Yin, Chendi Ge,
+     Chenghua Huang, Chengxing Xie, et al. Glm-5: from vibe coding to agentic engineering. arXiv preprint
+     arXiv:2602.15763, 2026.
+[32] Dongxu Zhang, Zhichao Yang, Sepehr Janghorbani, Jun Han, Andrew Ressler II, Qian Qian, Gregory D
+     Lyng, Sanjit Singh Batra, and Robert E. Tillman. Fast and effective on-policy distillation from reasoning
+     preﬁxes. In Maria Liakata, Viviane P. Moreira, Jiajun Zhang, and David Jurgens (eds.), Findings of the
+     Association for Computational Linguistics: ACL 2026, pp. 25553–25569, San Diego, California, United
+     States, July 2026. Association for Computational Linguistics. ISBN 979-8-89176-395-1. doi: 10.18653/
+     v1/2026.ﬁndings-acl.1276. URL https://aclanthology.org/2026.findings-acl.1276/.
+[33] Zhiwei Zhang, Fei Zhao, Rui Wang, Zezhong Wang, Bin Liang, Jiakang Wang, Yao Hu, Shaosheng Cao,
+     and Kam-Fai Wong. Robust tool use via ﬁssion-grpo: Learning to recover from execution errors. arXiv
+     preprint arXiv:2601.15625, 2026.
+[34] Jeffrey Zhou, Tianjian Lu, Swaroop Mishra, Siddhartha Brahma, Sujoy Basu, Yi Luan, Denny
+     Zhou, and Le Hou. Instruction-following evaluation for large language models. arXiv preprint
+     arXiv:2311.07911, 2023.
+[35] Zilin Zhu, Chengxing Xie, Xin Lv, and slime Contributors. slime: An llm post-training framework for
+     rl scaling. https://github.com/THUDM/slime, 2025. GitHub repository. Corresponding author: Xin
+     Lv.
+
+
+
+
+                                             12
+A Contributors
+
+Zechen Sun, Zhiwei Zhang, Fei Zhao, Juntao Li, Mu Chuan, Huayu Deng, Guojian Zhan, Wenliang Chen,
+Yao Hu, Min Zhang.
+
+
+B     Training Hyperparameters and Infrastructure
+
+All main and ablation runs share the hyperparameters below; only the mixture-scheduling components
+(§3.2) differ across variants.
+
+B.1   D3 -MOPD Scheduler
+
+Table 3 lists the scheduler settings used for the D3 -MOPD composite-signal method.
+
+                               Table 3: D3 -MOPD scheduler hyperparameters.
+                Symbol     Description                                                      Value
+                n          Watcher update cadence (rollout steps)                           10
+                W          Window length in the descent-velocity estimate (rollout steps)   10
+                R          Number of non-overlapping windows averaged in vk                 3
+                                                                         (0)
+                S0         Seed length for the initial-KL normalizer KLk                    5
+                –          EMA window applied to raw per-step KL                            10
+                –          Numerical KL ﬂoor (ϵKL ) in denominators                         0.15
+                T          Softmax temperature in Eq. 6                                     0.5
+                ϵ          Per-domain mixture ﬂoor in Eq. 6                                 0.10
+                η          Batch-level jitter amplitude                                     0.30
+                –          File-poll interval of the watcher process (seconds)              300
+
+
+B.2   Student Training
+
+The student is trained with slime [35] on top of the Megatron backend; rollout inference is handled by an
+SGLang engine group co-located with the trainer. All runs use 7 nodes of GPUs: 4 trainer nodes, 2 SGLang
+rollout nodes, and 1 teacher node shared by K =4 teachers, connected via RDMA InﬁniBand. Table 4 lists
+the training-loop hyperparameters, and Table 5 lists parallelism and performance settings.
+
+                                     Table 4: Training hyperparameters.
+                     Setting                                               Value
+                     Student initialization                                Qwen3.6-35B-A3B
+                     Number of teachers K                                  4
+                     Total rollout steps                                   256
+                     Rollout batch size B (prompts per step)               128
+                     Responses sampled per prompt                          4
+                     Global mini-batch size                                128
+                     Gradient-accumulation micro-steps per rollout step    4
+                     Optimizer                                             Adam
+                     Learning rate                                         1 × 10−6
+                     Learning-rate schedule                                constant
+                     Weight decay                                          0.1
+                     Adam ( β 1 , β 2 )                                    (0.9, 0.98)
+                     Policy-loss variant (advantage estimator)             CISPO [2]
+                     Clip ratio (low, high)                                (0.2, 0.2)
+                     OPD reverse-KL coefﬁcient                             1.0
+                     Max prompt length                                     16,384 tokens
+                     Max response length                                   8,192 tokens
+                     Rollout sampling temperature                          1.0
+                     Chat-template thinking mode                           disabled
+
+
+
+                                              13
+                       Table 5: Parallelism and performance settings (Megatron backend).
+                                    Setting                                   Value
+                                    Tensor-model parallel size                2
+                                    Context-parallel size                     4
+                                    Expert-model parallel size                8
+                                    Max tokens per GPU per micro-batch        6,144
+                                    SGLang rollout: GPUs per engine           4
+
+
+
+Throughput overhead. Because the watcher runs as a standalone process that reads the training log and
+writes updated ratios to a status ﬁle without requiring the trainer to pause, it adds no synchronization
+overhead. Over the full 256-step run the mean throughputs of D3 -MOPD (520 tokens/GPU/s) and vanilla
+MOPD (531 tokens/GPU/s) differ by only 2.1%, a gap attributable to the shift in sequence-length distribu-
+tion as the scheduler redirects budget toward longer-response domains rather than to any computational
+overhead from the watcher.
+
+
+C Best-Average Checkpoint Comparison
+
+Table 2 reports the per-benchmark peak accuracy, where each benchmark’s best value may come from a
+different checkpoint. Table 6 instead reports the accuracy at the single checkpoint with the highest average
+score, reﬂecting the performance of a single deployable model.
+
+Table 6: Per-benchmark accuracy (%) and normalized score at the best-average checkpoint (vanilla MOPD:
+step 143; D3 -MOPD: step 95). The Teacher row reports each domain’s dedicated expert model (one spe-
+cialized model per domain, not a single model). Unlike Table 2, all values in each row come from a single
+checkpoint. Bold marks the column best, underline the runner-up.
+                                          Math        Instruction Following           Code      Tool-use
+        Method                    AIME25 HMMT(N) IFBench         IFEval       LCB-v6 OJB-C++ BFCL(B) Norm.
+        Teacher                    76.2       72.3      52.1      91.9         64.8      28.5     67.0     1.00
+        Student                    69.8       70.7      30.0      86.8         60.0      25.9     57.5     0.00
+        Vanilla MOPD (step 143)    73.2       71.0      45.7      91.0         61.0      27.6     60.0     0.48
+        ∆(Vanilla − Teacher)       −3.0       −1.3      −6.4      −0.9         −3.8      −0.9     −7.0     −0.52
+
+        D3 -MOPD (step 95)         74.0       71.4      45.1      91.2         62.5      29.7     62.5     0.73
+        ∆(D3 -MOPD − Teacher)      −2.2       −0.9      −7.0      −0.7         −2.3      +1.2     −4.5     −0.27
+        ∆(D3 -MOPD − Vanilla)      +0.8       +0.4      −0.6      +0.2         +1.5      +2.1     +2.5     +0.25
+
+
+
+
+Comparison with per-benchmark peaks. Compared with Table 2, the normalized scores drop for both
+methods (vanilla MOPD: 0.63 → 0.48; D3 -MOPD: 0.97 → 0.73), since no single checkpoint can maximize
+every benchmark at once. The drop is concentrated in benchmarks whose peaks occur far from the best-
+average step: for example, D3 -MOPD’s HMMT(N) falls from 73.2 (per-benchmark peak) to 71.4 at step 95,
+indicating that HMMT(N) peaks at a later checkpoint. Nevertheless, D3 -MOPD at step 95 still outperforms
+vanilla MOPD at step 143 on six of seven benchmarks and achieves a notably higher normalized score (0.73
+vs. 0.48), conﬁrming that the improvement holds when deploying a single checkpoint.
+
+
+D Generalization to 4B Student
+
+To verify that D3 -MOPD generalizes across model scales, we replicate the training pipeline with Qwen3.5-
+4B [20] as the student. The four domain-speciﬁc teachers are obtained by GRPO-training the same model
+on the corresponding data used for the Qwen3.6-35B-A3B experiments. Training hyperparameters (Table 4)
+and scheduler settings (Table 3) follow the same conﬁguration with minor scale-related adjustments.
+
+
+                                                 14
+Table 7: Per-benchmark accuracy (%) and normalized score with Qwen3.5-4B student (vanilla MOPD:
+step 159; D3 -MOPD: step 119). The Teacher row reports each domain’s dedicated GRPO-trained 4B ex-
+pert. Bold marks the column best, underline the runner-up.
+                                           Math        Instruction Following            Code      Tool-use
+         Method                    AIME25 HMMT(N) IFBench          IFEval       LCB-v6 OJB-C++ BFCL(B) Norm.
+         Teacher                    63.4      66.4       55.9        85.3        53.3      18.1     63.0     1.00
+         Student                    47.8      51.7       35.9        85.3        39.4      13.8     51.0     0.00
+         Vanilla MOPD (step 159)    59.3      63.4       45.4        82.7        53.7      18.5     63.0     0.86
+         ∆(Vanilla − Teacher)       −4.1      −3.0       −10.5       −2.6        +0.4      +0.4     0.0      −0.14
+
+         D3 -MOPD (step 119)        61.8      64.4       49.5        84.5        54.6      19.8     64.5     1.01
+         ∆(D3 -MOPD − Teacher)      −1.6      −2.0       −6.4        −0.8        +1.3      +1.7     +1.5     +0.01
+         ∆(D3 -MOPD − Vanilla)      +2.5      +1.0       +4.1        +1.8        +0.9      +1.3     +1.5     +0.15
+
+
+
+Results. Table 7 shows that the improvement pattern observed at the 35B-A3B scale carries over to the 4B
+student. D3 -MOPD outperforms vanilla MOPD on all seven benchmarks, with per-benchmark gains rang-
+ing from +0.9 (LCB-v6) to +4.1 (IFBench). The normalized score of D3 -MOPD (1.01) slightly surpasses the
+composite teacher ceiling (1.00), whereas vanilla MOPD reaches 0.86. Both methods surpass the domain-
+expert teachers on the code benchmarks (LCB-v6 and OJB-C++), and D3 -MOPD additionally exceeds the
+tool-use teacher on BFCL(B) by +1.5. The remaining gap to the teacher is largest on IFBench (−6.4), consis-
+tent with instruction following being the hardest domain for distillation at both model scales.
+
+Convergence speed. D3 -MOPD reaches its best-average checkpoint 40 steps earlier than vanilla MOPD
+(step 119 vs. step 159), a relative reduction of 25% in the number of training steps needed to achieve peak
+average performance. This faster convergence aligns with the 35B-A3B result (step 95 vs. step 143, Table 6),
+indicating that dynamic domain scheduling accelerates convergence across model scales.
+
+E   Theoretical Analysis of Composite-Signal Allocation
+
+We provide a simpliﬁed analysis showing that under an exponential decay model, the composite signal
+     f k · vk is proportional to the marginal reduction in the normalized gap, justifying its use as a greedy-
+sk = KL
+optimal allocation criterion.
+
+Exponential decay model.         We model each domain’s reverse-KL as decaying exponentially in its cumula-
+tive training exposure:
+                                              KLk (nk ) = KLk (0) · e−λk nk ,                                        (7)
+where nk is the cumulative sample count allocated to domain k and λk > 0 is a domain-speciﬁc learning
+rate. This captures the empirical observation (§2.2) that per-domain KL decreases roughly exponentially at
+domain-speciﬁc rates.
+
+Proposition 1 Under the exponential decay model (Eq. 7), with batch size B, window length W, uniform allocation
+pk = 1/K, and small per-window changes (λk B W/K ≪ 1), the composite signal satisﬁes
+                                                                 fk
+                                                           B W ∂KL
+                                           sk = f
+                                                KLk · vk ≈    ·     .                                                (8)
+                                                            K   ∂nk
+
+Allocating samples to arg maxk sk thus maximizes the instantaneous reduction in the average normalized gap ḡ =
+1     f
+K ∑k KLk .
+
+                             f k = KLk (nk )/KLk (0) = e−λk nk , with marginal reduction
+Proof. The normalized gap is KL
+                                               fk
+                                             ∂KL                    f k.
+                                                  = λk e−λk nk = λk KL
+                                              ∂nk
+
+
+                                                  15
+Under uniform allocation pk = 1/K, each window of W rollout steps delivers B W/K samples to domain k.
+Substituting into Eq. 3, the single-window relative change is δk = e−λk B W/K − 1, constant across windows
+                                                                (i )
+
+i. The descent velocity (Eq. 4) therefore reduces to vk = 1 − e−λk B W/K . A ﬁrst-order expansion yields
+vk ≈ λk B W/K, giving
+                                                                         f
+                                                        f k = B W · ∂KLk .
+                                    f k · vk ≈ B W · λk KL
+                               sk = KL
+                                                 K               K      ∂nk
+                                                                 f k /∂nk |.
+Since B W/K is constant across domains, arg maxk sk = arg maxk |∂KL                                         □
+
+
+Interpretation. Proposition 1 shows that the composite signal ranks domains by the magnitude of their
+normalized marginal KL reduction. The initial-KL normalization in KL    f k (Eq. 2) is essential: without it,
+domains with large absolute KL (e.g., IF, whose KL is ∼65× that of Math) would dominate the allocation
+regardless of their relative improvement rate. The ﬁrst-order condition λk B W/K ≪ 1 requires per-window
+KL changes to be small, which is satisﬁed in practice by the short window length (W = 10 steps).
+
+Practical robustness. The softmax-ﬂoor mapping (Eq. 6) smooths the greedy arg maxk sk allocation: the
+temperature T distributes samples across domains in proportion to their exponential signal strength rather
+than concentrating on a single domain, while the ﬂoor ϵ guarantees every domain retains a minimum sam-
+ple rate, preventing catastrophic forgetting of domains that have temporarily plateaued but may resume
+descent later in training.
+
+Remark on the exponential decay assumption. The exponential decay model is a simplifying assump-
+tion that we adopt to derive the proportionality between sk and the marginal KL reduction in closed form.
+The method itself does not require this assumption to hold exactly, because the composite signal is self-
+correcting by construction: if a domain deviates from exponential decay and enters an unexpected plateau,
+its descent velocity vk drops toward zero and automatically reduces its allocation regardless of the un-
+derlying functional form. The theoretical analysis therefore serves as a design rationale for choosing the
+gap-velocity product as the allocation criterion rather than a necessary condition for the method to produce
+effective schedules.
+
+
+F Composite Signal Trajectories
+
+                                                                        f k evolve for each domain over the
+Figure 7 visualizes how the composite signal s̃k and the normalized KL KL
+full 256-step training run. Panel (e) shows the corresponding allocation ratio pk produced by the scheduler.
+The scheduler concentrates budget on whichever domain currently exhibits both a large remaining gap and
+rapid descent, producing a sequence of distinct allocation phases. In the ﬁrst phase (steps 20–55), IF receives
+the highest signal because its initial KL gap is the largest among all domains and it descends rapidly once
+training begins, causing the allocation to reach approximately 38% while the other three domains receive
+near-ﬂoor shares. As IF’s descent velocity slows around step 55, Math takes over as the dominant domain
+and holds s̃math = 1.0 for roughly 60 consecutive steps, during which its normalized KL drops steadily
+from 0.42 to 0.25. The scheduler then redirects budget to Tool-use (steps 120–160) and ﬁnally returns to IF
+(steps 180–250) as IF’s accumulated gap reopens after an extended period of reduced allocation.
+The self-correcting property of the composite signal is visible in the interplay between the shaded signal
+regions and the KL curves within each panel. When a domain’s signal drops to zero and it receives only
+the ﬂoor allocation ϵ = 0.10, its normalized KL tends to plateau or rise (for example, IF’s normalized KL
+climbs from 0.29 to 0.65 during steps 65–120), which eventually increases the remaining gap component
+and restores a nonzero signal in a later update. This feedback loop ensures that no domain is permanently
+neglected even without explicit revisitation logic in the scheduler.
+
+
+G Ablation Domain Ratio Trajectories
+
+Figure 8 shows the per-domain sampling ratio of each ablation variant alongside vanilla MOPD and D3 -
+MOPD over 256 rollout steps.
+
+
+                                             16
+                                                                                              (a) Math                                                                             (b) Code
+                                                                      1.0                                                                                 1.0
+                                                                                                                                  0.6                                                                                0.6
+
+
+                                                                                                                                        Normalized KL                                                                      Normalized KL
+                                                          Signal sk
+                                                                                                                                  0.4                                                                                0.4
+                                                                      0.5                                                                                 0.5
+                                                                                                                                  0.2                                                                                0.2
+                                                                      0.0                                                         0.0                     0.0                                                        0.0
+                                                                                       50   100      150       200         250                                         50        100     150       200         250
+                                                                                                  (c) IF                                                                          (d) Tool-use
+                                                                      1.0                                                                                 1.0
+                                                                                                                                  0.6                                                                                0.6
+
+
+                                                                                                                                        Normalized KL                                                                      Normalized KL
+                                                          Signal sk
+                                                                                                                                  0.4                                                                                0.4
+                                                                      0.5                                                                                 0.5
+                                                                                                                                  0.2                                                                                0.2
+                                                                      0.0                                                         0.0                     0.0                                                        0.0
+                                                                                       50   100      150       200         250                                         50        100     150       200         250
+                                                                                             Rollout step            (e) Allocation ratio (all domains)                           Rollout step
+
+
+
+                                                         Target ratio pk
+                                                                      0.4
+                                                                                                                                                                                                    uniform
+                                                                      0.2
+
+                                                                                             50                      100                                150                      200                     250
+                                                                                                                                   Rollout step
+                                                                                                        Math                     Code                             IF             Tool-use
+Figure 7: Per-domain composite signal and normalized KL over 256 rollout steps, with the resulting alloca-
+tion ratio in panel (e). The scheduler produces a sequence of phase transitions that track the domain with
+the largest remaining gap and fastest descent at each point in training.
+
+
+                   0.6
+                                       Math                                      0.6
+                                                                                                           Code                                         0.6
+                                                                                                                                                                        Instruction Following                              0.6
+                                                                                                                                                                                                                                                       Tool-use
+                   0.5                                                           0.5                                                                    0.5                                                                0.5
+
+
+
+(a) Domain Ratio
+                   0.4                                                           0.4                                                                    0.4                                                                0.4
+                   0.3                                                           0.3                                                                    0.3                                                                0.3
+                   0.2                                                           0.2                                                                    0.2                                                                0.2
+                   0.1                                                           0.1                                                                    0.1                                                                0.1
+                   0.0                                                           0.0                                                                    0.0                                                                0.0
+                   0.6                                                           0.6                                                                    0.6                                                                0.6
+                   0.5                                                           0.5                                                                    0.5                                                                0.5
+
+
+
+(b) Domain Ratio
+                   0.4                                                           0.4                                                                    0.4                                                                0.4
+                   0.3                                                           0.3                                                                    0.3                                                                0.3
+                   0.2                                                           0.2                                                                    0.2                                                                0.2
+                   0.1                                                           0.1                                                                    0.1                                                                0.1
+                   0.0                                                           0.0                                                                    0.0                                                                0.0
+                   0.6                                                           0.6                                                                    0.6                                                                0.6
+                   0.5                                                           0.5                                                                    0.5                                                                0.5
+
+
+
+(c) Domain Ratio
+                   0.4                                                           0.4                                                                    0.4                                                                0.4
+                   0.3                                                           0.3                                                                    0.3                                                                0.3
+                   0.2                                                           0.2                                                                    0.2                                                                0.2
+                   0.1                                                           0.1                                                                    0.1                                                                0.1
+                   0.0                                                           0.0                                                                    0.0                                                                0.0
+                   0.6                                                           0.6                                                                    0.6                                                                0.6
+                   0.5                                                           0.5                                                                    0.5                                                                0.5
+
+
+
+(d) Domain Ratio
+                   0.4                                                           0.4                                                                    0.4                                                                0.4
+                   0.3                                                           0.3                                                                    0.3                                                                0.3
+                   0.2                                                           0.2                                                                    0.2                                                                0.2
+                   0.1                                                           0.1                                                                    0.1                                                                0.1
+                   0.0                                                           0.0                                                                    0.0                                                                0.0
+                         0   63         127        191                     255         0      63           127             191                   255          0             63         127         191           255                       0     63       127        191   255
+                                    Rollout Step                                                      Rollout Step                                                               Rollout Step                                                         Rollout Step
+                                  Vanilla MOPD                 D3 -MOPD                           D3 -MOPD w/o velocity                                 D3 -MOPD w/o gap                       D3 -MOPD w/o jitter                             D3 -MOPD w/o smoothing
+
+
+Figure 8: Per-domain sampling ratio of each ablation variant vs. D3 -MOPD and vanilla MOPD over 256
+rollout steps. (a) w/o velocity, (b) w/o gap, (c) w/o jitter, (d) w/o smoothing.
+
+
+• w/o velocity (row a). Without descent velocity, the scheduler relies solely on the KL gap. The ratios are
+  ﬂatter than D3 -MOPD: Math rises to ∼0.30 but never reaches the ∼0.50 peak of D3 -MOPD, and the late-
+
+
+                                                                                                                     17
+  stage shift toward IF and Tool-use is weaker. Because the gap signal alone cannot distinguish an actively
+  descending domain from one plateaued at a high KL, the scheduler spreads budget uniformly.
+• w/o gap (row b). Without the remaining gap, the scheduler uses only descent velocity. Early in training
+  all domains descend rapidly, so the velocity signal cannot differentiate them, producing large oscillations
+  before step 63. Later, IF is identiﬁed as the fastest-descending domain and heavily upweighted, but the
+  lack of gap information causes abrupt ratio swings (e.g., Math drops to ∼0.10 around step 100 before
+  rebounding). This instability explains why the w/o gap variant peaks latest at step 255 (Table 1).
+• w/o jitter (row c). The overall trajectory shape is similar to D3 -MOPD, conﬁrming that jitter does not
+  alter the scheduler’s long-run allocation. However, the ratio curves show sharper step-like transitions
+  between watcher updates, most visible in Code near step 200 and Tool-use near step 240. The corre-
+  sponding accuracy drops on code benchmarks (Table 1) suggest that this reduced per-batch variation
+  hurts domains near their r-KL plateau.
+• w/o smoothing (row d). A single observation window (R=1) makes the velocity estimate more reactive
+  but noisier. The ratio curves oscillate visibly more than D3 -MOPD (R=3), with frequent spikes in Math
+  and Code around steps 60–130. The overall allocation pattern nonetheless remains close to D3 -MOPD,
+  which explains why this variant still achieves 62.17 (+0.81 in Table 1).
+
+
+
+
+                                            18
+

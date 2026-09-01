@@ -14,6 +14,13 @@ task more often then changes the model objective, so the resulting capability
 trade-off can come from the objective, the compute schedule, or both. A coupled
 design makes optimization efficiency difficult to measure.
 
+Adaptive curricula use task difficulty, learning progress, or domain-loss
+trajectories to change this mixture online
+\citep{corrado2026drats,sun2026d3mopd}. These methods ask which tasks should
+receive more weight during training. We study the complementary fixed-target
+question: can task frequency reduce optimization error and compute while the
+user-specified capability mixture remains unchanged?
+
 Response length creates a second ambiguity. In a prompt-balanced mixed batch,
 global token averaging gives long-response tasks a larger coefficient. Recent
 MOPD work diagnoses this imbalance and changes domain loss weights
@@ -44,9 +51,9 @@ time.
 
 The controlled experiment checks the sampling formulas with known gradient
 distributions and costs. The large-model experiments use frozen gradient banks
-to compare raw gradients, GPAS scores, and measured AdamW task steps. Paired
-training runs then measure teacher-loss progress per token and GPU hour. A GRPO
-experiment tests the same task sampler with reward-based updates.
+to compare raw gradients, GPAS scores, and measured AdamW task steps. Matched
+seed-42 training runs then measure teacher-loss progress per token and GPU hour.
+A GRPO experiment tests the same task sampler with reward-based updates.
 
 The paper makes three contributions:
 \begin{itemize}
