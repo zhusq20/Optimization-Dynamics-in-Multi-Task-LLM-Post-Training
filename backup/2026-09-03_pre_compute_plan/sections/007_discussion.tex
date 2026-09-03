@@ -3,13 +3,12 @@
 \label{sec:conclusion}
 % ============================================================================
 
-The study covers one student scale, four tasks, one seed per method, and one
-system layout. GPAS
+The study covers one student scale, four tasks, and one system layout. GPAS
 is a one-step rule: it treats micro-batches within a step as independent,
 holds the AdamW scaling fixed within the step, and its variance reduction is
 bounded by the count limits ($H\leq2$). The additive step-time model was
-fitted to one layout, in which rollout dominates the fixed time; other layouts
-need their own fit. The method needs at least two micro-batches per task per step, so
+fitted to serial teacher execution; concurrent teacher serving needs its own
+fit. The method needs at least two micro-batches per task per step, so
 settings with many more tasks than micro-batches need a task-subsampling
 variant.
 

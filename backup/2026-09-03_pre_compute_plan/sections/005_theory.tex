@@ -43,7 +43,7 @@ that of Uniform, whereas GPAS lowers it to $0.68\times$
 Long-response tasks cost more per micro-batch, so the allocation with the
 least variance per step need not have the least variance per hour. Let
 $\tau_i$ be the measured time of one task-$i$ micro-batch and $C$ the fixed
-time per step for rollout, synchronization, and the optimizer update,
+time per step for synchronization, teacher loading, and the optimizer update,
 so that a step takes $C+\sum_i m_i\tau_i$. A wall-clock budget $T$ then allows
 $T/(C+\sum_i m_i\tau_i)$ steps, and the variance of the gradient averaged
 over those steps is proportional to

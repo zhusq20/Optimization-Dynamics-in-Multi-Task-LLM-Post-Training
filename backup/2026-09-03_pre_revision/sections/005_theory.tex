@@ -1,0 +1,118 @@
+% ============================================================================
+\section{GPAS Micro-Batch Allocation}
+\label{sec:theory}
+% ============================================================================
+
+\subsection{Noise in optimizer coordinates}
+
+AdamW's current second-moment state rescales coordinate $k$ by
+$D_k=(\sqrt{v_k}+\epsilon)^{-1}$. We therefore measure the
+one-micro-batch noise of task $i$ in the same coordinates. Assuming independent
+micro-batches,
+\begin{equation}
+\begin{split}
+    e_i&=\mathbb E\bigl\|D(g_i-\mathbb E[g_i])\bigr\|_2^2,\\
+    V(m)&=\mathbb E\bigl\|D(A-\nabla F)\bigr\|_2^2
+          =\sum_{i=1}^M\frac{w_i^2e_i}{m_i}.
+\end{split}
+\label{eq:batch_variance}
+\end{equation}
+Because every task is present, $V(m)$ measures within-task sampling noise and
+does not include task-selection noise. For a fixed student state, step size,
+and $D$, the allocation affects the one-step descent bound only through $V(m)$
+(Appendix~\ref{app:descent}).
+
+Minimizing $V(m)$ for a fixed budget of $G$ micro-batches gives
+\begin{equation}
+    m_i\ \propto\ w_i\sqrt{e_i}.
+    \label{eq:batch_gpas_allocation}
+\end{equation}
+We call this rule Gradient-Preconditioned Adaptive Sampling (GPAS). It is
+Neyman allocation---the classical rule that samples each stratum in proportion
+to its standard deviation---in the coordinates that AdamW uses. We clip the
+continuous counts to $[m_{\min},m_{\max}]$, rescale the remaining counts to sum
+to $G$, and round by largest remainder. Appendix~\ref{app:allocation_proofs}
+gives the short derivation.
+
+\subsection{Cost-GPAS}
+
+Long-response tasks can cost more per micro-batch, so minimizing variance per
+step need not minimize variance per hour. Let $\tau_i$ be the measured marginal
+time of one task-$i$ micro-batch. Let $C$ denote fixed per-step time for
+synchronization, teacher transfer, and the optimizer update. Under the serial
+teacher layout used here, Cost-GPAS minimizes
+\begin{equation}
+    J_C(m)=\left(C+\sum_{i=1}^M m_i\tau_i\right)
+           \left(\sum_{i=1}^M\frac{w_i^2e_i}{m_i}\right).
+    \label{eq:batch_cost_objective}
+\end{equation}
+The first factor is the measured step-time model and the second is $V(m)$; the
+product is proportional to the variance of a mean gradient estimate under a
+fixed wall-clock budget. With no fixed overhead, the solution is
+\[
+    m_i\ \propto\ w_i\sqrt{e_i/\tau_i}.
+\]
+When $C$ is large, the solution approaches GPAS. For the measured $C>0$ case,
+we enumerate the small feasible set of four-task integer allocations. The first
+step uses Uniform because it has no preceding noise or timing observation.
+
+\subsection{Online estimates and variance ratio}
+
+All statistics for the next allocation come from the completed step. For each
+task, $\widehat e_i$ is the unbiased sample variance of the vectors $Dg_{i,s}$,
+summed over coordinates; equivalently, its numerator is
+$\sum_s\|Dg_{i,s}\|_2^2-m_i\|D\bar g_i\|_2^2$ and its denominator is
+$m_i-1$. The minimum count of two makes this estimate available on every step.
+The default uses the current estimate without smoothing.
+\missing{Report the observed step-to-step change of $\widehat e_i$ and revise
+this choice if the four-teacher trace is unstable.}
+
+Response lengths make timings more variable, so $\tau_i$ and $C$ use
+exponential averages with decay $0.9$. We measure the predicted variance change
+relative to the bounded Uniform allocation as
+\begin{equation}
+    H=\frac{V(m^{\rm unif})}{V(m)}.
+    \label{eq:allocation_variance_ratio}
+\end{equation}
+When $H$ is close to one, the predicted variance under adaptive counts is close
+to the Uniform value. With $m_i^{\rm unif}=4$ and $m_i\leq8$, $H\leq2$. For
+Cost-GPAS, $H$ measures variance only; end-to-end GPU hours measure time
+efficiency.
+
+\subsection{Implementation and optional second-moment correction}
+
+GPAS works with conventional AdamW. Its second-moment observation $A^2$
+contains the allocation-dependent noise term
+$\sum_i w_i^2\operatorname{Var}(g_i)/m_i$. As an optional consistency
+refinement, we form
+\begin{equation}
+    U=\sum_{i=1}^M\frac{w_i}{m_i}\sum_{s=1}^{m_i}g_{i,s}^2,
+    \qquad v_{\rm obs}=U/G.
+    \label{eq:taskwise_square_observation}
+\end{equation}
+The expectation of $U/G$ is independent of $m$. Its noise scale matches the
+conventional observation at proportional allocation $m_i=Gw_i$, avoiding the
+roughly $\sqrt G=4\times$ effective-learning-rate change that would result from
+using $U$ itself in noise-dominated coordinates. The remaining difference in
+the signal term is derived in Appendix~\ref{app:moment_target_proof}. We call
+this optional variant taskwise AdamW (TW) and test it separately from the main
+allocation comparison.
+
+\begin{algorithm}[H]
+\caption{One optimizer step and the next GPAS allocation.}
+\label{alg:batch_gpas}
+\small
+\begin{minipage}{0.97\linewidth}
+\begin{enumerate}
+    \item Use the previous step's $e_i$ (and $\tau_i,C$ for Cost-GPAS) to
+    choose bounded integer counts $m$; use Uniform on the first step.
+    \item For every task $i$, take $m_i b$ new prompts, sample one response per
+    prompt, obtain token-level teacher feedback, and accumulate each
+    micro-batch gradient with weight $w_i/m_i$.
+    \item From the same gradients and execution trace, estimate $e_i$, update
+    the timing averages, and log counts, losses, tokens, $H$, and timing.
+    \item Apply one conventional AdamW update, or the optional TW update using
+    $A$ for the first moment and $U/G$ for the second moment.
+\end{enumerate}
+\end{minipage}
+\end{algorithm}

@@ -1,0 +1,44 @@
+% ============================================================================
+\section{Setting: Fixed-Weight MOPD with Adaptive Counts}
+\label{sec:setting}
+% ============================================================================
+
+A micro-batch contains $b=4$ prompts from one task, each with one sampled
+response, and is processed in one backward pass. One optimizer step accumulates
+$G=16$ such micro-batches---64 responses in total---before one AdamW update.
+Following MOPD and Open-MOPD, a prompt receives one response and a rollout batch
+is used for one update \citep{ma2026mopdmultiteacheronpolicydistillation,
+gao2026openmopddiagnosingfixingcapability}. This gives every prompt one dense
+token-level teacher signal. Prompts are not reused, which supports the
+within-step independence assumption used below.
+
+There are $M$ tasks (domains), each with a fixed teacher. Let $L_i(\theta)$ be
+task $i$'s sampled-token reverse-KL loss, averaged first over valid tokens in a
+response and then over the $b$ responses in a micro-batch. Fixed positive
+weights $w_i$ sum to one and define
+\begin{equation}
+    F(\theta)=\sum_{i=1}^M w_i L_i(\theta).
+    \label{eq:fixed_multitask_objective}
+\end{equation}
+The experiments use unnormalized task losses and set $w_i$ proportional to the
+inverse of the task's positive initial loss. The initial losses are measured
+once at the initial student checkpoint, and the resulting weights remain fixed
+throughout training.
+
+Task $i$ receives an integer count $m_i$ satisfying
+$\sum_i m_i=G$ and $m_{\min}\leq m_i\leq m_{\max}$. We use
+$m_{\min}=2$ and $m_{\max}=8$. Let $g_{i,s}$ be the gradient of micro-batch
+$s$ after its internal averaging. The accumulated gradient is
+\begin{equation}
+    A=\sum_{i=1}^M\frac{w_i}{m_i}
+      \sum_{s=1}^{m_i}g_{i,s}.
+    \label{eq:batch_gradient_observation}
+\end{equation}
+In practice, the trainer multiplies each internally averaged micro-batch loss
+by $w_i/m_i$ before backward. Conditional on the student state and counts,
+$\mathbb E[A]=\nabla F(\theta)$, so changing $m_i$ changes sampling variance
+but not the objective. By contrast, averaging all tokens in a mixed step makes
+a task's effective weight grow with both its count and its response length.
+The per-response mean and $w_i/m_i$ scaling prevent the length-dependent task
+weighting reported by Open-MOPD. Appendix Table~\ref{tab:notation} summarizes
+the notation and the values used in the experiments.

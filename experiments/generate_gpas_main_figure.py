@@ -21,8 +21,7 @@ OUT_PNG = ROOT / "figures" / "gpas_main_figure.png"
 
 
 # Existing controlled figures use blue, teal, amber, and neutral gray.  The
-# same family is retained here, with red reserved for the proposal-dependent
-# standard-AdamW second moment.
+# same family is retained here.
 NAVY = "#173B57"
 BLUE = "#3F7FBF"
 TEAL = "#2A9D8F"
@@ -220,7 +219,7 @@ def main() -> None:
     ax.text(
         50,
         40.4,
-        "Fix what to learn.  Adapt where to spend compute.",
+        "Fixed objective weights; adaptive micro-batch counts",
         ha="center",
         va="center",
         fontsize=8.6,
@@ -233,23 +232,23 @@ def main() -> None:
     rounded_box(ax, 31.2, 4.8, 31.8, 33.1, facecolor=PANEL, radius=1.1)
     rounded_box(ax, 64.7, 4.8, 34.2, 33.1, facecolor=PANEL, radius=1.1)
 
-    panel_title(ax, 2.5, 36.1, "(a)", r"Separate $\lambda$ and $q$")
-    panel_title(ax, 32.7, 36.1, "(b)", "Fix AdamW geometry")
+    panel_title(ax, 2.5, 36.1, "(a)", r"Fix $w$; allocate $m$")
+    panel_title(ax, 32.7, 36.1, "(b)", "Measure update noise")
     panel_title(ax, 66.2, 36.1, "(c)", "Allocate compute")
 
     # ------------------------------------------------------------------ (a)
-    ax.text(3.0, 32.8, "What to learn", color=GRAY, fontsize=5.6, va="center")
+    ax.text(3.0, 32.8, "Fixed task weights", color=GRAY, fontsize=5.6, va="center")
     ax.text(
         3.0,
         30.8,
-        r"Objective $\lambda$",
+        r"Objective $w$",
         color=NAVY,
         fontsize=6.7,
         fontweight="bold",
         va="center",
     )
     draw_lock(ax, 23.6, 30.1, scale=0.85)
-    ax.text(27.0, 30.8, "fixed", color=GRAY, fontsize=5.4, va="center", ha="right")
+    ax.text(22.7, 30.8, "fixed", color=GRAY, fontsize=5.4, va="center", ha="right")
     segmented_bar(ax, 3.0, 27.4, 23.9, 2.15, [0.25, 0.25, 0.25, 0.25], labels=True)
 
     for idx, (name, color) in enumerate(zip(TASK_NAMES, TASK_COLORS)):
@@ -263,11 +262,11 @@ def main() -> None:
             va="center",
         )
 
-    ax.text(3.0, 21.9, "Where to spend the next step", color=GRAY, fontsize=5.6, va="center")
+    ax.text(3.0, 21.9, "Micro-batches in the next step", color=GRAY, fontsize=5.6, va="center")
     ax.text(
         3.0,
         19.9,
-        r"Proposal $q$",
+        r"Counts $m$",
         color=NAVY,
         fontsize=6.7,
         fontweight="bold",
@@ -278,35 +277,35 @@ def main() -> None:
 
     rounded_box(ax, 3.0, 8.0, 23.9, 5.9, facecolor=WHITE, radius=0.7)
     ax.text(
-        8.9,
+        8.5,
         11.75,
-        r"sample $I\sim q$",
+        r"all tasks present",
         color=NAVY,
-        fontsize=6.4,
+        fontsize=5.7,
         fontweight="bold",
         ha="center",
         va="center",
     )
-    ax.text(8.9, 9.55, "one task / step", color=GRAY, fontsize=5.2, ha="center", va="center")
+    ax.text(8.5, 9.55, r"$m_i\geq 2$", color=GRAY, fontsize=5.2, ha="center", va="center")
     ax.plot([14.5, 14.5], [8.7, 13.2], color=LIGHT_GRAY, linewidth=0.8)
     ax.text(
-        20.9,
+        21.0,
         11.55,
-        r"$w_I=\lambda_I/q_I$",
+        r"loss $\times\;w_i/m_i$",
         color=NAVY,
-        fontsize=6.3,
+        fontsize=5.6,
         fontweight="bold",
         ha="center",
         va="center",
     )
-    ax.text(20.9, 9.55, "importance correction", color=GRAY, fontsize=4.6, ha="center", va="center")
+    ax.text(21.0, 9.55, "fixed objective", color=GRAY, fontsize=4.6, ha="center", va="center")
     arrow(ax, (9.0, 16.4), (9.0, 14.05), color=BLUE, linewidth=0.85)
     arrow(ax, (21.0, 27.2), (21.0, 14.05), color=GRAY, linewidth=0.75, linestyle="--")
 
     ax.text(
         14.9,
         6.55,
-        r"$\mathbb{E}[w_I G_I]=\nabla F(\theta)$",
+        r"$\mathbb{E}[A]=\sum_i w_i\nabla L_i$",
         color=TEAL,
         fontsize=6.1,
         fontweight="bold",
@@ -315,73 +314,33 @@ def main() -> None:
     )
 
     # ------------------------------------------------------------------ (b)
-    rounded_box(ax, 33.2, 30.0, 27.8, 3.2, facecolor=WHITE, radius=0.65)
-    ax.text(
-        47.1,
-        31.6,
-        r"first moment: $w_I G_I$  (unbiased)",
-        color=NAVY,
-        fontsize=5.45,
-        fontweight="bold",
-        ha="center",
-        va="center",
-    )
+    ax.text(47.1, 32.6, "reuse gradients from this step", color=GRAY,
+            fontsize=5.4, ha="center", va="center")
+    rounded_box(ax, 33.2, 27.4, 27.8, 3.5, facecolor=WHITE, radius=0.65)
+    ax.text(47.1, 29.15, r"micro-batch gradient $g_{i,s}$", color=NAVY,
+            fontsize=6.0, fontweight="bold", ha="center", va="center")
 
-    rounded_box(
-        ax,
-        33.2,
-        20.0,
-        27.8,
-        8.3,
-        facecolor=RED_FILL,
-        edgecolor="#E9B9A5",
-        radius=0.7,
-    )
-    ax.text(34.5, 26.4, "Standard AdamW", color=RED, fontsize=5.8, fontweight="bold", va="center")
-    ax.text(59.8, 26.4, "q-dependent", color=RED, fontsize=4.6, fontweight="bold", ha="right", va="center")
-    ax.text(34.5, 23.6, r"$v_{\rm obs}=w_I^2G_I^2$", color=NAVY, fontsize=6.1, va="center")
-    ax.text(
-        34.5,
-        21.4,
-        r"$\mathbb{E}[v_{\rm obs}]=\sum_i \lambda_i^2 S_i/q_i$",
-        color=NAVY,
-        fontsize=5.75,
-        va="center",
-    )
+    arrow(ax, (47.1, 27.25), (47.1, 24.9), color=BLUE, linewidth=0.9)
+    rounded_box(ax, 37.0, 20.9, 20.2, 3.8, facecolor=BLUE_FILL,
+                edgecolor="#A9C9E8", radius=0.65)
+    ax.text(47.1, 23.55, "AdamW coordinates", color=BLUE, fontsize=5.4,
+            fontweight="bold", ha="center", va="center")
+    ax.text(47.1, 21.9, r"$Dg_{i,s}$,  $D=(\sqrt{v}+\epsilon)^{-1}$",
+            color=NAVY, fontsize=5.45, ha="center", va="center")
 
-    ax.text(
-        47.1,
-        18.7,
-        "one-line second-moment change",
-        color=GRAY,
-        fontsize=4.9,
-        ha="center",
-        va="center",
-    )
-    arrow(ax, (47.1, 19.75), (47.1, 17.95), color=TEAL, linewidth=0.9)
-
-    rounded_box(
-        ax,
-        33.2,
-        8.4,
-        27.8,
-        8.3,
-        facecolor=TEAL_FILL,
-        edgecolor="#99D5C9",
-        radius=0.7,
-    )
-    ax.text(34.5, 14.8, "Moment-consistent AdamW", color=TEAL, fontsize=4.95, fontweight="bold", va="center")
-    ax.text(59.8, 14.8, "q-independent", color=TEAL, fontsize=4.1, fontweight="bold", ha="right", va="center")
-    ax.text(34.5, 12.0, r"$v_{\rm obs}=w_I G_I^2$", color=NAVY, fontsize=6.1, va="center")
-    ax.text(
-        34.5,
-        9.8,
-        r"$\mathbb{E}[v_{\rm obs}]=\sum_i \lambda_i S_i$",
-        color=NAVY,
-        fontsize=5.75,
-        va="center",
-    )
-    ax.text(47.1, 6.55, r"common local AdamW geometry", color=TEAL, fontsize=5.55, fontweight="bold", ha="center", va="center")
+    arrow(ax, (47.1, 20.7), (47.1, 18.7), color=TEAL, linewidth=0.9)
+    rounded_box(ax, 33.2, 10.1, 27.8, 8.3, facecolor=TEAL_FILL,
+                edgecolor="#99D5C9", radius=0.7)
+    ax.text(47.1, 16.5, r"task noise  $e_i=\mathrm{Var}(Dg_i)$",
+            color=TEAL, fontsize=6.1, fontweight="bold", ha="center", va="center")
+    for idx, (length, color) in enumerate(zip([6.0, 10.5, 4.8, 8.0], TASK_COLORS)):
+        y = 14.3 - idx * 1.25
+        ax.text(37.0, y, TASK_SHORT[idx], color=color, fontsize=4.8,
+                fontweight="bold", ha="right", va="center")
+        ax.plot([37.7, 37.7 + length], [y, y], color=color, linewidth=2.1,
+                solid_capstyle="round")
+    ax.text(47.1, 7.8, "no extra forward or backward pass", color=TEAL,
+            fontsize=5.2, fontweight="bold", ha="center", va="center")
 
     # Horizontal stage transitions.
     arrow(ax, (29.6, 11.0), (31.0, 11.0), color=NAVY, linewidth=1.0)
@@ -391,10 +350,10 @@ def main() -> None:
     ax.text(66.7, 32.5, "reuse the completed step", color=GRAY, fontsize=5.4, va="center")
     rounded_box(ax, 66.7, 27.5, 13.9, 3.8, facecolor=WHITE, radius=0.65)
     rounded_box(ax, 82.4, 27.5, 14.5, 3.8, facecolor=WHITE, radius=0.65)
-    ax.text(73.65, 29.4, r"AdamW scale $s_i$", color=BLUE, fontsize=5.55, fontweight="bold", ha="center", va="center")
-    ax.text(89.65, 29.4, r"step time $c_i$", color=AMBER, fontsize=5.55, fontweight="bold", ha="center", va="center")
+    ax.text(73.65, 29.4, r"scaled noise $e_i$", color=BLUE, fontsize=5.55, fontweight="bold", ha="center", va="center")
+    ax.text(89.65, 29.4, r"micro-batch cost $\tau_i$", color=AMBER, fontsize=5.2, fontweight="bold", ha="center", va="center")
 
-    # A tiny four-task scale profile reinforces that the proposal is taskwise.
+    # A tiny four-task profile reinforces that the allocation is taskwise.
     bar_x = 67.4
     for idx, (length, color) in enumerate(zip([5.4, 8.6, 4.1, 6.7], TASK_COLORS)):
         y = 25.5 - idx * 1.05
@@ -403,22 +362,23 @@ def main() -> None:
 
     rounded_box(ax, 66.7, 16.4, 30.2, 5.2, facecolor=BLUE_FILL, edgecolor="#A9C9E8", radius=0.7)
     ax.text(68.2, 19.7, "GPAS", color=BLUE, fontsize=6.4, fontweight="bold", va="center")
-    ax.text(82.5, 19.7, r"$q_i\propto\lambda_i s_i$", color=NAVY, fontsize=6.35, fontweight="bold", ha="center", va="center")
-    ax.text(95.6, 19.7, r"min $V(q)$", color=GRAY, fontsize=4.8, ha="right", va="center")
+    ax.text(82.5, 19.7, r"$m_i\propto w_i\sqrt{e_i}$", color=NAVY, fontsize=6.15, fontweight="bold", ha="center", va="center")
+    ax.text(95.6, 19.7, r"min $V(m)$", color=GRAY, fontsize=4.8, ha="right", va="center")
     ax.text(81.8, 17.6, "optimizer-aware allocation", color=GRAY, fontsize=4.8, ha="center", va="center")
 
     rounded_box(ax, 66.7, 9.7, 30.2, 5.2, facecolor=TEAL_FILL, edgecolor="#99D5C9", radius=0.7)
-    ax.text(68.2, 13.0, "Cost-GPAS", color=TEAL, fontsize=6.4, fontweight="bold", va="center")
-    ax.text(83.0, 13.0, r"$q_i\propto\lambda_i s_i/\sqrt{c_i}$", color=NAVY, fontsize=6.0, fontweight="bold", ha="center", va="center")
-    ax.text(95.6, 13.0, r"min $J(q)$", color=GRAY, fontsize=4.8, ha="right", va="center")
-    ax.text(81.8, 10.9, "cost-aware allocation", color=GRAY, fontsize=4.8, ha="center", va="center")
+    ax.text(68.2, 13.0, "Cost-GPAS", color=TEAL, fontsize=5.8, fontweight="bold", va="center")
+    ax.text(85.6, 13.0, r"minimize $J_C(m)$", color=NAVY, fontsize=5.2,
+            fontweight="bold", ha="center", va="center")
+    ax.text(81.8, 10.9, r"if $C=0$:  $m_i\propto w_i\sqrt{e_i/\tau_i}$",
+            color=GRAY, fontsize=4.7, ha="center", va="center")
 
     ax.text(81.8, 7.2, "Evaluate: teacher loss vs. tokens  •  GPU hours", color=GRAY, fontsize=4.9, fontweight="bold", ha="center", va="center")
 
     arrow(ax, (80.7, 27.3), (80.7, 21.8), color=BLUE, linewidth=0.85)
     arrow(ax, (89.6, 27.3), (89.6, 15.1), color=AMBER, linewidth=0.85)
 
-    # Online feedback: update q, never lambda.  The arc ends at the proposal
+    # Online feedback: update m, never w.  The arc ends at the allocation
     # bar in panel (a), and stays below the panel content to avoid crossings.
     feedback_x = [91.8, 97.8, 97.8, 0.4, 0.4]
     feedback_y = [9.4, 3.25, 3.25, 3.25, 17.7]
@@ -427,7 +387,7 @@ def main() -> None:
     ax.text(
         52.0,
         1.65,
-        r"next step: update $q$ from the current gradient and time; keep $\lambda$ fixed",
+        r"next step: update $m$ from current noise and cost; keep $w$ fixed",
         color=BLUE,
         fontsize=5.2,
         fontweight="bold",

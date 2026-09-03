@@ -37,17 +37,16 @@ $H$ & predicted variance ratio relative to Uniform & $H\leq2$ \\
 \toprule
 Component & Configuration \\
 \midrule
-Student & Qwen3-1.7B \citep{qwen2025qwen3} in non-thinking mode;
-\missing{exact checkpoint revision and initial scores} \\
-Teachers & Four Qwen3-1.7B models obtained from the student by reinforcement
-learning on each task (math, code, instruction following, science), so every
-teacher shares the student's origin and tokenizer; non-thinking mode;
-\missing{RL recipe, steps, revisions, and teacher scores} \\
+Student & Qwen3-1.7B \citep{qwen2025qwen3};
+\missing{exact checkpoint revision; Base/SFT/Instruct status; initial scores} \\
+Teachers & One fixed specialist for each of math, code, instruction following,
+and science; \missing{teacher names, sizes, revisions, origins, and same-origin
+status} \\
 Training prompts & $16{,}000$ unique prompts per task, shuffled once and read
 without replacement; \missing{dataset names, versions, licenses, and filters} \\
 Rollout and loss & One response per prompt; one update per rollout batch;
 sampled-token reverse KL, averaged over valid tokens and then prompts;
-maximum response length $4{,}096$, truncated responses kept;
+maximum response length $8{,}192$, truncated responses kept;
 \missing{temperature, ratio-truncation rule, and observed truncation rate by
 task} \\
 Step and budget & $b=4$ prompts per micro-batch, $G=16$ micro-batches per
@@ -58,10 +57,10 @@ $\epsilon$, weight decay, gradient clipping, precision, and sharding} \\
 Evaluation & Held-out teacher loss on $128$ fixed prompts per task from
 checkpoints every $50$ steps; MATH-500, LiveCodeBench slice, IFBench,
 GPQA-Diamond; \missing{benchmark versions and decoding settings} \\
-Seeds & $1$ per method \\
-System & Two GPUs per run: one 96\,GB GPU trains the student, one 48\,GB GPU
-serves rollouts and holds the four resident teachers; \missing{GPU models,
-inference engine, software revisions, and GPU hours per run} \\
+Seeds & $3$ for Uniform and GPAS; $1$ for Cost-GPAS and RawNoise \\
+System & At most one teacher loaded at a time, in a fixed cyclic order;
+\missing{GPU type and count, inference engine, software revisions, and GPU
+hours per run} \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -199,8 +198,7 @@ each task, we generate $32$ fresh micro-batches from the held-out prompts and
 record $\|Dg_{i,s}\|_2^2$ and $\|D\bar g_i\|_2^2$ for each half, with $D$ from
 the checkpoint's AdamW state. Half $\mathcal A$ gives
 $\widehat e^{\mathcal A}_i$, from which each rule computes its allocation
-$m^{\mathcal A}$ (LossGap uses the checkpoint's held-out losses); half
-$\mathcal B$ gives $\widehat e^{\mathcal B}_i$, and the
+$m^{\mathcal A}$; half $\mathcal B$ gives $\widehat e^{\mathcal B}_i$, and the
 held-out variance of that allocation is
 $\sum_iw_i^2\widehat e^{\mathcal B}_i/m^{\mathcal A}_i$, reported relative to
 the same quantity at Uniform counts. We exchange the halves and average. The
@@ -211,18 +209,17 @@ micro-batches to match the online estimate. Only scalar norms are stored.
 \subsection{System timing and logs}
 \label{app:system_details}
 
-For each task in a step, the log records rollout, scoring, backward, and
-optimizer time, peak memory, attempted responses, and valid and generated
-tokens. $\tau_i$ is the scoring and backward time of task $i$'s micro-batches
-divided by $m_i$; $C$ is the remaining step time, including rollout, weight
-synchronization to the inference GPU, and the optimizer update. GPU hours are
-wall time times the two reserved GPUs, including all waiting. Checkpoints
-store the allocation, noise estimates, timing averages, and prompt positions,
-and a resume test reproduces the next allocation and parameter update. A
-layout that scores tasks concurrently with training has a step time closer to
-$C+\max_i m_i\tau_i$ than to the serial sum; the fixed-objective scaling and
-GPAS are unchanged, and Cost-GPAS should use the step-time model fitted for
-that layout.
+For each task in a step, the log records teacher load and offload time,
+rollout, scoring, backward, and optimizer time, peak memory, attempted
+responses, and valid and generated tokens. $\tau_i$ is the rollout, scoring,
+and backward time of task $i$'s micro-batches divided by $m_i$; $C$ is the
+remaining step time, including teacher loading and the optimizer update.
+GPU hours include all loading and waiting time. Checkpoints store the
+allocation, noise estimates, timing averages, and prompt positions, and a
+resume test reproduces the next allocation and parameter update. Under
+concurrent teacher serving the step time is closer to $C+\max_i m_i\tau_i$
+than to the serial sum; the fixed-objective scaling and GPAS are unchanged,
+and Cost-GPAS should use the step-time model fitted for that layout.
 
 \subsection{Full task-level trajectories}
 

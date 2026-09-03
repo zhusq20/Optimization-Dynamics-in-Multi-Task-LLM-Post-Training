@@ -1,7 +1,7 @@
 # GPAS experiment artifacts
 
-The controlled checks validate the estimator and AdamW-moment calculations used
-in the paper. Run them from the repository root:
+The controlled checks validate the all-task micro-batch allocation and AdamW
+moment calculations used in the paper. Run them from the repository root:
 
 ```bash
 python3 experiments/generate_controlled_figure.py
@@ -11,26 +11,31 @@ The command regenerates:
 
 - `experiments/controlled_optimizer_sampling_results.csv`
 - `experiments/controlled_adamw_moment_results.csv`
-- `experiments/random_geometry_stress_scan.csv`
-- `experiments/random_geometry_stress_summary.csv`
 - `figures/controlled_optimizer_sampling.pdf`
-- `figures/random_geometry_stress_scan.pdf`
 
-The main controlled construction uses 20,000 trials with 16 corrected task
-draws per trial. A separate AdamW check uses 1,000,000 draws. Seeds, task
-geometries, optimizer scaling, and task costs are defined in
-`generate_controlled_figure.py`.
+The allocation check uses 20,000 trials, 16 micro-batches per step, and at least
+two micro-batches from every task. The separate moment check uses 200,000
+simulated steps. The seeds, noise geometry, optimizer scaling, task costs, count
+bounds, and rounding rule are defined in `generate_controlled_figure.py`.
 
 Current empirical ratios relative to Uniform are:
 
-| Method or moment | Ratio / error |
+| Method or observation | Ratio / change |
 |---|---:|
-| GPAS, AdamW-metric estimator error | 0.717 |
-| Cost-GPAS, time-weighted error | 0.889 |
-| Raw gradient-norm sampling, AdamW-metric error | 6.868 |
-| Conventional AdamW second-moment relative error | 0.816 |
-| Taskwise AdamW second-moment Monte Carlo error | 0.00235 |
+| GPAS, AdamW-scaled gradient variance | 0.679 |
+| Cost-GPAS, predicted time times variance | 0.857 |
+| Raw-noise allocation, AdamW-scaled gradient variance | 2.316 |
+| Conventional AdamW second-moment change after reallocation | 0.543 |
+| Taskwise AdamW $U/G$ change after reallocation | 0.00092 |
 
-These controlled artifacts support the calculation and implementation checks.
-The large-model protocol and frozen-checkpoint banks are specified in
+These controlled artifacts check the calculations and implementation. The
+four-teacher protocol supplies the end-to-end MOPD efficiency study and is in
 `EXPERIMENT_PLAN_QWEN3_1.7B_4T_MOPD_GPAS_zh.md`.
+
+`experiments/measure_initial_kl.py` measures the initial per-task teacher loss
+$\ell_i(0)$ on the held-out prompts and prints the inverse-initial-loss weights and the
+max/min ratio that decides between inverse-loss and equal weights (plan section 2).
+
+The `random_geometry_stress_*` files are retained as artifacts of the earlier
+task-subsampling formulation and are not evidence for the current all-task
+micro-batch method.

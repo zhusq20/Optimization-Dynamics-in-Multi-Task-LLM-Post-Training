@@ -1,0 +1,24 @@
+\begin{abstract}
+
+Multi-teacher on-policy distillation (MOPD) trains one student on its own
+rollouts, scored token by token by a specialist teacher for each task. In
+current methods, the task mixture can determine both the objective weights and
+the amount of rollout and teacher computation assigned to each task. We fix the
+objective weights and adapt only the number of fixed-size micro-batches assigned
+to each task. Every teacher contributes to every optimizer step. Scaling each
+micro-batch loss by its task weight divided by its count preserves the expected
+gradient under every allocation, so the allocation changes gradient variance
+without changing the objective. Gradient-Preconditioned Adaptive Sampling
+(GPAS) assigns micro-batches in proportion to each task's objective weight and
+gradient standard deviation after AdamW's diagonal scaling. Cost-GPAS also uses
+the measured time per micro-batch and the fixed time per optimizer step. Both
+methods use gradients and timings already recorded during training and require
+no additional forward or backward passes. In a controlled calculation, GPAS
+reduces scaled gradient variance to $0.679\times$ that of Uniform, whereas
+allocation based on raw gradient noise increases it to $2.316\times$ that of
+Uniform. We evaluate GPAS in four-teacher distillation of Qwen3-1.7B on
+mathematics, code, instruction following, and science.
+\missing{Insert the four-teacher loss, GPU-hour, and downstream-capability
+results after the runs finish.}
+
+\end{abstract}

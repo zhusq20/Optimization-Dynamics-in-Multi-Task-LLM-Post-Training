@@ -1,0 +1,45 @@
+% ============================================================================
+\section{Related Work}
+% ============================================================================
+
+\paragraph{Task weighting and data allocation.}
+Multi-task methods tune loss weights, alter gradient directions, or adapt data
+schedules
+\citep{sener2019multitasklearningmultiobjectiveoptimization,
+yu2020gradientsurgerymultitasklearning,
+liu2024conflictaversegradientdescentmultitask,chen2018gradnorm}.
+Language-model training similarly adapts domain, rollout, or prompt
+distributions from learning progress
+\citep{albalak2023efficient,wang2025dump,zheng2025greso,
+gao2025promptcurriculum}. GPAS instead keeps task importance fixed and changes
+the number of micro-batches used to estimate each task gradient. Because all
+tasks appear in every step, it measures within-task gradient noise for every
+task instead of observing only a sampled task.
+
+\paragraph{Multi-teacher on-policy distillation.}
+MOPD routes student rollouts to task teachers and trains a shared student with
+token-level teacher feedback \citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD studies unequal token budgets, reward scales, and stale rewards
+\citep{gao2026openmopddiagnosingfixingcapability}. D$^3$-MOPD updates the domain
+mixture using teacher-loss gap and descent velocity \citep{sun2026d3mopd}; this
+changes the objective represented by the training mixture. Open-MOPD's
+token-share balancing is satisfied here by per-response averaging and
+$w_i/m_i$ scaling. Gap-following changes the objective weights, whereas GPAS
+changes the precision of each task-gradient estimate; the two methods can be
+combined. Teacher mixtures can still produce transfer and task trade-offs
+\citep{li2026coinsidesdualnature}, motivating task-level capability reporting.
+
+\paragraph{Stratified allocation for optimization.}
+Gradient-norm sampling reduces the second moment of an SGD estimate
+\citep{alain2015variancereductionsgddistributed,
+katharopoulos2018samplescreatedequaldeep}. Neyman allocation assigns samples
+according to within-stratum standard deviation, and unequal sampling costs give
+the same square-root cost correction used here
+\citep{neyman1934representative,cochran1977sampling,mohri2026costawarelearning}.
+The appropriate variance scale depends on the optimizer: Euclidean coordinates
+are natural for SGD, while adaptive optimizers rescale coordinates
+\citep{lahire2023nonuniformadaptive}. GPAS applies this stratified allocation to
+fixed-size MOPD micro-batches and measures noise using the current AdamW
+scaling. The optional taskwise second-moment observation tests the separate
+effect of allocation on the optimizer state; GPAS does not require this
+modification.

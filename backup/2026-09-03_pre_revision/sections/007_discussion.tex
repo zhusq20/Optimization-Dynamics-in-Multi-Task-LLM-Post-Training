@@ -1,0 +1,23 @@
+% ============================================================================
+\section{Limitations and Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+The study evaluates one student scale, four tasks, and a serial one-teacher-slot
+system. GPAS is a local rule based on the current within-task noise, while the
+analysis treats equal-size micro-batches as independent and holds the AdamW
+scaling fixed within a step. Nonrepeating prompt streams support the sampling
+assumption but cannot remove correlations induced by a shared student. The
+additive timing model is specific to serial execution; concurrent teacher slots
+require a different Cost-GPAS objective. Inverse-initial-loss weighting is also
+unstable when an initial task KL is close to zero. When the measured
+variance ratio $H$ remains near one, the predicted variance under GPAS is close
+to Uniform, and Uniform is simpler to use.
+
+GPAS fixes the objective weights while adapting the precision of each task's
+gradient estimate. Scaling by $w_i/m_i$ preserves the expected gradient. GPAS
+uses optimizer-scaled noise to set the micro-batch counts, and Cost-GPAS also
+uses measured task time. Both methods use the gradients and timings produced by
+standard MOPD training and work with conventional AdamW. The taskwise
+second-moment correction is optional. \missing{Replace this sentence with the
+main four-teacher empirical conclusion once the results are available.}

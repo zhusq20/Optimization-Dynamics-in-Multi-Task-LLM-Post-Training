@@ -1,4 +1,4 @@
-"""Reproduce the controlled GPAS checks from explicit synthetic geometries."""
+"""Reproduce the controlled checks for all-task micro-batch GPAS."""
 
 from __future__ import annotations
 
@@ -11,56 +11,35 @@ import numpy as np
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SAMPLING_RESULTS = ROOT / "experiments" / "controlled_optimizer_sampling_results.csv"
+ALLOCATION_RESULTS = ROOT / "experiments" / "controlled_optimizer_sampling_results.csv"
 MOMENT_RESULTS = ROOT / "experiments" / "controlled_adamw_moment_results.csv"
-STRESS_RESULTS = ROOT / "experiments" / "random_geometry_stress_scan.csv"
-STRESS_SUMMARY = ROOT / "experiments" / "random_geometry_stress_summary.csv"
 CONTROLLED_FIGURE = ROOT / "figures" / "controlled_optimizer_sampling.pdf"
-STRESS_FIGURE = ROOT / "figures" / "random_geometry_stress_scan.pdf"
 
-# The controlled estimator uses 20,000 independent trials. Each trial averages
-# 16 importance-weighted task draws, matching a small task-batch budget.
-CONTROLLED_SEED = 20260901
-CONTROLLED_TRIALS = 20_000
-DRAWS_PER_TRIAL = 16
+SEED = 20260902
+TRIALS = 20_000
+MOMENT_DRAWS = 200_000
+MOMENT_CHUNK = 5_000
 
-# The moment check retains its larger Monte Carlo budget.
-MOMENT_SEED = 20260901
-MOMENT_DRAWS = 1_000_000
-MOMENT_CHUNK_SIZE = 20_000
+TASKS = 3
+TOTAL_MICROBATCHES = 16
+MIN_MICROBATCHES = 2
+MAX_MICROBATCHES = 12
+TARGET_WEIGHTS = np.full(TASKS, 1.0 / TASKS)
 
-# The stress scan samples every geometry from a fresh deterministic RNG stream.
-STRESS_SEED = 20260902
-STRESS_GEOMETRIES = 10_000
-STRESS_TASKS = 4
-STRESS_DIMENSION = 16
-LOG_SCALE_LOW = -4.0
-LOG_SCALE_HIGH = 4.0
-
-# Three zero-mean Gaussian tasks occupy three separate coordinates. If task i is
-# selected, its gradient is raw_scale[i] * Normal(0, 1) * e_i. The arrays sum
-# to one, so they also give the raw-scale and AdamW-scale proposals.
-RAW_SCALES = np.array(
+# A fixed diagonal map reverses the raw and AdamW-scaled noise rankings.
+RAW_NOISE_SCALES = np.array(
     [0.7652593561149718, 0.19230656846142996, 0.04243407542359844]
 )
-ADAMW_SCALES = np.array(
+ADAMW_NOISE_SCALES = np.array(
     [0.1740545215177264, 0.1969024054681955, 0.6290430730140781]
 )
-TARGET_WEIGHTS = np.full(3, 1.0 / 3.0)
-UNIFORM_PROPOSAL = np.full(3, 1.0 / 3.0)
-COST_PROPOSAL = np.array(
-    [0.18711814021008133, 0.3346968374362811, 0.4781850223536376]
-)
+METRIC_DIAGONAL = ADAMW_NOISE_SCALES / RAW_NOISE_SCALES
 
-# Applying this fixed diagonal map to a raw gradient changes its task scale
-# from RAW_SCALES to ADAMW_SCALES. The chosen costs make COST_PROPOSAL exactly
-# proportional to ADAMW_SCALES / sqrt(TASK_COSTS).
-METRIC_DIAGONAL = ADAMW_SCALES / RAW_SCALES
-TASK_COSTS = (ADAMW_SCALES / COST_PROPOSAL) ** 2
+# These costs produce a distinct cost-aware integer allocation.
+TASK_COSTS = np.array([0.8652444749092914, 0.3460977899637165, 1.730488949818583])
 
 
 def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
-    """Write a nonempty list of dictionaries with a stable column order."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=list(rows[0]))
@@ -68,129 +47,119 @@ def write_rows(path: Path, rows: list[dict[str, Any]]) -> None:
         writer.writerows(rows)
 
 
-def normalized(values: np.ndarray) -> np.ndarray:
-    """Return a probability vector proportional to positive values."""
-    return values / np.sum(values)
+def bounded_largest_remainder(scores: np.ndarray) -> np.ndarray:
+    """Apply bounded proportional allocation followed by largest remainder."""
+    if TOTAL_MICROBATCHES < TASKS * MIN_MICROBATCHES:
+        raise ValueError("infeasible lower bound")
+    if TOTAL_MICROBATCHES > TASKS * MAX_MICROBATCHES:
+        raise ValueError("infeasible upper bound")
+    if np.any(scores <= 0):
+        raise ValueError("allocation scores must be positive")
 
-
-def theoretical_mse(
-    task_scales: np.ndarray, proposal: np.ndarray, draws: int
-) -> float:
-    """MSE of the zero-mean, importance-weighted trial average."""
-    return float(np.sum((TARGET_WEIGHTS * task_scales) ** 2 / proposal) / draws)
-
-
-def controlled_sampling_experiment() -> list[dict[str, Any]]:
-    """Run the three-task estimator study and return one row per proposal."""
-    raw_proposal = normalized(TARGET_WEIGHTS * RAW_SCALES)
-    adamw_proposal = normalized(TARGET_WEIGHTS * ADAMW_SCALES)
-    recovered_cost_proposal = normalized(
-        TARGET_WEIGHTS * ADAMW_SCALES / np.sqrt(TASK_COSTS)
+    # Find z with sum(clip(score / z, lower, upper)) = G.
+    low = np.min(scores) / (MAX_MICROBATCHES * 2.0)
+    high = np.max(scores) / (MIN_MICROBATCHES * 0.5)
+    for _ in range(100):
+        middle = 0.5 * (low + high)
+        total = np.clip(
+            scores / middle, MIN_MICROBATCHES, MAX_MICROBATCHES
+        ).sum()
+        if total > TOTAL_MICROBATCHES:
+            low = middle
+        else:
+            high = middle
+    continuous = np.clip(
+        scores / high, MIN_MICROBATCHES, MAX_MICROBATCHES
     )
-    np.testing.assert_allclose(raw_proposal, RAW_SCALES, atol=1e-15)
-    np.testing.assert_allclose(adamw_proposal, ADAMW_SCALES, atol=1e-15)
-    np.testing.assert_allclose(recovered_cost_proposal, COST_PROPOSAL, atol=1e-15)
-    np.testing.assert_allclose(METRIC_DIAGONAL * RAW_SCALES, ADAMW_SCALES)
+    counts = np.floor(continuous + 1e-12).astype(int)
+    remainder = TOTAL_MICROBATCHES - int(counts.sum())
+    order = np.argsort(-(continuous - counts), kind="stable")
+    for index in order:
+        if remainder == 0:
+            break
+        if counts[index] < MAX_MICROBATCHES:
+            counts[index] += 1
+            remainder -= 1
+    if remainder != 0 or counts.sum() != TOTAL_MICROBATCHES:
+        raise RuntimeError("bounded rounding failed")
+    return counts
 
-    proposals = [
-        ("Uniform", UNIFORM_PROPOSAL),
-        ("Gradient-Norm IS", raw_proposal),
-        ("GPAS", adamw_proposal),
-        ("Cost-GPAS", recovered_cost_proposal),
+
+def scaled_variance(counts: np.ndarray) -> float:
+    return float(
+        np.sum((TARGET_WEIGHTS * ADAMW_NOISE_SCALES) ** 2 / counts)
+    )
+
+
+def controlled_allocation_experiment() -> list[dict[str, Any]]:
+    """Compare fixed-count stratified allocations using common random numbers."""
+    methods = [
+        ("Uniform", np.ones(TASKS)),
+        ("Raw-Noise", TARGET_WEIGHTS * RAW_NOISE_SCALES),
+        ("GPAS", TARGET_WEIGHTS * ADAMW_NOISE_SCALES),
+        (
+            "Cost-GPAS",
+            TARGET_WEIGHTS * ADAMW_NOISE_SCALES / np.sqrt(TASK_COSTS),
+        ),
     ]
+    allocations = [(name, bounded_largest_remainder(score)) for name, score in methods]
 
-    # Common random numbers reduce comparison noise while preserving the
-    # marginal sampling distribution of every proposal.
-    rng = np.random.default_rng(CONTROLLED_SEED)
-    task_uniforms = rng.random((CONTROLLED_TRIALS, DRAWS_PER_TRIAL))
-    gaussian_draws = rng.standard_normal((CONTROLLED_TRIALS, DRAWS_PER_TRIAL))
+    rng = np.random.default_rng(SEED)
+    max_count = max(int(counts.max()) for _, counts in allocations)
+    normal = rng.standard_normal((TRIALS, TASKS, max_count))
 
-    raw_theory = []
-    adamw_theory = []
-    raw_empirical = []
-    adamw_empirical = []
-    mean_residual = []
-
-    for _, proposal in proposals:
-        sampled_tasks = np.searchsorted(
-            np.cumsum(proposal), task_uniforms, side="right"
-        )
-        estimates = np.zeros((CONTROLLED_TRIALS, 3))
-        for task_index in range(3):
-            selected = sampled_tasks == task_index
-            contribution = (
-                selected
-                * gaussian_draws
-                * RAW_SCALES[task_index]
-                * TARGET_WEIGHTS[task_index]
-                / proposal[task_index]
+    theoretical = np.array([scaled_variance(counts) for _, counts in allocations])
+    empirical = []
+    predicted_time = []
+    for _, counts in allocations:
+        estimate = np.zeros((TRIALS, TASKS))
+        for task in range(TASKS):
+            estimate[:, task] = (
+                TARGET_WEIGHTS[task]
+                * RAW_NOISE_SCALES[task]
+                * normal[:, task, : counts[task]].mean(axis=1)
             )
-            estimates[:, task_index] = np.sum(contribution, axis=1) / DRAWS_PER_TRIAL
+        scaled = estimate * METRIC_DIAGONAL[None, :]
+        empirical.append(float(np.mean(np.sum(scaled**2, axis=1))))
+        predicted_time.append(float(counts @ TASK_COSTS))
 
-        raw_squared_error = np.sum(estimates**2, axis=1)
-        adamw_squared_error = np.sum(
-            (estimates * METRIC_DIAGONAL[None, :]) ** 2, axis=1
-        )
-        raw_theory.append(theoretical_mse(RAW_SCALES, proposal, DRAWS_PER_TRIAL))
-        adamw_theory.append(
-            theoretical_mse(ADAMW_SCALES, proposal, DRAWS_PER_TRIAL)
-        )
-        raw_empirical.append(float(np.mean(raw_squared_error)))
-        adamw_empirical.append(float(np.mean(adamw_squared_error)))
-        mean_residual.append(float(np.linalg.norm(np.mean(estimates, axis=0))))
-
-    raw_theory = np.asarray(raw_theory) / raw_theory[0]
-    adamw_theory = np.asarray(adamw_theory) / adamw_theory[0]
-    raw_empirical = np.asarray(raw_empirical) / raw_empirical[0]
-    adamw_empirical = np.asarray(adamw_empirical) / adamw_empirical[0]
-    expected_cost = np.array([proposal @ TASK_COSTS for _, proposal in proposals])
-    expected_cost /= expected_cost[0]
-    cost_theory = adamw_theory * expected_cost
-    cost_empirical = adamw_empirical * expected_cost
+    theoretical /= theoretical[0]
+    empirical = np.asarray(empirical) / empirical[0]
+    predicted_time = np.asarray(predicted_time) / predicted_time[0]
+    cost_theory = theoretical * predicted_time
+    cost_empirical = empirical * predicted_time
 
     rows: list[dict[str, Any]] = []
-    for index, (method, proposal) in enumerate(proposals):
+    for method_index, (method, counts) in enumerate(allocations):
         row: dict[str, Any] = {
             "method": method,
-            "prob_task_1": float(proposal[0]),
-            "prob_task_2": float(proposal[1]),
-            "prob_task_3": float(proposal[2]),
-            "raw_theory_mse_ratio": float(raw_theory[index]),
-            "raw_empirical_mse_ratio": float(raw_empirical[index]),
-            "adamw_theory_mse_ratio": float(adamw_theory[index]),
-            "adamw_empirical_mse_ratio": float(adamw_empirical[index]),
-            "expected_cost_ratio": float(expected_cost[index]),
-            "cost_theory_ratio": float(cost_theory[index]),
-            "cost_empirical_ratio": float(cost_empirical[index]),
-            "estimator_mean_residual": mean_residual[index],
-            "seed": CONTROLLED_SEED,
-            "trials": CONTROLLED_TRIALS,
-            "draws_per_trial": DRAWS_PER_TRIAL,
+            "microbatches_task_1": int(counts[0]),
+            "microbatches_task_2": int(counts[1]),
+            "microbatches_task_3": int(counts[2]),
+            "adamw_theory_variance_ratio": float(theoretical[method_index]),
+            "adamw_empirical_variance_ratio": float(empirical[method_index]),
+            "predicted_time_ratio": float(predicted_time[method_index]),
+            "cost_theory_ratio": float(cost_theory[method_index]),
+            "cost_empirical_ratio": float(cost_empirical[method_index]),
+            "seed": SEED,
+            "trials": TRIALS,
+            "total_microbatches": TOTAL_MICROBATCHES,
+            "minimum_microbatches": MIN_MICROBATCHES,
+            "maximum_microbatches": MAX_MICROBATCHES,
         }
-        for task_index in range(3):
-            suffix = task_index + 1
-            row[f"raw_scale_task_{suffix}"] = float(RAW_SCALES[task_index])
-            row[f"adamw_scale_task_{suffix}"] = float(ADAMW_SCALES[task_index])
-            row[f"metric_diagonal_task_{suffix}"] = float(
-                METRIC_DIAGONAL[task_index]
-            )
-            row[f"cost_task_{suffix}"] = float(TASK_COSTS[task_index])
+        for task in range(TASKS):
+            suffix = task + 1
+            row[f"raw_noise_scale_task_{suffix}"] = float(RAW_NOISE_SCALES[task])
+            row[f"adamw_noise_scale_task_{suffix}"] = float(ADAMW_NOISE_SCALES[task])
+            row[f"metric_diagonal_task_{suffix}"] = float(METRIC_DIAGONAL[task])
+            row[f"cost_task_{suffix}"] = float(TASK_COSTS[task])
         rows.append(row)
     return rows
 
 
-def moment_experiment(proposal: np.ndarray) -> list[dict[str, Any]]:
-    """Estimate AdamW moment bias under a proposal different from the target.
-
-    For moment vectors x and their target values x_ref, relative bias is
-    ||x - x_ref||_2 / ||x_ref||_2. The Monte Carlo columns insert empirical
-    moment averages for x; the calculated columns insert exact expectations.
-    """
-    rng = np.random.default_rng(MOMENT_SEED)
-    num_tasks = 3
+def moment_experiment(uniform: np.ndarray, adaptive: np.ndarray) -> list[dict[str, Any]]:
+    """Measure moment changes caused by replacing uniform with adaptive counts."""
     dimension = 24
-    target = np.full(num_tasks, 1.0 / num_tasks)
-
     coordinate = np.linspace(0.6, 1.4, dimension)
     means = np.stack(
         [
@@ -207,176 +176,92 @@ def moment_experiment(proposal: np.ndarray) -> list[dict[str, Any]]:
         ]
     )
     task_seconds = means**2 + scales**2
-    reference_first = np.sum(target[:, None] * means, axis=0)
-    reference_second = np.sum(target[:, None] * task_seconds, axis=0)
+    first_exact = np.sum(TARGET_WEIGHTS[:, None] * means, axis=0)
+    taskwise_second_exact = np.sum(
+        TARGET_WEIGHTS[:, None] * task_seconds, axis=0
+    ) / TOTAL_MICROBATCHES
 
-    first_sum = np.zeros(dimension)
-    standard_second_sum = np.zeros(dimension)
-    consistent_second_sum = np.zeros(dimension)
+    def standard_second_exact(counts: np.ndarray) -> np.ndarray:
+        return first_exact**2 + np.sum(
+            (TARGET_WEIGHTS**2 / counts)[:, None] * scales**2, axis=0
+        )
+
+    exact_by_allocation = {
+        "Uniform": {
+            "First moment": first_exact,
+            "Standard second moment": standard_second_exact(uniform),
+            "Taskwise second moment": taskwise_second_exact,
+        },
+        "GPAS": {
+            "First moment": first_exact,
+            "Standard second moment": standard_second_exact(adaptive),
+            "Taskwise second moment": taskwise_second_exact,
+        },
+    }
+
+    sums: dict[str, dict[str, np.ndarray]] = {}
+    rng = np.random.default_rng(SEED + 1)
+    max_count = int(max(uniform.max(), adaptive.max()))
     seen = 0
+    for label in ("Uniform", "GPAS"):
+        sums[label] = {
+            "First moment": np.zeros(dimension),
+            "Standard second moment": np.zeros(dimension),
+            "Taskwise second moment": np.zeros(dimension),
+        }
 
     while seen < MOMENT_DRAWS:
-        batch = min(MOMENT_CHUNK_SIZE, MOMENT_DRAWS - seen)
-        task = rng.choice(num_tasks, size=batch, p=proposal)
-        gradients = means[task] + scales[task] * rng.standard_normal((batch, dimension))
-        weight = target[task] / proposal[task]
-        first_sum += np.sum(weight[:, None] * gradients, axis=0)
-        standard_second_sum += np.sum((weight[:, None] * gradients) ** 2, axis=0)
-        consistent_second_sum += np.sum(weight[:, None] * gradients**2, axis=0)
+        batch = min(MOMENT_CHUNK, MOMENT_DRAWS - seen)
+        normal = rng.standard_normal((batch, TASKS, max_count, dimension))
+        gradients = means[None, :, None, :] + scales[None, :, None, :] * normal
+        for label, counts in (("Uniform", uniform), ("GPAS", adaptive)):
+            first = np.zeros((batch, dimension))
+            taskwise_second = np.zeros((batch, dimension))
+            for task in range(TASKS):
+                selected = gradients[:, task, : counts[task], :]
+                first += TARGET_WEIGHTS[task] * selected.mean(axis=1)
+                taskwise_second += (
+                    TARGET_WEIGHTS[task]
+                    * (selected**2).mean(axis=1)
+                    / TOTAL_MICROBATCHES
+                )
+            sums[label]["First moment"] += first.sum(axis=0)
+            sums[label]["Standard second moment"] += (first**2).sum(axis=0)
+            sums[label]["Taskwise second moment"] += taskwise_second.sum(axis=0)
         seen += batch
 
-    empirical_first = first_sum / MOMENT_DRAWS
-    empirical_standard_second = standard_second_sum / MOMENT_DRAWS
-    empirical_consistent_second = consistent_second_sum / MOMENT_DRAWS
-    exact_standard_second = np.sum(
-        (target**2 / proposal)[:, None] * task_seconds, axis=0
-    )
+    empirical = {
+        label: {name: value / MOMENT_DRAWS for name, value in values.items()}
+        for label, values in sums.items()
+    }
 
-    def relative_bias(value: np.ndarray, reference: np.ndarray) -> float:
+    def relative_change(value: np.ndarray, reference: np.ndarray) -> float:
         return float(np.linalg.norm(value - reference) / np.linalg.norm(reference))
 
-    common = {
-        "draws": MOMENT_DRAWS,
-        "seed": MOMENT_SEED,
-        "q_task_1": float(proposal[0]),
-        "q_task_2": float(proposal[1]),
-        "q_task_3": float(proposal[2]),
-    }
-    return [
-        {
-            "optimizer": "Standard AdamW",
-            "moment": "First moment",
-            "mc_relative_bias": relative_bias(empirical_first, reference_first),
-            "calculated_relative_bias": 0.0,
-            **common,
-        },
-        {
-            "optimizer": "Moment-consistent AdamW",
-            "moment": "First moment",
-            "mc_relative_bias": relative_bias(empirical_first, reference_first),
-            "calculated_relative_bias": 0.0,
-            **common,
-        },
-        {
-            "optimizer": "Standard AdamW",
-            "moment": "Second moment",
-            "mc_relative_bias": relative_bias(
-                empirical_standard_second, reference_second
-            ),
-            "calculated_relative_bias": relative_bias(
-                exact_standard_second, reference_second
-            ),
-            **common,
-        },
-        {
-            "optimizer": "Moment-consistent AdamW",
-            "moment": "Second moment",
-            "mc_relative_bias": relative_bias(
-                empirical_consistent_second, reference_second
-            ),
-            "calculated_relative_bias": 0.0,
-            **common,
-        },
-    ]
-
-
-def stress_scan() -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, np.ndarray]]:
-    """Calculate proposal quality for 10,000 random four-task geometries."""
-    rng = np.random.default_rng(STRESS_SEED)
-    task_coordinate_seconds = np.exp(
-        rng.uniform(
-            LOG_SCALE_LOW,
-            LOG_SCALE_HIGH,
-            size=(STRESS_GEOMETRIES, STRESS_TASKS, STRESS_DIMENSION),
-        )
-    )
-    metric_squared = np.exp(
-        rng.uniform(
-            LOG_SCALE_LOW,
-            LOG_SCALE_HIGH,
-            size=(STRESS_GEOMETRIES, STRESS_DIMENSION),
-        )
-    )
-
-    raw_scales = np.sqrt(np.sum(task_coordinate_seconds, axis=2))
-    adamw_scales = np.sqrt(
-        np.sum(task_coordinate_seconds * metric_squared[:, None, :], axis=2)
-    )
-    raw_proposals = raw_scales / np.sum(raw_scales, axis=1, keepdims=True)
-    adamw_proposals = adamw_scales / np.sum(adamw_scales, axis=1, keepdims=True)
-    uniform_proposals = np.full_like(raw_proposals, 1.0 / STRESS_TASKS)
-    target = np.full(STRESS_TASKS, 1.0 / STRESS_TASKS)
-
-    def metric_mse(proposals: np.ndarray) -> np.ndarray:
-        return np.sum((target[None, :] * adamw_scales) ** 2 / proposals, axis=1)
-
-    uniform_mse = metric_mse(uniform_proposals)
-    raw_mse_ratio = metric_mse(raw_proposals) / uniform_mse
-    adamw_mse_ratio = metric_mse(adamw_proposals) / uniform_mse
-    adamw_vs_raw_ratio = adamw_mse_ratio / raw_mse_ratio
-    proposal_l1 = np.sum(np.abs(raw_proposals - adamw_proposals), axis=1)
-
     rows: list[dict[str, Any]] = []
-    for geometry in range(STRESS_GEOMETRIES):
-        row: dict[str, Any] = {
-            "geometry_id": geometry,
-            "seed": STRESS_SEED,
-            "raw_proposal_adamw_mse_ratio": float(raw_mse_ratio[geometry]),
-            "adamw_proposal_adamw_mse_ratio": float(adamw_mse_ratio[geometry]),
-            "adamw_vs_raw_mse_ratio": float(adamw_vs_raw_ratio[geometry]),
-            "proposal_l1_distance": float(proposal_l1[geometry]),
-            "metric_squared_min": float(np.min(metric_squared[geometry])),
-            "metric_squared_max": float(np.max(metric_squared[geometry])),
-        }
-        for task_index in range(STRESS_TASKS):
-            suffix = task_index + 1
-            row[f"raw_scale_task_{suffix}"] = float(raw_scales[geometry, task_index])
-            row[f"adamw_scale_task_{suffix}"] = float(
-                adamw_scales[geometry, task_index]
-            )
-            row[f"raw_prob_task_{suffix}"] = float(
-                raw_proposals[geometry, task_index]
-            )
-            row[f"adamw_prob_task_{suffix}"] = float(
-                adamw_proposals[geometry, task_index]
-            )
-        rows.append(row)
-
-    def distribution_fields(prefix: str, values: np.ndarray) -> dict[str, float]:
-        return {
-            f"{prefix}_min": float(np.min(values)),
-            f"{prefix}_p05": float(np.quantile(values, 0.05)),
-            f"{prefix}_median": float(np.median(values)),
-            f"{prefix}_mean": float(np.mean(values)),
-            f"{prefix}_p95": float(np.quantile(values, 0.95)),
-            f"{prefix}_max": float(np.max(values)),
-        }
-
-    summary = {
-        "geometries": STRESS_GEOMETRIES,
-        "tasks": STRESS_TASKS,
-        "dimension": STRESS_DIMENSION,
-        "seed": STRESS_SEED,
-        "log_uniform_low": LOG_SCALE_LOW,
-        "log_uniform_high": LOG_SCALE_HIGH,
-        **distribution_fields("raw_mse_ratio", raw_mse_ratio),
-        **distribution_fields("adamw_mse_ratio", adamw_mse_ratio),
-        **distribution_fields("adamw_vs_raw_ratio", adamw_vs_raw_ratio),
-        **distribution_fields("proposal_l1_distance", proposal_l1),
-        "fraction_adamw_better_than_raw": float(
-            np.mean(adamw_mse_ratio < raw_mse_ratio)
-        ),
-        "fraction_adamw_better_than_uniform": float(np.mean(adamw_mse_ratio < 1.0)),
-        "fraction_raw_better_than_uniform": float(np.mean(raw_mse_ratio < 1.0)),
-    }
-    plot_values = {
-        "raw_mse_ratio": raw_mse_ratio,
-        "adamw_mse_ratio": adamw_mse_ratio,
-    }
-    return rows, [summary], plot_values
+    for name in ("First moment", "Standard second moment", "Taskwise second moment"):
+        rows.append(
+            {
+                "observation": name,
+                "mc_relative_change_from_uniform": relative_change(
+                    empirical["GPAS"][name], empirical["Uniform"][name]
+                ),
+                "calculated_relative_change_from_uniform": relative_change(
+                    exact_by_allocation["GPAS"][name],
+                    exact_by_allocation["Uniform"][name],
+                ),
+                "uniform_counts": "-".join(str(int(value)) for value in uniform),
+                "adaptive_counts": "-".join(str(int(value)) for value in adaptive),
+                "draws": MOMENT_DRAWS,
+                "seed": SEED + 1,
+            }
+        )
+    return rows
 
 
-def configure_plot_style() -> None:
+def make_figure(
+    allocation_rows: list[dict[str, Any]], moment_rows: list[dict[str, Any]]
+) -> None:
     plt.rcParams.update(
         {
             "font.size": 8.2,
@@ -388,141 +273,83 @@ def configure_plot_style() -> None:
             "pdf.fonttype": 42,
         }
     )
-
-
-def make_controlled_figure(
-    sampling: list[dict[str, Any]], moment: list[dict[str, Any]]
-) -> None:
-    methods = [str(row["method"]) for row in sampling]
-    short_methods = ["Uniform", "GradNorm", "GPAS", "Cost"]
+    methods = [str(row["method"]) for row in allocation_rows]
+    short_methods = ["Uniform", "RawNoise", "GPAS", "Cost"]
     colors = ["#7B8794", "#E69F00", "#3B77B4", "#2A9D8F"]
-    configure_plot_style()
     fig, axes_grid = plt.subplots(2, 2, figsize=(7.2, 5.0))
     axes = axes_grid.ravel()
 
-    x = np.arange(3)
+    x = np.arange(TASKS)
     width = 0.18
-    for method_index, row in enumerate(sampling):
-        probability = [float(row[f"prob_task_{task}"]) for task in (1, 2, 3)]
+    for method_index, row in enumerate(allocation_rows):
+        counts = [float(row[f"microbatches_task_{task}"]) for task in (1, 2, 3)]
         axes[0].bar(
             x + (method_index - 1.5) * width,
-            probability,
+            counts,
             width=width,
             color=colors[method_index],
             label=methods[method_index],
         )
-    axes[0].set_title("Task proposals")
-    axes[0].set_ylabel("sampling probability")
+    axes[0].set_title("Integer micro-batch allocation")
+    axes[0].set_ylabel("micro-batches per step")
     axes[0].set_xticks(x, ["task 1", "task 2", "task 3"])
-    axes[0].set_ylim(0, 0.84)
     axes[0].legend(frameon=False, loc="upper center", ncol=2)
 
-    adamw_empirical = [float(row["adamw_empirical_mse_ratio"]) for row in sampling]
-    adamw_calculated = [float(row["adamw_theory_mse_ratio"]) for row in sampling]
-    axes[1].bar(np.arange(4), adamw_empirical, color=colors, width=0.68)
-    axes[1].scatter(np.arange(4), adamw_calculated, color="black", marker="x", s=22)
-    axes[1].set_title("AdamW-metric estimator error")
+    empirical = [float(row["adamw_empirical_variance_ratio"]) for row in allocation_rows]
+    calculated = [float(row["adamw_theory_variance_ratio"]) for row in allocation_rows]
+    axes[1].bar(np.arange(4), empirical, color=colors, width=0.68)
+    axes[1].scatter(np.arange(4), calculated, color="black", marker="x", s=22)
+    axes[1].set_title("AdamW-scaled gradient variance")
     axes[1].set_ylabel("relative to Uniform")
     axes[1].set_xticks(np.arange(4), short_methods, rotation=20)
-    axes[1].set_ylim(0, 1.08 * max(adamw_empirical + adamw_calculated))
 
-    cost_empirical = [float(row["cost_empirical_ratio"]) for row in sampling]
-    cost_calculated = [float(row["cost_theory_ratio"]) for row in sampling]
+    cost_empirical = [float(row["cost_empirical_ratio"]) for row in allocation_rows]
+    cost_calculated = [float(row["cost_theory_ratio"]) for row in allocation_rows]
     axes[2].bar(np.arange(4), cost_empirical, color=colors, width=0.68)
     axes[2].scatter(np.arange(4), cost_calculated, color="black", marker="x", s=22)
-    axes[2].set_title("Time-weighted objective $J(q)$")
+    axes[2].set_title("Predicted time $\\times$ variance")
     axes[2].set_ylabel("relative to Uniform")
     axes[2].set_xticks(np.arange(4), short_methods, rotation=20)
-    axes[2].set_ylim(0, 1.08 * max(cost_empirical + cost_calculated))
 
-    moment_names = ["First moment", "Second moment"]
-    optimizer_names = ["Standard AdamW", "Moment-consistent AdamW"]
-    moment_x = np.arange(2)
-    drift_colors = ["#D55E00", "#2A9D8F"]
-    for optimizer_index, optimizer in enumerate(optimizer_names):
-        rows = [
-            next(
-                row
-                for row in moment
-                if row["optimizer"] == optimizer and row["moment"] == moment_name
-            )
-            for moment_name in moment_names
-        ]
-        offset = (optimizer_index - 0.5) * 0.34
-        axes[3].bar(
-            moment_x + offset,
-            [float(row["mc_relative_bias"]) for row in rows],
-            width=0.34,
-            color=drift_colors[optimizer_index],
-            label=optimizer.replace(" AdamW", ""),
-        )
-        axes[3].scatter(
-            moment_x + offset,
-            [float(row["calculated_relative_bias"]) for row in rows],
-            color="black",
-            marker="x",
-            s=22,
-            zorder=3,
-        )
-    axes[3].set_title("Expected moment change")
-    axes[3].set_ylabel("relative bias")
-    axes[3].set_xticks(moment_x, ["first", "second"])
-    axes[3].legend(frameon=False, loc="upper left")
+    moment_labels = ["First", "AdamW $A^2$", "Taskwise $U/G$"]
+    moment_empirical = [
+        float(row["mc_relative_change_from_uniform"]) for row in moment_rows
+    ]
+    moment_calculated = [
+        float(row["calculated_relative_change_from_uniform"]) for row in moment_rows
+    ]
+    axes[3].bar(np.arange(3), moment_empirical, color=["#7B8794", "#D55E00", "#2A9D8F"], width=0.68)
+    axes[3].scatter(np.arange(3), moment_calculated, color="black", marker="x", s=22)
+    axes[3].set_title("Change after reallocating counts")
+    axes[3].set_ylabel("relative change from Uniform")
+    axes[3].set_xticks(np.arange(3), moment_labels)
 
     for axis in axes:
         axis.spines["top"].set_visible(False)
         axis.spines["right"].set_visible(False)
         axis.grid(axis="y", color="#D9DEE3", linewidth=0.6, alpha=0.75)
         axis.set_axisbelow(True)
-
     fig.tight_layout(w_pad=1.3, h_pad=1.5)
     CONTROLLED_FIGURE.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(CONTROLLED_FIGURE, bbox_inches="tight")
     plt.close(fig)
 
 
-def make_stress_figure(plot_values: dict[str, np.ndarray]) -> None:
-    configure_plot_style()
-    fig, axis = plt.subplots(figsize=(5.4, 3.15))
-    series = [
-        ("Raw-scale proposal", plot_values["raw_mse_ratio"], "#E69F00"),
-        ("AdamW-scale proposal", plot_values["adamw_mse_ratio"], "#3B77B4"),
-    ]
-    for label, values, color in series:
-        ordered = np.sort(values)
-        cumulative = np.arange(1, len(ordered) + 1) / len(ordered)
-        axis.step(ordered, cumulative, where="post", color=color, label=label)
-    axis.axvline(1.0, color="#4F5660", linestyle="--", linewidth=0.9, label="Uniform")
-    axis.set_title("Random optimizer geometries")
-    axis.set_xlabel("AdamW-metric MSE relative to Uniform")
-    axis.set_ylabel("fraction of geometries")
-    axis.set_ylim(0, 1.01)
-    axis.spines["top"].set_visible(False)
-    axis.spines["right"].set_visible(False)
-    axis.grid(color="#D9DEE3", linewidth=0.6, alpha=0.75)
-    axis.set_axisbelow(True)
-    axis.legend(frameon=False, loc="lower right")
-    fig.tight_layout()
-    STRESS_FIGURE.parent.mkdir(parents=True, exist_ok=True)
-    fig.savefig(STRESS_FIGURE, bbox_inches="tight")
-    plt.close(fig)
-
-
 def main() -> None:
-    sampling = controlled_sampling_experiment()
-    write_rows(SAMPLING_RESULTS, sampling)
-
-    gpas = next(row for row in sampling if row["method"] == "GPAS")
-    proposal = np.array([float(gpas[f"prob_task_{task}"]) for task in (1, 2, 3)])
-    moment = moment_experiment(proposal)
+    allocation = controlled_allocation_experiment()
+    write_rows(ALLOCATION_RESULTS, allocation)
+    uniform_counts = np.array(
+        [allocation[0][f"microbatches_task_{task}"] for task in (1, 2, 3)],
+        dtype=int,
+    )
+    gpas_row = next(row for row in allocation if row["method"] == "GPAS")
+    gpas_counts = np.array(
+        [gpas_row[f"microbatches_task_{task}"] for task in (1, 2, 3)],
+        dtype=int,
+    )
+    moment = moment_experiment(uniform_counts, gpas_counts)
     write_rows(MOMENT_RESULTS, moment)
-
-    stress_rows, stress_summary, stress_plot_values = stress_scan()
-    write_rows(STRESS_RESULTS, stress_rows)
-    write_rows(STRESS_SUMMARY, stress_summary)
-
-    make_controlled_figure(sampling, moment)
-    make_stress_figure(stress_plot_values)
+    make_figure(allocation, moment)
 
 
 if __name__ == "__main__":

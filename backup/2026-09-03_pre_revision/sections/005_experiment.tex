@@ -1,0 +1,197 @@
+% ============================================================================
+\section{Experimental Setup}
+\label{sec:experiments}
+% ============================================================================
+
+We study a single Qwen3-1.7B student and four specialist teachers for
+mathematics, code, instruction following, and science. Each task has one fixed
+teacher. Appendix Table~\ref{tab:pipeline} lists the complete model, data,
+optimization, and system metadata; entries marked in red remain to be filled
+from the final run configuration.
+
+\subsection{Data, loss, and fixed budget}
+
+Each micro-batch contains four prompts from one task, each with one sampled
+response, and is processed in one backward pass. A step contains 16
+micro-batches and therefore 64 responses. Reverse KL is averaged over valid
+tokens within each response and then over the four responses; $w_i/m_i$ is
+applied only after this internal mean. Every attempted response contributes to
+the response count and resource total, including invalid or truncated outputs.
+
+The objective weights are the normalized inverse initial task losses. Every run
+starts from the same student and uses these weights unchanged. The first step
+uses Uniform and initializes the online statistics; later steps follow the
+assigned count rule. With 500 steps, the total budget is $32{,}000$ attempted
+responses. The learning-rate schedule uses optimizer step as its clock.
+
+Each task's fixed stream contains $16{,}000$ prompts. Even a task assigned the
+maximum count on every step consumes exactly
+$500\times8\times4=16{,}000$ prompts, while Uniform consumes $8{,}000$.
+Consequently, no prompt is reused. At a given step, methods can differ in the
+number of prompts consumed from each task-specific shuffled stream.
+
+\subsection{Methods and focused comparisons}
+
+The primary comparison uses conventional AdamW for Uniform, GPAS, and
+Cost-GPAS, isolating the count rule from the optimizer. Two focused diagnostics
+address the method's central design choices: RawNoise replaces the
+AdamW-scaled noise by raw-coordinate noise, and a matched Uniform/GPAS pair uses
+the optional taskwise (TW) second moment. The count bounds, signal definitions,
+and second-moment choices are fixed before the reported training loss is
+examined. Uniform assigns $(4,4,4,4)$ micro-batches. GPAS uses
+$w_i\sqrt{e_i}$, and Cost-GPAS minimizes
+Equation~\ref{eq:batch_cost_objective}. RawNoise substitutes unscaled gradient
+noise for $e_i$. Uniform--TW and GPAS--TW use the corresponding count rules
+with the optional second-moment observation in
+Equation~\ref{eq:taskwise_square_observation}. Appendix
+Table~\ref{tab:exp_methods} gives a compact summary.
+
+All configurations consume the same shuffled prompt stream for a task in the
+same order: the $n$th requested prompt is identical across configurations.
+This pairing removes prompt-order variation from method comparisons. The
+allocation determines how many prompts each task has consumed at a given step.
+
+\subsection{Research questions and evaluation}
+
+The experiments answer five questions:
+\begin{enumerate}
+    \item How different are the tasks' optimizer-scaled noise levels, how do
+    they change during training, and when does raw noise rank them differently?
+    \item Does GPAS reduce held-out gradient variance and weighted teacher loss
+    at a matched number of optimizer steps?
+    \item Does Cost-GPAS reduce the GPU hours required to reach a common loss?
+    \item Does the optional taskwise second moment materially change the result?
+    \item Does every downstream task remain at least as strong as its Uniform
+    counterpart under the fixed objective?
+\end{enumerate}
+
+At early, middle, and late checkpoints from Uniform, each task supplies a
+fixed set of independently generated micro-batches. We estimate the allocation
+on one half and measure its weighted-gradient variance on the other, then
+exchange the halves. This paired test evaluates the allocation separately from
+the online variance ratio $H$.
+
+Capability evaluation includes MATH-500 greedy pass@1, a fixed LiveCodeBench
+pass@1 slice, IFBench strict accuracy, and GPQA-Diamond average@4.
+\missing{Confirm benchmark versions and decoding settings; add AIME24/25
+average@16 or a second science benchmark if the listed set has insufficient
+range above the initial student.} Alongside the raw scores, we average the
+per-task normalized gain
+$(s-s_{\rm init})/(s_{\rm teacher}-s_{\rm init})$, using the initial student and
+the corresponding specialist teacher as endpoints. We also report average
+response length and truncation rate by task.
+
+\subsection{System and accounting}
+
+At most one teacher is loaded on the GPU at a time. Each step loads all four
+teachers in a fixed cyclic order, and every method uses this order because the
+target hardware cannot hold all teacher parameters simultaneously. GPU hours
+equal full wall time times the number of reserved GPUs, including model-transfer
+and waiting time.
+Each trace records teacher readiness, rollout, scoring, backward, optimizer
+time, tokens, attempted responses, and peak memory. The serial timing model
+extracts $\tau_i$ from marginal per-micro-batch time and $C$ from the remaining
+fixed work. We report $C/(\sum_i m_i\tau_i)$ next to end-to-end GPU hours.
+Appendix~\ref{app:system_details} gives the timing definitions and resume test.
+
+% ============================================================================
+\section{Results}
+\label{sec:results}
+% ============================================================================
+
+\subsection{Noise and allocation dynamics}
+
+\begin{figure}[H]
+    \centering
+    \missingfigure[0.18\textheight]{Insert Figure 2 from the four-teacher logs:
+    (a) scaled and raw noise by task over training; (b) GPAS and Cost-GPAS
+    counts; (c) variance ratio $H$ with the bound $2$; (d) task times and fixed
+    overhead ratio.}
+    \caption{Optimizer-scaled noise and the resulting allocations.
+    \missing{Replace the placeholder with logged trajectories and state the
+    main quantitative observation in the caption.}}
+    \label{fig:allocation_dynamics}
+\end{figure}
+
+\missing{Report the cross-task range and temporal drift of $\widehat e_i$, the
+fraction of steps where raw and scaled noise disagree in rank, how often each
+task reaches a count bound, and the median and quantiles of $H$. If $H$ stays
+near one, state that Uniform is sufficient in this regime.}
+
+\subsection{Training efficiency}
+
+\begin{figure}[H]
+    \centering
+    \missingfigure[0.17\textheight]{Insert Figure 3: (a) weighted teacher loss
+    versus optimizer step for Uniform and GPAS; (b) weighted teacher loss versus
+    GPU hours for Uniform, GPAS, and Cost-GPAS. Put per-task curves in the
+    appendix.}
+    \caption{Training progress at matched update and compute budgets.
+    \missing{Replace the placeholder and add uncertainty intervals.}}
+    \label{fig:training_efficiency}
+\end{figure}
+
+\missing{State the matched-step loss difference for GPAS, the GPU-hour saving
+for Cost-GPAS at the predeclared Uniform-reachable threshold, and the associated
+response/token counts. Base each comparison on its paired uncertainty interval.}
+
+\subsection{Capability and resource summary}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{Four-teacher capability and efficiency.
+\missing{Populate from the fixed evaluation outputs and timing logs.}}
+\label{tab:main_results}
+\begin{tabular}{lccccccc}
+\toprule
+& Math & Code & IF & Science & Norm. avg. & Final $F$ & GPU h to target \\
+\midrule
+Initial student & & & & & & & \\
+Teacher upper bounds & & & & & & & \\
+Uniform & & & & & & & \\
+GPAS & & & & & & & \\
+Cost-GPAS & & & & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\missing{Report the initial student and specialist endpoints, all task scores,
+normalized average, final weighted teacher loss, and GPU hours to threshold.
+State every task-level difference from Uniform alongside the average.}
+
+\subsection{Two targeted diagnostics}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Allocation signal and optional optimizer-state diagnostics.
+\missing{Fill after RawNoise and TW runs.}}
+\label{tab:ablations}
+\begin{tabular}{llccc}
+\toprule
+Count rule & AdamW state & Median $H$ & Final $F$ & Norm. avg. \\
+\midrule
+Uniform & Conv. & & & \\
+RawNoise & Conv. & & & \\
+GPAS & Conv. & & & \\
+Uniform & TW & & & \\
+GPAS & TW & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\missing{Use the RawNoise comparison to isolate optimizer coordinates and the
+matched Conv./TW pairs to decide whether the optional correction matters. Keep
+other hyperparameters fixed; no further allocation ablations are needed.}
+
+\subsection{Controlled calculation}
+
+The controlled three-task check isolates the allocation arithmetic before the
+large-model study. GPAS attains $0.679\times$ Uniform's optimizer-scaled
+variance, close to the calculated $0.681\times$, whereas RawNoise reaches
+$2.316\times$. Zero-overhead Cost-GPAS attains a time--variance product of
+$0.857\times$ Uniform, close to the calculated $0.854\times$.
+Appendix~\ref{app:controlled} contains the setup, figure, and second-moment
+checks.

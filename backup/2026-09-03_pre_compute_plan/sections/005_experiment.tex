@@ -24,38 +24,29 @@ measured once at the initial student and shared by all runs.
 
 Uniform assigns $(4,4,4,4)$ micro-batches on every step. GPAS uses
 Equation~\ref{eq:batch_gpas_allocation} and Cost-GPAS minimizes
-Equation~\ref{eq:batch_cost_objective}. Two further count rules use the same
-estimator with a different signal. RawNoise applies the GPAS rule to the
-unscaled noise $\mathbb E\|g_i-\mathbb E[g_i]\|_2^2$ instead of $e_i$,
-isolating the effect of the optimizer coordinates. LossGap sets
-$m_i\propto w_i\bar L_i$, where $\bar L_i$ is an exponential average of task
-$i$'s training-batch teacher loss; this is the signal that gap-following
-mixtures use, placed inside the fixed-objective estimator. StdMOPD is the
-common recipe: the same $16$ prompts per task per step as Uniform, with the
-sampled-token loss averaged over all valid tokens of the step, so its
-effective task weights follow token counts. Its objective differs from
-Equation~\ref{eq:fixed_multitask_objective}, and we compare it on per-task
-held-out losses and downstream scores. All methods share the optimizer,
-learning-rate schedule, count bounds, response cap, and prompt streams, and
-every adaptive rule starts with one Uniform step. Each method runs with one
-seed; the seed sets the prompt shuffle and the response sampling, and streams
-are matched across methods.
+Equation~\ref{eq:batch_cost_objective}. RawNoise is a diagnostic that applies
+the GPAS rule to the unscaled noise $\mathbb E\|g_i-\mathbb E[g_i]\|_2^2$
+instead of $e_i$, isolating the effect of the optimizer coordinates. All
+methods share the optimizer, learning-rate schedule, count bounds, and prompt
+streams, and every method starts with one Uniform step. Uniform and GPAS use
+three seeds each; the seed changes the prompt shuffle and the response
+sampling, and streams stay matched across methods within a seed. Cost-GPAS
+and RawNoise use one seed. \missing{Run RawNoise only if the held-out
+variance check shows that raw and scaled allocations differ materially.}
 
 \subsection{Measurements}
 
 \paragraph{Held-out teacher loss.} The primary training metric is the
 weighted teacher loss $\sum_i w_iL_i$ on a fixed held-out set of $128$ prompts
 per task, evaluated from checkpoints every $50$ steps with a fixed sampling
-seed. Differences between methods carry paired bootstrap intervals over the
-$512$ held-out prompts; the intervals reflect evaluation sampling, not seed
-variation. Training-batch losses are reported in the appendix because they
-depend on which prompts each method drew. The common loss target for compute
+seed. Training-batch losses are reported in the appendix because they depend
+on which prompts each method drew. The common loss target for compute
 comparisons is Uniform's final held-out loss.
 
-\paragraph{Compute.} GPU hours are full wall time times the two reserved
-GPUs, including synchronization and waiting. Each step's trace records
-rollout time and per-task scoring and backward time, from which $\tau_i$ and
-$C$ are obtained (Appendix~\ref{app:system_details}).
+\paragraph{Compute.} GPU hours are full wall time times the number of reserved
+GPUs, including teacher loading and waiting. Each step's trace records
+per-task rollout, scoring, backward, and teacher-loading time, from which
+$\tau_i$ and $C$ are obtained (Appendix~\ref{app:system_details}).
 
 \paragraph{Held-out gradient variance.} At early, middle, and late Uniform
 checkpoints, we generate $32$ fresh micro-batches per task, estimate
@@ -77,15 +68,14 @@ task.
 
 \subsection{System}
 
-Each run reserves two GPUs: one trains the student, and one serves the
-student's rollouts and holds the four teachers, which score their tasks'
-responses in a fixed order. Generation stops at $4{,}096$ tokens per response
-and truncated responses are kept, because the token-level loss needs no
-completed response. The cap bounds the rollout time of a step, which does not
-depend on the counts, so the step time is predictable from the counts through
-$C+\sum_i m_i\tau_i$ with rollout inside $C$. We report the overhead ratio
-$C/\sum_i m_i\tau_i$ next to GPU hours, because a large ratio limits what
-Cost-GPAS can save.
+The target hardware holds one teacher at a time, so each step loads the four
+teachers in a fixed cyclic order and every method pays the same loading cost.
+Generation stops at $8{,}192$ tokens per response and truncated responses are
+kept, because the token-level loss needs no completed response. The cap
+bounds the generation time of each task block, so the step time is
+predictable from the counts through $C+\sum_i m_i\tau_i$. We report the
+overhead ratio $C/\sum_i m_i\tau_i$ next to GPU hours, because a large ratio
+limits what Cost-GPAS can save.
 
 % ============================================================================
 \section{Results}
@@ -119,7 +109,6 @@ Allocation & Early & Middle & Late \\
 \midrule
 Uniform & $1.00$ & $1.00$ & $1.00$ \\
 RawNoise & & & \\
-LossGap & & & \\
 GPAS & & & \\
 Cost-GPAS & & & \\
 \bottomrule
@@ -135,10 +124,9 @@ each task sits at a count bound, and the median and quartiles of $H$.}
 \begin{figure}[H]
     \centering
     \missingfigure[0.17\textheight]{Insert Figure 3: (a) held-out weighted
-    teacher loss versus optimizer step for Uniform, GPAS, RawNoise, and
-    LossGap, with paired bootstrap bands over held-out prompts; (b) held-out
-    weighted teacher loss versus GPU hours for Uniform, GPAS, and Cost-GPAS.
-    Per-task curves go to the appendix.}
+    teacher loss versus optimizer step for Uniform and GPAS, with seed bands;
+    (b) held-out weighted teacher loss versus GPU hours for Uniform, GPAS, and
+    Cost-GPAS. Per-task curves go to the appendix.}
     \caption{Held-out teacher loss at matched steps and at matched compute.
     \missing{State the matched-step loss difference and the GPU-hour saving at
     Uniform's final loss.}}
@@ -151,10 +139,9 @@ each task sits at a count bound, and the median and quartiles of $H$.}
 \centering
 \scriptsize
 \setlength{\tabcolsep}{2.5pt}
-\caption{Four-teacher capability and efficiency. StdMOPD optimizes a
-different objective, so its held-out $F$ is not comparable and its compute
-column is omitted. \missing{Populate from the evaluation outputs and timing
-logs; state every task-level difference from Uniform next to the average.}}
+\caption{Four-teacher capability and efficiency. \missing{Populate from the
+evaluation outputs and timing logs; state every task-level difference from
+Uniform next to the average.}}
 \label{tab:main_results}
 \begin{tabular}{lccccccc}
 \toprule
@@ -162,12 +149,10 @@ logs; state every task-level difference from Uniform next to the average.}}
 \midrule
 Initial student & & & & & & & \\
 Teachers & & & & & & & \\
-StdMOPD & & & & & & & \\
 Uniform & & & & & & & \\
-RawNoise & & & & & & & \\
-LossGap & & & & & & & \\
 GPAS & & & & & & & \\
 Cost-GPAS & & & & & & & \\
+RawNoise & & & & & & & \\
 \bottomrule
 \end{tabular}
 \end{table}
