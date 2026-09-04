@@ -1,0 +1,42 @@
+\begin{table}[H]
+\centering
+\small
+\caption{Numerical values behind Figure~\ref{fig:controlled_checks}, reported
+to four decimal places. Variance and time--variance products are normalized
+by Uniform. Monte Carlo estimates use $20{,}000$ common-random-number trials
+with seed 20260902.}
+\label{tab:controlled_allocation_values}
+\setlength{\tabcolsep}{4.5pt}
+\begin{tabular}{lcrrrr}
+\toprule
+& & \multicolumn{2}{c}{Scaled variance} &
+\multicolumn{2}{c}{Time--variance} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+Method & Counts & Calculated & Monte Carlo & Calculated & Monte Carlo \\
+\midrule
+Uniform   & $(6,5,5)$  & 1.0000 & 1.0000 & 1.0000 & 1.0000 \\
+RawNoise  & $(11,3,2)$ & 2.3224 & 2.3157 & 2.0901 & 2.0842 \\
+GPAS      & $(3,3,10)$ & 0.6808 & 0.6793 & 0.9153 & 0.9133 \\
+Cost-GPAS & $(3,5,8)$  & 0.7321 & 0.7345 & 0.8542 & 0.8569 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Relative norm change in optimizer observations when reallocating
+from Uniform counts $(6,5,5)$ to GPAS counts $(3,3,10)$. Monte Carlo
+estimates use $200{,}000$ draws with seed 20260903.}
+\label{tab:controlled_moment_values}
+\setlength{\tabcolsep}{7pt}
+\begin{tabular}{lcc}
+\toprule
+Observation & Calculated change & Monte Carlo change \\
+\midrule
+First moment & 0.0000 & 0.0021 \\
+Conventional second moment $A^2$ & 0.5420 & 0.5428 \\
+Taskwise second moment $U/G$ & 0.0000 & 0.0009 \\
+\bottomrule
+\end{tabular}
+\end{table}

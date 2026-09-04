@@ -37,12 +37,13 @@ $H$ & predicted variance ratio relative to Uniform & $H\leq2$ \\
 \toprule
 Component & Configuration \\
 \midrule
-Student & Qwen3-1.7B \citep{qwen2025qwen3} in non-thinking mode;
-\missing{exact checkpoint revision and initial scores} \\
-Teachers & Four Qwen3-1.7B models obtained from the student by reinforcement
-learning on each task (math, code, instruction following, science), so every
-teacher shares the student's origin and tokenizer; non-thinking mode;
-\missing{RL recipe, steps, revisions, and teacher scores} \\
+Student & Qwen3-1.7B \citep{qwen2025qwen3} in non-thinking mode; exact frozen
+revision in Table~\ref{tab:v4_frozen_assets}; \missing{initial scores} \\
+Teachers & Math and instruction following use task-specific Qwen3-1.7B RL
+checkpoints at step 299; code and science use one frozen Qwen3-4B weight set
+through separate task endpoints. All run in non-thinking mode and have
+byte-identical tokenizer files. Exact identifiers are in
+Table~\ref{tab:v4_frozen_assets}; \missing{RL recipe and teacher scores} \\
 Training prompts & $16{,}000$ unique prompts per task, shuffled once and read
 without replacement; \missing{dataset names, versions, licenses, and filters} \\
 Rollout and loss & One response per prompt; one update per rollout batch;
@@ -65,6 +66,8 @@ inference engine, software revisions, and GPU hours per run} \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\input{sections/table_v4_frozen_assets}
 
 \subsection{One-step variance criterion}
 \label{app:descent}
@@ -164,6 +167,8 @@ GPAS attains $0.679\times$ Uniform's scaled variance (calculated $0.681$),
 RawNoise $2.316\times$, and Cost-GPAS a time--variance product of
 $0.857\times$ Uniform (calculated $0.854$). The second-moment panel uses
 $200{,}000$ simulated steps.
+
+\input{sections/table_controlled_values}
 
 \begin{figure}[H]
     \centering
