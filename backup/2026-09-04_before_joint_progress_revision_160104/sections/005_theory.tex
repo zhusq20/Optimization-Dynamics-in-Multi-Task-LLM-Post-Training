@@ -1,0 +1,122 @@
+% ============================================================================
+\section{GPAS: Spending Computation on Noisy Task Estimates}
+\label{sec:theory}
+% ============================================================================
+
+\subsection{Measure fluctuations where they affect the update}
+
+GPAS asks how much a task's micro-batch gradient varies around its own mean.
+A large gradient shared by every micro-batch is a consistent learning signal.
+A large fluctuation between micro-batches is something additional samples
+can average out. We measure the latter after the optimizer's coordinate
+scaling, so the statistic reflects the coordinates in which the update
+will move.
+
+Let $D$ be the diagonal scaling available at the start of the step.
+For SGD, $D=I$; for Adam-type optimizers,
+$D=\operatorname{diag}((\sqrt{\widehat v_{\rm pre}}+\epsilon)^{-1})$,
+where $\widehat v_{\rm pre}$ is the pre-step bias-corrected second moment.
+Define the task's noise and the combined-gradient variance as
+\begin{equation}
+    e_i=\mathbb E\|D(g_i-\mu_i)\|_2^2,
+    \qquad
+    V(m)=\mathbb E\|D(A-\mu)\|_2^2
+         =\sum_{i=1}^M\frac{w_i^2e_i}{m_i},
+    \label{eq:batch_variance}
+\end{equation}
+where $\mu=\sum_iw_i\mu_i$. The equality follows from conditionally
+independent micro-batches at a fixed training state. It captures a simple
+benefit of averaging: doubling a task's count halves its contribution to
+the variance. We use the pre-step $D$ as a local measure for AdamW and leave
+the optimizer update unchanged.
+
+The minimum-variance continuous allocation is
+\begin{equation}
+    m_i\propto w_i\sqrt{e_i}.
+    \label{eq:batch_gpas_allocation}
+\end{equation}
+This is the classical Neyman allocation
+\citep{neyman1934representative,cochran1977sampling}, applied to MOPD
+micro-batches in the optimizer's coordinates. For equally weighted tasks,
+nine times the noise calls for three times as many micro-batches. The square
+root reflects diminishing returns: as a task receives more samples, its
+mean becomes more precise and further samples help less. We scale the counts
+to sum to $G$, enforce the bounds, and round by largest remainder.
+Appendix~\ref{app:allocation_proofs} gives the derivation and
+Appendix~\ref{app:descent} connects the variance to a local descent bound.
+
+\subsection{Reuse the gradients already computed}
+\label{sec:online_estimates}
+
+After processing a task's micro-batches, let $\bar g_i$ be their sample mean.
+The observed noise is
+\begin{equation}
+    \widehat e_i=\frac1{m_i-1}\sum_{s=1}^{m_i}
+                    \|D(g_{i,s}-\bar g_i)\|_2^2.
+    \label{eq:noise_estimate}
+\end{equation}
+We smooth these measurements across steps,
+$\widetilde e_i\leftarrow\rho\widetilde e_i+(1-\rho)\widehat e_i$,
+and use $\widetilde e_i$ in the next allocation. Smoothing lets individual
+long or unusual responses influence the schedule gradually. The first step
+uses Uniform counts and initializes the moving averages.
+
+Tasks are processed in blocks. A running mean and a scalar sum of squared
+deviations give Equation~\ref{eq:noise_estimate} without retaining every
+micro-batch gradient. The same parameter-sized mean buffer is reused for
+each task. The additional work consists of vector reductions and the count
+calculation; rollout, teacher scoring, and backward passes are the ordinary
+training passes. We measure the memory and running-time cost of collecting
+these statistics.
+
+This measurement also makes the schedule easy to interpret. We log task
+loss, response length, measured noise, and assigned counts together.
+Loss tracks the remaining distillation gap; noise tracks how variable
+the estimate of its update is. GPAS can therefore give two tasks with
+similar losses different counts, or change their relative counts as
+the optimizer's scaling evolves. These trajectories connect the allocation
+to the training process directly, without requiring a separate token-level
+noise model.
+
+\subsection{Account for the time a micro-batch takes}
+
+Tasks also differ in cost. A long code response may occupy the rollout
+engine and teacher service much longer than a short instruction-following
+response. GPAS has a cost-aware mode that uses measured time alongside
+gradient noise.
+
+Let $\tau_i$ be the marginal time for a task-$i$ micro-batch and $C$ the
+fixed time for synchronization, the optimizer, and other step-level work.
+For a step-time model $T(m)=C+\sum_i m_i\tau_i$, the scheduler minimizes
+\begin{equation}
+    J_C(m)=T(m)V(m)
+          =\left(C+\sum_i m_i\tau_i\right)
+           \sum_i\frac{w_i^2e_i}{m_i}.
+    \label{eq:batch_cost_objective}
+\end{equation}
+This local criterion balances precision per update against updates per
+unit time. With four tasks, we enumerate the feasible integer count vectors.
+When fixed time is negligible, the continuous rule becomes
+$m_i\propto w_i\sqrt{e_i/\tau_i}$: an expensive task needs more variability
+to justify the same number of micro-batches. As fixed step time grows,
+the choice approaches the per-step rule. We fit the timing model to the
+training trace and evaluate efficiency using end-to-end GPU hours.
+
+\begin{algorithm}[t]
+\caption{One training step with GPAS.}
+\label{alg:batch_gpas}
+\small
+\begin{minipage}{0.97\linewidth}
+\begin{enumerate}
+    \item Choose counts $m$ from the previous noise and time averages;
+    use Uniform on the first step. Read the pre-step optimizer scaling $D$.
+    \item For each task, generate $m_i$ micro-batches and obtain its
+    teacher's top-$k$ scores on the student responses.
+    \item Compute the ordinary dense loss. Accumulate the task's
+    gradients, record their variation under $D$, and add the task mean
+    to $A$ with weight $w_i$.
+    \item Update the noise and time averages, then apply the usual
+    optimizer step with gradient $A$.
+\end{enumerate}
+\end{minipage}
+\end{algorithm}

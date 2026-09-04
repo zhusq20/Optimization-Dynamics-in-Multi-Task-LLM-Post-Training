@@ -3,75 +3,87 @@
 \label{sec:intro}
 % ============================================================================
 
-Multi-teacher on-policy distillation (MOPD) merges several specialist teachers
-into one student. The student samples a response, the teacher for that task
-scores every token, and the student is updated to reduce the sampled-token
-reverse KL to the teacher \citep{ma2026mopdmultiteacheronpolicydistillation}.
-Every MOPD method must choose a task mixture, and the choice matters more than
-it looks. Open-MOPD reports that, under token-mean aggregation, a $25\times$
-difference in response length leaves instruction following with about $1\%$
-of the gradient tokens despite $20\%$ of the prompts
-\citep{gao2026openmopddiagnosingfixingcapability}. D$^3$-MOPD adapts the
-mixture online from the teacher-loss gap and its descent rate
-\citep{sun2026d3mopd}. In both cases the mixture is at once the training
-objective and the compute schedule, so a change in one cannot be separated
-from a change in the other.
+Multi-teacher on-policy distillation (MOPD) provides a practical way to
+combine capabilities in one language model. The student generates responses,
+and each response is scored by the teacher assigned to its task
+\citep{ma2026mopdmultiteacheronpolicydistillation}. This allows specialist
+teachers to be developed separately and their feedback to be combined during
+student training. The same approach can add a new capability while using an
+earlier model as a teacher to preserve existing ones
+\citep{liu2026instella}. The intended outcome is a student that acquires
+useful capabilities across tasks. A decrease in average teacher loss alone
+does not establish that outcome.
 
-We keep the two apart. The objective is a weighted sum of per-task teacher
-losses with weights chosen before training. Each optimizer step accumulates
-$G$ fixed-size micro-batches, each drawn from a single task, and the only
-online decision is how many micro-batches each task gets. Multiplying each
-micro-batch loss by its task weight divided by its task's count makes the
-expected gradient identical under every allocation
-(Section~\ref{sec:setting}). The allocation therefore decides only how
-precisely each task gradient is estimated, and the natural criterion is
-variance: spend more micro-batches where the gradient is noisier.
-\missing{In our four-teacher run the per-micro-batch gradient noise, measured
-in AdamW coordinates, differs by up to X$\times$ across tasks and drifts by
-Y$\times$ over training (Figure~\ref{fig:allocation_dynamics}), so no fixed
-split is variance-optimal throughout.}
+Three questions must be distinguished. Can this student acquire each
+capability through separate distillation? Can one shared model attain
+those capability levels together? Can training reach them with the
+available computation? Open-MOPD uses separately distilled students as
+references and identifies capability imbalance in joint training
+\citep{gao2026openmopddiagnosingfixingcapability}. These references establish
+what the student learns separately; a gap in joint training can still
+reflect task exposure, weak usable teacher signals, interacting updates,
+or other optimization effects.
+
+We study a local question about the training process:
+\begin{quote}
+Given capabilities that a student can acquire separately, when does a
+shared MOPD update improve task objectives together, what limits its
+rate, and when can more precise estimates help?
+\end{quote}
+Figure~\ref{fig:joint_progress_teaser} separates three cases. Exact,
+nonconflicting updates can still make slow progress. A combined mean
+gradient can oppose one task's loss gradient. Or a useful mean direction
+can be estimated too imprecisely. Additional samples can improve precision;
+under fixed task weights and optimizer scaling, they cannot change the
+mean direction or its deterministic local rate.
 
 \begin{figure}[t]
     \centering
-    \includegraphics[width=\linewidth]{figures/gpas_main_figure.pdf}
-    \caption{GPAS fixes the objective weights $w$ and adapts only the
-    micro-batch counts $m$. Gradients from the completed step give each task's
-    noise in AdamW coordinates, and measured time adds the cost correction, so
-    the next allocation needs no additional model passes.}
-    \label{fig:gpas_overview}
+    \includegraphics[width=\linewidth]{figures/joint_progress_teaser.pdf}
+    \caption{Distinct limits on joint progress, illustrated analytically.
+    (a) Orthogonal, noiseless task gradients yield unequal loss decay rates
+    (Equation~\ref{eq:zero_conflict_rates}).
+    (b,c) Sampling concentrates first-order progress $X_1$ around a harmful
+    or useful mean. With $D=I$, $w_1=w_2=1/2$, independent Gaussian
+    micro-batch gradients, $\Sigma_1=\Sigma_2=I$, and $m_1=m_2=G/2$,
+    $X_1\sim\mathcal N(a_1,1/G)$. Set $\mu_1=(1,0)^\top$ and
+    $\mu_2=(-2,1)^\top$ in (b), or $(-0.6,1)^\top$ in (c).
+    Shading marks $X_1\leq0$. The sample-size comparison changes total
+    budget $G$; GPAS instead reallocates a fixed budget and need not reduce
+    every task's directional uncertainty. These are analytical examples,
+    not measured MOPD results.}
+    \label{fig:joint_progress_teaser}
 \end{figure}
 
-Gradient-Preconditioned Adaptive Sampling (GPAS) assigns task $i$ a count
-proportional to $w_i\sqrt{e_i}$, where $w_i$ is its weight and $e_i$ its
-per-micro-batch gradient noise measured after AdamW's diagonal scaling. This
-is the classical stratified-sampling rule, which samples each stratum in
-proportion to its standard deviation, applied in the coordinates the optimizer
-actually uses. The coordinates matter: raw and scaled noise can rank tasks
-differently, and allocating by raw noise can then increase the variance that
-AdamW sees (Section~\ref{sec:theory}). Cost-GPAS additionally uses the
-measured time per micro-batch and the fixed time per step, so that variance is
-minimized per GPU hour instead of per step. Both rules run on statistics from
-the step just completed, namely each task's within-step gradient variance and
-its timing. Every task is present in every step, so these statistics are
-always available, and computing them needs one parameter-sized buffer and no
-extra forward or backward pass. GPAS is a drop-in change to a standard MOPD
-trainer with AdamW.
+Existing work motivates testing these possible causes. CaMOPD studies counteracting
+recovery and preservation gradients \citep{chen2026camopd}; D$^3$-MOPD
+allocates samples using the remaining teacher gap and descent velocity
+\citep{sun2026d3mopd}. Slow alignment has also been observed when the
+training states are held fixed \citep{fu2026rethinkingopd2}. These findings
+do not determine whether sampling uncertainty limits a particular MOPD
+run. Dense top-$k$ supervision already computes multiple token
+contributions at each prefix, while prompts and student trajectories
+continue to produce variable gradients
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
 
-\missing{Findings, to be written from the four-teacher runs: (i) how much the
-scaled noise levels differ across tasks and drift, and in what fraction of
-steps raw and scaled noise rank the tasks differently; (ii) the held-out
-teacher-loss reduction of GPAS at matched steps; (iii) the GPU-hour saving of
-Cost-GPAS at Uniform's final loss; (iv) per-task downstream results relative
-to Uniform.}
+We derive how teacher log-ratios on retained tokens produce task gradients,
+then analyze the mean progress and directional uncertainty they imply.
+A zero-conflict example separates common descent from fast learning;
+a classical one-sided probability bound relates sampling to first-order
+reliability. The analysis fixes the student-generated states and optimizer
+scaling. We measure state-distribution changes and actual AdamW updates
+separately. Local progress is a diagnostic; successful training can
+temporarily increase a task loss.
 
-Our contributions are:
-\begin{itemize}
-    \item a fixed-objective MOPD estimator in which adaptive micro-batch
-    counts change the variance of the gradient estimate but not its
-    expectation;
-    \item GPAS and Cost-GPAS, optimizer-aware count rules whose statistics
-    come from the passes MOPD already performs;
-    \item a four-teacher study of Qwen3-1.7B that measures noise and
-    allocation dynamics, held-out loss per step and per GPU hour, and
-    per-task downstream capability, with the recipe and logs released.
-\end{itemize}
+Gradient-Preconditioned Adaptive Sampling (GPAS) provides an allocation
+intervention for this analysis. It applies Neyman allocation to gradient
+variance after optimizer scaling and preserves the specified task mean
+weights. Its per-step rule minimizes an estimate of total update variance,
+a conservative measure of uncertainty in task progress. We give an
+analytical example in which the
+variance-minimizing allocation has greater directional uncertainty than
+another allocation. A four-domain protocol tests the diagnostics against
+controlled updates, separately acquired capabilities, and end-to-end
+training efficiency.
+\missing{Replace the protocol contribution with measured findings after
+the diagnostic and training comparisons are complete.}

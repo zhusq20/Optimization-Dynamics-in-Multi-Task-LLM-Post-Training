@@ -1,0 +1,229 @@
+% ============================================================================
+\section{Experimental Setup}
+\label{sec:experiments}
+% ============================================================================
+
+\subsection{Configuration}
+
+We distill four specialists into a Qwen3-1.7B student in non-thinking mode:
+the mathematics and instruction-following teachers are task-specific
+Qwen3-1.7B RL checkpoints, and the code and science teachers are Qwen3-4B in
+non-thinking mode. A micro-batch contains $b=4$ prompts from one task, one
+response per prompt, and one backward pass. Each step accumulates $G=16$
+micro-batches, or $64$ responses, with $m_{\min}=2$ and $m_{\max}=8$; the
+estimator uses the student's top $k=16$ tokens. Every run lasts $500$ steps,
+uses a nonrepeating stream of $16{,}000$ prompts per task, and caps a response
+at $4{,}096$ tokens. The fixed objective weights are proportional to the
+inverse initial task losses, and timing averages use decay $0.9$. Uniform
+assigns four micro-batches to each task, so the count limits imply $H\leq2$.
+
+All training methods use AdamW with \missing{learning rate and schedule,
+$\beta_1$, $\beta_2$, $\epsilon$, weight decay, gradient clipping, precision,
+and sharding}, and each method uses one seed. A run reserves two GPUs: one
+$96$-GB device trains the student and one $48$-GB device generates rollouts
+and serves all four teachers. We evaluate $128$ fixed held-out prompts per
+task every $50$ steps and use $32$ fresh micro-batches per task at early,
+middle, and late checkpoints for the paired variance protocol. Methods share
+the prompt order, sampling settings, optimizer, response cap, and checkpoint
+schedule. Table~\ref{tab:pipeline} gives the complete configuration and exact
+asset revisions.
+
+\subsection{Methods}
+
+The top-$k$ estimator is the default unless a row explicitly says otherwise.
+\textbf{Uniform} uses the same count for every task.
+\textbf{GPAS (per step)} applies
+Equation~\ref{eq:batch_gpas_allocation} to preconditioned noise.
+\textbf{GPAS (per GPU hour)} is the same method in its cost-aware mode and
+minimizes Equation~\ref{eq:batch_cost_objective}.
+\textbf{Counts from unpreconditioned noise} sets $D$ to the identity only when
+computing counts; it is the SGD rule run under AdamW and isolates whether the
+optimizer's preconditioner matters.
+\textbf{Counts from loss gap} assigns counts in proportion to
+$w_i\bar L_i$, where $\bar L_i$ is the smoothed training-batch teacher loss,
+while retaining the fixed objective.
+
+Two one-component ablations replace the top-$k$ estimator by the usual
+sampled-token estimator under, respectively, Uniform counts and GPAS (per
+step) counts. These two rows and their top-$k$ counterparts form the estimator
+by allocation comparison. \textbf{StdMOPD} uses the sampled-token estimator
+and averages all valid tokens in a step together; its effective task weights
+therefore follow token counts, so its objective differs from
+Equation~\ref{eq:fixed_multitask_objective}. Every adaptive rule begins from a
+Uniform step, and all methods otherwise share the configuration above.
+
+\subsection{Measurements}
+
+\paragraph{Held-out teacher loss.}
+Held-out teacher loss is the fixed-weight teacher loss on prompts that the
+training stream never sees. It is the primary training metric and is evaluated
+with a common sampling seed; method differences use paired bootstrap intervals
+over prompts, which measure evaluation uncertainty rather than variation over
+training seeds. Uniform's final held-out loss is the common target for compute
+comparisons.
+
+\paragraph{Gap and token diagnostics.}
+At every step and for every task, we log three scalars from the top-$k$ scores.
+The gap level is the student-probability-weighted mean log ratio within the
+top-$k$ set; the within-position spread is the corresponding weighted variance
+of that log ratio; and the tail mass is one minus the summed student probability
+of the set. The spread is a low-cost diagnostic rather than the gradient
+variance itself, because it omits the score vectors' directions and norms; the
+paired gradient measurement below tests whether it predicts token-level noise.
+
+\paragraph{Paired gradient variance.}
+At each selected checkpoint, we generate fresh micro-batches and first compute
+the actual top-$k$ training gradient, whose sampled tail token comes from the
+rollout. These gradients supply $\widehat e_i$ for the held-out allocation
+comparison. We split the pool in half: one half estimates task noise and
+chooses an allocation, while the other scores that allocation using $V(m)$;
+swapping the halves and averaging removes the choice of split. Separately,
+after the response traces are fixed, the sampled-token and top-$k$ diagnostic
+gradients share an independent scoring-token draw at every prefix. Their paired
+variance change isolates the fixed-prefix token mechanism but need not equal
+the online training-noise change (details in Appendix~\ref{app:heldout}).
+
+\paragraph{Compute.}
+GPU hours are full wall time times the two reserved GPUs, including waiting and
+synchronization. A trace assigns count-dependent rollout, scoring, and backward
+work to $\tau_i$ and the remaining fixed work to $C$, and we report the fit
+residual of this additive model. The overhead ratio is the fixed time per step
+divided by time spent on micro-batches; it caps how much a time-aware allocation
+can save (details in Appendix~\ref{app:system_details}).
+
+\paragraph{Capability.}
+We report MATH-500 greedy pass@1, a fixed LiveCodeBench pass@1 slice, IFBench
+strict accuracy, and GPQA-Diamond average@4 for the initial student, each
+teacher, and each method. For score $s$, the per-task normalized gain is
+$(s-s_{\rm init})/(s_{\rm teacher}-s_{\rm init})$; we also report its average,
+mean response length, and truncation rate. \missing{Insert benchmark versions
+and complete decoding settings.}
+
+% ============================================================================
+\section{Results}
+\label{sec:results}
+% ============================================================================
+
+\subsection{Noise is heterogeneous, drifting, and coordinate dependent}
+
+\begin{figure}[H]
+    \centering
+    \missingfigure[0.20\textheight]{Insert Figure 2 from the four-teacher
+    logs: (a) preconditioned and unpreconditioned noise over training; (b)
+    counts chosen by GPAS in its per-step and per-GPU-hour modes; (c) stacked
+    response-level and removable token-level noise by task, aligned with gap
+    level and teacher origin.}
+    \caption{Task-gradient noise, allocation, and its token component.
+    \missing{State the cross-task range, drift, coordinate-ranking disagreement,
+    and token share for distant versus same-origin teachers.}}
+    \label{fig:allocation_dynamics}
+\end{figure}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Held-out preconditioned top-$k$ gradient variance relative to Uniform.
+Each allocation is selected on one half of fresh micro-batches and evaluated
+on the other. \missing{Fill the checkpoint values and the relative error of
+$\widehat e_i$ across halves.}}
+\label{tab:heldout_variance}
+\begin{tabular}{lccc}
+\toprule
+Allocation & Early & Middle & Late \\
+\midrule
+Uniform & $1.00$ & $1.00$ & $1.00$ \\
+Counts from unpreconditioned noise & & & \\
+Counts from loss gap & & & \\
+GPAS (per step) & & & \\
+GPAS (per GPU hour) & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\missing{A single-micro-batch noise estimate spans X across tasks and each
+task drifts by up to Y over training; the preconditioned and unpreconditioned
+rankings disagree in Z of steps. Report count-bound occupancy and the median
+and quartiles of H.} The controlled calculation already shows why the
+coordinate choice can matter: the unpreconditioned rule reaches
+$2.3\times$ Uniform's preconditioned variance, whereas GPAS reaches
+$0.68\times$.
+
+\subsection{Teacher--student gap appears as token-level noise}
+
+Figure~\ref{fig:allocation_dynamics}c separates response-level noise from the
+fixed-prefix token component targeted by the top-$k$ estimator. \missing{Report
+the token-noise fraction for distant and same-origin teachers, its association
+with gap level and within-position spread, the tail mass, and the reduction in
+the cross-task noise ratio and resulting count change.} This comparison treats
+teacher distance as a measured correlate, not as an assumed monotone law.
+
+\subsection{Analytic removal and sample allocation are complementary}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\caption{Four-teacher capability and efficiency. StdMOPD optimizes a different
+objective, so its held-out $F$ and compute-to-target entries are not comparable.
+\missing{Populate from evaluation outputs and timing logs; report every
+task-level difference from Uniform.}}
+\label{tab:main_results}
+\begin{tabular}{lccccccc}
+\toprule
+& Math & Code & IF & Science & Norm. avg. & Final $F$ & GPU h to target \\
+\midrule
+Initial student & & & & & & & \\
+Teachers & & & & & & & \\
+StdMOPD & & & & & & & \\
+Uniform & & & & & & & \\
+GPAS (per step) & & & & & & & \\
+GPAS (per GPU hour) & & & & & & & \\
+Counts from unpreconditioned noise & & & & & & & \\
+Counts from loss gap & & & & & & & \\
+Sampled-token estimator (Uniform) & & & & & & & \\
+Sampled-token estimator (GPAS per step) & & & & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Matched-step $2\times2$ ablation of the gradient estimator and count
+allocation. \missing{Fill held-out teacher loss and paired differences from
+the four runs.}}
+\label{tab:estimator_allocation_ablation}
+\begin{tabular}{lcc}
+\toprule
+& Uniform counts & GPAS (per step) counts \\
+\midrule
+Sampled-token estimator & & \\
+Top-$k$ estimator & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\missing{At matched steps, integrating the retained-token contribution improves
+held-out loss by X, allocating the residual noise improves it by Y, and the
+combination improves it by Z. Once that contribution is integrated, counts from
+loss gap provide no additional advantage over the noise rule.}
+
+\subsection{The overhead ratio bounds the gain from time-aware allocation}
+
+\begin{figure}[H]
+    \centering
+    \missingfigure[0.17\textheight]{Insert Figure 3: (a) held-out weighted
+    teacher loss versus optimizer steps for the matched estimator--allocation
+    comparison; (b) the same fixed objective versus GPU hours for Uniform and
+    GPAS in its per-step and per-GPU-hour modes. Annotate the measured overhead
+    ratio and the time to Uniform's final loss.}
+    \caption{Matched-step learning curves and compute efficiency under the
+    measured system overhead.
+    \missing{State the overhead ratio and GPU-hour saving at the common loss
+    target.}}
+    \label{fig:training_efficiency}
+\end{figure}
+
+\missing{At overhead ratio R, GPAS (per GPU hour) reaches Uniform's final loss
+in S fewer GPU hours. Relate the observed saving to the upper limit implied by
+fixed step time and report the additive time model's error.}

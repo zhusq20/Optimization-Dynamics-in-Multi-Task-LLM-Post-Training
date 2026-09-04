@@ -1,0 +1,653 @@
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+000
+001
+      O PTIMIZATION DYNAMICS                                   IN      M ULTI -TASK LLM
+002   P OST-T RAINING
+003
+004
+005    Anonymous authors
+006    Paper under double-blind review
+007
+008
+009                                               A BSTRACT
+010
+011            Multi-teacher on-policy distillation (MOPD) consolidates reinforcement-learned
+012            specialists into one model, but its finite-budget dynamics are often attributed
+013            to cross-task gradient interference. We show that, under exact teachers ob-
+014            tained from a shared KL reference, ideal reverse-KL MOPD is the correspond-
+015            ing KL-regularized multi-task RL objective up to known task-wise scales. The
+016            two methods therefore share stationary points and gradient-conflict angles after
+017
+               temperature-aware task weighting. Their raw interference vanishes only when
+               every task field vanishes; aggregate stationarity or a shared initialization is insuf-
+018
+               ficient. We then analyze the practical frozen-prefix token field directly. Its path
+019
+               is determined by effective task/token exposure, action-centered teacher signal, re-
+020            ward scale and temperature, teacher approximation, stochastic covariance, local
+021            curvature, staleness, and the optimizer. A local dynamics model shows that task
+022            ratios can produce arbitrarily different convergence rates even when pairwise in-
+023            terference is identically zero, and yields a closed-form minimum-time allocation
+024            in a separable regime. Thus interference is a useful downstream diagnostic, but
+025            not a sufficient explanation of MOPD optimization.
+026
+027
+028   1   I NTRODUCTION
+029
+030   Post-training a single language model across mathematics, coding, instruction following, and tool
+031
+      use creates an allocation problem: tasks differ in reward sparsity, response length, learning speed,
+      and optimization noise. Multi-teacher on-policy distillation (MOPD) addresses this problem by first
+032
+      training task specialists with RL and then distilling their token distributions on student-generated
+033
+      trajectories (Ma et al., 2026). The pipeline can integrate capabilities, yet some tasks improve much
+034   earlier than others under a fixed compute budget.
+035
+036   Cross-task gradient interference is a natural explanation. For task fields gi and gj , a negative inner
+037
+      product means that an infinitesimal update for one objective locally hurts the other. Recent analy-
+      ses contrast the gradient geometry of supervised and reinforcement learning (Zhu et al., 2026) and
+038
+      document gradient imbalance in multi-task RL post-training (Wu et al., 2025). However, an inner
+039
+      product is computed only after the data mixture, teacher signal, reward scale, token reduction, cur-
+040   vature, noise, and optimizer have formed the update. It cannot identify which of these upstream
+041   variables caused a trajectory. Moreover, raw interference approaches zero whenever both gradient
+042   norms shrink, even if their cosine remains −1.
+043
+      Our starting point is an exact identity. If specialist i is the Boltzmann optimum of a KL-regularized
+044
+      RL objective with reference π0 and temperature βi , then ideal reverse-KL distillation toward that
+045
+      specialist has exactly the RL task field scaled by 1/βi . Consequently, ideal MOPD does not possess
+046   a different sign or angle of gradient conflict. A shared base checkpoint alone is not sufficient: the
+047   identity requires the shared KL reference, the intended reward and temperature, and an exact teacher.
+048   This separates the destination from the path. The destination follows from the ideal objective; the
+049   practical path is formed by the realized token field and its finite-budget implementation.
+050
+      This distinction is important because concurrent work, including Open-MOPD, already identifies
+051
+      response-length imbalance, convergence drift, and stale student rewards as empirical bottlenecks.1
+052
+         1
+053        Open-MOPD: Diagnosing and Fixing Capability Imbalance in Multi-Teacher On-Policy Distillation,
+      arXiv:2608.19098.
+
+
+                                                         1
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+054
+055
+056
+057                                                                  R                                                                    R
+                                                                                                                                                     teacher subset T
+058                       q (x
+                                 ; θ)
+
+059                                                                                                                                                                      KL
+                                                             mxA = βA(q) ∇θq(x; θ)
+                                                                                                                                                                       e
+060                                                                                                                                             PD                ve
+                                                                                                                                                                    rs
+                                                             βPPO(q) = 1                                                                      O                   re
+                                                             βGRPO(q) = αG(q) > 0
+061
+062                                                                fixed prompt x                                                                      T ⊂ R
+
+                          student θ                                                                                          student θ
+063
+                                             (a) RL task fields                                                                   (b) MOPD token fields
+                                                    task j                                                    task j                                                          task j
+064                                 task i                                                    task i                                                     task i
+
+
+065                                           g2̂                                                      g2̂                                                         g2̂
+
+          rare failures                                        rare failures                                                               earlier                                     earlier
+066         A≃ −1                                                A≃ −1                   rare mixed groups: A ≠ 0                                      teacher gap closes
+
+067
+068
+069
+                                                                            ĝ1                                        ĝ1                                                                       ĝ1
+070                                      0
+                                 common successes
+                                                                                                     0                                                             0
+                                                                                            common groups
+                                      A≃0                                                      all A = 0
+071                                                                                                                                                      Ri2 = ‖ĝ i‖2 → 0
+                     Asucc = 1 − q ≃ 0, Afail = −q ≃ − 1                                  Pmix = 1 − q G − (1 − q)G
+072                           Pr(failure) = 1 − q                                         = G(1 − q) + O((1 − q)2)                                        |Iij| ≤ RiRj → 0
+
+073         (c) PPO signal contraction                                               (d) GRPO active groups                              (e) Teacher-signal contraction
+074
+      Figure 1: Schematic motivation. Gradient interference is a statistic of the realized task fields. Its
+075   raw magnitude can contract because learning signals contract, without identifying the data, reward,
+076   teacher, or geometry that created the optimization path.
+077
+078
+079   Our goal is complementary: to give a compact theory that explains why such variables matter even
+080   when gradient interference is absent, and to connect them to teacher temperature, local score/Fisher
+081   geometry, stochastic covariance, and minimum-time task allocation.
+082   We make three contributions. First, we prove exact objective, gradient, interference, and
+083   temperature-aware mixture relations between ideal MOPD and KL-regularized multi-task RL, to-
+084   gether with the conditional scope of interference extinction. Second, taking the practical frozen-
+085   prefix token update as the object of study, we derive a centered-signal path law that exposes effective
+086   token allocation, reward/teacher quality, covariance, curvature, and optimizer state. Third, we de-
+087   rive a local convergence model and a closed-form finite-budget allocation rule, then specify targeted
+088
+      experiments that distinguish this theory from explanations based only on gradient conflict.
+089
+090   2        R ELATED W ORK
+091
+092   On-policy and multi-teacher distillation. On-policy distillation queries a teacher on student-
+093   generated states, reducing the train–test state mismatch of offline imitation. MOPD extends this
+094   idea to capability integration by routing each domain to an independently trained RL specialist (Ma
+095   et al., 2026). Our analysis focuses on the resulting multi-task optimization field: when the ideal
+096
+      teacher construction preserves the RL objective, and which practical quantities still determine finite-
+      time behavior.
+097
+098
+      Multi-task gradient geometry. Multi-objective learning commonly diagnoses conflict through
+099
+      task-gradient inner products and modifies updates using adaptive weighting or gradient
+100   surgery (Sener & Koltun, 2019; Yu et al., 2020; Liu et al., 2024). In LLM post-training, recent
+101   work studies gradient imbalance in multi-task RL (Wu et al., 2025), proposes task-aware GRPO
+102   variants (Ramesh et al., 2026), and argues that centered RL updates can exhibit weaker raw cross-
+103   task interaction than supervised updates (Zhu et al., 2026). We retain interference as a local signed
+104   diagnostic, but distinguish raw inner-product contraction from angular orthogonality and from con-
+105   vergence of the aggregate objective.
+106
+107   Optimization-budget imbalance. Open-MOPD empirically attributes capability imbalance to un-
+      equal token budgets, heterogeneous convergence, and stale student-dependent signals. Our theory
+
+
+                                                                                                       2
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+108
+      complements those observations in three ways: it derives the temperature calibration required to pre-
+109   serve a target RL mixture, shows analytically that allocation and curvature alter convergence even
+110   at identically zero interference, and separates the population token field from its teacher, truncation,
+111   staleness, and sampling perturbations. This places gradient conflict and budget imbalance inside one
+112   local dynamics model rather than treating either as a universal explanation.
+113
+114
+      3     S AME E NDPOINT, D IFFERENT O PTIMIZATION PATHS
+115
+116
+      3.1   E XACT TEACHERS : OBJECTIVE AND GRADIENT EQUIVALENCE
+117
+118   Task i has prompt distribution Di , reward Ri (x, y), KL temperature βi > 0, and a common reference
+119   policy π0 . Define
+120
+                   JiRL (θ) = Ex∼Di ,y∼πθ [Ri (x, y)] − βi Ex∼Di DKL (πθ (· | x) ∥ π0 (· | x)) .                  (1)
+121
+122   The exact KL-RL teacher and ideal reverse-KL objective are
+123
+                             π0 (y | x)eRi (x,y)/βi
+124          Ti⋆ (y | x) =                          ,                           Zi (x) = Ey∼π0 [eRi (x,y)/βi ],   (2)
+125
+                                     Zi (x)
+126            FiM (θ) = −Ex∼Di DKL (πθ (· | x) ∥ Ti⋆ (· | x)) .                                                  (3)
+127
+      Proposition 1 (Exact teacher identity). For every θ,
+128
+                                         1 RL                                               1 RL
+129                          FiM (θ) =     J (θ) − Ex log Zi (x),                   giM =     g .                 (4)
+130                                      βi i                                               βi i
+131
+132   The proof is the direct substitution of log Ti⋆ = log π0 + Ri /βi − log Zi ; Appendix A.1 gives the
+133
+      complete algebra. Sharing an initialization only fixes the starting point. Equation (4) additionally
+      requires the same KL reference and an exact teacher for the stated reward and βi .
+134
+135   If the target RL scalarization uses normalized weights wi , an MOPD mixture with normalized
+136   weights ai reproduces its vector field up to one positive global scale exactly when
+137                                                          w i βi
+138                                                  a⋆i = ∑︁        .                                            (5)
+                                                             j wj βj
+139
+140   For a shared prompt and an unrestricted policy, the analytic MOPD optimum is the geometric teacher
+141   barycenter                                       ∏︁ ⋆            ai
+142                                                       i Ti (y | x)
+                                     Ta (y | x) = ∑︁ ∏︁         ⋆ ′       ai
+                                                                             .                       (6)
+143                                                    y′    i Ti (y | x)
+144   Thus mixture weights change only the path when routed teachers admit a common solution, but also
+145   change the endpoint when teachers disagree on the same observed context.
+146
+147   3.2   W HAT VANISHING INTERFERENCE DOES AND DOES NOT IMPLY
+148
+149   Let Iij = ⟨gi , gj ⟩ and ρij = Iij /(∥gi ∥ ∥gj ∥) when both fields are nonzero.
+150   Proposition 2 (Interference invariance and conditional extinction). Under Proposition 1,
+151                                                      RL
+                                                        Iij
+152                                           M
+                                             Iij =            ,       ρM     RL
+                                                                       ij = ρij .                                 (7)
+153                                                     βi βj
+154
+                                                                                 ⃦         ⃦
+      If optimization converges to a common task-wise stationary point, so that ⃦giRL (θt )⃦ → 0 for every
+155   task, then both RL and ideal MOPD have Iij (θt ) → 0.
+156
+                                                                                             ∑︁
+157   The last statement is simply Cauchy–Schwarz. It is conditional: aggregate stationarity i wi gi = 0
+158   does not imply task-wise stationarity. For example, J1 (θ) = − 12 (θ − 1)2 and J2 (θ) = − 12 (θ + 1)2
+159   have an equal-weight stationary point at θ = 0, but g1 = 1, g2 = −1, and I12 = −1. Moreover,
+160   I12 → 0 can occur while ρ12 = −1 throughout if both opposed fields merely shrink. Hence
+161   raw interference extinction is a consequence of simultaneous signal contraction, not an intrinsic
+      advantage of MOPD.
+
+
+                                                                  3
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+162
+      3.3    T HE PRACTICAL TOKEN FIELD
+163
+164   We now take the implemented frozen-prefix update itself as the object of study. Let µi be task i’s
+165   prefix distribution within one update, Ti (v | c) its routed teacher, and
+166
+167                                          Ti (v | c)
+                           δi (c, v) = log              ,            sθ (c, v) = ∇θ log πθ (v | c).          (8)
+168                                          πθ (v | c)
+169
+      The population token field is
+170
+171                                      hi = Ec∼µi ,v∼πθ [δi (c, v)sθ (c, v)].                              (9)
+172
+173   Proposition 3 (Centered-signal path law). Let δ̄i (c) = Ev∼πθ [δi (c, v) | c]. Then
+174                                                         √︂              √︂
+                                                                          2            2
+175                    hi = E[(δi − δ̄i )sθ ],   ∥hi ∥ ≤ E[(δi − δ̄i ) ] E[∥sθ ∥ ].                         (10)
+176
+177   Let qi be the realized task/token coefficient, bi the combined teacher and
+                                                                             ∑︁ implementation perturba-
+178   tion, and let a stochastic update be θ+ = θ + ηP (h̄ + ξ), where h̄ = i qi (hi + bi ), E[ξ] = 0, and
+179   Cov(ξ) = Ω. For any smooth evaluation objective Ek ,
+180                                                           (︂ ⃦ ⃦
+                                                                         2
+                                                                                        )︂
+181                     E[Ek (θ+ ) − Ek (θ)] = η∇Ek⊤ P h̄ + O η 2 [⃦P h⃦̄ + tr(P ΩP ⊤ )] .            (11)
+182
+183   Equation (10) shows that only action-centered teacher differences coupled to score/Fisher geometry
+184   move the policy. Reward and credit assignment enter through the teacher signal. In particular, if an
+185   intended dense token signal Ai (c, v) and the actual teacher satisfy
+186
+187                                   Ti (v | c)   Ai (c, v)
+                                log              =           − log ZiA (c) + ϵi (c, v),                     (12)
+188                                   π0 (v | c)      βi
+189
+      then
+190                                                                     [︃(︃                    )︃    ]︃
+                               1                                                           πθ
+191                        hi = giA + E[ϵi sθ ],            giA = E            Ai − βi log           sθ .   (13)
+                               βi                                                          π0
+192
+193   The action-centered component of ϵi , rather than a teacher’s standalone benchmark score, deter-
+194   mines its field error. The coefficient qi is also not generally the configured prompt ratio. Under
+195   token-mean reduction, a useful population approximation is
+196
+                                                        pprompt L̄i ω̄i
+197                                           qieff ≈ ∑︁ i prompt         ,                                 (14)
+198                                                     j pj      L̄j ω̄j
+199
+200   where L̄i is mean valid length and ω̄i is mean token weight. Per-response averaging removes the
+201
+      simple length factor; masking, packing, clipping, and truncation can modify it further. Together,
+      Eqs. (11)–(14) expose the upstream path variables: data allocation qi , reward/temperature and
+202
+      teacher signal, coverage µi , approximation and staleness bi , covariance Ω, and optimizer geome-
+203
+      try P . Pairwise interference is only one inner product after these quantities form the update.
+204
+205
+206   3.4    L OCAL RATES AND FINITE - BUDGET ALLOCATION
+207
+      Suppose compatible teachers share a locally realizable solution θ† . For e = θ − θ† , let Hi ⪰ 0 be
+208
+      the local task Fisher/Hessian. The mixture gradient flow is
+209
+                                                    ∑︂
+210                      ė = −H(q)e,      H(q) =       qi Hi ,    e(t) = e−H(q)t e(0).              (15)
+211                                                          i
+212
+213   The endpoint is common, but the spectrum of H(q) controls the entire path. For example, the losses
+      1           2        1        2
+214   2 (θ1 − a) and 2 (θ2 − b) have zero pairwise interference everywhere, while their errors decay as
+        −q1 t       −q2 t
+215   e       and e       . Thus allocation alone can create arbitrarily different learning speeds without any
+      gradient conflict.
+
+
+                                                                 4
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+216
+      Proposition 4 (Minimum-time static allocation). In a separable local regime, suppose ℓi (t) =
+217   ℓi (0)e−2qi κi λi t , where λi is local curvature and κi ∈ (0, 1] is usable token-signal efficiency. To
+218   reach ℓi (T ) ≤ εi for all tasks, define
+219
+220
+                                               [log(ℓi (0)/εi )]+
+                                              Bi =                .                                        (16)
+221                                                  2κi λi
+222   Among static mixtures, the minimum completion time and allocation are
+223                                        ∑︂                    Bi
+224                                   T⋆ =    Bi ,      qi⋆ = ∑︁       .                                   (17)
+                                            i                     j Bj
+225
+226
+      Each target requires qi T ≥ Bi ; summing gives the lower bound, and Eq. (17) attains it. The optimal
+227
+      ratio therefore depends on remaining headroom, teacher-signal efficiency, and curvature, not directly
+228
+      on gradient conflict.
+229
+230
+231   4    E MPIRICAL T ESTS
+232
+233   We organize the empirical evaluation around four causal tests. Each test specifies a prediction that
+234
+      can be falsified without relying on a global ranking of final task performance.
+235
+236
+      Test 1: exact-teacher equivalence. Use a finite response space or a small language model for
+      which Zi (x) and exact Boltzmann teachers can be evaluated. For random checkpoints, compare giM
+237
+      with giRL /βi in relative norm and cosine. Then vary βi and compare equal teacher sampling with
+238
+      the calibrated mixture in Eq. (5). Only the calibrated mixture should reproduce the target RL field
+239
+      up to a global time scale. A shared initialization with an undertrained or reward-mismatched teacher
+240   serves as the negative control.
+241
+242   Test 2: same endpoint, different paths. Construct routed tasks with a common realizable end-
+243   point and hold the total number of valid optimization tokens, learning rate, and optimizer fixed.
+244   Sweep configured prompt ratios, response-length distributions, and loss reductions to create differ-
+245   ent realized qieff . At each checkpoint, log configured prompt share, valid-token share, post-weighting
+246   share, per-task loss, centered signal radius from Eq. (10), gradient norm, raw interference, and co-
+247   sine. The key prediction is that changing qieff changes per-task convergence rates even when the
+248   interference matrix is unchanged or identically zero. Plotting progress against cumulative effective
+249
+      tokens should collapse curves better than plotting against global steps.
+250
+251
+      Test 3: reward, teacher, and realization quality. Independently vary reward scale or teacher
+      temperature, teacher training budget, rollout freshness, and sampled-token versus full-vocabulary or
+252
+      truncated updates. For teacher quality, estimate the action-centered residual in Eq. (13) on student-
+253
+      visited prefixes rather than using only the teacher’s final task score. For stochastic realization, report
+254   per-task covariance or signal-to-noise ratio under equal compute. For staleness, compare one fresh
+255   update, repeated updates with stale student-dependent quantities, and repeated updates after refresh-
+256   ing those quantities. The theory predicts that these interventions can alter the path while leaving
+257   ideal task-gradient angles unchanged.
+258
+259   Allocation test. Fit κi λi from short single-task or lightly mixed learning curves, compute Eq. (17),
+260   and compare its static mixture against equal prompts, equal valid tokens, and a conflict-minimizing
+261   scheduler under a matched token budget. Evaluation should report time to reach all prespecified
+262   task thresholds, final per-task performance, and uncertainty across seeds. This directly tests whether
+263
+      remaining headroom and learnability predict allocation better than raw gradient conflict.
+264
+265   5    D ESIGN I MPLICATIONS
+266
+267   The analysis yields three practical principles. First, distinguish objective weights from data fre-
+268   quency. If teachers use different KL temperatures, equal teacher sampling does not represent an
+269   equal-weight RL objective; task weights should first be calibrated by Eq. (5), and sampling may
+      then be changed with appropriate reweighting to control estimator variance.
+
+
+                                                          5
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+270
+      Second, allocate optimization budget using realized exposure and remaining demand. Prompt counts
+271   are insufficient when response lengths, masking, and loss reductions differ. A scheduler should
+272   monitor effective valid-token share, residual teacher signal, and a curvature or empirical learning-
+273   rate proxy. Equation (17) suggests allocating more budget to tasks with larger remaining log gap or
+274   lower usable signal and curvature, rather than optimizing pairwise cosine alone.
+275
+      Third, monitor the field that is actually implemented. Teacher benchmark quality, full-vocabulary
+276
+      KL, and prompt ratios can all look favorable while the student receives a weak action-centered signal
+277   on visited prefixes. Logging centered teacher residuals, token-level covariance, truncation mass, and
+278   rollout-to-current KL separates teacher error, estimator noise, and staleness. Gradient interference
+279   remains useful as a warning that the resulting fields oppose one another, but reducing it is not a
+280   substitute for correcting the upstream allocation or signal.
+281
+282
+      6   D ISCUSSION AND L IMITATIONS
+283
+284   Our claim is deliberately narrower than “MOPD and RL always converge to zero interference from
+285   the same base model.” Exact equivalence requires a common KL reference and teachers that are
+286   exact optima for the stated rewards and temperatures. Conditional interference extinction further
+287   requires a common task-wise stationary point. A joint stationary point can instead contain nonzero
+288   opposing task fields, and a vanishing raw inner product need not imply a vanishing cosine.
+289
+      The practical path law is local. Neural-network nonconvexity, changing rollout coverage, adaptive
+290   optimizers, and finite-step clipping can depart from the quadratic and small-step approximations.
+291   Teacher incompatibility or limited student capacity can also make the endpoint depend on the task
+292   mixture. The minimum-time allocation is therefore a testable local prescription, not a global guar-
+293   antee.
+294
+      Finally, low gradient conflict is neither necessary nor sufficient for end-to-end performance. A task
+295
+      can receive too little effective budget while remaining orthogonal to every other task, and two tasks
+296   can have negative local interaction while a shared representation improves final generalization. The
+297   intended use of interference is diagnostic: report it together with effective exposure, signal mag-
+298   nitude, curvature, covariance, and teacher mismatch rather than treating it as a standalone success
+299   criterion.
+300
+301   AI USE STATEMENT
+302
+303   Generative AI tools were used to assist with prose editing, manuscript organization, and drafting
+304   LaTeX presentations of mathematical arguments. All AI-assisted derivations, citations, and claims
+305
+      are subject to author verification; the authors retain responsibility for the final manuscript.
+306
+307   E THICS STATEMENT
+308
+      The theoretical analysis itself does not involve human subjects or private data. Empirical work
+309   should document model and dataset licenses, benchmark limitations, and any safety implications of
+310   consolidating specialist capabilities before submission.
+311
+312   R EPRODUCIBILITY STATEMENT
+313
+314   All theoretical assumptions and proofs are provided in the main text and Appendix A. Section 4
+315   specifies the required controls and logged quantities. The final empirical version should additionally
+316   report model checkpoints, prompts, reward definitions, token reductions, hyperparameters, compute
+317   budgets, and seed-level uncertainty.
+318
+319   R EFERENCES
+320
+      Bo Liu, Xingchao Liu, Xiaojie Jin, Peter Stone, and Qiang Liu. Conflict-averse gradient descent for
+321
+        multi-task learning, 2024. URL https://arxiv.org/abs/2110.14048.
+322
+323   Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+       Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli Luo. Mopd: Multi-teacher on-policy
+
+
+                                                        6
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+324
+          distillation for capability integration in llm post-training, 2026. URL https://arxiv.org/
+325       abs/2606.30406.
+326
+327   Shyam Sundhar Ramesh, Xiaotong Ji, Matthieu Zimmer, Sangwoong Yoon, Zhiyong Wang,
+328     Haitham Bou Ammar, Aurelien Lucchi, and Ilija Bogunovic. Multi-task grpo: Reliable llm rea-
+329     soning across tasks, 2026. URL https://arxiv.org/abs/2602.05547.
+330
+331   Ozan Sener and Vladlen Koltun. Multi-task learning as multi-objective optimization, 2019. URL
+332     https://arxiv.org/abs/1810.04650.
+333
+334   Runzhe Wu, Ankur Samanta, Ayush Jain, Scott Fujimoto, Jeongyeol Kwon, Ben Kretzu, Youliang
+335     Yu, Kaveh Hassani, Boris Vidolov, and Yonathan Efroni. Imbalanced gradients in rl post-training
+336     of multi-task llms, 2025. URL https://arxiv.org/abs/2510.19178.
+337
+338   Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine, Karol Hausman, and Chelsea Finn.
+339     Gradient surgery for multi-task learning, 2020. URL https://arxiv.org/abs/2001.
+340     06782.
+341
+342   Kejian Zhu, Zhuoran Jin, Shangqing Tu, Hongbang Yuan, Yushi Bai, Kang Liu, Juanzi Li, and Jun
+343
+        Zhao. Sft conflicts, rl coexists: A theoretical and empirical analysis of multi-task learning for
+        llms, 2026. URL https://arxiv.org/abs/2608.03573.
+344
+345
+346
+347   A     P ROOFS
+348
+349   A.1    E XACT EQUIVALENCE , CALIBRATION , AND BARYCENTER
+350
+351
+      For a fixed prompt x, Eq. (2) gives
+352                                               [︃                                      ]︃
+                                                        πθ (y | x) Ri (x, y)
+353                 −DKL (πθ ∥Ti⋆ ) = −Ey∼πθ        log            −         + log Zi (x)                (18)
+                                                        π0 (y | x)    βi
+354
+                                          1
+355                                   =      (Ey∼πθ [Ri (x, y)] − βi DKL (πθ ∥π0 )) − log Zi (x).        (19)
+356                                       βi
+357   Averaging over x proves the objective identity in Eq. (4); differentiation proves the gradient identity.
+358
+                                           MOPD mixture is i (ai /βi )giRL . It equals a positive global
+                                                              ∑︁
+359   For arbitrary task fields, the
+                                  ∑︁ idealRL
+360   multiple of the target field i wi gi if and only if ai /βi = cwi . Normalizing a yields Eq. (5).
+361   Finally, for ai > 0 and i ai = 1, define Ta (y | x) ∝ i Ti (y | x)ai . Direct expansion gives
+                               ∑︁                             ∏︁
+362
+                                  ∑︂
+363                                  ai DKL (π∥Ti ) = DKL (π∥Ta ) − log Za (x),                          (20)
+364                               i
+365
+366   where Za is independent of π. Hence Ta is the unrestricted optimum, proving Eq. (6).
+367
+368   A.2    I NTERFERENCE AND CONDITIONAL EXTINCTION
+369
+370   Equation (4) gives
+371                                        ⟨︁ M M ⟩︁      1 ⟨︁ RL RL ⟩︁
+                                             gi , gj =         g , gj .                                  (21)
+372                                                      βi βj i
+373
+374
+      Positive scaling preserves cosine whenever both gradients are nonzero. If every task field converges
+      to zero, then |Iij | ≤ ∥gi ∥ ∥gj ∥ → 0.
+375
+376   This conclusion does not follow from aggregate stationarity. For the two objectives in Section 3, the
+377   equal-weight aggregate derivative is −θ and therefore vanishes at θ = 0, while the task derivatives
+      are 1 and −1. Their inner product is −1.
+
+
+                                                          7
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+378
+      A.3    C ENTERED TOKEN FIELD AND ONE - STEP PATH LAW
+379
+380   For every prefix c, the score identity is
+381
+382
+                                              Ev∼πθ (·|c) [sθ (c, v)] = 0.                                  (22)
+383   Therefore any prefix-only baseline vanishes against the score and
+384
+385
+                                                  hi = E[(δi − δ̄i )sθ ].                                   (23)
+386   Cauchy–Schwarz proves Eq. (10). Substituting log(Ti /π0 ) = Ai /βi − log ZiA + ϵi into δi =
+387   log(Ti /πθ ) removes the prefix-only partition term and gives Eq. (13). If ϵ˜︁i = ϵi − E[ϵi | c], the same
+388   argument gives the useful error bound
+389                                                   √︂        √︂
+                                                                        2
+390                                     ∥E[ϵi sθ ]∥ ≤ E[˜︁ ϵ2i ] E[∥sθ ∥ ].                                  (24)
+391
+392   For the stochastic update in Proposition 3, Taylor expansion yields
+393                                                                             ⃦2
+                           Ek (θ+ ) − Ek (θ) = η∇Ek⊤ P (h̄ + ξ) + O(⃦ηP (h̄ + ξ)⃦ ).
+                                                                     ⃦
+394                                                                                                         (25)
+395                                                                                   2
+396
+      Taking the conditional expectation, using E[ξ] = 0, and writing E ∥P ξ∥ = tr(P ΩP ⊤ ) proves
+      Eq. (11).
+397
+398
+399
+      A.4    L OCAL DYNAMICS AND MINIMUM - TIME ALLOCATION
+400
+      At a common teacher-matching solution θ† , the gradient of each reverse-KL loss vanishes and its
+401   Hessian is the conditional Fisher matrix Hi ⪰ 0. Thus
+402
+                                                                             2
+403                                      ∇Li (θ† + e) = Hi e + O(∥e∥ ).                                     (26)
+404
+      Summing with coefficients qi and retaining the linear term gives Eq. (15); the matrix-exponential
+405   solution follows from the linear ordinary differential equation.
+406                                                                                ∑︁
+407   For Proposition 4, the target ℓi (T ) ≤ εi is equivalent to qi T ≥ Bi . Since i qi = 1,
+408                                                 ∑︂          ∑︂
+                                              T =       qi T ≥       Bi .                         (27)
+409
+                                                       i            i
+410                        ∑︁
+411   Choosing qi = Bi /      j Bj makes every active constraint tight and attains the lower bound, proving
+412   Eq. (17).
+413
+414
+415
+416
+417
+418
+419
+420
+421
+422
+423
+424
+425
+426
+427
+428
+429
+430
+431
+
+
+
+                                                            8
+

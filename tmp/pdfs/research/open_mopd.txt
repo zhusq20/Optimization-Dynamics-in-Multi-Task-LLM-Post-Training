@@ -1,0 +1,1623 @@
+Open-MOPD: Diagnosing and Fixing Capability Imbalance inMulti-Teacher On-Policy Distillation
+// Restore the saved color scheme preference, or
+// enact the browser preference if "automatic",
+// without expecting DOM load to have completed.
+//
+// Also restore any saved readingmode and ToC display preferences.
+function initializeReadingPreferences() {
+let saved_theme = localStorage.getItem("ar5iv_theme") || "automatic";
+if (saved_theme === "automatic") {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+saved_theme = "dark";
+}
+}
+if (saved_theme == "dark") {
+document.documentElement.setAttribute("data-theme", "dark");
+} else {
+document.documentElement.setAttribute("data-theme", "light");
+}
+const tocDisplay = localStorage.getItem('arxiv_html_paper_toc_display');
+if (tocDisplay) {
+document.documentElement.setAttribute("data-toc-display", tocDisplay);
+}
+const readingMode = localStorage.getItem('arxiv_html_paper_reading_mode');
+if (readingMode) {
+document.documentElement.setAttribute("data-reading-mode", readingMode);
+}
+// Pre-apply spinout-banner dismissal here, before the banner paints, so it
+// never flashes in only to be hidden later by the deferred arxiv-header.js.
+// Key matches arxiv-header.js: "arxiv-banner-dismissed:" + data-banner-name.
+if (localStorage.getItem('arxiv-banner-dismissed:spinout-nonprofit')) {
+document.documentElement.setAttribute("data-banner-dismissed", "");
+}
+}
+// Run as soon as JS starts, to minimize repainting
+initializeReadingPreferences();
+/* Banner pre-dismissal (set above before paint -> no flash-then-hide) and
+reading-mode chrome hiding. */
+html[data-banner-dismissed] .ds-announcement { display: none; }
+html[data-reading-mode="enabled"] .ds-announcement,
+html[data-reading-mode="enabled"] .ds-site-footer { display: none; }
+/* Keep the announcement text dark on the Open-Blue band in both colour themes
+(otherwise it inherits the paper's warm-wash text in dark mode and washes out). */
+.ds-announcement-text { color: var(--arxiv-ink, #1c1a17); }
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Open-MOPD: An Open Recipe for Multi-Teacher Capability Integration
+2.1 The Multi-Teacher On-Policy Distillation Objective
+2.2 Base Model Selection
+Experimental feasibility.
+Model capacity.
+2.3 The End-to-End Training Recipe
+Stage I: mixed-domain SFT.
+Stage II: per-domain RL teachers.
+Stage III: multi-teacher on-policy distillation.
+2.4 Evaluation Setup
+3 Diagnosing the Multi-Teacher Integration Gap
+3.1 A baseline reveals the integration gap
+3.2 Testing teacher conflict
+3.3 Measuring training imbalance across domains
+Token imbalance across domains.
+Reward magnitudes also affect the update budget.
+Multiple inner updates make the reward stale.
+4 From Diagnosis to Method: Open-MOPD
+4.1 Token-Share Balancing
+4.2 Gap-Following Allocation
+4.3 Reward Refresh
+4.4 The Complete Algorithm
+5 Ablation Studies
+5.1 Token-Share Balancing
+5.2 Gap-Following Allocation
+5.3 Reward Refresh
+6 Related Work
+6.1 On-Policy Distillation and Multi-Teacher Extensions
+Distillation on a fixed corpus.
+On-policy distillation.
+Staleness under batch reuse.
+From Single-Teacher to Multi-Teacher OPD.
+6.2 Integrating Domain Experts
+Training Domain Specialists.
+Integration in data space.
+Integration in weight space and in module space.
+7 Conclusion
+References
+8 Constructing the Open-MOPD Recipe
+8.1 Base Model Choice
+OpenR1 math comparison between 1.7B and 7B.
+Choosing SmolLM3-3B-Base.
+8.2 Stage Hyperparameters
+Mixed-domain SFT and domain RL teachers.
+Single-domain OPD and multi-teacher OPD.
+License: CC BY-SA 4.0
+arXiv:2608.19098v1 [cs.LG] 19 Aug 2026
+1]SIA-Lab of Tsinghua AIR and ByteDance Seed
+2]Institute for AI Industry Research (AIR), Tsinghua University
+3]Department of Computer Science and Technology, Tsinghua University
+\contribution[*]Equal contribution
+\contribution[‡]Project Lead
+\contribution[†]Corresponding author
+Open-MOPD: Diagnosing and Fixing Capability Imbalance in
+Multi-Teacher On-Policy Distillation
+Huan-ang Gao
+Haohan Chi
+Yong Yan
+Shiyuan Feng
+Hanlin Wu
+Zheng Jiang
+Bingxiang He
+Wei-Ying Ma
+Ya-Qin Zhang
+Hao Zhou
+Affiliation: [
+Affiliation: [
+Affiliation: [
+Abstract
+Multi-teacher on-policy distillation (M-OPD) has emerged as a promising paradigm for consolidating domain-specialized reinforcement learning (RL) experts into a single generalist student via dense, token-level reward supervision. Despite its practical success, the optimization dynamics governing multi-teacher capability integration remain poorly understood, and open, rigorously reproducible recipes are conspicuously lacking. In this work, we establish a controlled M-OPD benchmark on SmolLM3-3B-Base with oracle routing, isolating capability integration from routing ambiguity. Our investigation reveals a pronounced capability integration gap: standard M-OPD recovers only $35.6\%$ of the improvement from mixed-domain SFT to RouteRL. Concise tasks such as instruction following suffer severe degradation and premature stagnation. Under this metric, token-level teacher disagreement does not appear to be the dominant bottleneck; the main failure is a severe misallocation of the token-level optimization budget. We identify three separable contributors to this imbalance: structural sequence-length disparities across domains, different convergence rates across domains, and reward staleness from stale student updates across repeated minibatches of a shared rollout. To resolve these imbalances, we introduce Open-MOPD, a principled framework incorporating token-share balancing, gap-aware dynamic budget allocation, and student reward refresh. Together, these mechanisms systematically restore cross-domain balance, elevating recovery from $35.6\%$ to $83.4\%$ of the improvement from mixed-domain SFT to RouteRL in one student model. We fully open-source our end-to-end post-training recipe, training trajectories, and evaluation suites on an 8 $\times$ A100-80GB academic setup.
+Project page: https://bytedtsinghua-sia.github.io/Open-MOPD/
+1 Introduction
+Reinforcement learning (RL) has established itself as a foundational pillar in large language model (LLM) post-training, excelling at cultivating specialized capabilities in domain-specific models [1, 2]. However, serving multiple specialized models in real-world applications is often computationally prohibitive, creating a strong demand for a single unified model that preserves these disparate strengths. To consolidate multiple specialists into a single student, multi-teacher on-policy distillation (M-OPD) has emerged as an appealing paradigm; each input prompt is routed to a corresponding domain expert, which provides dense per-token reward supervision over the trajectories generated by the student policy [3, 4, 5]. Despite the increasing adoption of multi-teacher distillation in industrial pipelines, the fundamental mechanisms governing multi-domain capability integration remain poorly understood, and the research community still lacks an open and rigorously reproducible recipe.
+To isolate and examine the core dynamics of multi-teacher consolidation, we construct a fully controlled M-OPD experimental framework initialized from SmolLM3-3B-Base. The pipeline incorporates a three-domain mixed-SFT initialization, three domain-expert RL teachers (spanning mathematics, coding, and general instruction following), and oracle routing based on ground-truth domain labels. Using ground-truth domain labels, we isolate capability integration from routing errors. This design operates at a parameter scale that balances two criteria (Section 2.2), and the entire pipeline and ablation ladder are reproducible on an 8 $\times$ A100-80GB academic setup, while the model remains capable of long-horizon reasoning.
+Figure 1: The integration gap is real and strongly asymmetric.
+(a) Per-domain macro-averages of Naive M-OPD and RouteOPD, where the number above each bar indicates the gap in that domain;
+(b) per-domain validation trajectories of Naive M-OPD, with dashed lines denoting the RouteOPD reference for the corresponding domain;
+(c) recovered theoretical headroom relative to RouteRL,
+$(\text{current}-\pi_{\mathrm{mixsft}})/(\text{RouteRL}-\pi_{\mathrm{mixsft}})$ .
+Instruction following (IF) exhibits the largest absolute gap and the lowest recovered headroom, and is the earliest domain to stop improving.
+Our empirical investigation reveals that perfect routing is far from sufficient for successful capability integration. Under a standardized six-benchmark evaluation protocol, naive M-OPD reaches an average score of $28.05$ , while distilling each domain on its own reaches $31.55$ . We use RouteOPD to measure the deployment-time integration gap. In particular, concise instruction-following (IF) tasks fall $6.16$ points below their RouteOPD reference ( $3.3\times$ the degradation observed in mathematics) and plateau earliest during training.
+Through systematic per-domain measurement, we locate this integration gap in the unmanaged allocation of the token-level optimization budget rather than catastrophic gradient conflict (Section 3). Because on-policy distillation objectives aggregate loss values across tokens, the actual optimization share received by each domain is governed by its gradient token volume rather than its prompt frequency. Consequently, concise IF responses contribute a negligible fraction of gradient tokens despite receiving a balanced prompt allocation, accounting for $20.3\%$ of the input prompts but only $0.99\%$ of the gradient tokens. Furthermore, even if the raw token budget is equalized initially, it drifts apart within tens of steps because the supervisory reward signals diminish at uneven rates as the student converges toward different teachers at varying speeds. This imbalance is compounded by standard multi-step rollout reuse, which leaves student-dependent reward components stale across successive gradient updates.
+To address these orthogonal failure modes, we introduce Open-MOPD, a principled framework that targets each distortion with a dedicated mechanism (Section 4). First, token-share balancing decouples gradient budget allocation from sequence length, establishing a weighted token-share target rather than a fixed per-batch quota. Second, gap-aware allocation dynamically steers the optimization budget toward domains with the largest remaining student–teacher gap. This prevents the training collapse observed with naive reward normalization at step 74, where budget is wastefully funneled into already-converged domains. Third, student reward refresh recomputes student log-probabilities before each gradient step while caching teacher states, eliminating sample staleness with negligible overhead [6]. In cumulative ablation experiments, Open-MOPD raises recovery from $35.6\%$ to $83.4\%$ in one student model.
+Our principal contributions are summarized below.
+•
+Empirical Diagnosis. Using an oracle-routed testbed that isolates integration dynamics from routing errors, we identify and characterize the capability integration gap in multi-teacher on-policy distillation, revealing pronounced cross-domain performance asymmetry and premature stagnation in concise tasks (Section 3).
+•
+Mechanistic Decomposition. Token-level teacher disagreement under our metric is unlikely to be the dominant bottleneck. We instead identify three separable contributors to token-level optimization budget distortion: sequence-length disparities, different convergence rates, and reward staleness from stale student updates across repeated minibatches of a shared rollout (Section 4).
+•
+Principled Methodology. We propose Open-MOPD, an optimization framework combining token-share balancing, gap-aware dynamic budget allocation, and student reward refresh, which resolves domain imbalances and recovers most of the available headroom in one student model (Section 4, Section 5).
+•
+Open-Source Recipe. We fully open-source our end-to-end post-training pipeline, model checkpoints, and evaluation suites on a reproducible academic compute budget (Appendix 8).
+2 Open-MOPD: An Open Recipe for Multi-Teacher Capability Integration
+Our goal is to integrate the capabilities of several domain experts into one unified
+student model. Let the set of domains be $\mathcal{D}$ . On our base model,
+$\mathcal{D}=\{\mathrm{math},\mathrm{code},\mathrm{instruction\_following}\,(\mathrm{IF})\}$ .
+Each domain has an expert teacher $\pi_{\phi_{d}}$ trained with reinforcement learning, and the student
+model is $\pi_{\theta}$ . Each training sample carries a domain label d(x), allowing a single student model to receive supervision signals from the corresponding domain expert across three distinct tasks: mathematics, code generation, and instruction following. With the training framework fixed, Open-MOPD aims to identify a recipe that stably transfers the capabilities of all three experts into a single student model.
+2.1 The Multi-Teacher On-Policy Distillation Objective
+For a prompt $x$ , the student first samples a response
+$y\sim\pi_{\theta}(\cdot\mid x)$ from the current policy. The teacher evaluates student rollouts via a single prefill pass to generate the teacher distribution. Write the routed teacher
+as $\pi_{\phi_{d(x)}}$ . At position $t$ , we take the top- $k$ token set of the student distribution
+$\mathcal{S}_{t}=\mathrm{TopK}_{k}\!\big(\pi_{\theta}(\cdot\mid x,y_{<t})\big),$
+(1)
+with $k=16$ by default. For each $v\in\mathcal{S}_{t}$ , we first define the teacher–student
+log-probability difference
+$\delta_{t}(v)=\mathrm{sg}\!\Big[\log\pi_{\phi_{d(x)}}(v\mid x,y_{<t})-\log\pi_{\theta}(v\mid x,y_{<t})\Big],$
+(2)
+where $\mathrm{sg}[\cdot]$ denotes stop-gradient; this is the token-level advantage signal of dense
+distillation. It is then aggregated with softmax weights over $\mathcal{S}_{t}$ into a dense reward
+$r_{t}(v)=\delta_{t}(v)\cdot\tilde{\pi}_{\theta}(v\mid x,y_{<t}),\qquad\tilde{\pi}_{\theta}(v\mid x,y_{<t})=\mathrm{softmax}_{u\in\mathcal{S}_{t}}\!\big[\log\pi_{\theta}(u\mid x,y_{<t})\big](v),$
+(3)
+and tokens outside $\mathcal{S}_{t}$ contribute zero. The position-level reward is
+$r_{t}=\sum_{v\in\mathcal{S}_{t}}r_{t}(v).$
+(4)
+With no critic, $r_{t}$ is placed directly in the advantage slot of PPO. Intuitively, $\delta_{t}(v)>0$
+means that the teacher assigns a higher probability to token $v$ than the student does; $\tilde{\pi}_{\theta}$ only
+determines the share each token inside the top- $k$ contributes to the position-level reward $r_{t}$ .
+Because the student generates every response, the supervision distribution follows the student’s
+current policy. This is the key difference between on-policy distillation and supervised fine-tuning
+on offline teacher trajectories, whose fixed data distribution can create a distribution shift. For
+this reason, Section 3 starts from this minimal version, which adds no further
+training mechanisms and keeps the effects of later changes easier to identify.
+2.2 Base Model Selection
+The open recipe uses SmolLM3-3B-Base as its base model. It is a fully open 3B decoder-only model
+whose pre-training covers web, math and code data and which is trained at a 64K
+context [7]. This choice balances compute cost with the feasibility of running the full
+recipe and repeating its ablations.
+Experimental feasibility.
+Multi-teacher OPD needs student generation, one or more teacher forwards, long-response training and
+per-domain validation at once; a full reproduction also includes mixed-domain SFT, three domain RL
+teachers and the final multi-teacher distillation. If the base model started at 7B or larger, that
+chain would be hard to close within a budget on which an ordinary academic team can ablate
+repeatedly: the GPU hours taken by a single experiment rise, and the repeated runs needed for
+mechanism comparisons become unaffordable. Open-MOPD therefore takes “runnable on a single
+8 $\times$ A100-80GB node” as a recipe constraint, so that the end-to-end pipeline and the mechanism
+ablations can be executed repeatedly with limited computational resources.
+Model capacity.
+The base model must also have enough capacity. A model that is too small lets the response
+length limit truncate long-chain supervision before it enters a usable trajectory; for a failed
+experiment, it is difficult to determine whether the failure is caused by the algorithm or training
+configuration, or by the model’s limited ability to discover and learn solutions within the response
+length limit. We observed this failure mode earlier with the smaller Qwen3-1.7B-Base as base model:
+across five epochs of SFT on the same OpenR1-Math-93k, its best AIME24 result was only
+7.08%, and even with a 31K generation budget the truncation rate stayed at 69.17–80.42%.
+Qwen2.5-7B-Base on the same data reached 31.25%, with the truncation rate down to 12.92%
+(Appendix 8.1). When most responses are truncated, a failed run reveals little
+about whether the training method itself is effective.
+SmolLM3-3B-Base is large enough to learn from the long responses used in our math and code SFT,
+which has a 32,768-token limit. This lets us measure the integration gap and run the ablations
+without response truncation dominating the results.
+2.3 The End-to-End Training Recipe
+The Open-MOPD recipe has three stages. The teachers in Stage II and the student in Stage III are
+initialized from the same mixed-domain SFT model.
+Table 1 summarizes the base model, the data, and the evaluation settings of the recipe.
+Table 1: The Open-MOPD pipeline. Starting from a mixed-domain SFT checkpoint ( $\pi_{\mathrm{mixsft}}$ ), domain-specific RL produces three teacher models $\pi_{\phi_{d}}$ . Multi-teacher OPD then trains the student model $\pi_{\theta}$ from the initial checkpoint. All datasets are publicly released for end-to-end reproducibility.
+Stage
+Data
+Key settings and products
+Base model
+SmolLM3-3B-Base
+3B; 1.7B fails to close long trajectories, while 7B is too costly for repeated ablations
+(Appendix 8.1)
+I
+Mixed-domain SFT
+Math:
+OpenR1-Math-93k
+Code:
+OCR-50k
+(sampled from the full set)
+IF:
+Instruction-Nemotron
+Four epochs; sequence limit 32,768; approximately balanced by response tokens (37/28/35)
+product $\pi_{\mathrm{mixsft}}$
+II
+Domain RL teachers
+Math:
+DAPO-Math-17k
+Code:
+DeepScaler-24k
+(LCB-decontaminated)
+IF:
+Nemotron-IF-RL-46k
+Independent RL per domain, no domain mixing; all forked from $\pi_{\mathrm{mixsft}}$
+products $\pi_{\phi_{\mathrm{math}}},\pi_{\phi_{\mathrm{code}}},\pi_{\phi_{\mathrm{IF}}}$
+III
+Multi-teacher OPD
+The union of the three domains’ RL prompts above; each prompt is hard-routed to its teacher by domain
+label
+Response limit 16K for math/code and 2K for IF; top- $k{=}16$ ; the student is initialized from
+$\pi_{\mathrm{mixsft}}$
+product $\pi_{\theta}$
+Evaluation
+Math:
+AIME24/
+AIME25
+Code:
+LiveCodeBench
+v5/v6
+IF:
+IFEval+
+IFBenchtest
+mean@64 / mean@10 / mean@1; averaged evenly across the datasets within a domain first, then
+macro-averaged over the three domains
+Stage I: mixed-domain SFT.
+Starting from SmolLM3-3B-Base, we balance the sample count of each domain by response token count and
+then run four epochs of supervised fine-tuning on the mixed data, giving the shared student checkpoint
+$\pi_{\mathrm{mixsft}}$ .
+The data mixture is: math OpenR1-Math-93k (93,733 examples), code OCR-50k sampled from the full
+OpenCodeReasoning set (50,000 examples), and instruction-following Instruction-Nemotron aligned
+(820,039 examples); estimated by response tokens, the shares are approximately 37% math,
+28% code and 35% IF. The sequence length limit is 32,768.
+Stage II: per-domain RL teachers.
+Three teachers are initialized separately from $\pi_{\mathrm{mixsft}}$ , each running RL only on the
+verifiable reward of its own domain.
+The math teacher is trained on DAPO-Math-17k; the code teacher is trained on DeepScaler-24k (the
+LiveCodeBench-decontaminated version); the IF teacher is trained on Nemotron-IF-RL-46k. This stage gives
+$\pi_{\phi_{\mathrm{math}}},\pi_{\phi_{\mathrm{code}}},\pi_{\phi_{\mathrm{IF}}}$ .
+Stage III: multi-teacher on-policy distillation.
+The student is also initialized from $\pi_{\mathrm{mixsft}}$ . Training prompts come from the union of
+the three domains and are sampled as a domain mixture. The student $\pi_{\theta}$ generates a response
+for each sampled prompt. The domain label then selects the corresponding teacher for OPD using the
+objective in Section 2.1.
+The response length limit is 16K for math and code and 2K for IF; by default the dense reward is
+computed on the student top- $k$ ( $k=16$ ).
+2.4 Evaluation Setup
+For each domain, we use the best performance obtained by training a student with its domain
+teacher alone as a reference. These three single-teacher students together form RouteOPD, our
+deployment-time integration-gap reference. At evaluation time, the domain label selects the
+corresponding student to generate the response. The performance gap between the unified
+multi-teacher OPD (M-OPD) student and RouteOPD defines the integration gap.
+All main results use the same online verifier and the same six benchmarks.
+Scoring is done per dataset first, then averaged simply over the datasets within a domain, and the
+final total score is the simple average of the three domain averages.
+The math domain uses AIME24 and AIME25 with $n=64$ and temperature $=0.6$ , reporting accuracy
+mean@64;
+the instruction-following domain uses IFEval and IFBenchtest (abbreviated IFBtest in tables) with $n=1$ , reporting
+accuracy mean@1;
+the code domain uses LiveCodeBench v5 and v6 with $n=10$ and temperature $=1.0$ , reporting accuracy
+mean@10.
+Table 2 provides the reference results for SmolLM3-3B under this
+evaluation protocol. It includes the base model, the four mixed-domain SFT checkpoints, the
+single-domain RL and OPD results, and their domain-routed combinations RouteRL and RouteOPD.
+It also includes the RFT, $\pi_{\mathrm{mixrl}}$ , Parameter Merging, Naive M-OPD, and Open-MOPD
+comparisons. The analysis and ablations below use this table as their common reference.
+Table 2: Integration gap on SmolLM3-3B.
+Each domain reports its sub-dataset scores and macro-average. We define the total score as the
+average of the three domain averages. The four SFT rows are checkpoints after successive epochs.
+Single-domain RL and OPD report results only for their respective domains. Gray-shaded
+RouteRL and RouteOPD use a separate model for each domain and select that model
+using the domain label at evaluation time. They therefore cannot be deployed as one model. The
+recovery rate is $\frac{\text{Row Total}-\text{SFT}}{\text{RouteRL}-\text{SFT}}$ , using
+$\pi_{\mathrm{mixsft}}$ (epoch 4) as the SFT baseline. In the Baselines and
+M-OPD sections, the highest score in each column is boldfaced and the second highest is
+underlined.
+Math (avg@64)
+Code (avg@10)
+IF
+Method
+AIME24
+AIME25
+avg
+LCBv5
+LCBv6
+avg
+IFEval
+IFBtest
+avg
+Total
+Recovery rate
+SmolLM3-3B-Base
+2.08
+1.72
+1.90
+3.41
+6.17
+4.79
+16.08
+13.00
+14.54
+7.08
+—
+SFT
+$\pi_{\mathrm{mixsft}}$ (e1)
+12.24
+16.61
+14.43
+13.29
+17.20
+15.25
+64.70
+16.00
+40.35
+23.34
+—
+$\pi_{\mathrm{mixsft}}$ (e2)
+12.55
+17.97
+15.26
+13.17
+16.63
+14.90
+65.62
+16.00
+40.81
+23.66
+—
+$\pi_{\mathrm{mixsft}}$ (e3)
+15.10
+19.53
+17.32
+14.97
+18.57
+16.77
+66.36
+18.00
+42.18
+25.42
+—
+$\pi_{\mathrm{mixsft}}$ (e4)
+15.63
+20.26
+17.95
+15.99
+19.20
+17.60
+66.91
+16.00
+41.46
+25.67
+—
+RL
+$\pi_{\phi_{\mathrm{math}}}$
+23.65
+24.84
+24.24
+—
+—
+—
+—
+—
+—
+—
+—
+$\pi_{\phi_{\mathrm{code}}}$
+—
+—
+—
+22.16
+21.31
+21.73
+—
+—
+—
+—
+—
+$\pi_{\phi_{\mathrm{IF}}}$
+—
+—
+—
+—
+—
+—
+74.49
+27.67
+51.08
+—
+—
+RouteRL
+23.65
+24.84
+24.24
+22.16
+21.31
+21.73
+74.49
+27.67
+51.08
+32.35
+100%
+OPD
+Math-OPD
+22.34
+23.96
+23.15
+—
+—
+—
+—
+—
+—
+—
+—
+Code-OPD
+—
+—
+—
+22.28
+21.14
+21.71
+—
+—
+—
+—
+—
+IF-OPD
+—
+—
+—
+—
+—
+—
+75.60
+24.00
+49.80
+—
+—
+RouteOPD
+22.34
+23.96
+23.15
+22.28
+21.14
+21.71
+75.60
+24.00
+49.80
+31.55
+88.0%
+Baselines
+RFT
+22.97
+23.91
+23.44
+18.98
+19.43
+19.21
+55.08
+18.67
+36.87
+26.51
+12.6%
+$\pi_{\mathrm{mixrl}}$
+21.15
+22.14
+21.64
+16.59
+20.97
+18.78
+70.24
+22.67
+46.45
+28.96
+49.3%
+ParamMerge-Avg
+18.91
+20.99
+19.95
+18.38
+21.20
+19.79
+70.06
+17.67
+43.86
+27.87
+32.9%
+ParamMerge-TA
+21.93
+22.76
+22.34
+21.74
+23.14
+22.44
+71.53
+21.67
+46.60
+30.46
+71.7%
+M-OPD
+Naive M-OPD
+20.92
+21.60
+21.26
+17.53
+20.99
+19.26
+68.61
+18.67
+43.64
+28.05
+35.6%
+Open-MOPD (Ours)
+21.98
+22.86
+22.42
+20.84
+22.63
+21.73
+74.49
+24.67
+49.58
+31.24
+83.4%
+3 Diagnosing the Multi-Teacher Integration Gap
+The recipe in Section 2 provides an open baseline for multi-teacher OPD. It
+combines mixed-domain SFT, one teacher for each domain, hard routing by domain label, and
+on-policy distillation on the student’s own responses. This setup gives all domains the correct
+teacher signal while training one shared student. However, the shared student still falls short of
+the domain-specific teachers. This section studies why the shared student does not retain all of
+the capabilities learned by the domain teachers. We first establish the integration gap with a
+simple baseline, then test teacher conflict as a possible cause, and finally measure how much
+training signal each domain receives and how this signal changes during training.
+3.1 A baseline reveals the integration gap
+In Table 2, Naive M-OPD lifts $\pi_{\mathrm{mixsft}}$ from 25.67 to 28.05,
+which shows that the multi-teacher signal is useful. Its score is 0.91 points below
+$\pi_{\mathrm{mixrl}}$ and 3.50 points below RouteOPD.
+RouteOPD reaches 31.55, showing that the teachers, the student initialization, and the single-teacher
+distillation objective are sufficient to learn these capabilities. The score drops when the three
+teacher signals are naively combined in one student.
+Figure 1 shows that the gap is uneven across domains. IF falls 6.16 points
+below its RouteOPD reference, which is 3.3 times the math gap of 1.89 points. It is also the
+main source of the total integration gap (Figure 1a).
+Along the training trajectory (Figure 1b), none of the three domains reaches its corresponding RouteOPD reference within 300 steps. Figure 1c reports the fraction of each domain’s gap to that reference that has been closed. Over the $[200,300]$ -step window, math closes 64% of its gap, code 40%, and IF only 26%. IF is also the only domain whose score decreases during the middle of training, falling by 11% over the $[100,200]$ window.
+3.2 Testing teacher conflict
+A natural hypothesis is that teachers of different domains give mutually contradictory token
+preferences on the same student trajectory: although the math, code and IF teachers are each
+selected on their own domain only, they share a large number of formatting words, connectives and
+reasoning templates. If the teachers disagree on these common tokens, multi-task OPD can push the
+gradients in different directions and interfere with the shared parameters. To test this hypothesis,
+multi-teacher on-policy distillation lets all three teachers score the same context for every token
+sampled by the student. We define
+$c_{t}=\max_{d\in\mathcal{D}}\log\pi_{\phi_{d}}(y_{t}\mid x,y_{<t})-\min_{d\in\mathcal{D}}\log\pi_{\phi_{d}}(y_{t}\mid x,y_{<t})$
+(5)
+as the teacher disagreement. If conflicting teacher signals are a major cause of the multi-task
+OPD failure, $c_{t}$ should be large for a substantial fraction of tokens.
+Figure 2 provides three tests of this hypothesis. The first two examine how
+often strong disagreement occurs, while the third tests whether changing such tokens improves
+training. First, disagreement is small and stable. We measured $c_{t}$ over the full training run. As we can see in Figure 2a, the mean
+value is 0.126 nat, and $c_{t}$ remains below 0.27 nat throughout the 300 training steps. Both
+values are much smaller than the 1-nat conflict threshold (where the probability
+ratio between the most and least likely teachers is about $e\approx 2.7$ ). These results do not support widespread teacher conflict as the
+main cause of the integration gap.
+Second, high-conflict tokens are rare. Only 0.62% of tokens satisfy $c_{t}>1$ on average. The rate
+is 3.9% on IF, where disagreement is largest, and 0.31% on math
+(Figure 2b). A maximum value of 30.58 nat shows that extreme conflict can
+occur, but it is limited to a small number of tokens.
+Third, we tested whether directly changing high-conflict tokens improves training. We used two
+interventions. A conflict mask removes the top 1%, 5%, or 20% of tokens by $c_{t}$ from the
+distillation loss, using thresholds of 0.83, 0.49, and 0.22 nat. We rescaled the remaining weights
+to keep the total loss scale fixed. A consensus target replaces the hard-routed teacher target
+with the average of the three teachers’ log-probabilities when $c_{t}\leq 1$ ; it keeps the routed
+teacher when $c_{t}>1$ (purple points in Figure 2c).
+Under the same settings, the three conflict masks reduce the total score by $0.52$ , $0.73$ , and
+$0.75$ points, respectively, relative to the baseline. The consensus target reduces it by $0.83$
+points. High-conflict tokens may be irrelevant noise, or they may carry domain-specific
+information. Token-level disagreement alone cannot tell these cases apart. This may explain why
+removing or replacing such tokens hurts performance.
+Figure 2: Teacher conflict is measurable but not the bottleneck.
+(a) Average teacher disagreement $c_{t}$ (log scale) and its distance to the 1-nat criterion. The legend applies to both panels (a) and (b).
+(b) Fraction of tokens with $c_{t}>1$ , broken down by domain.
+(c) Change in total score for four conflict interventions relative to the baseline. Blue points show the conflict mask, where the horizontal axis indicates the filtering threshold when removing top- $k\%$ tokens by $c_{t}$ quantile (larger $k$ means lower threshold). Purple points show the consensus method with a fixed threshold of 1 nat; tokens with $c_{t}\leq 1$ use the average log-probs of all three teachers, while those with $c_{t}>1$ keep the routed teacher.
+Error bars denote validation standard error.
+The teacher-conflict experiments show that token-level teacher disagreement under this metric is unlikely to be the dominant bottleneck.
+We therefore examine how much training signal each domain provides to the shared student and how
+the available training resources are distributed across domains.
+3.3 Measuring training imbalance across domains
+We study how much training signal each domain receives and how this amount changes during
+training. We first measure the number of valid response tokens and the average per-token reward
+for each domain. We then examine how these quantities change over the training trajectory. Finally,
+we study the effect of using old student probabilities in later inner updates from the same rollout
+batch. These measurements cover three sources of imbalance, namely token counts, reward magnitudes, and
+updates based on old student probabilities.
+Token imbalance across domains.
+The training loss uses token-mean aggregation, so every valid response token contributes to the loss
+once. The raw token share of domain $d$ is therefore
+$s_{d}^{\mathrm{tok}}=\frac{n_{d}L_{d}}{\sum_{j\in\mathcal{D}}n_{j}L_{j}},$
+(6)
+where $n_{d}$ is the number of prompts of that domain and $L_{d}$ is the average response length.
+Figure 3 shows that the two shares are completely decoupled along the whole
+trajectory, where the prompt share is fixed by the sampler at 39.8%/39.8%/20.3%, whereas the token
+share is 49.7%/49.3%/0.99% (Figure 3a).
+Across all 300 steps the token share of IF never exceeds 1.65% and never falls below 0.44%, so
+this is not an incidental property of a particular batch.
+The cause is given directly by length (Figure 3b): the average response length of
+math and code is about 10,500 tokens while that of IF is only 409 tokens, a difference of more than
+25 times; Equation 6 is therefore almost entirely determined by length.
+This also shows that simply raising the sampling frequency of IF is not a viable fix. For IF to
+obtain $1/3$ of the token budget, its number of prompts would have to be scaled up about 33.6 times
+(Figure 3c), and the math and code prompts in a batch would be squeezed to the
+point where long-chain supervision can no longer be maintained.
+Figure 3: Prompt share and gradient-token share are decoupled.
+(a) Whole-run averages of prompt share versus token share per domain (log scale; light bars for prompts, solid bars for tokens). IF accounts for $\approx 20\%$ of prompts but only $\approx 1\%$ of gradient tokens.
+(b) Average response length (log scale) accounts for this difference, with $\approx 10,500$ tokens for math/code versus $\approx 409$ tokens for IF.
+(c) Balancing token share ( $1/3$ per domain) solely via oversampling requires a $33.6\times$ prompt multiplier for IF. This severely reduces math and code prompts per batch, making long-chain supervision unsustainable.
+Reward magnitudes also affect the update budget.
+In addition to the number of tokens, the strength of each update depends on the reward magnitude.
+As a simple estimate of the update budget, the contribution of a domain is
+$B_{d}\ \propto\ s_{d}^{\mathrm{tok}}\,\bar{m}_{d},\qquad\bar{m}_{d}=\mathbb{E}_{t\in d}[\lvert r_{t}\rvert].$
+(7)
+Figure 4a and Equation 7 show how the reward
+magnitude changes during training. Early in training, $\bar{m}_{d}$ is 0.019 for math, 0.063 for
+code, and 0.091 for IF. The largest value is 4.9 times the smallest. Because $\bar{m}_{d}$ measures
+the average difference between the student and teacher policies, it should decrease as the student
+approaches its teacher during training. The decrease is different across domains. Along the same
+trajectory, IF shrinks by 2.4 times, math by 2.1 times, and code by 1.9 times
+(Figure 4b).
+Here $\bar{m}_{d}$ is the average per-token reward magnitude for domain $d$ . It is the expectation
+of $|r_{t}|$ over the tokens in that domain and measures the average effect of one token on the
+parameter update.
+The effect of the reward magnitude becomes clear after the token shares are balanced. When
+$s_{d}^{\mathrm{tok}}$ is fixed at $1/3$ for every domain, the training contribution of each domain
+depends only on $\bar{m}_{d}$ in Equation 7. Within 25 steps, the budget
+share of IF drops from 48.7% to around 9% and ends at
+11.4%, while that of code rises from 39.6% to 63.8%
+(Figure 4c). Thus, balancing the token counts does not keep the training
+contributions balanced in later steps because the reward magnitudes differ across domains.
+Figure 4: The effective budget drifts with distillation progress.
+(a) Per-token reward magnitude $\bar{m}_{d}$ of each domain (log axis), differing by 4.9 $\times$ early on;
+(b) after normalizing to their respective initial values, the three domains shrink at different
+rates, which shows that $\bar{m}_{d}$ measures the remaining teacher–student gap;
+(c) on a trajectory where $s_{d}^{\mathrm{tok}}$ is flattened to $1/3$ ,
+Equation 7 degenerates to
+$B_{d}\propto\bar{m}_{d}$ , so the curves show the budget drift caused by the gap alone. Within 25 steps
+the share of IF falls below the dashed line to about 9%, while code rises to 63.8%. Flattening the
+token share does not lock the budget in place.
+Multiple inner updates make the reward stale.
+To reduce the cost of generation, practical training usually performs $K$ inner updates on one
+large rollout batch. The teacher remains fixed, while the student changes after the first inner
+update. If later updates still use the student probabilities computed during rollout,
+$\log\pi_{\theta}(v\mid x,y_{<t})$ and $\tilde{\pi}_{\theta}(v\mid x,y_{<t})$ ( $v\in\mathcal{S}_{t}$ ), then
+the student-dependent part of Equation 3 is inconsistent with the current
+policy.
+Figure 5 measures the policy shift by the KL between the rollout policy
+and the current policy within the same batch, and its value rises monotonically with $K$ , growing
+from 0 at $K{=}1$ (no shift by definition) to 0.059 at $K{=}4$ and 0.216 at $K{=}32$
+(Figure 5a); the fraction of tokens clipped by PPO rises with $K$ , from 0 to 0.86
+(Figure 5b).
+Therefore, in a high-throughput setting, most tokens are updated after the student has already
+drifted away from the rollout policy. The dense reward is still computed from the student and
+teacher probabilities at rollout time.
+Figure 5: Repeated inner updates change the student policy within a rollout batch. The
+horizontal axis is the number of inner updates $K$ per rollout batch.
+(a) Within the same batch, the KL between the rollout policy and the current student policy grows
+monotonically with $K$ ;
+(b) the fraction of tokens clipped by PPO rises with $K$ . At $K{=}1$ both are 0, and the dense reward
+is then consistent with the current student.
+These measurements identify three parts of the training signal that need to be controlled. The first is the token budget, followed by reward magnitude and reward freshness.
+the token budget across domains, the teacher–student gap during training, and the reward delay
+inside inner updates. The next section presents one method for each part.
+4 From Diagnosis to Method: Open-MOPD
+Open-MOPD keeps the teacher routing and the on-policy distillation objective of
+Section 2.1, and changes only how the optimization budget is allocated and
+how the reward components are computed.
+The three mechanisms correspond to the three measurements of Section 3.3:
+token-share balancing controls the domain token budget within a batch,
+gap-following allocation adjusts the budget over the course of training according to the
+remaining distillation gap,
+reward refresh refreshes the student-dependent reward across the several inner updates of one
+rollout.
+They act on different time scales, so they can be validated independently and can also be combined
+into a single training recipe.
+Figure 6 gives the complete method, showing the data flow of one training iteration, with
+badges marking the stage that each mechanism rewrites.
+Figure 6: Overview of Open-MOPD.
+Prompts are hard-routed by domain label. During rollout, the teacher computes and caches log-probabilities on $\mathcal{S}_{t}$ once. The student generates responses under its own distribution. Together, both terms form the dense reward for PPO updates. Within each rollout batch, the inner update repeats $K$ times, reusing the teacher term while recomputing the student term via reward refresh.
+Badges highlight where each mechanism acts: token-share balancing and gap-following allocation determine the domain loss weight $w_{d}$ , while reward refresh rebuilds $r_{t}$ in every inner update.
+4.1 Token-Share Balancing
+Token-share balancing assigns a fixed weight to each domain’s token-mean loss. Let $g_{d}^{\star}$ be the target domain budget, where $\sum_{d}g_{d}^{\star}=1$ . In each batch, we compute $s_{d}^{\mathrm{tok}}$ from the attention mask and weight the loss of domain $d$ by
+$w_{d}^{\mathrm{share}}=\frac{g_{d}^{\star}}{s_{d}^{\mathrm{tok}}}.$
+(8)
+After this weighting, the effective share of domain $d$ is
+$\frac{w_{d}^{\mathrm{share}}s_{d}^{\mathrm{tok}}}{\sum_{j}w_{j}^{\mathrm{share}}s_{j}^{\mathrm{tok}}}=g_{d}^{\star}.$
+This directly controls the actual token ratio in the loss, without relying on stable response lengths or oversampling short answers.
+The main recipe uses the equal-share target $g^{\star}=(1/3,1/3,1/3)$ , which needs no corpus-specific
+tuning. On the token shares shown in Figure 3,
+it yields weights of 0.69 for math, 0.66 for code and 32.7 for IF. Every IF token is amplified about
+48 times to compensate for its 25-fold length disadvantage,
+while Equation 8 guarantees that the weighted shares of the three domains are
+exactly 33.33%. Compared with changing only the prompt sampling rates, token-share balancing
+preserves the diversity of math and code prompts while giving the shorter IF responses a meaningful
+contribution to training.
+Token-share balancing changes how much each domain contributes to the loss through its token weight; it does not change the sampling frequency or the reward magnitude of individual tokens. We intentionally keep this design because the size of the reward shows the gap between the teacher and the student, and simply normalizing it would remove useful information about learning progress.
+4.2 Gap-Following Allocation
+Let $m_{d}$ be the running per-token reward magnitude for domain $d$ (for example, an exponential moving average of $\lvert r\rvert$ ), which serves as an observable proxy for the remaining teacher–student gap.
+A naive idea is to normalize the loss with $m_{d}^{-\alpha}$ , giving larger weights to domains
+with smaller rewards. This may seem reasonable early in training because a small reward can
+indicate that a domain is learning slowly. However, $m_{d}$ also tracks the remaining distillation
+gap: as a domain approaches its teacher, its $m_{d}$ becomes smaller. Inverse normalization therefore
+assigns more budget to domains that have already made more progress.
+This forms an unstable feedback loop. As a domain converges, its $m_{d}$ decreases, which in turn increases its assigned weight $m_{d}^{-\alpha}$ . The domain then receives even more training budget, accelerating its convergence and shrinking $m_{d}$ further. Without any balancing force, the weights continuously diverge and eventually crash the training. We observe this pattern directly in experiments: over the first 75 steps, $m_{d}$ for IF decreases 35.3-fold. Setting $\alpha=0.5$ causes the IF weight to rise from 26.7 to 90.7, while the code weight drops from 0.44 to 0.27. Therefore, we believe that the inverse rule is unstable when $\alpha$ is positive and not too small.
+Gap-following allocation keeps the direction of the gap, interprets it as “capability not yet
+distilled”, and allocates the budget to the domains that still have a larger gap.
+$\tilde{w}_{d}=w_{d}^{\mathrm{share}}\cdot\operatorname{Clamp}\!\left(\left(\frac{m_{d}}{m_{\mathrm{ref}}}\right)^{\alpha},\,0.05,\,20\right),\qquad w_{d}^{\mathrm{gap}}=\frac{\tilde{w}_{d}}{\sum_{j}\tilde{w}_{j}s_{j}^{\mathrm{tok}}},$
+(9)
+Here $\tilde{w}_{d}$ is the unnormalized weight before the final normalization. It combines the
+token-share weight $w_{d}^{\mathrm{share}}$ from the previous section with a clipped gap factor.
+The reference value $m_{\mathrm{ref}}$ is the mean of $m_{d}$ across domains in the current batch.
+Thus, $(m_{d}/m_{\mathrm{ref}})^{\alpha}$ measures the reward magnitude of domain $d$ relative to the
+other domains. We clip this factor to $[0.05,20]$ so that a sudden change in one domain’s reward
+does not make its training weight too small or too large. The divisor
+$\sum_{j}\tilde{w}_{j}s_{j}^{\mathrm{tok}}$ is the token-share-weighted mean of the weights, so after
+normalization $\sum_{d}w_{d}^{\mathrm{gap}}s_{d}^{\mathrm{tok}}=1$ and the total loss scale of a batch
+stays unchanged. Consequently, when a domain approaches its teacher, its $m_{d}$ and its budget fall
+together, while domains with a larger teacher–student gap receive more updates. This allocation rule
+therefore follows the remaining gap rather than normalizing reward magnitudes; Section 5.2
+shows its benefit on top of token-share balancing and the collapse that occurs when $\alpha$ takes a
+negative sign.
+4.3 Reward Refresh
+The first two mechanisms deal with the budget between domains; reward refresh deals with temporal
+inconsistency inside one rollout.
+Our design draws on an insight from AsyncOPD [6]: when the student changes,
+the student-dependent part of a reverse-KL signal should be recomputed with the current student.
+We apply this insight to a different source of staleness by refreshing the student-dependent reward
+before each of the $K$ inner updates in our synchronous multi-teacher pipeline. The student is
+updated $K$ times within one rollout batch, while the rollout
+trajectories come from the student before these updates. This creates a mismatch in the reward,
+which reward refresh corrects. Suppose that one rollout is used for $K$ update minibatches. The
+teacher needs only one prefill to compute
+$\log\pi_{\phi_{d(x)}}(v\mid x,y_{<t})$ , while the student probabilities are recomputed after
+each update.
+In the actor forward of the $k$ -th inner update, reward refresh recomputes the student-dependent term
+on the same set $\mathcal{S}_{t}$ .
+$\displaystyle\delta_{t}^{(k)}(v)$
+$\displaystyle=\mathrm{sg}\!\Big[\log\pi_{\phi_{d(x)}}(v\mid x,y_{<t})-\log\pi_{\theta}^{(k)}(v\mid x,y_{<t})\Big],$
+(10)
+$\displaystyle r_{t}^{(k)}(v)$
+$\displaystyle=\delta_{t}^{(k)}(v)\cdot\tilde{\pi}_{\theta}^{(k)}(v\mid x,y_{<t}),\qquad v\in\mathcal{S}_{t},\quad k=0,\ldots,K-1.$
+Here $\tilde{\pi}_{\theta}^{(k)}$ is computed on the current student log-probabilities following
+Equation 3.
+It is then aggregated into $r_{t}^{(k)}$ by Equation 4 and placed in the advantage
+slot of PPO. The update is subsequently constructed with the
+$w_{d}r_{t}^{(k)}$ of the current domain, where $w_{d}=w_{d}^{\mathrm{gap}}$ when gap-following allocation is
+enabled and $w_{d}=w_{d}^{\mathrm{share}}$ otherwise.
+Reward refresh reuses the student forward pass already required by PPO and adds no teacher
+forward. It therefore makes each update use the difference between the current student and the
+teacher.
+At $K=1$ , Eqs. (3), (4), and (10) reduce to the objective in
+Section 2.1; at $K>1$ , they repair only the part of the reward that explicitly
+depends on the student. The sampled student states still come from rollout time, so reward refresh
+removes the staleness that can be removed without another prefill.
+4.4 The Complete Algorithm
+Table 3 summarizes the three mechanisms and the quantities they modify.
+Together, they change token weighting, domain weighting, and reward evaluation in the shared student.
+Table 3: Summary of the three Open-MOPD mechanisms. Each mechanism modifies a different part of the training computation.
+Mechanism
+Measurement
+Intervention
+token-share balancing
+Response-token share $s_{d}^{\mathrm{tok}}$ in the current batch
+Set $w_{d}^{\mathrm{share}}=g_{d}^{\star}/s_{d}^{\mathrm{tok}}$ to equalise the domains’ token shares in the loss.
+gap-following allocation
+Running mean reward magnitude $m_{d}$ for each domain
+Multiply the share weight by the clipped factor $(m_{d}/m_{\mathrm{ref}})^{\alpha}$ , giving more weight to domains with a larger current reward signal.
+reward refresh
+Student log-probabilities at each inner update
+Recompute the student-dependent reward while reusing the cached teacher log-probabilities.
+Algorithm 1 summarizes the complete training loop. The teacher
+log-probabilities are computed once per rollout, while the student-dependent reward term is
+recomputed before each inner update.
+Algorithm 1 Open-MOPD training loop
+1:
+Domain-mixed sampler, student $\pi_{\theta}$ , teachers $\{\pi_{\phi_{d}}\}$ , inner-step count $K$
+2:
+Updated student $\pi_{\theta}$
+3:
+for each training step $t$ do
+4:
+Sample rollout batch $\mathcal{R}_{t}$ from $\pi_{\theta}$ and route prompts by domain label.
+5:
+Compute teacher log-probabilities $\ell_{\phi,d(x^{(b)})}^{(b)}$ for each sampled response.
+6:
+Compute response-token shares $s_{d}^{\mathrm{tok}}$ and weights $w_{d}^{\mathrm{share}}$ using Equation 8.
+7:
+Update reward means $m_{d}$ and compute gap weights $w_{d}$ using Equation 9.
+8:
+for each inner minibatch $\mathcal{M}_{t,k}$ , $k=0,\ldots,K-1$ do
+9:
+Recompute current-student log-probabilities and refresh $r_{t}^{(k)}$ using Equation 10.
+10:
+Update $\theta$ with the PPO objective using $w_{d}r_{t}^{(k)}$ .
+11:
+end for
+12:
+end for
+Together, these three mechanisms address the problems found in our diagnosis. Token-share
+balancing fixes the token budget, gap-following allocation changes each domain’s share of updates
+as training progresses, and reward refresh keeps the feedback up to date.
+5 Ablation Studies
+Token-share balancing controls the response-token share across domains, gap-following allocation
+controls how the update budget follows the remaining teacher–student gap, and reward refresh
+recomputes the student-dependent reward before each inner update. We first verify these effects one
+mechanism at a time and measure the resulting change in the corresponding domain score. We then
+evaluate the combined recipe by its reduction of the integration gap. For reward refresh, we also
+measure the runtime cost.
+Table 4: From Naive M-OPD to the full recipe.
+Each row changes one thing from the row above, as shown in the first column.
+The three middle columns show whether token-share balancing, gap-following allocation, and reward refresh are turned on. $K$ is the number of inner updates per rollout batch.
+Mechanism
+Six datasets
+Configuration
+share
+gap
+refresh
+$K$
+Math
+Code
+IF
+Total
+$\Delta$
+Naive M-OPD
+1
+21.26
+19.26
+43.64
+28.05
+—
++share
+✓
+1
+20.55
+19.57
+47.53
+29.22
+$+1.17$
++gap
+✓
+✓
+1
+21.00
+19.31
+49.50
+29.94
+$+1.89$
+Switching to the $K{=}4$ throughput setting (256 prompts per update, $4\times$ rollout batch)
+Naive M-OPD (same-setting control)
+4
+21.62
+19.72
+46.49
+29.28
+$+1.23$
++share+gap
+✓
+✓
+4
+23.05
+21.07
+47.16
+30.43
+$+2.38$
+Open-MOPD
+✓
+✓
+✓
+4
+22.42
+21.73
+49.58
+31.24
+$\mathbf{+3.19}$
+5.1 Token-Share Balancing
+The first test checks the mechanism directly. With token-share balancing enabled (Section 4.1), the weighted token
+share $w_{d}s_{d}^{\mathrm{tok}}$ stays at $33.33\%$ over all 300 steps (marked by the dashed line in
+Figure 7a); the same sampler with it switched off hands $99\%$ of the gradient
+tokens to math and code and leaves only about $1\%$ to IF (Figure 3a).
+The first cause of imbalance measured in Section 3.3 is therefore removed
+entirely. In Table 4, token-share balancing gives a gain of $+1.17$ points, almost
+entirely from IF; math and code barely move. This shows that, under naive M-OPD, most token loss
+is spent on math and code, where the student is already close to its teacher. Token-share
+balancing increases the token share of IF, which receives very little training otherwise, and
+improves the overall M-OPD score.
+5.2 Gap-Following Allocation
+We add gap-following allocation on top of token-share balancing. Unlike static balancing, which keeps
+every domain at around 1/3, gap-following allocation changes domain ratios dynamically as training
+goes on (Figure 7a). In this setting, the budget goes to the domain with the
+largest teacher–student gap $\bar{m}_{d}$ . Averages calculated over the middle window of the baseline
+trajectory show that $\bar{m}_{d}$ is $0.028$ for code, $0.008$ for math, and $0.003$ for IF
+( $2.16\times$ , $0.61\times$ , and $0.23\times$ the average, respectively). From the first 25 steps
+to steps 200–300, the math share grows from 15.1% to 32.6%, the IF share drops from 34.5% to 17.1%,
+and code gets the most budget (averaging 55.4% and peaking at 87.6%). When tested alone without
+reward refresh, this mechanism brings a $+0.72$ -point improvement ( $K=1$ ladder, Table 4).
+Reversing the factor gives more budget to domains with smaller gaps. This favors domains that the
+student already handles well and creates a positive feedback loop. In our experiment, the IF gap
+shrinks by $32.5\times$ , its weight rises from 24.4 to 80.9, and training stops at step 74
+(Figure 7b). The sign of $\alpha$ is therefore fixed by the direction of the
+gap.
+Figure 7:
+Gap-following allocation dynamically changes the budget trajectory.
+(a) Weighted token share $w_{d}s_{d}^{\mathrm{tok}}$ : static token-share balancing keeps the share fixed at $1/3$ (dashed line). Adding gap-following allocation ( $\alpha{=}1$ ) dynamically adjusts the budget based on the remaining teacher–student gap. Domains that converge quickly lose budget, while those with larger gaps receive more resources (e.g., code exceeds $50\%$ , whereas IF drops to $\sim 17\%$ ).
+(b) IF domain weight (log scale): setting $\alpha{=}1$ properly reduces its weight, whereas the inverse formulation ( $\alpha{=}-0.5$ ) creates an unstable feedback loop, causing training to collapse at step 74.
+5.3 Reward Refresh
+Reward refresh (Section 4.3) moves the student-dependent part of the dense
+reward into every inner update. The teacher log-probs are still prefilled once at the top of the
+rollout batch and reused throughout, and the student log-probabilities are read from the actor
+forward that PPO already performs. Reward refresh therefore adds no extra student forward. Without
+refresh, the dense reward uses the student probabilities saved at rollout time; with refresh, it uses
+the student probabilities from the current inner update. The teacher term is computed once per outer
+step in both cases; only the student parameters used to evaluate the reward change.
+We measure the extra runtime and performance gain from reward refresh. At $K{=}4$ , the
+dense-reward computation takes 27.3 s with refresh and 27.8 s without refresh. These values
+account for $2.10\%$ and $2.12\%$ of one outer step, respectively (Figure 8).
+The full step takes 1298 s with refresh and 1313 s without it. The difference is small and
+falls within the step-to-step variation, so reward refresh adds no measurable extra runtime cost.
+On top of token-share balancing and gap-following allocation, reward refresh gives a further
+$+0.81$ points at $K{=}4$ (Table 4). This gain supports the effectiveness of
+the mechanism and completes the Open-MOPD recipe.
+Figure 8:
+Composition of one outer step at $K{=}4$ . Averaged over steady training steps.
+The dense-reward computation accounts for $2.2\%$ of each step. Reward refresh changes only when the
+student probabilities are read for this computation, without changing total throughput.
+6 Related Work
+6.1 On-Policy Distillation and Multi-Teacher Extensions
+Distillation on a fixed corpus.
+Knowledge distillation trains a student to match the teacher’s output distribution
+[8]. For sequence models, the teacher usually generates responses in
+advance, and the student learns from this fixed corpus
+[9]. The student therefore trains on prefixes produced by the teacher, while
+inference uses prefixes produced by the student. This distribution shift creates the exposure-bias
+problem in sequence prediction
+[10, 11]. A large difference in teacher and student
+capacity can also make distillation difficult
+[12, 13, 14].
+On-policy distillation.
+On-policy distillation (OPD) trains the student on its own rollouts and uses teacher feedback on
+the prefixes that the student actually visits [15, 16]. Recent work
+improves this process by changing the divergence, the sampling rule, or the token-level training
+signal [17, 18, 19, 3]. Other studies
+examine training stability and failure modes, including unreliable feedback on long or drifted
+prefixes [20]. A recent survey organizes these methods by their feedback
+signal, teacher access, and optimization rule [21]. Most existing work still uses
+one teacher. Our work studies how several teachers share the updates of one student.
+Staleness under batch reuse.
+PPO supports multiple minibatch updates within one rollout cycle
+[22]. In asynchronous RL, policy lag occurs when rollouts come from a policy
+that is several updates behind the learner
+[23, 24, 25, 26, 27, 28]. Prior work studies how much stale data RL systems can tolerate
+[29, 30], and recent work examines staleness in OPD
+[6, 31]. In our synchronous pipeline, each rollout batch is
+partitioned into $K$ minibatches and used for sequential student updates, so the student-dependent
+reward can become stale as the student changes. Reward refresh recomputes this term before each
+inner update using the student probabilities from PPO’s existing actor forward, adding no extra
+student forward.
+From Single-Teacher to Multi-Teacher OPD.
+MOPD extends OPD to multiple domain teachers through a standard three-stage recipe: train
+domain specialists from a shared SFT model, route each student rollout to its domain teacher,
+and use token-level teacher feedback for training
+[32, 4]. This recipe has been used in several public models.
+Nemotron-Cascade 2 distills strong intermediate teachers to recover capabilities lost during
+Cascade RL, while Agents-A1 combines six domain teachers and normalizes the loss across
+responses and domains [33, 34]. At a larger scale,
+DeepSeek-V4 distills more than ten teachers, and Kimi K3 uses nine teachers defined by domain
+and reasoning effort [35, 36]. These studies show that MOPD
+can integrate specialists at different model scales. Open-MOPD studies how to balance the
+training received by different domains during this integration.
+6.2 Integrating Domain Experts
+Training Domain Specialists.
+Reinforcement learning on a single domain can produce a strong specialist for that domain.
+The success of DeepSeekMath and DeepSeek-R1 in mathematical reasoning provided a practical
+recipe for LLM reinforcement learning
+[1, 37]. DAPO further developed this recipe for
+large-scale training [2]. Domain-specific RL has since expanded to software
+engineering, search, and instruction following
+[38, 39, 40, 41]. Each pipeline produces
+one specialist, while deployment usually requires one model that can handle all of these
+domains. Our work studies how to integrate these specialists into one student through
+multi-teacher OPD.
+Integration in data space.
+A common way to combine domains is to train one model on mixed-domain data. Qwen3, for example,
+uses general-domain RL to improve a wide range of tasks [42]. Another approach
+trains the domains in sequence. Nemotron-Cascade applies a separate RL stage to each domain, so
+each stage can use its own data and training settings [43]. In joint training,
+the data mixture can strongly affect the final model. DoReMi studies this problem in pre-training,
+while MoDoMoDo extends data-mixture optimization to multi-domain RLVR
+[44, 45]. Equal task sampling still does not guarantee equal
+training: different tasks can produce gradients with very different magnitudes
+[46]. Open-MOPD studies how unequal response-token counts, different
+teacher–student gaps, and outdated rewards create imbalance across domains in multi-teacher OPD.
+Integration in weight space and in module space.
+A second route combines domain experts after they have been trained. Weight-space methods merge
+task-specific parameter changes into one checkpoint. Task Arithmetic introduced this operation,
+TIES-Merging resolves conflicting parameter signs, and DARE sparsifies model changes before they
+are merged
+[47, 48, 49]. Other methods retain the expert
+structure during integration. BTM trains experts on different domains and combines them through
+ensembling or parameter averaging, BTX turns their feed-forward layers into a routed mixture of
+experts, and BTS connects frozen experts with lightweight stitch layers
+[50, 51, 52]. These methods integrate specialists
+after separate training. Multi-teacher OPD trains one shared student from their outputs, and
+Open-MOPD studies how to balance the updates received by different domains during this shared
+training.
+7 Conclusion
+We build from scratch a fully open multi-teacher on-policy distillation pipeline—mixed-domain SFT,
+three domain RL teachers, multi-teacher OPD—and use it to answer one concrete question, namely when
+routing is already error-free, what prevents the capabilities of three experts from being written
+into the same set of parameters at once.
+Our experiments identify the allocation of the optimization budget as the main bottleneck. We identify
+three separable contributors to imbalance: unequal token counts, unequal reward magnitudes, and outdated
+rewards during repeated inner updates.
+The three mechanisms of Open-MOPD—token-share balancing, gap-following allocation, and
+reward refresh—correspond one by one to these three sources and are validated separately in ablation
+experiments. Together, they reduce the integration gap from 3.50 points to 0.31 points, while the
+recovery rate relative to RouteRL rises from $\mathbf{35.6\%}$ to $\mathbf{83.4\%}$ .
+We release the complete recipe and the mechanism implementations to support reproducible follow-up
+work.
+References
+[1]
+Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi, H. Zhang, M. Zhang, et al. (2024)
+DeepSeekMath: Pushing the Limits of Mathematical Reasoning in Open Language Models.
+External Links: 2402.03300
+Cited by: §1,
+§6.2.
+[2]
+Q. Yu, Z. Zhang, R. Zhu, Y. Yuan, X. Zuo, Y. Yue, W. Dai, T. Fan, et al. (2025)
+DAPO: An Open-Source LLM Reinforcement Learning System at Scale.
+External Links: 2503.14476
+Cited by: §1,
+§6.2.
+[3]
+Y. Li, Y. Zuo, B. He, J. Zhang, C. Xiao, C. Qian, T. Yu, H. Gao, et al. (2026)
+Rethinking On-Policy Distillation of Large Language Models: Phenomenology, Mechanism, and Recipe.
+External Links: 2604.13016
+Cited by: §1,
+§6.1.
+[4]
+W. Ma, J. Wei, L. Zhao, H. Zhang, B. Xiao, L. Li, Q. Yang, B. Gao, et al. (2026)
+MOPD: Multi-Teacher On-Policy Distillation for Capability Integration in LLM Post-Training.
+External Links: 2606.30406
+Cited by: §1,
+§6.1.
+[5]
+A. Bercovich, I. Levy, I. Golan, M. Dabbah, R. El-Yaniv, O. Puny, I. Galil, Z. Moshe, et al. (2025)
+Llama-Nemotron: Efficient Reasoning Models.
+External Links: 2505.00949
+Cited by: §1.
+[6]
+W. Kang, K. Galim, S. Oh, M. Kang, S. Park, D. Kim, M. Lee, M. Kim, et al. (2026)
+AsyncOPD: How Stale Can On-Policy Distillation Be?.
+External Links: 2606.24143
+Cited by: §1,
+§4.3,
+§6.1.
+[7]
+Hugging Face (2025)
+SmolLM3: smol, multilingual, long-context reasoner.
+Note: https://huggingface.co/blog/smollm3
+Cited by: §2.2.
+[8]
+G. Hinton, O. Vinyals, and J. Dean (2015)
+Distilling the Knowledge in a Neural Network.
+External Links: 1503.02531
+Cited by: §6.1.
+[9]
+Y. Kim and A. M. Rush (2016)
+Sequence-Level Knowledge Distillation.
+External Links: 1606.07947
+Cited by: §6.1.
+[10]
+M. Ranzato, S. Chopra, M. Auli, and W. Zaremba (2015)
+Sequence Level Training with Recurrent Neural Networks.
+External Links: 1511.06732
+Cited by: §6.1.
+[11]
+S. Bengio, O. Vinyals, N. Jaitly, and N. Shazeer (2015)
+Scheduled Sampling for Sequence Prediction with Recurrent Neural Networks.
+External Links: 1506.03099
+Cited by: §6.1.
+[12]
+J. H. Cho and B. Hariharan (2019)
+On the Efficacy of Knowledge Distillation.
+External Links: 1910.01348
+Cited by: §6.1.
+[13]
+S. Mirzadeh, M. Farajtabar, A. Li, N. Levine, A. Matsukawa, and H. Ghasemzadeh (2019)
+Improved Knowledge Distillation via Teacher Assistant.
+External Links: 1902.03393
+Cited by: §6.1.
+[14]
+Y. Li, X. Yue, Z. Xu, F. Jiang, L. Niu, B. Y. Lin, B. Ramasubramanian, and R. Poovendran (2025)
+Small Models Struggle to Learn from Strong Reasoners.
+External Links: 2502.12143
+Cited by: §6.1.
+[15]
+Y. Gu, L. Dong, F. Wei, and M. Huang (2023)
+MiniLLM: On-Policy Distillation of Large Language Models.
+External Links: 2306.08543
+Cited by: §6.1.
+[16]
+R. Agarwal, N. Vieillard, Y. Zhou, P. Stanczyk, S. Ramos, M. Geist, and O. Bachem (2023)
+On-Policy Distillation of Language Models: Learning from Self-Generated Mistakes.
+External Links: 2306.13649
+Cited by: §6.1.
+[17]
+J. Ko, S. Kim, T. Chen, and S. Yun (2024)
+DistiLLM: Towards Streamlined Distillation for Large Language Models.
+External Links: 2402.03898
+Cited by: §6.1.
+[18]
+J. Ko, T. Chen, S. Kim, T. Ding, L. Liang, I. Zharkov, and S. Yun (2025)
+DistiLLM-2: A Contrastive Approach Boosts the Distillation of LLMs.
+External Links: 2503.07067
+Cited by: §6.1.
+[19]
+W. Xu, R. Han, Z. Wang, L. T. Le, D. Madeka, L. Li, W. Y. Wang, R. Agarwal, C. Lee, and T. Pfister (2024)
+Speculative Knowledge Distillation: Bridging the Teacher-Student Gap Through Interleaved Sampling.
+External Links: 2410.11325
+Cited by: §6.1.
+[20]
+Y. Fu, H. Huang, K. Jiang, J. Liu, Z. Jiang, Y. Zhu, and D. Zhao (2026)
+Revisiting On-Policy Distillation: Empirical Failure Modes and Simple Fixes.
+External Links: 2603.25562
+Cited by: §6.1.
+[21]
+M. Song and M. Zheng (2026)
+A Survey of On-Policy Distillation for Large Language Models.
+External Links: 2604.00626
+Cited by: §6.1.
+[22]
+J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov (2017)
+Proximal Policy Optimization Algorithms.
+External Links: 1707.06347
+Cited by: §6.1.
+[23]
+W. Fu, J. Gao, X. Shen, C. Zhu, Z. Mei, C. He, S. Xu, G. Wei, et al. (2025)
+AReaL: A Large-Scale Asynchronous Reinforcement Learning System for Language Reasoning.
+External Links: 2505.24298
+Cited by: §6.1.
+[24]
+Y. Zhong, Z. Zhang, X. Song, H. Hu, C. Jin, B. Wu, N. Chen, Y. Chen, et al. (2025)
+StreamRL: Scalable, Heterogeneous, and Elastic RL for LLMs with Disaggregated Stream Generation.
+External Links: 2504.15930
+Cited by: §6.1.
+[25]
+G. Sheng, Y. Tong, B. Wan, W. Zhang, C. Jia, X. Wu, Y. Wu, X. Li, et al. (2025)
+Laminar: A Scalable Asynchronous RL Post-Training Framework.
+External Links: 2510.12633
+Cited by: §6.1.
+[26]
+R. Yan, Y. Jiang, T. Wu, J. Gao, Z. Mei, W. Fu, H. Mai, W. Wang, Y. Wu, and B. Yuan (2025)
+AReaL-Hex: Accommodating Asynchronous RL Training over Heterogeneous GPUs.
+External Links: 2511.00796
+Cited by: §6.1.
+[27]
+W. Gao, Y. Zhao, D. An, T. Wu, L. Cao, S. Xiong, J. Huang, W. Wang, et al. (2025)
+RollPacker: Mitigating Long-Tail Rollouts for Fast, Synchronous RL Post-Training.
+External Links: 2509.21009
+Cited by: §6.1.
+[28]
+G. Sheng, C. Zhang, Z. Ye, X. Wu, W. Zhang, R. Zhang, Y. Peng, H. Lin, and C. Wu (2024)
+HybridFlow: A Flexible and Efficient RLHF Framework.
+External Links: 2409.19256
+Cited by: §6.1.
+[29]
+H. Zheng, J. Zhao, and B. Chen (2025)
+Prosperity before Collapse: How Far Can Off-Policy RL Reach with Stale Data on LLMs?.
+External Links: 2510.01161
+Cited by: §6.1.
+[30]
+X. Li, S. Wu, and Z. Shen (2025)
+A-3PO: Accelerating Asynchronous LLM Training with Staleness-aware Proximal Policy Approximation.
+External Links: 2512.06547
+Cited by: §6.1.
+[31]
+L. Zheng and H. Jiang (2026)
+Blockwise Policy-Drift Gating for On-Policy Distillation.
+External Links: 2606.24084
+Cited by: §6.1.
+[32]
+C. Team, B. Xiao, B. Xia, B. Yang, B. Gao, B. Shen, C. Zhang, C. He, et al. (2026)
+MiMo-V2-Flash Technical Report.
+External Links: 2601.02780
+Cited by: §6.1.
+[33]
+Z. Yang, Z. Liu, Y. Chen, W. Dai, B. Wang, S. Lin, C. Lee, Y. Chen, D. Jiang, J. He, R. Pi, G. Lam, N. Lee, A. Bukharin, M. Shoeybi, B. Catanzaro, and W. Ping (2026)
+Nemotron-Cascade 2: Post-Training LLMs with Cascade RL and Multi-Domain On-Policy Distillation.
+External Links: 2603.19220
+Cited by: §6.1.
+[34]
+L. Bai et al. (2026)
+Scaling the Horizon, Not the Parameters: Reaching Trillion-Parameter Performance with a 35B Agent.
+External Links: 2606.30616
+Cited by: §6.1.
+[35]
+DeepSeek-AI, A. Xu, B. Lin, B. Xue, B. Wang, B. Xu, B. Wu, B. Zhang, et al. (2026)
+DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence.
+External Links: 2606.19348
+Cited by: §6.1.
+[36]
+Kimi Team (2026)
+Kimi K3: Open Frontier Intelligence.
+External Links: 2607.24653
+Cited by: §6.1.
+[37]
+DeepSeek-AI, D. Guo, D. Yang, H. Zhang, J. Song, P. Wang, Q. Zhu, R. Xu, et al. (2025)
+DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning.
+External Links: 2501.12948
+Cited by: §6.2.
+[38]
+N. Jain, J. Singh, M. Shetty, L. Zheng, K. Sen, and I. Stoica (2025)
+R2E-Gym: Procedural Environments and Hybrid Verifiers for Scaling Open-Weights SWE Agents.
+External Links: 2504.07164
+Cited by: §6.2.
+[39]
+Y. Wei, O. Duchenne, J. Copet, Q. Carbonneaux, L. Zhang, D. Fried, G. Synnaeve, R. Singh, and S. I. Wang (2025)
+SWE-RL: Advancing LLM Reasoning via Reinforcement Learning on Open Software Evolution.
+External Links: 2502.18449
+Cited by: §6.2.
+[40]
+B. Jin, H. Zeng, Z. Yue, J. Yoon, S. Arik, D. Wang, H. Zamani, and J. Han (2025)
+Search-R1: Training LLMs to Reason and Leverage Search Engines with Reinforcement Learning.
+External Links: 2503.09516
+Cited by: §6.2.
+[41]
+V. Pyatkin, S. Malik, V. Graf, H. Ivison, S. Huang, P. Dasigi, N. Lambert, and H. Hajishirzi (2025)
+Generalizing Verifiable Instruction Following.
+External Links: 2507.02833
+Cited by: §6.2.
+[42]
+A. Yang, A. Li, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Gao, et al. (2025)
+Qwen3 Technical Report.
+External Links: 2505.09388
+Cited by: §6.2.
+[43]
+B. Wang, C. Lee, N. Lee, S. Lin, W. Dai, Y. Chen, Y. Chen, Z. Yang, et al. (2025)
+Nemotron-Cascade: Scaling Cascaded Reinforcement Learning for General-Purpose Reasoning Models.
+External Links: 2512.13607
+Cited by: §6.2.
+[44]
+S. M. Xie, H. Pham, X. Dong, N. Du, H. Liu, Y. Lu, P. Liang, Q. V. Le, T. Ma, and A. W. Yu (2023)
+DoReMi: Optimizing Data Mixtures Speeds Up Language Model Pretraining.
+External Links: 2305.10429
+Cited by: §6.2.
+[45]
+Y. Liang, J. Qiu, W. Ding, Z. Liu, J. Tompkin, M. Xu, M. Xia, Z. Tu, L. Shi, and J. Zhu (2025)
+MoDoMoDo: Multi-Domain Data Mixtures for Multimodal LLM Reinforcement Learning.
+External Links: 2505.24871
+Cited by: §6.2.
+[46]
+R. Wu, A. Samanta, A. Jain, S. Fujimoto, J. Kwon, B. Kretzu, Y. Yu, K. Hassani, B. Vidolov, and Y. Efroni (2025)
+Imbalanced Gradients in RL Post-Training of Multi-Task LLMs.
+External Links: 2510.19178
+Cited by: §6.2.
+[47]
+G. Ilharco, M. T. Ribeiro, M. Wortsman, S. Gururangan, L. Schmidt, H. Hajishirzi, and A. Farhadi (2022)
+Editing Models with Task Arithmetic.
+External Links: 2212.04089
+Cited by: §6.2.
+[48]
+P. Yadav, D. Tam, L. Choshen, C. Raffel, and M. Bansal (2023)
+TIES-Merging: Resolving Interference When Merging Models.
+External Links: 2306.01708
+Cited by: §6.2.
+[49]
+L. Yu, B. Yu, H. Yu, F. Huang, and Y. Li (2023)
+Language Models are Super Mario: Absorbing Abilities from Homologous Models as a Free Lunch.
+External Links: 2311.03099
+Cited by: §6.2.
+[50]
+M. Li, S. Gururangan, T. Dettmers, M. Lewis, T. Althoff, N. A. Smith, and L. Zettlemoyer (2022)
+Branch-Train-Merge: Embarrassingly Parallel Training of Expert Language Models.
+External Links: 2208.03306
+Cited by: §6.2.
+[51]
+S. Sukhbaatar, O. Golovneva, V. Sharma, H. Xu, X. V. Lin, B. Rozière, J. Kahn, D. Li, et al. (2024)
+Branch-Train-MiX: Mixing Expert LLMs into a Mixture-of-Experts LLM.
+External Links: 2403.07816
+Cited by: §6.2.
+[52]
+Q. Zhang, P. Bhargava, C. Bi, C. X. Cai, J. Foerster, J. Fu, P. S. Koura, R. Silva, S. Shen, E. Dinan, S. Gururangan, and M. Lewis (2025)
+BTS: Harmonizing Specialized Experts into a Generalist LLM.
+External Links: 2502.00075
+Cited by: §6.2.
+\beginappendix
+8 Constructing the Open-MOPD Recipe
+In this section, we introduce how we obtained the final Open-MOPD recipe.
+We first screen on math SFT for a base model that stably produces reasoning trajectories, and then
+extend the selected base model to a mixed-domain SFT over math, code and instruction following.
+8.1 Base Model Choice
+OpenR1 math comparison between 1.7B and 7B.
+Early screening applied the same 93,733 OpenR1 math examples to Qwen3-1.7B-Base and
+Qwen2.5-7B-Base separately. Both runs use a 32,768-token SFT length limit, a global batch of 128 and
+a learning rate of $4\times 10^{-5}$ , with 732 steps per epoch.
+Table 6 reports the complete curve over the first five epochs.
+The problem with Qwen3-1.7B-Base is not a lack of generation length: under the 31K budget,
+69.17–80.42% of the samples still exhaust the limit at all five checkpoints, and only
+20.00–31.25% of the answers close </think>; adding epochs does not produce a monotone
+improvement either, and AIME24 stays below 7.1%. This means that a large fraction of the
+trajectories seen by a subsequent RL or OPD stage contain only a reasoning prefix and never reach a
+final answer. A drop in task score can then not be attributed uniquely to the reward, the routing or
+cross-domain interference, because the base model and the data mixture themselves have not yet learnt
+to end a reasoning trajectory reliably.
+The same OpenR1 data shows the opposite trend on Qwen2.5-7B-Base: AIME24 rises from 16.25% to
+31.25% and the truncation rate falls from 42.92% to 12.92%. This rules out the explanation that
+“OpenR1 trajectories are inherently too long, so any base model would truncate”, and it shows that
+enlarging the capacity of the base model does recover trajectory closure. Qwen2.5-7B-Base therefore
+satisfies the capability condition, but it puts the student, the three RL teachers and every
+mechanism ablation of the full recipe at 7B scale; for an open research baseline that has to be run
+repeatedly, this cost is too high.
+Choosing SmolLM3-3B-Base.
+The final recipe selects SmolLM3-3B-Base as the compromise between the two ends. Four epochs of
+mixed-domain SFT over the three domains give $\pi_{\mathrm{mixsft}}$ : OpenR1-Math-93k, the OCR-50k
+subset sampled from the full OpenCodeReasoning set, and Instruction-Nemotron contribute roughly
+37.3%, 28.1% and 34.6% of the training response tokens respectively. The per-domain sample counts
+are balanced by response token count, so that the 820K short IF answers do not drown out the fewer
+but longer math and code trajectories.
+Table 5 summarises the selection evidence for the three candidate
+base models.
+From the table, we can see that 3B is therefore not an arbitrary choice of a “medium model” but an operating point bracketed by two
+failure boundaries: going down to 1.7B, generation is dominated by unclosed reasoning and truncation,
+and mechanism attribution is no longer unique; going up to 7B, the single model is stronger, but the
+end-to-end multi-teacher recipe and its repeated ablations exceed the resource boundary we set for a
+community baseline. SmolLM3-3B-Base retains enough trajectory capacity while still allowing the final
+Open-MOPD training to run on a single 8 $\times$ A100-80GB node.
+Table 5: Base-model choice for Open-MOPD. The table summarises directly the experimental results
+used when constructing the recipe. The truncation evidence is reported in a dedicated row
+below each base model.
+Base model
+SFT data
+Performance
+Qwen3-1.7B-Base
+OpenR1-Math-93k
+AIME24 best 7.08
+Truncation evidence:
+69.17–80.42%; capacity and trajectory closure insufficient.
+SmolLM3-3B-Base
+Three-domain mixSFT
+AIME24 15.63
+Truncation evidence:
+15.2%; chosen as the base model of the recipe.
+Qwen2.5-7B-Base
+OpenR1-Math-93k
+AIME24 31.25
+Truncation evidence:
+12.92%; capable enough, but a full multi-teacher ablation is too costly.
+Table 6: Base-model screening under the same OpenR1-Math-93k SFT. Each cell is
+AIME24 accuracy / generation truncation rate (%). Qwen3-1.7B-Base mainly generates long, unclosed
+reasoning trajectories at every observed checkpoint; Qwen2.5-7B-Base instead raises accuracy and
+lowers truncation together as SFT proceeds.
+Epoch
+Step
+Qwen3-1.7B-Base
+Qwen2.5-7B-Base
+1
+732
+4.58 / 75.42
+16.25 / 42.92
+2
+1464
+7.08 / 72.50
+20.83 / 35.42
+3
+2196
+6.67 / 80.42
+30.83 / 22.08
+4
+2928
+5.83 / 69.17
+30.42 / 19.58
+5
+3660
+6.67 / 69.58
+31.25 / 12.92
+8.2 Stage Hyperparameters
+This section lists all hyperparameters of the four stages of the recipe, taken from the training
+configurations that were actually run rather than from recommended values compiled after the fact.
+Table 7 gives the mixed-domain SFT and the three domain RL teachers, and
+Table 8 gives single-domain OPD (the RouteOPD oracle of the main text) and
+multi-teacher OPD. Items not listed use the verl defaults.
+Mixed-domain SFT and domain RL teachers.
+The three teachers share one GRPO configuration and differ only in data, sequence length, rollout
+group size and number of steps: IF answers are short, so it uses a smaller response limit, smaller
+groups and more steps; math and code use a 30,000-token response limit to accommodate the full
+reasoning chain. All three disable the KL penalty and apply group filtering on accuracy (the samples
+of one prompt are discarded if they are all correct or all wrong, with at most 8 generation batches
+resampled, which the dynamic sampling trick proposed by DAPO), so that the gradient comes only from groups that discriminate.
+Table 7: Hyperparameters of stages one and two. SFT is standard supervised fine-tuning; the three RL
+teachers are all GRPO, each initialised from $\pi_{\mathrm{mixsft}}$ and trained only on the
+verifiable reward of its own domain. World size is given as number of nodes $\times$
+GPUs per node, all A100-80GB. “—” means the item does not apply to that stage.
+Mixed-domain SFT
+RL: math
+RL: code
+RL: IF
+World size
+8 $\times$ 8
+8 $\times$ 8
+8 $\times$ 8
+4 $\times$ 8
+Starting point
+SmolLM3-3B-Base
+$\pi_{\mathrm{mixsft}}$
+Algorithm
+Cross-entropy
+GRPO
+train batch size
+128
+128
+128
+128
+mini batch size
+—
+32
+32
+32
+Learning rate
+$4\times 10^{-5}$
+$1\times 10^{-6}$
+lr schedule
+cosine, warmup 3%
+constant, warmup 10 steps
+grad clip
+0.2
+1.0
+Prompt limit
+—
+1,024
+2,048
+2,048
+Response limit
+32,768 (total length)
+30,000
+30,000
+2,048
+rollout $n$
+—
+16
+16
+8
+Temperature
+—
+1.0
+epochs / steps
+4 epochs
+1,000 steps
+1,000 steps
+3,000 steps
+$\mathrm{clip}_{\mathrm{low}}/\mathrm{clip}_{\mathrm{high}}$
+—
+0.2 / 0.25
+KL penalty
+—
+disabled
+entropy coeff
+—
+0
+group filtering
+—
+by acc, at most 8 generation batches
+Single-domain OPD and multi-teacher OPD.
+The two share the same optimiser and distillation settings, so the difference between the RouteOPD
+oracle and M-OPD in the main text comes only from the number of teachers and the domain mixture, not
+from the training configuration. The dense reward is computed on the student top- $k$ ( $k{=}16$ ), and
+$K{=}\text{train batch}/\text{mini batch}{=}4$ is the off-policy depth.
+The multi-teacher column additionally enables the domain sampler and the three mechanism switches:
+token-share balancing sets the target gradient share, gap-following allocation adjusts the domain
+weights by the remaining gap, and reward refresh refreshes the dense reward within every inner
+update; the table gives their values in the final recipe.
+Table 8: Hyperparameters of stage three. The left columns are the three single-domain OPD runs (the
+RouteOPD oracle of the main text) and the right column is multi-teacher OPD.
+The two share the optimiser, sequence lengths and distillation settings; the token-share balancing /
+gap-following allocation / reward refresh rows are the values of our mechanisms in the final recipe.
+Single-domain OPD (RouteOPD oracle)
+Multi-teacher OPD
+math
+code
+IF
+Open-MOPD
+World size
+1 $\times$ 8
+1 $\times$ 8
+1 $\times$ 8
+1 $\times$ 8
+Teacher
+$\pi_{\phi_{\mathrm{math}}}$
+$\pi_{\phi_{\mathrm{code}}}$
+$\pi_{\phi_{\mathrm{IF}}}$
+3-teacher hard routing
+Student starting point
+$\pi_{\mathrm{mixsft}}$
+train batch size
+1,024
+mini batch size
+256 (i.e. $K{=}4$ )
+Learning rate
+$1.5\times 10^{-6}$ , constant
+$\mathrm{clip}_{\mathrm{low}}/\mathrm{clip}_{\mathrm{high}}$
+0.2 / 0.28
+KL penalty
+disabled
+Advantage estimation
+dense reward written directly into the advantage slot
+Prompt limit
+1,024
+2,048
+2,048
+2,048
+Response limit
+16,384
+16,384
+1,024
+16K (math/code) / 2K (IF)
+Total steps
+600
+Reward form
+single-teacher dense reward
+multi-teacher hard-routed dense reward
+top- $k$
+16, from the student distribution, nucleus truncation $p{=}0.99$
+Reward weighting
+weighted by student probability $\tilde{\pi}_{\theta}$ (Eq. 3)
+share target $g^{\star}$
+—
+—
+—
+$(1/3,1/3,1/3)$
+gap-following $\alpha$
+—
+—
+—
+$1.0$ ( $m_{d}/m_{\mathrm{ref}}$ forward)
+reward refresh
+enabled
+enabled
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

@@ -1,0 +1,28 @@
+\begin{abstract}
+
+Multi-teacher on-policy distillation (MOPD) trains one student on its own
+rollouts, each scored token by token by the specialist teacher for its task.
+A task mixture is one knob doing two jobs: it sets both objective weight and
+sample count, even though task-gradient noise differs across tasks and drifts
+during training. On-policy distillation also entangles objective level and
+noise inside each token score: the mean student--teacher log-probability gap
+measures local disagreement, whereas centered variation across sampled tokens
+can make the score-function gradient noisy and can differ with teacher
+distance. Gradient-Preconditioned Adaptive
+Sampling (GPAS) fixes the objective weights, computes each task gradient with
+an estimator that is exact on the student's top-$k$ tokens and uses the sampled
+token for an unbiased tail correction, and allocates micro-batches according
+to the remaining noise in the optimizer's preconditioned coordinates; an
+optional cost-aware mode targets variance per unit time. In four-teacher
+distillation of Qwen3-1.7B on mathematics, code, instruction following, and
+science, \missing{task noise spans X across tasks, drifts by Y during training,
+and the preconditioner changes its ranking in Z of the steps.} \missing{The
+token component accounts for X of the noise for distant teachers and Y for
+same-origin teachers; integrating the retained-token contribution narrows the
+cross-task spread from A to B, while that integration and allocation together
+improve matched-step teacher loss by C.}
+\missing{At overhead ratio R, the cost-aware mode reaches Uniform's loss in S
+fewer GPU hours, while no task falls below its Uniform counterpart on downstream
+benchmarks.}
+
+\end{abstract}

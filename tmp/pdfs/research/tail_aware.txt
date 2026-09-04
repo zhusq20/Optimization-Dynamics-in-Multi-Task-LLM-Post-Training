@@ -1,0 +1,1604 @@
+Tail-Aware Top-𝑘 On-Policy Distillation
+// Restore the saved color scheme preference, or
+// enact the browser preference if "automatic",
+// without expecting DOM load to have completed.
+//
+// Also restore any saved readingmode and ToC display preferences.
+function initializeReadingPreferences() {
+let saved_theme = localStorage.getItem("ar5iv_theme") || "automatic";
+if (saved_theme === "automatic") {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+saved_theme = "dark";
+}
+}
+if (saved_theme == "dark") {
+document.documentElement.setAttribute("data-theme", "dark");
+} else {
+document.documentElement.setAttribute("data-theme", "light");
+}
+const tocDisplay = localStorage.getItem('arxiv_html_paper_toc_display');
+if (tocDisplay) {
+document.documentElement.setAttribute("data-toc-display", tocDisplay);
+}
+const readingMode = localStorage.getItem('arxiv_html_paper_reading_mode');
+if (readingMode) {
+document.documentElement.setAttribute("data-reading-mode", readingMode);
+}
+// Pre-apply spinout-banner dismissal here, before the banner paints, so it
+// never flashes in only to be hidden later by the deferred arxiv-header.js.
+// Key matches arxiv-header.js: "arxiv-banner-dismissed:" + data-banner-name.
+if (localStorage.getItem('arxiv-banner-dismissed:spinout-nonprofit')) {
+document.documentElement.setAttribute("data-banner-dismissed", "");
+}
+}
+// Run as soon as JS starts, to minimize repainting
+initializeReadingPreferences();
+/* Banner pre-dismissal (set above before paint -> no flash-then-hide) and
+reading-mode chrome hiding. */
+html[data-banner-dismissed] .ds-announcement { display: none; }
+html[data-reading-mode="enabled"] .ds-announcement,
+html[data-reading-mode="enabled"] .ds-site-footer { display: none; }
+/* Keep the announcement text dark on the Open-Blue band in both colour themes
+(otherwise it inherits the paper's warm-wash text in dark mode and washes out). */
+.ds-announcement-text { color: var(--arxiv-ink, #1c1a17); }
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Preliminaries
+3 Motivation
+3.1 Theoretical Analysis on the Tail Probability
+3.2 Empirical Study on the Tail Probability Increase
+Setup.
+Normalized top- $k$ OPD steadily increases the student’s tail probability.
+Tail probability increase hurts downstream performance.
+4 Method
+Tail-Aware Top- $k$ OPD.
+5 Experiments
+5.1 Experimental Setup
+Models and Training Dataset.
+Evaluation.
+Compared Methods.
+Implementation.
+5.2 Results
+TA-OPD achieves the best performance across student–teacher model pairs.
+TA-OPD prevents the increase in tail probability and entropy.
+TA-OPD is effective with a small $k$ .
+Additional results.
+6 Discussion
+Sample-corrected TA-OPD.
+TA-OPD is most effective when the student–teacher capability gap is large.
+7 Related Work
+On-policy Distillation.
+KL computation for LLM post-training.
+8 Conclusion
+Limitations.
+References
+A Proof
+A.1 Proof of Proposition
+Step 1: $\bar{p}$ can be expressed as a softmax restricted to top- $k$ tokens.
+Step 2: the gradient with respect to logit.
+Step 3: the top- $k$ gradients sum to zero.
+A.2 Proof of Proposition
+Step 1: only the top- $k$ logits change.
+Step 2: the derivative of $A$ is a covariance.
+Step 3: first-order taylor expansion.
+A.3 Proof of Proposition
+Step 1: the derivative with respect to probability.
+Step 2: pushing through the softmax Jacobian.
+Step 3: the gradient on each logit.
+A.4 Proof of Proposition
+A.5 Proof of Proposition
+Unbiasedness in value.
+Unbiasedness in gradient.
+B Detailed Analysis of the tail probability increase
+The tail probability increase occurs when the student–teacher capability gap is large.
+The tail probability increase occurs when $k$ is not sufficiently large.
+The tail probability increase becomes more pronounced with longer responses.
+The tail probability increase does not occur with the student top- $k$ OPD.
+The teacher top- $k$ OPD yields better downstream performance than the student top- $k$ OPD.
+C Compared Methods
+Sampled-token OPD.
+Unnormalized top- $k$ OPD.
+Normalized top- $k$ OPD.
+D Implementation Details
+D.1 Experimental Details
+D.2 Numerically Stable Computation of TA-OPD
+Numerical issue of a naive implementation.
+Our log-space implementation.
+E Extensive Study
+E.1 Synthetic experiment
+TA-OPD matches both the shape and tail probability of the teacher policy.
+TA-OPD better approximates the full-vocabulary OPD.
+E.2 Top- $k$ Overlap Ratio of Different OPD Methods
+Setup.
+TA-OPD attains a higher top- $k$ overlap ratio.
+E.3 Computational Overhead of TA-OPD
+E.4 Ablation on the Tail Token
+Setup.
+Removing the tail token collapses training.
+The unnormalized objective is not a divergence.
+E.5 Discussion of EMA-PG
+Behavior when the sampled token falls inside the top- $k$ tokens.
+Variance analysis.
+F Detailed Results
+F.1 Training Dynamics of Additional Model Pairs
+License: CC BY 4.0
+arXiv:2608.14728v1 [cs.LG] 12 Aug 2026
+Tail-Aware Top- $k$ On-Policy Distillation
+Huipeng Huang
+Affiliation: Department of Statistics and Data Science, Southern University of Science and Technology
+Hongxin Wei
+††thanks: Corresponding author (weihx@sustech.edu.cn)
+Affiliation: Department of Statistics and Data Science, Southern University of Science and Technology
+Abstract
+On-policy distillation (OPD) has emerged as an effective paradigm for transferring knowledge between language models, where a student is trained to align its next-token distribution with the teacher’s along its own trajectories.
+To provide dense supervision at tractable cost, many works minimize the reverse Kullback-Leibler (KL) divergence between the student and teacher’s normalized distributions over the teacher’s top- $k$ tokens.
+However, this normalized objective discards the information about tail probability: the total probability outside the teacher’s top- $k$ tokens.
+As a result, the optimization can steadily increase the student’s tail probability and entropy, empirically degrading downstream accuracy.
+To address this issue, we propose Tail-Aware Top- $k$ OPD (TA-OPD), a novel distillation method that restores the missing tail probability signal.
+In particular, TA-OPD minimizes the reverse KL divergence over the top- $k$ tokens plus a tail token that carries the tail probability.
+In effect, TA-OPD better aligns the student’s next-token distribution with the teacher’s, preventing the increase in tail probability and entropy caused by top- $k$ normalization.
+Extensive experiments demonstrate the superiority of TA-OPD, improving Avg@8 by up to 8.05 points on common benchmarks.
+Our code is available at https://github.com/HuipengHuang/TA-OPD.
+1 Introduction
+Knowledge distillation (Hinton et al., 2015) is a promising approach for transferring the capabilities of large language models (LLMs) to smaller models.
+However, standard distillation is performed off-policy: the student is trained on teacher-generated sequences (Kim and Rush, 2016; Gu et al., 2024), yet at inference time it must condition on its own generations.
+This discrepancy between training and inference yields errors that accumulate quickly along the generated sequence (Bengio et al., 2015; Arora et al., 2022) and hinders effective learning (Xu et al., 2025b).
+This motivates on-policy distillation (OPD) (Agarwal et al., 2024; Lu and Lab, 2025; Xu et al., 2025a), where the student is trained to align its next-token distribution with the teacher’s along its own trajectories.
+A popular idea, normalized top- $k$ OPD (Fu et al., 2026; Xing et al., 2026), minimizes the reverse Kullback-Leibler (KL) divergence between the student and teacher’s normalized distributions over the teacher’s top- $k$ tokens.
+However, it discards the information about tail probability: the total probability mass outside the teacher’s top- $k$ tokens.
+Theoretically, the optimization increases the student’s tail probability whenever the student’s distribution is not well aligned to the teacher’s, which commonly happens in distillation.
+Empirically, as the student’s tail probability steadily increases, it more frequently samples tokens outside the teacher’s top- $k$ tokens, drifting toward prefixes where the teacher’s supervision is unreliable.
+Consequently, the student fails to imitate the teacher’s next-token distribution, degrading downstream performance.
+To address this, we propose Tail-Aware Top- $k$ OPD (TA-OPD), a novel distillation method that restores the missing tail probability signal.
+In particular, TA-OPD minimizes the reverse KL divergence over the top- $k$ tokens plus a tail token that carries the tail probability.
+In effect, TA-OPD aligns the student’s tail probability with the teacher’s, preventing the tail probability and entropy increase caused by top- $k$ normalization.
+Theoretically, we show that TA-OPD’s objective is a tight lower bound of the full-vocabulary reverse KL divergence.
+In addition, when the sampled token’s probability is available, we derive a sampled variant of TA-OPD that debiases the TA-OPD objective with the sampled token and yields an unbiased estimate of the full-vocabulary reverse KL divergence.
+Extensive experiments on mathematical benchmarks demonstrate the superiority of TA-OPD over baselines.
+Notably, when distilling OpenThinker3-7B (Guha et al., 2025) into Qwen2.5-7B-Instruct (Qwen et al., 2025), normalized top- $k$ OPD’s training collapses: its training entropy increases to around 6, and its Avg@8 accuracy on MATH500 (Hendrycks et al., 2021) drops to 68.78%.
+In contrast, TA-OPD stabilizes distillation, keeps the training entropy below 1.5, and improves Avg@8 accuracy on MATH500 to 77.88%.
+Through additional analyses, we show that TA-OPD is most effective when the student-teacher capability gap is large, and TA-OPD can be applied with a small $k$ .
+We summarize our contributions as follows:
+•
+We show that normalized top- $k$ OPD discards the tail probability.
+As a result, minimizing the normalized objective can steadily increase the student’s tail probability and entropy, empirically degrading downstream accuracy.
+•
+We propose TA-OPD, a novel distillation method that restores the tail probability signal.
+We show that TA-OPD addresses the increase in tail probability and entropy caused by top- $k$ normalization.
+When the sampled token’s probability is available, we derive a sampled variant of TA-OPD, an unbiased estimate of the full-vocabulary reverse KL divergence.
+•
+We conduct extensive experiments to show that TA-OPD achieves superior performance
+compared with normalized top- $k$ OPD, improving Avg@8 accuracy by up to 8.05 points on common benchmarks.
+2 Preliminaries
+On-policy distillation (OPD) aims to distill knowledge from a teacher LLM $\pi_{\text{te}}$ to a student LLM $\pi_{\theta}$ on trajectories sampled from the student.
+Given a prompt $x\sim\mathcal{D}_{x}$ , the student samples a response $\hat{y}=(\hat{y}_{1},\ldots,\hat{y}_{T})\sim\pi_{\theta}(\cdot\mid x)$ .
+At each step $t$ , on the prefix $\hat{y}_{<t}=(\hat{y}_{1},\ldots,\hat{y}_{t-1})$ , we define the student’s and teacher’s next-token distributions over a vocabulary $\mathcal{V}$ as $p_{t}=\pi_{\theta}(\cdot\mid x,\hat{y}_{<t})$ and $q_{t}=\pi_{\text{te}}(\cdot\mid x,\hat{y}_{<t})$ .
+OPD minimizes reverse KL divergence over student-sampled trajectories:
+$\mathcal{L}_{\mathrm{OPD}}(\theta)=\mathbb{E}_{x\sim\mathcal{D}_{x},\;\hat{y}\sim\pi_{\theta}(\cdot\mid x)}\left[\sum_{t=1}^{T}D_{\mathrm{KL}}(p_{t}\|q_{t})\right],$
+(1)
+where $D_{\mathrm{KL}}(p_{t}\|q_{t})=\sum_{v\in\mathcal{V}}p_{t}(v)\log\tfrac{p_{t}(v)}{q_{t}(v)}$ .
+Different OPD methods vary in how they approximate $D_{\mathrm{KL}}(p_{t}\|q_{t})$ with their per-token losses $\ell_{t}$ .
+Given a student-sampled token $\hat{y}_{t}\sim p_{t}$ , sampled-token OPD (Lu and Lab, 2025; Xiao et al., 2026) computes
+$\ell_{t}^{\mathrm{sample}}=\log p_{t}(\hat{y}_{t})-\log q_{t}(\hat{y}_{t})$ ,
+which is cheap to compute but discards the dense information over the remaining vocabulary.
+Full-vocabulary OPD (Xu et al., 2026) computes $\ell_{t}^{\mathrm{full}}=D_{\mathrm{KL}}(p_{t}\|q_{t})$ exactly over $\mathcal{V}$ .
+It provides dense supervision but is prohibitively expensive for LLMs.
+Normalized top- $k$ OPD provides an intermediate design between sampled-token and
+full-vocabulary OPD by restricting the divergence computation to a subset.
+Prior works adopt two choices of the subset: the student’s top- $k$ tokens (Li et al., 2026) or the teacher’s top- $k$ tokens (Jin et al., 2026; Fu et al., 2026).
+In this work, we primarily focus on the teacher top- $k$ variant.
+Formally, we define the teacher’s top- $k$ tokens as $S_{t}^{k}=\operatorname{TopK}(q_{t},k)$ .
+The normalized distributions on $S_{t}^{k}$ are given by:
+$\bar{p}_{t}^{(S_{t}^{k})}(v)=\frac{p_{t}(v)\,\mathbf{1}[v\in S_{t}^{k}]}{\sum_{u\in S_{t}^{k}}p_{t}(u)},\qquad\bar{q}_{t}^{(S_{t}^{k})}(v)=\frac{q_{t}(v)\,\mathbf{1}[v\in S_{t}^{k}]}{\sum_{u\in S_{t}^{k}}q_{t}(u)},$
+where $\mathbf{1}[\cdot]$ denotes the indicator function.
+Distillation is then performed by minimizing the subset reverse KL divergence $\ell_{t}^{\mathrm{norm}}=D_{\mathrm{KL}}\!\bigl(\bar{p}_{t}^{(S_{t}^{k})}\,\|\,\bar{q}_{t}^{(S_{t}^{k})}\bigr)$ , yielding the trajectory-level objective:
+$\mathcal{L}_{\mathrm{OPD}}^{\mathrm{norm}}(\theta)=\mathbb{E}_{x\sim\mathcal{D}_{x},\;\hat{y}\sim\pi_{\theta}(\cdot\mid x)}\left[\sum_{t=1}^{T}D_{\mathrm{KL}}\!\bigl(\bar{p}_{t}^{(S_{t}^{k})}\,\|\,\bar{q}_{t}^{(S_{t}^{k})}\bigr)\right].$
+(2)
+Normalized top- $k$ OPD reduces the teacher-query cost while retaining dense, multi-token supervision over $S_{t}^{k}$ , making it a practical approximation to full-vocabulary OPD.
+However, the objective discards the tail probability, i.e., the total probability mass outside the teacher’s top- $k$ tokens:
+$p_{t}^{\mathrm{tail}}=\sum_{v\notin S_{t}^{k}}p_{t}(v),\qquad q_{t}^{\mathrm{tail}}=\sum_{v\notin S_{t}^{k}}q_{t}(v).$
+(3)
+Concerningly, the objective can be minimized even when the student’s tail probability is much higher than the teacher’s, making the student’s next-token distribution diverge substantially from the teacher’s.
+We proceed by analyzing how the method affects the student’s tail probability.
+3 Motivation
+In this section, we investigate how the normalized objective in Eq. (2) changes the student’s tail probability.
+We find that minimizing the objective can steadily increase the student’s tail probability.
+3.1 Theoretical Analysis on the Tail Probability
+Fix a step $t$ and let $z_{t,v}$ denote the
+student logit for token $v$ under the prefix, so that
+$p_{t}(v)=\frac{e^{z_{t,v}}}{\sum_{u\in\mathcal{V}}e^{z_{t,u}}}$ .
+We have the following propositions for the optimization of the normalized objective.
+Proposition 1.
+For every step $t$ , the gradient of $\ell_{t}^{\mathrm{norm}}$ with respect to
+the student logit $z_{t,v}$ is
+$\frac{\partial\ell_{t}}{\partial z_{t,v}}=\begin{cases}\bar{p}_{t}^{(S_{t}^{k})}(v)\!\left[\log\dfrac{\bar{p}_{t}^{(S_{t}^{k})}(v)}{\bar{q}_{t}^{(S_{t}^{k})}(v)}-\ell_{t}\right],&v\in S_{t}^{k},\\[10.00002pt]
+0,&v\notin S_{t}^{k}.\end{cases}$
+Moreover, the gradients on the logits of the top- $k$ tokens sum to zero:
+$\sum_{v\in S_{t}^{k}}\frac{\partial\ell_{t}}{\partial z_{t,v}}=0$ .
+The proof is provided in Appendix A.1.
+The proposition shows that the normalized objective provides no explicit mechanism for decreasing the student’s tail probability.
+Decreasing the tail probability requires raising the top- $k$ logits relative to the tail logits.
+However, the normalized objective can do neither: the tail logits receive zero gradient, and the gradients on the top- $k$ logits sum to zero.
+In the following, we further explore how the zero-sum gradient within the top- $k$ tokens affects the student’s tail probability.
+Proposition 2.
+Assume that the student $\pi_{\theta}$ is a tabular softmax policy, where each token $v$ at each step $t$ is
+associated with an independent logit parameter $z_{t,v}=\theta_{t,v}$ .
+Write $\bar{p}:=\bar{p}_{t}^{(S_{t}^{k})}$ and $\bar{q}:=\bar{q}_{t}^{(S_{t}^{k})}$ for the normalized
+distributions on $S_{t}^{k}$ , and let $\operatorname*{Cov}_{v\sim r}(f,g)$ denote the
+covariance of $f(v)$ and $g(v)$ under $v\sim r$ .
+After one gradient descent step
+$\theta\leftarrow\theta-\eta\,\frac{\partial\ell_{t}^{\mathrm{norm}}}{\partial\theta}$
+with learning rate $\eta$ , the student’s tail probability change $\Delta p_{t}^{\mathrm{tail}}$ is given by:
+$\Delta p_{t}^{\mathrm{tail}}=\eta\,p_{t}^{\mathrm{tail}}\bigl(1-p_{t}^{\mathrm{tail}}\bigr)\Bigl[\underbrace{\operatorname*{Cov}_{v\sim\bar{p}}\bigl(\bar{p}(v),\log\bar{p}(v)\bigr)}_{\text{ student self-covariance}}-\underbrace{\operatorname*{Cov}_{v\sim\bar{p}}\bigl(\bar{p}(v),\log\bar{q}(v)\bigr)}_{\text{student-teacher covariance}}\Bigr]+O(\eta^{2}).$
+Consequently, the student’s tail probability increases under first-order approximation
+if and only if the student self-covariance exceeds the student–teacher covariance.
+The proof is provided in Appendix A.2.
+The proposition11
+1
+We use the proposition as a motivation rather than a formal theoretical guarantee.
+shows that minimizing the normalized objective strictly increases the student’s tail probability if the student self-covariance exceeds the student–teacher covariance.
+The student self-covariance is nonnegative, since $\log\bar{p}$ is monotone with $\bar{p}$ .
+In contrast, the student-teacher covariance is positive only when the student concentrates its probability on the teacher’s high-probability tokens within $S_{t}^{k}$ , and can be negative when the two distributions are poorly aligned.
+In practice, when the student-teacher capability gap is large, the student cannot imitate the teacher’s next-token distribution well, and its probability mass cannot concentrate on the teacher’s high-probability tokens.
+As a result, the student–teacher covariance tends to be smaller than the student self-covariance, making the normalized objective exhibit a systematic bias toward increasing the student’s tail probability.
+This analysis motivates us to empirically examine the existence of the tail probability increase and its influence on the training dynamics of OPD.
+3.2 Empirical Study on the Tail Probability Increase
+Setup.
+We conduct experiments with three student-teacher model pairs:
+Qwen3-1.7B (Yang et al., 2025) with Qwen3-30B-A3B-Instruct-2507, Qwen2.5-7B-Instruct with OpenThinker3-7B, and
+Llama-3.1-8B (Grattafiori et al., 2024) with DeepSeek-R1-Distill-Llama-8B (Guo et al., 2025).
+All models are trained on DAPO-MATH-17K (Yu et al., 2026) with $k=16$ .
+Figure 1:
+The student’s tail probability, the teacher’s tail probability, and the student’s token-level entropy across training steps.
+Normalized top- $k$ OPD consistently increases the student’s tail probability and entropy across all three model pairs.
+Normalized top- $k$ OPD steadily increases the student’s tail probability.
+Figure 1 visualizes the students’ and teachers’ tail probabilities on student-generated prefixes, together with the students’ entropy across training steps.
+The results show that across three model pairs, the student’s tail probability and entropy steadily increase during on-policy training, validating our theoretical analysis.
+Furthermore, as the student’s tail probability increases, it more frequently samples tokens outside the teacher’s top- $k$ tokens.
+This drives the student toward reaching prefixes where the teacher is uncertain, as reflected by the increase in the teacher’s tail probability.
+Prior works show that the teacher’s supervision is unreliable on such uncertain prefixes (Fu et al., 2026; Xie et al., 2026), as the teacher itself exhibits significantly reduced accuracy given these prefixes.
+Consequently, normalized top- $k$ OPD progressively shifts probability mass away from the teacher’s top- $k$ tokens, making the student fail to imitate the teacher’s next-token distribution.
+Figure 2: Validation accuracy versus student’s tail probability.
+Tail probability increase hurts downstream performance.
+Figure 2 plots validation accuracy against the student’s tail probability. Each point is a checkpoint from a normalized top- $k$ OPD run with Qwen2.5-7B-Instruct as the student and OpenThinker3-7B as the teacher.
+The validation set is MATH-500, and the validation sampling temperature is $1$ .
+The validation accuracy degrades significantly from above $0.7$ to below $0.2$ as the tail
+probability grows from near $0$ to around $0.7$ , with a Pearson
+correlation coefficient of $-0.91$ .
+In Appendix B, we conduct a detailed analysis on the tail probability increase phenomenon.
+We find that it occurs when there is a large capability gap between the student and teacher and when $k$ is not sufficiently large (e.g., $k\leq 64$ ).
+Moreover, the phenomenon is more pronounced when the maximum training response length becomes longer.
+Figure 3: Geometric Interpretation of OPD Objectives.
+(a) Sparse Update (Sampled-Token OPD): The supervision is derived from a single sampled token, making the update direction stochastic and prone to updating some token logits in erroneous directions.
+(b) Increased Tail Probability (Normalized Top- $k$ OPD): The normalized objective discards the tail probability, leading to increased tail probability.
+(c) Decreased Tail Probability (Tail-Aware Top- $k$ OPD, Ours): TA-OPD restores the missing tail probability signal, matching the student’s tail probability to the teacher’s.
+4 Method
+In our previous analysis, we show that the normalized objective discards information about the tail probability, leading to the tail probability increase issue (Figure 3 (b)). To address this problem, our key idea is to restore the missing tail probability signal.
+Tail-Aware Top- $k$ OPD.
+We propose Tail-Aware Top- $k$ OPD (TA-OPD), which explicitly aligns the student’s tail probability with the teacher’s (Figure 3 (c)).
+In particular, we introduce a tail token $v_{\mathrm{tail}}$ that carries the tail probability.
+We then minimize the reverse KL divergence over the top- $k$ tokens plus
+the tail token.
+Formally, we define the augmented token set
+$S_{t}^{+}=S_{t}^{k}\cup\{v_{\mathrm{tail}}\}$ .
+On $S_{t}^{+}$ , each top- $k$ token retains its original probability,
+$p_{t}(v)=\pi_{\theta}(v\mid x,\hat{y}_{<t})$ , while the tail token carries the
+tail probability, $p_{t}(v_{\mathrm{tail}})=p_{t}^{\mathrm{tail}}$ .
+The per-token loss function of TA-OPD is then given by:
+$\ell_{t}^{\mathrm{TA}}=\sum_{v\in S_{t}^{+}}p_{t}(v)\log\frac{p_{t}(v)}{q_{t}(v)}=\sum_{v\in S_{t}^{k}}p_{t}(v)\log\frac{p_{t}(v)}{q_{t}(v)}+p_{t}^{\mathrm{tail}}\log\frac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}.$
+(4)
+By introducing the tail token $v_{\mathrm{tail}}$ , the term $p_{t}^{\mathrm{tail}}\log\frac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}$ explicitly compares the student’s and teacher’s tail probabilities, thereby driving the student’s tail probability toward the teacher’s.
+We next characterize the gradient signal of $\ell_{t}^{\mathrm{TA}}$ .
+Proposition 3.
+For every step $t$ , the gradient of
+$\ell_{t}^{\mathrm{TA}}$ with respect to the student logit $z_{t,v}$ is
+$\frac{\partial\ell_{t}^{\mathrm{TA}}}{\partial z_{t,v}}=\begin{cases}p_{t}(v)\Big(\log\dfrac{p_{t}(v)}{q_{t}(v)}-\ell_{t}^{\mathrm{TA}}\Big),&v\in S_{t}^{k},\\[11.99998pt]
+p_{t}(v)\Big(\log\dfrac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}-\ell_{t}^{\mathrm{TA}}\Big),&v\notin S_{t}^{k}.\end{cases}$
+(5)
+The proposition reveals two key properties of TA-OPD.
+First, while the normalized objective gives no gradient to logits outside the top- $k$ tokens, TA-OPD updates them through the tail log-ratio $\log\tfrac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}$ , which compares the student’s tail probability with the teacher’s.
+Second, the gradients on the top- $k$ logits no longer sum to zero.
+The top- $k$ gradient sum
+$\sum_{v\in S_{t}^{k}}\frac{\partial\ell_{t}^{\mathrm{TA}}}{\partial z_{t,v}}=p_{t}^{\mathrm{tail}}\Bigl(\ell_{t}^{\mathrm{TA}}-\log\tfrac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}\Bigr)$ is negative whenever the tail log-ratio is larger than the average log-ratio over $S_{t}^{k}$ .
+It therefore can explicitly raise the top- $k$ logits relative to the tail whenever the student over-weights the tail relative to the teacher.
+In the following, we show that $\ell_{t}^{\mathrm{TA}}$ is not merely a heuristic modification but a principled approximation of the full-vocabulary objective.
+Proposition 4 (Lower bound of the full-vocabulary reverse KL).
+Let $\tilde{p}_{t}(v)=p_{t}(v)/p_{t}^{\mathrm{tail}}$ and $\tilde{q}_{t}(v)=q_{t}(v)/q_{t}^{\mathrm{tail}}$ for $v\notin S_{t}^{k}$ be the normalized tail distributions. Then
+$\ell_{t}^{\mathrm{TA}}=\ell_{t}^{\mathrm{full}}-p_{t}^{\mathrm{tail}}\,D_{\mathrm{KL}}(\tilde{p}_{t}\|\tilde{q}_{t})\leq\ell_{t}^{\mathrm{full}}.$
+(6)
+The proofs of the above propositions are presented in Appendix A.3 and A.4.
+This proposition shows that the loss functions of TA-OPD and full-vocabulary OPD differ only by a non-negative residual term $p_{t}^{\mathrm{tail}}\,D_{\mathrm{KL}}(\tilde{p}_{t}\|\tilde{q}_{t})$ .
+In practice, TA-OPD drives both the student’s and teacher’s tail probabilities close to zero (see Figure 4 (a) and (b)).
+As a result, the residual term becomes small, making $\ell_{t}^{\mathrm{TA}}$ a tight lower bound to the ideal full-vocabulary reverse KL objective.
+5 Experiments
+5.1 Experimental Setup
+Models and Training Dataset.
+For main experiments, we use the three student-teacher model pairs as in section 3.2: Qwen3-1.7B with Qwen3-30B-A3B-Instruct-2507, Qwen2.5-7B-Instruct with OpenThinker3-7B, and
+Llama-3.1-8B with DeepSeek-R1-Distill-Llama-8B.
+We disable thinking modes for Qwen3 models.
+The training set is DAPO-MATH-17K.
+Evaluation.
+We evaluate on six math reasoning benchmarks—MATH500, Minerva (Lewkowycz et al., 2022), OlympiadBench (He et al., 2024), AMC (Li et al., 2024) and AIME24/25 (Li et al., 2024)—and two out-of-distribution benchmarks, ARC-c (Clark et al., 2018) and MMLU-Pro (Wang et al., 2024).
+We use a rollout temperature of 0.7, top-p sampling with p = 0.95, and a maximum response length of 8192 tokens.
+For MMLU-Pro, we report Pass@1. For other datasets, we sample 8 responses per question and report the average accuracy (Avg@8).
+Compared Methods.
+We compare our method with sampled-token OPD and normalized top- $k$ OPD.
+In Appendix E.4, we conduct an additional comparison with unnormalized top- $k$ OPD.
+We provide a detailed introduction to these methods in Appendix C.
+Implementation.
+All the OPD experiments use the same training setup: 300 training steps with a learning rate of $1\times 10^{-6}$ .
+Unless otherwise specified, we set $k=16$ for top- $k$ OPD.
+We use a prompt batch size of 72 and sample 4 rollouts per prompt, with a maximum generation length of 7168 tokens.
+More details of implementation are provided in Appendix D.
+5.2 Results
+Table 1:
+Results on math reasoning and out-of-distribution (OOD) benchmarks.
+We compare TA-OPD with sampled-token OPD (Sampled-token) and
+normalized top- $k$ OPD (Norm. top- $k$ ).
+Each Avg. column represents the macro-average.
+Best results are shown in bold.
+Methods
+In-Distribution Performance
+OOD Performance
+MATH500
+Minerva
+Olympiad
+AMC
+AIME 24
+AIME 25
+Avg.
+ARC-c
+MMLU-Pro
+Avg.
+Student: Qwen2.5-7B-Instruct
+Teacher: OpenThinker3-7B
+Sampled-token
+74.60
+31.25
+41.22
+45.48
+14.58
+16.25
+37.23
+74.99
+47.66
+61.33
+Norm. top- $k$
+68.78
+25.55
+36.02
+41.42
+13.75
+15.00
+33.42
+23.07
+37.38
+30.23
+TA-OPD (Ours)
+77.88
+32.58
+42.41
+45.03
+16.67
+17.50
+38.68
+76.30
+50.35
+63.33
+Student: Llama-3.1-8B
+Teacher: DeepSeek-R1-Distill-Llama-8B
+Sampled-token
+43.45
+12.78
+16.56
+17.62
+2.08
+1.25
+15.62
+41.88
+28.99
+35.44
+Norm. top- $k$
+31.30
+9.24
+9.96
+11.45
+1.25
+0.42
+10.60
+10.01
+18.33
+14.17
+TA-OPD (Ours)
+50.83
+14.94
+20.65
+20.48
+2.50
+2.50
+18.65
+65.70
+34.57
+50.14
+Student: Qwen3-1.7B
+Teacher: Qwen3-30B-A3B-Instruct-2507
+Sampled-token
+82.98
+49.49
+34.93
+52.41
+26.25
+19.58
+44.27
+83.91
+50.08
+67.00
+Norm. top- $k$
+81.80
+47.20
+33.28
+50.60
+23.33
+17.08
+42.22
+82.48
+49.66
+66.07
+TA-OPD (Ours)
+83.48
+49.82
+34.50
+52.86
+26.25
+20.83
+44.62
+83.59
+50.42
+67.01
+TA-OPD achieves the best performance across student–teacher model pairs.
+Table 1 compares TA-OPD with sampled-token OPD and normalized top- $k$ OPD.
+Evaluated on six math reasoning benchmarks, TA-OPD attains the best average accuracy on every student–teacher pair, outperforming normalized top- $k$ OPD by +5.26 points on Qwen2.5-7B-Instruct and +8.05 points on Llama-3.1-8B.
+Notably, TA-OPD demonstrates a significantly greater advantage on MATH500 with Llama-3.1-8B over normalized top- $k$ OPD, improving Avg@8 from 31.30 to 50.83 (+19.53 points).
+Regarding out-of-distribution performance, TA-OPD also demonstrates strong performance gain: on ARC-c, it achieves 76.30 with Qwen2.5-7B-Instruct and 65.70 with Llama-3.1-8B, whereas normalized top- $k$ OPD degrades to 23.07 and 10.01, indicating that the tail probability increase not only hurts mathematical reasoning but also degrades the student’s general capabilities.
+Overall, these results demonstrate that TA-OPD consistently achieves the best in-distribution and out-of-distribution performance across different model pairs.
+Figure 4:
+Tail probabilities and token-level entropy of TA-OPD and normalized top- $k$ OPD over training.
+The student and teacher models are Qwen2.5-7B-Instruct and OpenThinker3-7B.
+TA-OPD prevents the increase in tail probability and entropy.
+In Figure 4, we compare the training dynamics of TA-OPD and normalized top- $k$ OPD on the Qwen2.5-7B-Instruct and OpenThinker3-7B model pair.
+With normalized top- $k$ OPD, the student’s tail probability, the teacher’s tail probability, and the student’s entropy increase to approximately $0.6$ , $0.5$ , and $6$ over the course of training.
+In contrast, TA-OPD keeps the two tail probabilities close to $0$ and the student’s entropy below $1.5$ .
+The same trends are consistently observed for three alternative model pairs in Figure 17.
+In short, these results show that TA-OPD addresses the tail probability and entropy increase caused by top- $k$ normalization.
+Figure 5: Ablation study on $k$ .
+TA-OPD is effective with a small $k$ .
+In Figure 5, we ablate how the number of top- $k$ tokens
+affects the performance of TA-OPD.
+In particular, we fix Qwen3-1.7B-Base as the student and Qwen3-8B as the teacher, and only
+vary $k\in\{1,2,4,8,16,32\}$ .
+For each $k$ , we report the average accuracy macro-averaged across the six math reasoning
+benchmarks.
+The results show that the accuracy is insensitive to $k$ once $k\geq 2$ : $k=2$ attains an average accuracy of $30.43$ , only $0.43$ points below the best result of $30.86$ at $k=32$ .
+Overall, TA-OPD can be applied with a small $k$ .
+Additional results.
+Due to space constraints, we defer additional analyses to the appendix.
+Appendix E.1 conducts a synthetic experiment to provide an intuitive understanding of TA-OPD and normalized top- $k$ OPD’s optimization.
+Appendix E.2 shows that TA-OPD consistently achieves higher student-teacher top- $k$ overlap ratios compared to normalized top- $k$ OPD.
+Appendix E.3 shows that TA-OPD incurs negligible computational overhead over normalized top- $k$ OPD.
+6 Discussion
+Table 2:
+Comparison between TA-OPD and sample-corrected TA-OPD on math reasoning and out-of-distribution (OOD) benchmarks.
+Best results are shown in bold.
+Methods
+In-Distribution Performance
+OOD Performance
+MATH500
+Minerva
+Olympiad
+AMC
+AIME 24
+AIME 25
+Avg.
+ARC-c
+MMLU-Pro
+Avg.
+Student: DeepSeek-R1-Distill-Qwen-1.5B
+Teacher: JustRL-DeepSeek-1.5B
+TA-OPD
+86.13
+30.97
+57.04
+76.20
+41.67
+29.73
+53.62
+35.40
+25.98
+30.69
+SC-TA-OPD
+87.00
+32.08
+57.65
+76.51
+42.92
+30.17
+54.39
+35.55
+25.76
+30.66
+Student: Qwen3-1.7B
+Teacher: Qwen3-30B-A3B-Instruct-2507
+TA-OPD
+83.48
+49.82
+34.50
+52.86
+26.25
+20.83
+44.62
+83.59
+50.42
+67.01
+SC-TA-OPD
+84.00
+49.54
+34.93
+53.16
+26.67
+19.58
+44.65
+83.91
+50.28
+67.10
+Sample-corrected TA-OPD.
+While TA-OPD’s loss function is a tight lower bound of the
+full-vocabulary reverse KL divergence, it remains a biased estimate of the latter.
+By Proposition 4, the bias is
+$p_{t}^{\mathrm{tail}}\,D_{\mathrm{KL}}(\tilde{p}_{t}\,\|\,\tilde{q}_{t})$ .
+When the sampled token’s probability is additionally available, we can estimate the bias with the sampled token $\hat{y}_{t}$ , and add this estimate back to $\ell_{t}^{\mathrm{TA}}$ to yield an unbiased estimate of the full-vocabulary reverse KL divergence.
+Formally, the loss function of sample-corrected TA-OPD is given by:
+$\displaystyle\ell_{t}^{\mathrm{SC\text{-}TA}}=$
+$\displaystyle\sum_{v\in S_{t}^{+}}p_{t}(v)\operatorname{sg}\!\left(\log\frac{p_{t}(v)}{q_{t}(v)}\right)+\mathbf{1}[\hat{y}_{t}\notin S_{t}^{k}]\,\frac{p_{t}(\hat{y}_{t})}{\operatorname{sg}(p_{t}(\hat{y}_{t}))}\operatorname{sg}\!\left(\log\frac{p_{t}(\hat{y}_{t})/p_{t}^{\mathrm{tail}}}{q_{t}(\hat{y}_{t})/q_{t}^{\mathrm{tail}}}\right),$
+(7)
+where $\operatorname{sg}(\cdot)$ denotes the stop-gradient operator.
+We next characterize its theoretical property.
+Proposition 5 (Unbiasedness).
+For every step $t$ , taking the randomness over $\hat{y}_{t}\sim p_{t}$ , we have
+$\mathbb{E}_{\hat{y}_{t}\sim p_{t}}\bigl[\ell_{t}^{\mathrm{SC\text{-}TA}}\bigr]=D_{\mathrm{KL}}(p_{t}\,\|\,q_{t}),\quad\mathbb{E}_{\hat{y}_{t}\sim p_{t}}\bigl[\nabla_{\theta}\,\ell_{t}^{\mathrm{SC\text{-}TA}}\bigr]=\nabla_{\theta}\,D_{\mathrm{KL}}(p_{t}\,\|\,q_{t}).$
+The proof is provided in Appendix A.5.
+Proposition 5 shows that $\ell_{t}^{\mathrm{SC\text{-}TA}}$ is an unbiased estimate of the full-vocabulary reverse KL in both value and gradient, thereby combining the advantages of sampled-token OPD’s unbiasedness and top- $k$ OPD’s dense supervision.
+Table 2 compares TA-OPD with its sample-corrected variant on two student–teacher pairs.
+Removing the bias term yields only marginal gains: the macro-average on mathematical reasoning improves from $53.62$ to $54.39$ for DeepSeek-R1-Distill-Qwen-1.5B and from $44.62$ to $44.65$ for Qwen3-1.7B, while the OOD averages remain essentially unchanged in both settings ( $30.69$ vs. $30.66$ and $67.01$ vs. $67.10$ ).
+We attribute this to the tightness of TA-OPD: its bias to full-vocabulary OPD $p_{t}^{\mathrm{tail}}\,D_{\mathrm{KL}}(\tilde{p}_{t}\,\|\,\tilde{q}_{t})$ is negligible in practice.
+Overall, SC-TA-OPD provides rigorous theoretical guarantees of unbiasedness, while TA-OPD attains comparable performance to SC-TA-OPD.
+Figure 6:
+Performance under different student–teacher capability gaps.
+The students are Qwen2.5-Math-1.5B and DeepSeek-R1-Distill-Qwen-1.5B.
+The teacher is JustRL-DeepSeek-1.5B.
+TA-OPD is most effective when the student–teacher capability gap is large.
+We fix JustRL-DeepSeek-1.5B (He et al., 2025) as the teacher and compare two students, Qwen2.5-Math-1.5B and DeepSeek-R1-Distill-Qwen-1.5B.
+DeepSeek-R1-Distill-Qwen-1.5B is obtained by applying supervised fine-tuning to Qwen2.5-Math-1.5B, and the teacher is obtained by applying reinforcement learning to DeepSeek-R1-Distill-Qwen-1.5B.
+The capability gap between Qwen2.5-Math-1.5B and the teacher is therefore larger than that between DeepSeek-R1-Distill-Qwen-1.5B and the teacher.
+Figure 6 presents the Avg@8 accuracy of four OPD objectives on MATH500 for the two students.
+On Qwen2.5-Math-1.5B, TA-OPD attains an Avg@8 of 75.20 on MATH500, outperforming normalized top- $k$ OPD by 13.50 points.
+On DeepSeek-R1-Distill-Qwen-1.5B, the four objectives achieve similar performance, with sample-corrected TA-OPD attaining the best accuracy of 87.00.
+This is because, as shown in Figure 18, the tail
+probability increase is more pronounced under the larger capability gap, where TA-OPD
+therefore brings a larger improvement.
+In summary, TA-OPD brings substantial improvements over baselines when the
+student–teacher capability gap is large.
+7 Related Work
+On-policy Distillation.
+On-policy distillation (OPD) is an effective post-training paradigm that has attracted a surge of interest (Song and Zheng, 2026).
+To provide dense supervision at tractable cost, top- $k$ OPD has become a popular research direction (Zhu et al., 2026; Xing et al., 2026).
+Normalized top- $k$ OPD (Li et al., 2026; Fu et al., 2026) directly uses normalized top- $k$ reverse KL as the loss function.
+Entropy-aware OPD (Jin et al., 2026) improves sampled-token OPD by applying normalized top- $k$ forward KL at high-entropy positions.
+vOPD (Oh et al., 2026) uses normalized top- $k$ reverse KL as a reward baseline to reduce variance of sampled-token OPD.
+While these methods use normalized top- $k$ KL for different purposes, they share a common limitation: the normalized objective does not faithfully approximate the full-vocabulary KL.
+We note that Dasgupta et al. (2026) study a related tail probability issue, but it considers off-policy full-vocabulary distillation and is not applicable to top- $k$ OPD.
+Moreover, the failure mode it studies differs from ours: it studies how full-vocabulary forward KL in the off-policy setting makes the student’s tail probability too small, while we study how normalized top- $k$ objectives in the on-policy setting steadily increase it.
+KL computation for LLM post-training.
+KL divergence is a crucial component in post-training of LLMs (Vieillard et al., 2020; Ouyang et al., 2022).
+In OPD, the student is optimized by minimizing the reverse KL divergence to the teacher (Lu and Lab, 2025), while in reinforcement learning (RL), a KL constraint against the base model is commonly imposed to prevent the policy from drifting away (Ziegler et al., 2019; Shah et al., 2025).
+For efficiency, most existing methods estimate the divergence using only the sampled tokens (Schulman et al., 2015; Schulman, 2020).
+These estimators suffer from high variance and ignore the dense information in the logit space.
+To provide dense information at tractable cost, top-k approximations of the KL divergence have become an appealing alternative (Zhang and Ba, 2026).
+Existing top- $k$ OPD methods predominantly adopt a normalized top-k formulation (Li et al., 2026; Fu et al., 2026), which, as we reveal in this work, leads to a steady increase in the student’s tail probability.
+In the context of RL, several top-k KL approximations have also been explored, yet they are devised for purposes different from ours.
+For instance, DPPO (Qi et al., 2026) derives a KL approximation similar to TA-OPD’s loss objective, but uses it as a quantity to decide whether to clip the policy update on a token, thereby substituting heuristic PPO clipping (Schulman et al., 2017) with a principled constraint.
+In contrast, we directly use the top- $k$ KL approximation as the optimization objective and establish its theoretical properties.
+Besides, EMA-PG (Zhang and Ba, 2026) proposes a KL approximation similar to our sample-corrected TA-OPD.
+We provide a discussion of sample-corrected TA-OPD and EMA-PG in Appendix E.5.
+8 Conclusion
+In this paper, we introduce Tail-Aware Top-k On-Policy Distillation (TA-OPD), a novel distillation method that restores the missing tail probability signal.
+In particular, TA-OPD minimizes the reverse KL divergence over the teacher’s top- $k$ tokens plus a tail token that carries the tail probability.
+In effect, TA-OPD explicitly aligns the student’s tail probability with the teacher’s, addressing the tail probability and entropy increase caused by top- $k$ normalization.
+We further derive a sampled variant that yields an unbiased estimate of the full-vocabulary reverse KL when the sampled token’s probability is available.
+Extensive experiments show that TA-OPD consistently improves accuracy across benchmarks.
+Our method can be easily adopted in practice: it is straightforward to implement with existing OPD frameworks and requires no additional teacher queries beyond the top- $k$ probabilities.
+We hope that our insights inspire future research to further explore loss function designs for OPD.
+Limitations.
+The performance gain of TA-OPD over normalized top- $k$ OPD diminishes as $k$ increases or the capability gap between student and teacher decreases.
+Additionally, due to limited computational resources, our experiments are restricted to models with up to 8B parameters.
+While these sizes are standard for research-stage OPD studies, we do not presume automatic transfer to 30B+ models.
+References
+Agarwal et al. (2024)
+R. Agarwal, N. Vieillard, Y. Zhou, P. Stanczyk, S. Ramos Garea, M. Geist, and O. Bachem
+On-policy distillation of language models: learning from self-generated mistakes.
+In International Conference on Learning Representations,
+Vol. 2024, pp. 21246–21263.
+Cited by: §1.
+Arora et al. (2022)
+K. Arora, L. El Asri, H. Bahuleyan, and J. C. K. Cheung
+Why exposure bias matters: an imitation learning perspective of error accumulation in language generation.
+In Findings of the Association for Computational Linguistics: ACL 2022,
+pp. 700–710.
+Cited by: §1.
+Bengio et al. (2015)
+S. Bengio, O. Vinyals, N. Jaitly, and N. Shazeer
+Scheduled sampling for sequence prediction with recurrent neural networks.
+Advances in Neural Information Processing Systems 28.
+Cited by: §1.
+Clark et al. (2018)
+P. Clark, I. Cowhey, O. Etzioni, T. Khot, A. Sabharwal, C. Schoenick, and O. Tafjord
+Think you have solved question answering? try arc, the ai2 reasoning challenge.
+arXiv preprint arXiv:1803.05457.
+Cited by: §5.1.
+Cui et al. (2025)
+G. Cui, Y. Zhang, J. Chen, L. Yuan, Z. Wang, Y. Zuo, H. Li, Y. Fan, H. Chen, W. Chen, et al.
+The entropy mechanism of reinforcement learning for reasoning language models.
+arXiv preprint arXiv:2505.22617.
+Cited by: §A.2.
+Dasgupta et al. (2026)
+S. Dasgupta, T. Cohn, and T. Baldwin
+Don’t ignore the tail: decoupling top-k probabilities for efficient language model distillation.
+arXiv preprint arXiv:2602.20816.
+Cited by: §7.
+Fu et al. (2026)
+Y. Fu, H. Huang, K. Jiang, J. Liu, Z. Jiang, Y. Zhu, and D. Zhao
+Revisiting on-policy distillation: empirical failure modes and simple fixes.
+arXiv preprint arXiv:2603.25562.
+Cited by: Appendix C,
+§1,
+§2,
+§3.2,
+§7,
+§7.
+Grattafiori et al. (2024)
+A. Grattafiori, A. Dubey, A. Jauhri, A. Pandey, A. Kadian, A. Al-Dahle, A. Letman, A. Mathur, A. Schelten, A. Vaughan, et al.
+The llama 3 herd of models.
+arXiv preprint arXiv:2407.21783.
+Cited by: §3.2.
+Gu et al. (2024)
+Y. Gu, L. Dong, F. Wei, and M. Huang
+Minillm: knowledge distillation of large language models.
+In International Conference on Learning Representations,
+Vol. 2024, pp. 32694–32717.
+Cited by: §1.
+Guha et al. (2025)
+E. Guha, R. Marten, S. Keh, N. Raoof, G. Smyrnis, H. Bansal, M. Nezhurina, J. Mercat, T. Vu, Z. Sprague, A. Suvarna, B. Feuer, L. Chen, Z. Khan, E. Frankel, S. Grover, C. Choi, N. Muennighoff, S. Su, W. Zhao, J. Yang, S. Pimpalgaonkar, K. Sharma, C. C. Ji, Y. Deng, S. Pratt, V. Ramanujan, J. Saad-Falcon, J. Li, A. Dave, A. Albalak, K. Arora, B. Wulfe, C. Hegde, G. Durrett, S. Oh, M. Bansal, S. Gabriel, A. Grover, K. Chang, V. Shankar, A. Gokaslan, M. A. Merrill, T. Hashimoto, Y. Choi, J. Jitsev, R. Heckel, M. Sathiamoorthy, A. G. Dimakis, and L. Schmidt
+OpenThoughts: data recipes for reasoning models.
+External Links: 2506.04178,
+Link
+Cited by: §1.
+Guo et al. (2025)
+D. Guo, D. Yang, H. Zhang, J. Song, P. Wang, Q. Zhu, R. Xu, R. Zhang, S. Ma, X. Bi, et al.
+Deepseek-r1: incentivizing reasoning capability in llms via reinforcement learning.
+arXiv preprint arXiv:2501.12948.
+Cited by: §3.2.
+He et al. (2025)
+B. He, Z. Qu, Z. Liu, Y. Chen, Y. Zuo, C. Qian, K. Zhang, W. Chen, C. Xiao, G. Cui, et al.
+Justrl: scaling a 1.5 b llm with a simple rl recipe.
+arXiv preprint arXiv:2512.16649.
+Cited by: §6.
+He et al. (2024)
+C. He, R. Luo, Y. Bai, S. Hu, Z. Thai, J. Shen, J. Hu, X. Han, Y. Huang, Y. Zhang, et al.
+Olympiadbench: a challenging benchmark for promoting agi with olympiad-level bilingual multimodal scientific problems.
+In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+pp. 3828–3850.
+Cited by: §5.1.
+Hendrycks et al. (2021)
+D. Hendrycks, C. Burns, S. Kadavath, A. Arora, S. Basart, E. Tang, D. Song, and J. Steinhardt
+Measuring mathematical problem solving with the math dataset.
+Advances in Neural Information Processing Systems.
+Cited by: §1.
+Hinton et al. (2015)
+G. Hinton, O. Vinyals, and J. Dean
+Distilling the knowledge in a neural network.
+arXiv preprint arXiv:1503.02531.
+Cited by: §1.
+Jin et al. (2026)
+W. Jin, T. Min, Y. Yang, S. R. Kadhe, Y. Zhou, D. Wei, N. Baracaldo, and K. Lee
+Entropy-aware on-policy distillation of language models.
+arXiv preprint arXiv:2603.07079.
+Cited by: §2,
+§7.
+Kim and Rush (2016)
+Y. Kim and A. M. Rush
+Sequence-level knowledge distillation.
+In Proceedings of the 2016 conference on empirical methods in natural language processing,
+pp. 1317–1327.
+Cited by: §1.
+Kwon et al. (2023)
+W. Kwon, Z. Li, S. Zhuang, Y. Sheng, L. Zheng, C. H. Yu, J. Gonzalez, H. Zhang, and I. Stoica
+Efficient memory management for large language model serving with pagedattention.
+In Proceedings of the 29th symposium on operating systems principles,
+pp. 611–626.
+Cited by: §E.3.
+Lewkowycz et al. (2022)
+A. Lewkowycz, A. Andreassen, D. Dohan, E. Dyer, H. Michalewski, V. Ramasesh, A. Slone, C. Anil, I. Schlag, T. Gutman-Solo, et al.
+Solving quantitative reasoning problems with language models.
+Advances in Neural Information Processing Systems 35, pp. 3843–3857.
+Cited by: §5.1.
+Li et al. (2024)
+J. Li, E. Beeching, L. Tunstall, B. Lipkin, R. Soletskyi, S. Huang, K. Rasul, L. Yu, A. Q. Jiang, Z. Shen, et al.
+Numinamath: the largest public dataset in ai4maths with 860k pairs of competition math problems and solutions.
+Hugging Face repository 13 (9), pp. 9.
+Cited by: §5.1.
+Li et al. (2026)
+Y. Li, Y. Zuo, B. He, J. Zhang, C. Xiao, C. Qian, T. Yu, H. Gao, W. Yang, Z. Liu, et al.
+Rethinking on-policy distillation of large language models: phenomenology, mechanism, and recipe.
+arXiv preprint arXiv:2604.13016.
+Cited by: Appendix B,
+Appendix C,
+§E.2,
+§2,
+§7,
+§7.
+Lu and Lab (2025)
+K. Lu and T. M. Lab
+On-policy distillation.
+Thinking Machines Lab: Connectionism.
+Note: https://thinkingmachines.ai/blog/on-policy-distillation
+External Links: Document
+Cited by: Appendix C,
+§1,
+§2,
+§7.
+Oh et al. (2026)
+M. Oh, S. Song, G. Choi, Y. Choi, and Y. Jo
+KL for a kl: on-policy distillation with control variate baseline.
+arXiv preprint arXiv:2605.07865.
+Cited by: §7.
+Ouyang et al. (2022)
+L. Ouyang, J. Wu, X. Jiang, D. Almeida, C. Wainwright, P. Mishkin, C. Zhang, S. Agarwal, K. Slama, A. Ray, et al.
+Training language models to follow instructions with human feedback.
+Advances in Neural Information Processing Systems 35, pp. 27730–27744.
+Cited by: §7.
+Qi et al. (2026)
+P. Qi, X. Zhou, Z. Liu, T. Pang, C. Du, M. Lin, and W. S. Lee
+Rethinking the trust region in llm reinforcement learning.
+arXiv preprint arXiv:2602.04879.
+Cited by: §7.
+Qwen et al. (2025)
+Qwen, :, A. Yang, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Li, D. Liu, F. Huang, H. Wei, H. Lin, J. Yang, J. Tu, J. Zhang, J. Yang, J. Yang, J. Zhou, J. Lin, K. Dang, K. Lu, K. Bao, K. Yang, L. Yu, M. Li, M. Xue, P. Zhang, Q. Zhu, R. Men, R. Lin, T. Li, T. Tang, T. Xia, X. Ren, X. Ren, Y. Fan, Y. Su, Y. Zhang, Y. Wan, Y. Liu, Z. Cui, Z. Zhang, and Z. Qiu
+Qwen2.5 technical report.
+External Links: 2412.15115,
+Link
+Cited by: §1.
+Ren and Sutherland (2025)
+Y. Ren and D. Sutherland
+Learning dynamics of llm finetuning.
+In International Conference on Learning Representations,
+Vol. 2025, pp. 70523–70563.
+Cited by: §A.2.
+Schulman et al. (2015)
+J. Schulman, S. Levine, P. Abbeel, M. Jordan, and P. Moritz
+Trust region policy optimization.
+In International Conference on Machine Learning,
+pp. 1889–1897.
+Cited by: §7.
+Schulman et al. (2017)
+J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov
+Proximal policy optimization algorithms.
+arXiv preprint arXiv:1707.06347.
+Cited by: §7.
+Schulman (2020)
+J. Schulman
+Approximating kl divergence.
+John Schulman’s Homepage 5.
+Cited by: §7.
+Shah et al. (2025)
+V. Shah, J. Obando-Ceron, V. Jain, B. Bartoldson, B. Kailkhura, S. Mittal, G. Berseth, P. S. Castro, Y. Bengio, N. Malkin, et al.
+A comedy of estimators: on kl regularization in rl training of llms.
+arXiv preprint arXiv:2512.21852.
+Cited by: §7.
+Sheng et al. (2025)
+G. Sheng, C. Zhang, Z. Ye, X. Wu, W. Zhang, R. Zhang, Y. Peng, H. Lin, and C. Wu
+Hybridflow: a flexible and efficient rlhf framework.
+In Proceedings of the Twentieth European Conference on Computer Systems,
+pp. 1279–1297.
+Cited by: §D.1.
+Song and Zheng (2026)
+M. Song and M. Zheng
+A survey of on-policy distillation for large language models.
+arXiv preprint arXiv:2604.00626.
+Cited by: §7.
+Vieillard et al. (2020)
+N. Vieillard, T. Kozuno, B. Scherrer, O. Pietquin, R. Munos, and M. Geist
+Leverage the average: an analysis of kl regularization in reinforcement learning.
+Advances in Neural Information Processing Systems 33, pp. 12163–12174.
+Cited by: §7.
+Wang et al. (2024)
+Y. Wang, X. Ma, G. Zhang, Y. Ni, A. Chandra, S. Guo, W. Ren, A. Arulraj, X. He, Z. Jiang, et al.
+Mmlu-pro: a more robust and challenging multi-task language understanding benchmark.
+Advances in Neural Information Processing Systems 37, pp. 95266–95290.
+Cited by: §5.1.
+Xiao et al. (2026)
+B. Xiao, B. Xia, B. Yang, B. Gao, B. Shen, C. Zhang, C. He, C. Lou, F. Luo, G. Wang, et al.
+Mimo-v2-flash technical report.
+arXiv preprint arXiv:2601.02780.
+Cited by: Appendix C,
+§2.
+Xie et al. (2026)
+Y. Xie, S. Zhu, T. Wen, B. Chen, and Y. Wang
+On the position bias of on-policy distillation.
+arXiv preprint arXiv:2606.22600.
+Cited by: §3.2.
+Xing et al. (2026)
+X. Xing, H. Wang, B. Gao, Z. Li, and Y. Tang
+Trust region on-policy distillation.
+arXiv preprint arXiv:2606.01249.
+Cited by: §1,
+§7.
+Xu et al. (2026)
+A. Xu, B. Lin, B. Xue, B. Wang, B. Xu, B. Wu, B. Zhang, C. Lin, C. Dong, C. Ling, et al.
+DeepSeek-v4: towards highly efficient million-token context intelligence.
+arXiv preprint arXiv:2606.19348.
+Cited by: §2.
+Xu et al. (2025a)
+H. Xu, Q. Zhu, H. Deng, J. Li, L. Hou, Y. Wang, L. Shang, R. Xu, and F. Mi
+Kdrl: post-training reasoning llms via unified knowledge distillation and reinforcement learning.
+arXiv preprint arXiv:2506.02208.
+Cited by: §1.
+Xu et al. (2025b)
+W. Xu, R. Han, Z. Wang, L. Le, D. Madeka, L. Li, W. Wang, R. Agarwal, C. Lee, and T. Pfister
+Speculative knowledge distillation: bridging the teacher-student gap through interleaved sampling.
+In International Conference on Learning Representations,
+Vol. 2025, pp. 64616–64646.
+Cited by: §1.
+Yan et al. (2026)
+J. Yan, Y. Li, Z. Hu, Z. Wang, G. Cui, X. Qu, Y. Cheng, and Y. Zhang
+Learning to reason under off-policy guidance.
+Advances in Neural Information Processing Systems 38, pp. 117157–117186.
+Cited by: §D.1.
+Yang et al. (2025)
+A. Yang, A. Li, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Gao, C. Huang, C. Lv, et al.
+Qwen3 technical report.
+arXiv preprint arXiv:2505.09388.
+Cited by: §3.2.
+Yu et al. (2026)
+Q. Yu, Z. Zhang, R. Zhu, Y. Yuan, X. Zuo, Y. Yue, W. Dai, T. Fan, G. Liu, L. Liu, et al.
+Dapo: an open-source llm reinforcement learning system at scale.
+Advances in Neural Information Processing Systems 38, pp. 113222–113244.
+Cited by: §3.2.
+Zhang et al. (2026)
+H. Zhang, Y. Li, Z. Wang, Z. Wang, S. Zhang, X. Qu, and Y. Cheng
+Characterizing, evaluating, and optimizing complex reasoning.
+In Forty-third International Conference on Machine Learning,
+External Links: Link
+Cited by: §A.2.
+Zhang and Ba (2026)
+L. Zhang and J. Ba
+EMA policy gradient: taming reinforcement learning for llms with ema anchor and top-k kl.
+arXiv preprint arXiv:2602.04417.
+Cited by: §E.5,
+§7.
+Zhu et al. (2026)
+S. Zhu, X. Ye, H. Lu, W. Shi, and G. Liu
+The many faces of on-policy distillation: pitfalls, mechanisms, and fixes.
+arXiv preprint arXiv:2605.11182.
+Cited by: §7.
+Ziegler et al. (2019)
+D. M. Ziegler, N. Stiennon, J. Wu, T. B. Brown, A. Radford, D. Amodei, P. Christiano, and G. Irving
+Fine-tuning language models from human preferences.
+arXiv preprint arXiv:1909.08593.
+Cited by: §7.
+Appendix A Proof
+A.1 Proof of Proposition 1
+Proof.
+Fix a step $t$ and a prefix $\hat{y}_{<t}$ , and omit the subscript $t$ throughout: write
+$S=S_{t}^{k}=\operatorname{TopK}(q_{t},k)$ for the teacher’s top- $k$ tokens, $z_{v}=z_{t,v}$ for the
+student logit of token $v$ , and $\bar{p}=\bar{p}_{t}^{(S_{t}^{k})}$ , $\bar{q}=\bar{q}_{t}^{(S_{t}^{k})}$ for
+the normalized distributions on $S$ , so that
+$\ell^{\mathrm{norm}}=\sum_{u\in S}\bar{p}(u)\log\frac{\bar{p}(u)}{\bar{q}(u)}.$
+Since the token set $S$ is selected from the teacher distribution, both $S$ and $\bar{q}$ are
+constants with respect to the student logits.
+We proceed in three steps: we first show that $\bar{p}$ is a softmax over the logits
+restricted to top- $k$ tokens $S$ , then differentiate the loss through it, and finally sum the resulting gradients over $S$ .
+Step 1: $\bar{p}$ can be expressed as a softmax restricted to top- $k$ tokens.
+Writing the student distribution as $p(v)=e^{z_{v}}/\sum_{u\in\mathcal{V}}e^{z_{u}}$ , the
+vocabulary-level normalizer appears in both the numerator and the denominator of $\bar{p}$ and
+therefore cancels,
+$\bar{p}(v)=\frac{p(v)}{\sum_{w\in S}p(w)}=\frac{e^{z_{v}}}{\sum_{w\in S}e^{z_{w}}},\qquad v\in S.$
+(8)
+Two consequences of Eq. (8) drive the whole proof: $\bar{p}$ is a
+softmax over the sub-vector $(z_{w})_{w\in S}$ , and it does not depend on any logit outside
+$S$ . Its Jacobian is therefore the standard softmax Jacobian on $S$ and vanishes elsewhere,
+$\frac{\partial\bar{p}(u)}{\partial z_{v}}=\begin{cases}\bar{p}(u)\bigl(\mathbf{1}[u=v]-\bar{p}(v)\bigr),&u,v\in S,\\[3.99994pt]
+0,&v\notin S.\end{cases}$
+(9)
+Step 2: the gradient with respect to logit.
+Because $\bar{q}$ is fixed with respect to the student logits, the loss depends on the student
+only through $\{\bar{p}(u)\}_{u\in S}$ , with
+$\frac{\partial\ell^{\mathrm{norm}}}{\partial\bar{p}(u)}=\log\frac{\bar{p}(u)}{\bar{q}(u)}+1,\qquad u\in S.$
+The chain rule over the vocabulary thus gives
+$\frac{\partial\ell^{\mathrm{norm}}}{\partial z_{v}}=\sum_{u\in S}\frac{\partial\ell^{\mathrm{norm}}}{\partial\bar{p}(u)}\times\frac{\partial\bar{p}(u)}{\partial z_{v}}=\sum_{u\in S}\left(\log\frac{\bar{p}(u)}{\bar{q}(u)}+1\right)\frac{\partial\bar{p}(u)}{\partial z_{v}},$
+(10)
+where the terms with $u\notin S$ are already dropped because $\ell^{\mathrm{norm}}$ does not
+involve them.
+For $v\notin S$ , every Jacobian entry in Eq. (9) is zero, hence
+$\partial\ell^{\mathrm{norm}}/\partial z_{v}=0$ , which is the second case of the claim: the
+loss is blind to the logits outside the teacher’s top- $k$ tokens.
+For $v\in S$ , substituting Eq. (9) into Eq. (10) and
+separating the diagonal term $u=v$ gives
+$\frac{\partial\ell^{\mathrm{norm}}}{\partial z_{v}}=\bar{p}(v)\left(\log\frac{\bar{p}(v)}{\bar{q}(v)}+1\right)-\bar{p}(v)\sum_{u\in S}\bar{p}(u)\left(\log\frac{\bar{p}(u)}{\bar{q}(u)}+1\right).$
+(11)
+Note that
+$\sum_{u\in S}\bar{p}(u)\left(\log\frac{\bar{p}(u)}{\bar{q}(u)}+1\right)=\sum_{u\in S}\bar{p}(u)\log\frac{\bar{p}(u)}{\bar{q}(u)}+\sum_{u\in S}\bar{p}(u)=\ell^{\mathrm{norm}}+1.$
+By substituding it into Eq 11, we obtain
+$\frac{\partial\ell^{\mathrm{norm}}}{\partial z_{v}}=\bar{p}(v)\left[\log\frac{\bar{p}(v)}{\bar{q}(v)}-\ell^{\mathrm{norm}}\right],\qquad v\in S,$
+(12)
+which is the first case of the claim. Since
+$\ell^{\mathrm{norm}}=\mathbb{E}_{v\sim\bar{p}}\bigl[\log(\bar{p}(v)/\bar{q}(v))\bigr]$ by
+definition, Eq. (12) says that the gradient on a top- $k$ logit is its
+log-ratio centered at the $\bar{p}$ -weighted mean log-ratio.
+Step 3: the top- $k$ gradients sum to zero.
+Summing Eq. (12) over $v\in S$ and using
+$\sum_{v\in S}\bar{p}(v)\log\bigl(\bar{p}(v)/\bar{q}(v)\bigr)=\ell^{\mathrm{norm}}$ together with
+$\sum_{v\in S}\bar{p}(v)=1$ yields
+$\sum_{v\in S}\frac{\partial\ell^{\mathrm{norm}}}{\partial z_{v}}=\ell^{\mathrm{norm}}-\ell^{\mathrm{norm}}=0.$
+This is precisely the mean-centering exhibited in Eq. (12): the update
+redistributes logit mass among the top- $k$ tokens without changing their total, while
+leaving the tail logits untouched by Step 2. The normalized objective therefore acts only on
+the shape of the student distribution within $S$ , and never on how much probability the
+student assigns to $S$ as a whole.
+∎
+A.2 Proof of Proposition 2
+Proof.
+Fix a step $t$ and a prefix $\hat{y}_{<t}$ , and omit the subscript $t$ throughout, following
+the convention of Appendix A.1: write $S=S_{t}^{k}$ , $z_{v}=z_{t,v}$ ,
+$\bar{p}=\bar{p}_{t}^{(S_{t}^{k})}$ , $\bar{q}=\bar{q}_{t}^{(S_{t}^{k})}$ , and
+$p^{\mathrm{tail}}=p_{t}^{\mathrm{tail}}$ .
+Under the tabular assumption, each logit $z_{v}$ is an independent parameter, so the gradient
+step acts on the logits directly; this assumption is commonly adopted by prior works for
+analysis (Cui et al., 2025; Zhang et al., 2026; Ren and Sutherland, 2025).
+We write $p^{\mathrm{tail}}(\eta)$ for the tail probability after one gradient step with
+learning rate $\eta$ , and $\Delta p^{\mathrm{tail}}=p^{\mathrm{tail}}(\eta)-p^{\mathrm{tail}}(0)$
+for its change.
+We proceed in three steps: we first reduce $p^{\mathrm{tail}}(\eta)$ to a one-dimensional
+function of the step size, then identify the derivative of that function as a covariance,
+and finally expand it to first order in $\eta$ .
+Step 1: only the top- $k$ logits change.
+Split the softmax normalizer into the contributions of the top- $k$ tokens and of the tail
+tokens,
+$A:=\sum_{v\in S}e^{z_{v}},\qquad B:=\sum_{v\notin S}e^{z_{v}},\qquad Z:=A+B,$
+so that $p^{\mathrm{tail}}=B/Z$ .
+By Proposition 1, the gradient of $\ell^{\mathrm{norm}}$ is
+$g_{v}=\bar{p}(v)\left(\log\frac{\bar{p}(v)}{\bar{q}(v)}-\ell^{\mathrm{norm}}\right)\ \ \text{for }v\in S,\qquad g_{v}=0\ \ \text{for }v\notin S.$
+The update $z_{v}\leftarrow z_{v}-\eta g_{v}$ therefore leaves tail logit unchanged, and
+hence leaves $B$ unchanged.
+The change of the tail probability is thus determined by $A$ alone:
+$p^{\mathrm{tail}}(\eta)=\frac{B}{A(\eta)+B},\qquad A(\eta)=\sum_{v\in S}e^{z_{v}-\eta g_{v}}.$
+(13)
+Step 2: the derivative of $A$ is a covariance.
+Differentiating $A(\eta)$ in Eq. (13) with respect to $\eta$ and evaluating
+at $\eta=0$ gives
+$A^{\prime}(0)=-\sum_{v\in S}e^{z_{v}}g_{v}.$
+We now rewrite this sum in terms of the normalized distribution $\bar{p}$ .
+Using $e^{z_{v}}=Z\,p(v)$ and $p(v)=(1-p^{\mathrm{tail}})\,\bar{p}(v)$ for $v\in S$ , and then
+substituting the expression for $g_{v}$ from Step 1,
+$A^{\prime}(0)=-Z\bigl(1-p^{\mathrm{tail}}\bigr)\sum_{v\in S}\bar{p}(v)\,g_{v}=-Z\bigl(1-p^{\mathrm{tail}}\bigr)\left[\sum_{v\in S}\bar{p}(v)^{2}\log\frac{\bar{p}(v)}{\bar{q}(v)}-\ell^{\mathrm{norm}}\sum_{v\in S}\bar{p}(v)^{2}\right].$
+(14)
+Each of the two sums in Eq. (14) carries one factor $\bar{p}(v)$ that plays the
+role of a sampling weight, so both are expectations under $v\sim\bar{p}$ :
+$\sum_{v\in S}\bar{p}(v)^{2}\log\frac{\bar{p}(v)}{\bar{q}(v)}=\mathbb{E}_{v\sim\bar{p}}\!\left[\bar{p}(v)\log\frac{\bar{p}(v)}{\bar{q}(v)}\right],\qquad\sum_{v\in S}\bar{p}(v)^{2}=\mathbb{E}_{v\sim\bar{p}}\bigl[\bar{p}(v)\bigr].$
+Moreover $\ell^{\mathrm{norm}}=\mathbb{E}_{v\sim\bar{p}}\bigl[\log(\bar{p}(v)/\bar{q}(v))\bigr]$ by
+definition, so the bracket in Eq. (14) is the difference between the
+expectation of a product and the product of the expectations, which is exactly a covariance:
+$A^{\prime}(0)=-Z\bigl(1-p^{\mathrm{tail}}\bigr)\operatorname*{Cov}_{v\sim\bar{p}}\!\left(\bar{p}(v),\,\log\frac{\bar{p}(v)}{\bar{q}(v)}\right).$
+(15)
+The covariance appears because, by Proposition 1, the gradient on a
+top- $k$ logit is its log-ratio centered at the mean log-ratio, while its contribution to $A$
+is weighted by its own probability $\bar{p}(v)$ .
+Step 3: first-order taylor expansion.
+Differentiating $p^{\mathrm{tail}}(\eta)$ in Eq. (13) at $\eta=0$ and
+substituting Eq. (15) together with $B/Z=p^{\mathrm{tail}}$ yields
+$\frac{\mathrm{d}p^{\mathrm{tail}}}{\mathrm{d}\eta}\bigg|_{\eta=0}=-\frac{B}{(A+B)^{2}}\,A^{\prime}(0)=p^{\mathrm{tail}}\bigl(1-p^{\mathrm{tail}}\bigr)\operatorname*{Cov}_{v\sim\bar{p}}\!\left(\bar{p}(v),\,\log\frac{\bar{p}(v)}{\bar{q}(v)}\right).$
+A first-order Taylor expansion in $\eta$ , followed by splitting the log-ratio as
+$\log\bar{p}(v)-\log\bar{q}(v)$ and using the linearity of the covariance in its second
+argument, gives the stated identity:
+$\Delta p^{\mathrm{tail}}=\eta\,p^{\mathrm{tail}}\bigl(1-p^{\mathrm{tail}}\bigr)\Bigl[\operatorname*{Cov}_{v\sim\bar{p}}\bigl(\bar{p}(v),\log\bar{p}(v)\bigr)-\operatorname*{Cov}_{v\sim\bar{p}}\bigl(\bar{p}(v),\log\bar{q}(v)\bigr)\Bigr]+O(\eta^{2}).$
+Since $p^{\mathrm{tail}}\in(0,1)$ , the prefactor $p^{\mathrm{tail}}(1-p^{\mathrm{tail}})$ is
+strictly positive, so for sufficiently small $\eta>0$ the sign of $\Delta p^{\mathrm{tail}}$
+is determined by the sign of the covariance difference. The tail probability therefore
+increases if and only if the student self-covariance exceeds the student–teacher covariance.
+∎
+A.3 Proof of Proposition 3
+Proof.
+Fix a step $t$ and a prefix $\hat{y}_{<t}$ , and omit the subscript $t$ throughout, following
+the convention of Appendix A.1: write $S=S_{t}^{k}$ , $z_{v}=z_{t,v}$ ,
+$p(v)=p_{t}(v)$ , $q(v)=q_{t}(v)$ , and $p^{\mathrm{tail}}=p_{t}^{\mathrm{tail}}$ ,
+$q^{\mathrm{tail}}=q_{t}^{\mathrm{tail}}$ , so that
+$\ell^{\mathrm{TA}}=\sum_{u\in S}p(u)\log\frac{p(u)}{q(u)}+p^{\mathrm{tail}}\log\frac{p^{\mathrm{tail}}}{q^{\mathrm{tail}}},\qquad p^{\mathrm{tail}}=\sum_{u\notin S}p(u).$
+Since $S$ is selected from the teacher distribution, $S$ , $q$ , and $q^{\mathrm{tail}}$ are
+constants with respect to the student logits.
+Unlike the normalized loss of Proposition 1, $\ell^{\mathrm{TA}}$
+depends on the student through the unnormalized probabilities, and the tail tokens
+enter it through their aggregate $p^{\mathrm{tail}}$ .
+We proceed in three steps: we first differentiate $\ell^{\mathrm{TA}}$ with respect to the
+probabilities of all tokens, then push the derivative through the full softmax Jacobian, and
+finally read off the two cases of the claim.
+Step 1: the derivative with respect to probability.
+We treat $\ell^{\mathrm{TA}}$ as a function of the full probability vector
+$\bigl(p(u)\bigr)_{u\in\mathcal{V}}$ rather than eliminating $p^{\mathrm{tail}}$ .
+A top- $k$ token $u\in S$ appears only in its own summand, and a tail token $u\notin S$
+appears only inside $p^{\mathrm{tail}}$ , on which it acts with
+$\partial p^{\mathrm{tail}}/\partial p(u)=1$ . Hence
+$\frac{\partial\ell^{\mathrm{TA}}}{\partial p(u)}=\begin{cases}\log\dfrac{p(u)}{q(u)}+1,&u\in S,\\[10.00002pt]
+\log\dfrac{p^{\mathrm{tail}}}{q^{\mathrm{tail}}}+1,&u\notin S.\end{cases}$
+(16)
+Step 2: pushing through the softmax Jacobian.
+The student distribution is a softmax over the full vocabulary,
+$p(u)=e^{z_{u}}/\sum_{w\in\mathcal{V}}e^{z_{w}}$ , whose Jacobian is
+$\partial p(u)/\partial z_{v}=p(u)\bigl(\mathbf{1}[u=v]-p(v)\bigr)$ for all
+$u,v\in\mathcal{V}$ . Combining it with Eq. (16) through the chain rule gives
+$\frac{\partial\ell^{\mathrm{TA}}}{\partial z_{v}}=\sum_{u\in\mathcal{V}}\frac{\partial\ell^{\mathrm{TA}}}{\partial p(u)}\,\frac{\partial p(u)}{\partial z_{v}}=p(v)\,\frac{\partial\ell^{\mathrm{TA}}}{\partial p(u)}\bigg|_{u=v}-p(v)\sum_{u\in\mathcal{V}}p(u)\,\frac{\partial\ell^{\mathrm{TA}}}{\partial p(u)}.$
+(17)
+Note that for the second term, we have
+$\sum_{u\in\mathcal{V}}p(u)\,\frac{\partial\ell^{\mathrm{TA}}}{\partial p(u)}=\sum_{u\in S}p(u)\left(\log\frac{p(u)}{q(u)}+1\right)+\left(\sum_{u\notin S}p(u)\right)\!\left(\log\frac{p^{\mathrm{tail}}}{q^{\mathrm{tail}}}+1\right)=\ell^{\mathrm{TA}}+1,$
+where the second equality uses $\sum_{u\notin S}p(u)=p^{\mathrm{tail}}$ to recover the tail
+term of $\ell^{\mathrm{TA}}$ , and $\sum_{u\in\mathcal{V}}p(u)=1$ to collect the constant.
+Step 3: the gradient on each logit.
+Substituting $\ell^{\mathrm{TA}}+1$ for the sum in Eq. (17), we have
+$\frac{\partial\ell^{\mathrm{TA}}}{\partial z_{v}}=\begin{cases}p(v)\left(\log\dfrac{p(v)}{q(v)}-\ell^{\mathrm{TA}}\right),&v\in S,\\[11.99998pt]
+p(v)\left(\log\dfrac{p^{\mathrm{tail}}}{q^{\mathrm{tail}}}-\ell^{\mathrm{TA}}\right),&v\notin S,\end{cases}$
+(18)
+which establishes (5).
+∎
+A.4 Proof of Proposition 4
+Proof.
+Fix a step $t$ and drop the subscript $t$ as in Appendix A.3.
+The two loss functions are
+$\ell^{\mathrm{full}}=\sum_{v\in S}p(v)\log\frac{p(v)}{q(v)}+\sum_{v\notin S}p(v)\log\frac{p(v)}{q(v)},\qquad\ell^{\mathrm{TA}}=\sum_{v\in S}p(v)\log\frac{p(v)}{q(v)}+p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}},$
+where we have split $\ell^{\mathrm{full}}=D_{\mathrm{KL}}(p\|q)$ into the top- $k$ tokens and the
+tail tokens so that the two losses can be compared term by term.
+The two objectives share the same top- $k$ term and differ only in how they treat the
+tail, so taking the difference cancels the top- $k$ term and leaves
+$\ell^{\mathrm{full}}-\ell^{\mathrm{TA}}=\sum_{v\notin S}p(v)\log\frac{p(v)}{q(v)}-p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}.$
+(19)
+It remains to compute the right-hand side of (19). Substituting
+$p(v)=p_{\mathrm{tail}}\,\tilde{p}(v)$ and $q(v)=q_{\mathrm{tail}}\,\tilde{q}(v)$ for
+$v\notin S$ into its first term and splitting the logarithm gives
+$\displaystyle\sum_{v\notin S}p(v)\log\frac{p(v)}{q(v)}$
+$\displaystyle=\sum_{v\notin S}p_{\mathrm{tail}}\,\tilde{p}(v)\log\frac{p_{\mathrm{tail}}\,\tilde{p}(v)}{q_{\mathrm{tail}}\,\tilde{q}(v)}$
+$\displaystyle=p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}\sum_{v\notin S}\tilde{p}(v)+p_{\mathrm{tail}}\sum_{v\notin S}\tilde{p}(v)\log\frac{\tilde{p}(v)}{\tilde{q}(v)}$
+$\displaystyle=p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}+p_{\mathrm{tail}}\,D_{\mathrm{KL}}(\tilde{p}\|\tilde{q}),$
+where the last equality uses that $\tilde{p}$ is a probability distribution over the tail
+tokens, $\sum_{v\notin S}\tilde{p}(v)=1$ , and recognizes the remaining sum as
+$D_{\mathrm{KL}}(\tilde{p}\|\tilde{q})$ .
+Substituting this back into (19), the terms
+$p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}$ cancel and we obtain
+$\ell^{\mathrm{full}}-\ell^{\mathrm{TA}}=p_{\mathrm{tail}}\,D_{\mathrm{KL}}(\tilde{p}\|\tilde{q}).$
+∎
+A.5 Proof of Proposition 5
+Proof.
+Fix step $t$ and drop the subscript $t$ as in Appendix A.3: write $S=S_{t}^{k}$ ,
+$S^{+}=S_{t}^{+}$ , $p(v)=p_{t}(v)$ , $q(v)=q_{t}(v)$ , $\hat{y}=\hat{y}_{t}$ ,
+$p_{\mathrm{tail}}=p_{t}^{\mathrm{tail}}$ , and $q_{\mathrm{tail}}=q_{t}^{\mathrm{tail}}$ .
+Recall that the stop-gradient operator $\operatorname{sg}(\cdot)$ acts as the identity in the
+forward pass and has zero derivative, i.e., $\operatorname{sg}(x)=x$ in value and
+$\nabla_{\theta}\operatorname{sg}(x)=0$ .
+Throughout, the expectation is taken with respect to $\hat{y}\sim p$ , where the sampling
+distribution is fixed at the current parameters.
+We will repeatedly use the identity
+$\mathbb{E}_{\hat{y}\sim p}\bigl[\mathbf{1}[\hat{y}\notin S]\bigr]=\sum_{v\notin S}p(v)=p_{\mathrm{tail}}.$
+(20)
+Unbiasedness in value.
+Without considering the gradient, $\frac{p(\hat{y})}{\operatorname{sg}(p(\hat{y}))}=1$ , so
+$\displaystyle\ell^{\mathrm{SC\text{-}TA}}$
+$\displaystyle=\sum_{v\in S^{+}}p(v)\operatorname{sg}\!\left(\log\frac{p(v)}{q(v)}\right)+\mathbf{1}[\hat{y}\notin S]\,\frac{p(\hat{y})}{\operatorname{sg}(p(\hat{y}))}\operatorname{sg}\!\left(\log\frac{p(\hat{y})/p_{\mathrm{tail}}}{q(\hat{y})/q_{\mathrm{tail}}}\right)$
+$\displaystyle=\sum_{v\in S}p(v)\log\frac{p(v)}{q(v)}+p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}+\mathbf{1}[\hat{y}\notin S]\left(\log\frac{p(\hat{y})}{q(\hat{y})}-\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}\right),$
+(21)
+where the second equality expands $S^{+}=S\cup\{v_{\mathrm{tail}}\}$ using
+$p(v_{\mathrm{tail}})=p_{\mathrm{tail}}$ and $q(v_{\mathrm{tail}})=q_{\mathrm{tail}}$ .
+The first two terms are deterministic given the prefix.
+For the third term, taking the expectation over $\hat{y}\sim p$ and using
+Eq. (20) gives
+$\mathbb{E}_{\hat{y}\sim p}\!\left[\mathbf{1}[\hat{y}\notin S]\left(\log\frac{p(\hat{y})}{q(\hat{y})}-\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}\right)\right]=\sum_{v\notin S}p(v)\log\frac{p(v)}{q(v)}-p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}.$
+Summing the three terms, the two occurrences of
+$p_{\mathrm{tail}}\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}$ cancel and we obtain
+$\mathbb{E}_{\hat{y}\sim p}\bigl[\ell^{\mathrm{SC\text{-}TA}}\bigr]=\sum_{v\in S}p(v)\log\frac{p(v)}{q(v)}+\sum_{v\notin S}p(v)\log\frac{p(v)}{q(v)}=D_{\mathrm{KL}}(p\,\|\,q),$
+which establishes the unbiasedness in value.
+Unbiasedness in gradient.
+We first compute the gradient of the exact full-vocabulary reverse KL. Since $q$ is fixed,
+$\nabla_{\theta}\,D_{\mathrm{KL}}(p\,\|\,q)=\sum_{v\in\mathcal{V}}\nabla_{\theta}p(v)\left(\log\frac{p(v)}{q(v)}+1\right)=\sum_{v\in\mathcal{V}}\nabla_{\theta}p(v)\,\log\frac{p(v)}{q(v)},$
+where the last equality uses
+$\sum_{v\in\mathcal{V}}\nabla_{\theta}p(v)=\nabla_{\theta}\sum_{v\in\mathcal{V}}p(v)=\nabla_{\theta}1=0$ .
+We now differentiate $\ell^{\mathrm{SC\text{-}TA}}$ .
+Since the log-ratios are wrapped in stop-gradients, only the leading probabilities carry
+gradients in the first term.
+Note that $p_{\mathrm{tail}}=\sum_{v\notin S}p(v)$ depends on $\theta$ , so
+$\nabla_{\theta}p_{\mathrm{tail}}=\sum_{v\notin S}\nabla_{\theta}p(v)$ , and therefore
+$\nabla_{\theta}\sum_{v\in S^{+}}p(v)\operatorname{sg}\!\left(\log\frac{p(v)}{q(v)}\right)=\sum_{v\in S}\nabla_{\theta}p(v)\,\log\frac{p(v)}{q(v)}+\Bigl(\sum_{v\notin S}\nabla_{\theta}p(v)\Bigr)\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}.$
+For the second term, only the numerator $p(\hat{y})$ in
+$\frac{p(\hat{y})}{\operatorname{sg}(p(\hat{y}))}$ carries gradients, so
+$\nabla_{\theta}\!\left[\mathbf{1}[\hat{y}\notin S]\,\frac{p(\hat{y})}{\operatorname{sg}(p(\hat{y}))}\operatorname{sg}\!\left(\log\frac{p(\hat{y})/p_{\mathrm{tail}}}{q(\hat{y})/q_{\mathrm{tail}}}\right)\right]=\mathbf{1}[\hat{y}\notin S]\,\frac{\nabla_{\theta}p(\hat{y})}{p(\hat{y})}\left(\log\frac{p(\hat{y})}{q(\hat{y})}-\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}\right).$
+Taking the expectation over $\hat{y}\sim p$ of the second term gives
+$\displaystyle\mathbb{E}_{\hat{y}\sim p}\!\left[\mathbf{1}[\hat{y}\notin S]\,\frac{\nabla_{\theta}p(\hat{y})}{p(\hat{y})}\left(\log\frac{p(\hat{y})}{q(\hat{y})}-\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}\right)\right]$
+$\displaystyle=\sum_{v\notin S}p(v)\cdot\frac{\nabla_{\theta}p(v)}{p(v)}\left(\log\frac{p(v)}{q(v)}-\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}\right)=\sum_{v\notin S}\nabla_{\theta}p(v)\,\log\frac{p(v)}{q(v)}-\Bigl(\sum_{v\notin S}\nabla_{\theta}p(v)\Bigr)\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}.$
+Combining the two terms, the contributions involving
+$\log\frac{p_{\mathrm{tail}}}{q_{\mathrm{tail}}}$ cancel exactly and we obtain
+$\mathbb{E}_{\hat{y}\sim p}\bigl[\nabla_{\theta}\,\ell^{\mathrm{SC\text{-}TA}}\bigr]=\sum_{v\in S}\nabla_{\theta}p(v)\,\log\frac{p(v)}{q(v)}+\sum_{v\notin S}\nabla_{\theta}p(v)\,\log\frac{p(v)}{q(v)}=\nabla_{\theta}\,D_{\mathrm{KL}}(p\,\|\,q),$
+which establishes the unbiasedness in gradient. This completes the proof.
+∎
+Appendix B Detailed Analysis of the tail probability increase
+In this section, we conduct several controlled experiments to identify when the
+tail probability increase occurs.
+We find that it arises under two conditions: a large capability gap between the student and teacher, and an insufficiently large $k$ .
+Figure 7:
+The student’s tail probability, the teacher’s tail probability, and the student’s entropy across training steps under different student–teacher capability gaps.
+The teacher is Qwen3-8B, and the students are Qwen3-1.7B-Base and Qwen3-8B-Base.
+The tail probability increase occurs for Qwen3-1.7B-Base but not for Qwen3-8B-Base.
+The tail probability increase occurs when the student–teacher capability gap is large.
+We conduct an ablation study to demonstrate that the tail probability increase occurs when the capability gap between the student and teacher is large.
+Specifically, we fix Qwen3-8B as the teacher and compare two students, Qwen3-1.7B-Base and Qwen3-8B-Base, where the latter has a smaller capability gap to the teacher.
+For this ablation study, we set the maximum response length to 4096.
+In Figure 7, we visualize the student’s and teacher’s tail probabilities on student-generated prefixes, together with the student’s entropy.
+The tail probability increase emerges only under the large capability gap: for Qwen3-1.7B-Base, the student’s tail probability and entropy steadily increase over training steps, whereas for Qwen3-8B-Base, both remain low and stable.
+Overall, the tail probability increase arises when the student–teacher capability gap is large and is mitigated as the gap narrows.
+Figure 8:
+The student’s tail probability, the teacher’s tail probability, and the student’s entropy across training steps.
+The student and teacher models are Qwen2.5-Math-1.5B and DeepSeek-R1-Distill-Qwen-7B, respectively.
+The tail probability increase occurs when $k\leq 64$ .
+The tail probability increase occurs when $k$ is not sufficiently large.
+We conduct an ablation study on how $k$ affects the tail probability increase by fixing
+the student and teacher, and varying only $k$ . Specifically, we use
+Qwen2.5-Math-1.5B as the student and DeepSeek-R1-Distill-Qwen-7B as the teacher,
+and sweep $k\in\{8,16,32,64\}$ .
+For this ablation study, we set the training max response length to 4096.
+In Figure 8, we visualize the student’s and teacher’s tail probability on student-generated prefixes, together with the student’s entropy, across different values of $k$ .
+The tail probability increase emerges when $k$ is not sufficiently large ( $k\leq 64$ ): over training steps, the student’s tail probability steadily increases together with its entropy.
+The effect becomes stronger as $k$ decreases, with smaller $k$ yielding higher entropy and a larger increase in
+tail probability.
+In principle, this issue vanishes as $k$ approaches the vocabulary size, since the top- $k$ objective then reduces to the full-vocabulary OPD, under which the tail probability is explicitly matched to the teacher’s.
+This behavior is expected from Proposition 2: the magnitude of
+the single-step increase is proportional to $p_{t}^{\mathrm{tail}}(1-p_{t}^{\mathrm{tail}})$ ,
+which shrinks as $p_{t}^{\mathrm{tail}}\to 0$ .
+Since a larger $k$ yields a smaller initial tail probability, each update moves
+$p_{t}^{\mathrm{tail}}$ less, mitigating the compounding increase over training.
+Overall, the tail probability increase arises when $k$ is not sufficiently large and is mitigated as $k$ increases.
+Figure 9:
+The student’s tail probability, the teacher’s tail probability, and the student’s entropy across training steps under different maximum response lengths.
+The student and teacher models are Qwen2.5-7B-Instruct and OpenThinker3-7B, respectively.
+The tail probability increase becomes more pronounced as the maximum response length grows.
+The tail probability increase becomes more pronounced with longer responses.
+We study how the response length affects the tail probability increase by fixing the student and teacher, and varying only the maximum response length.
+Specifically, we use Qwen2.5-7B-Instruct as the student and OpenThinker3-7B as the teacher, and compare maximum response lengths of 4096 and 7168 tokens.
+In Figure 9, we visualize the student’s and teacher’s tail probabilities on student-generated prefixes, together with the student’s entropy, under the two length settings.
+The results show that the tail probability increase is amplified under the longer response length: the student’s tail probability and entropy grow faster and reach higher values throughout training.
+We attribute this to error compounding along longer trajectories: as the student’s tail probability rises, sampling more tokens per response increases the chance of drifting outside the teacher’s top- $k$ tokens, driving the student toward uncertain prefixes where the teacher’s supervision is unreliable and further inflating the tail probability.
+Overall, the tail probability increase is exacerbated by longer response lengths, suggesting that the issue is particularly concerning for long-horizon tasks.
+The tail probability increase does not occur with the student top- $k$ OPD.
+Prior work also adopts the student’s top- $k$ tokens as the support (Li et al., 2026).
+We examine this choice with Qwen3-1.7B-Base as the student and Qwen3-8B as the teacher,
+varying only the support between $\operatorname{TopK}(q_{t},k)$ and $\operatorname{TopK}(p_{t},k)$ .
+In each case, the tail probabilities of both models are computed with respect to the
+support in use, i.e. the teacher’s top- $k$ tokens for the teacher top- $k$ variant and the
+student’s top- $k$ tokens for the student top- $k$ variant.
+As shown in Figure 10, the tail probability increase is specific to
+the teacher top- $k$ support.
+Two mechanisms explain this.
+First, among all token sets of size $k$ , $\operatorname{TopK}(p_{t},k)$ is the one that leaves
+the least probability mass outside it, so the student’s tail probability starts near zero.
+By Proposition 2, the per-step change is proportional to
+$p_{t}^{\mathrm{tail}}(1-p_{t}^{\mathrm{tail}})$ , and each update therefore moves
+$p_{t}^{\mathrm{tail}}$ only slightly.
+Second, the student top- $k$ support is changing given a prefix: it is recomputed from the student at every step, so a token whose probability is pushed down simply drops out of the support and is replaced by another token that the student now ranks in its top $k$ .
+The support therefore always consists of the student’s $k$ most probable tokens, and the
+probability mass it covers cannot leak away.
+The teacher top- $k$ support, in contrast, is fixed by the teacher and does not follow the
+student, so the mass pushed outside it stays outside and accumulates across steps.
+Figure 10:
+The student’s tail probability, the teacher’s tail probability, and the student’s
+entropy across training steps under the student and teacher top- $k$ supports.
+The student and teacher models are Qwen3-1.7B-Base and Qwen3-8B.
+The tail probabilities are computed with respect to the support in use.
+The tail probability increase occurs only under the teacher top- $k$ support.
+The teacher top- $k$ OPD yields better downstream performance than the student top- $k$ OPD.
+Although the student top- $k$ support avoids the tail probability increase, it underperforms
+the teacher top- $k$ support on downstream benchmarks (Table 3).
+We attribute this to two factors.
+First, as shown in Figure 11, the average rollout length under
+the student top- $k$ support grows monotonically and saturates at the maximum response length
+of $7168$ tokens within the first $50$ steps, while the teacher top- $k$ variant maintains a healthy response length.
+Second, the teacher top- $k$ support directly covers the teacher’s high-probability tokens, whereas the student’s top- $k$ tokens may carry little teacher probability, allowing the objective to be reduced without moving the student toward the teacher’s high-probability modes.
+Given the superior downstream performance, we mainly study the teacher top- $k$ OPD in this work.
+Figure 11:
+Average response length across training steps under the student and teacher top- $k$
+supports.
+The student and teacher models are Qwen3-1.7B-Base and Qwen3-8B, respectively.
+Under the student top- $k$ support, the response length saturates at the maximum response
+length of $7168$ tokens, while the teacher top- $k$ variant maintains a healthy response length.
+Table 3:
+Performance of normalized top- $k$ OPD under the student and teacher top- $k$ supports.
+The Avg. column represents the macro-average across all six math reasoning benchmarks.
+Best results are shown in bold.
+Method
+MATH500
+Minerva
+Olympiad
+AMC
+AIME 24
+AIME 25
+Avg.
+Student: Qwen3-1.7B-Base
+Teacher: Qwen3-8B
+Student top- $k$
+68.58
+25.32
+33.35
+36.00
+9.17
+6.25
+29.78
+Teacher top- $k$
+69.93
+25.46
+33.41
+36.00
+9.17
+7.08
+30.18
+Appendix C Compared Methods
+Sampled-token OPD.
+Sampled-token OPD (Lu and Lab, 2025; Xiao et al., 2026) supervises only the token $\hat{y}_{t}\sim p_{t}$ sampled by the student:
+$\ell_{t}^{\mathrm{sample}}=\log p_{t}(\hat{y}_{t})-\log q_{t}(\hat{y}_{t}).$
+It is an unbiased estimate of the full-vocabulary reverse KL divergence and requires only the sampled token’s log-probability from the teacher, but it discards the dense information over the remaining vocabulary and suffers from high variance.
+Unnormalized top- $k$ OPD.
+Unnormalized top- $k$ OPD restricts the divergence computation to the teacher’s top- $k$ tokens $S_{t}^{k}=\operatorname{TopK}(q_{t},k)$ while keeping the original probabilities:
+$\ell_{t}^{\mathrm{unnorm}}=\sum_{v\in S_{t}^{k}}p_{t}(v)\log\frac{p_{t}(v)}{q_{t}(v)}.$
+It provides dense supervision over $S_{t}^{k}$ , but is not a well-defined divergence.
+Normalized top- $k$ OPD.
+Normalized top- $k$ OPD (Li et al., 2026; Fu et al., 2026) instead renormalizes both distributions on $S_{t}^{k}$ and minimizes the resulting subset reverse KL divergence:
+$\ell_{t}^{\mathrm{norm}}=D_{\mathrm{KL}}\!\bigl(\bar{p}_{t}^{(S_{t}^{k})}\,\|\,\bar{q}_{t}^{(S_{t}^{k})}\bigr)=\sum_{v\in S_{t}^{k}}\bar{p}_{t}^{(S_{t}^{k})}(v)\log\frac{\bar{p}_{t}^{(S_{t}^{k})}(v)}{\bar{q}_{t}^{(S_{t}^{k})}(v)}.$
+It aligns the student’s relative shape with the teacher’s over $S_{t}^{k}$ , but the normalization discards the tail probability, which, as we show in Section 3.1, steadily increases the student’s tail probability and entropy.
+Appendix D Implementation Details
+D.1 Experimental Details
+We implement all methods using the VERL framework (Sheng et al., 2025) and conduct experiments with 6 NVIDIA Pro 6000 GPUs, 8 NVIDIA A100 80 GB GPUs, or 32 NVIDIA A100 40 GB GPUs.
+Unless otherwise specified, all experiments use the default settings and hyperparameters listed in Table 4.
+For evaluation, we adopt the same prompt as Yan et al. (2026),
+which is shown in Prompt D.1.
+For experiments using Llama-3.1-8B as the student, we adopt the tokenizer and chat template of DeepSeek-R1-Distill-Llama-8B and synchronize the corresponding vocabulary and special-token configurations.
+Table 4: Default training and evaluation settings.
+Category
+Item
+Value
+Training
+Training temperature
+1.0
+Global batch size
+72
+Mini batch size
+36
+Rollout number
+4
+$k$ (Number of Top- $k$ Tokens)
+16
+Top- $p$
+1.0
+Max prompt length
+1024
+Max response length
+7168
+Learning rate
+1e-6
+Training step
+300
+loss aggregation
+token-mean
+optimizer
+AdamW
+Evaluation
+Temperature
+0.7
+Top- $p$
+0.95
+Max new tokens
+8192
+Your task is to follow a systematic, thorough reasoning process before providing the final solution. This involves analyzing, summarizing, exploring, reassessing, and refining your thought process through multiple iterations. Structure your response into two sections: Thought and Solution. In the Thought section, present your reasoning using the format: ”<think>\n thoughts </think>\n”. Each thought should include detailed analysis, brainstorming, verification, and refinement of ideas. After ”</think>\n” in the Solution section, provide the final, logical, and accurate answer, clearly derived from the exploration in the Thought section. If applicable, include the answer in \boxed{} for closed-form results like multiple choices or mathematical solutions.
+User: {QUESTION}
+Assistant:
+D.2 Numerically Stable Computation of TA-OPD
+The per-token TA-OPD loss in Eq. (4) depends on the tail
+log-probabilities $\log p_{t}^{\mathrm{tail}}$ and $\log q_{t}^{\mathrm{tail}}$ .
+Below, we describe a failure case of a naive implementation and how we
+implement the loss.
+Numerical issue of a naive implementation.
+The inference engine vLLM only provides access to the teacher’s top- $k$
+log-probabilities $\log q_{t}(v)$ , not the probabilities themselves.
+A naive implementation of TA-OPD loss is to exponentiate these log-probabilities back to
+probability space, sum them to obtain the total probability of the top- $k$ tokens
+$1-q_{t}^{\mathrm{tail}}=\sum_{v\in S_{t}^{k}}q_{t}(v)$ , and assign the remaining tail probability
+$q_{t}^{\mathrm{tail}}$ to $v_{\mathrm{tail}}$ .
+However, this is unstable.
+When the teacher’s tail probability is close to zero, numerical error can make the sum $\sum_{v\in S_{t}^{k}}q_{t}(v)$ exceed one.
+The tail probability $q_{t}^{\mathrm{tail}}$ then becomes negative, rendering
+$\log q_{t}^{\mathrm{tail}}$ ill-defined ( $-\infty$ or NaN) and producing NaN gradients.
+Our log-space implementation.
+To address the numerical issue, our implementation avoids forming $p_{t}^{\mathrm{tail}}$ and $q_{t}^{\mathrm{tail}}$ in probability space and carries out the whole
+computation in log space.
+We provide the pseudo code of our implementation in Listing 1.
+In particular, we first obtain the log total probability of the top- $k$ tokens directly from the top- $k$ log-probabilities via a log-sum-exp,
+$\log\bigl(1-p_{t}^{\mathrm{tail}}\bigr)=\operatorname{logsumexp}_{v\in S_{t}^{k}}\log p_{t}(v),\qquad\log\bigl(1-q_{t}^{\mathrm{tail}}\bigr)=\operatorname{logsumexp}_{v\in S_{t}^{k}}\log q_{t}(v),$
+which is numerically stable and never overflows.
+To further rule out the boundary case $p_{t}^{\mathrm{tail}}\to 0$ , we clamp the log total probability such that $\log(1-p_{t}^{\mathrm{tail}})\leq-\epsilon$ , ensuring a strictly positive tail probability and a finite log-domain computation.
+The tail log-probability term $\log p_{t}^{\mathrm{tail}}$ is then computed using the
+log1mexp primitive, which directly evaluates $\log(1-\exp(a))$ in log space:
+$\log p_{t}^{\mathrm{tail}}=\operatorname{log1mexp}\!\bigl(\log(1-p_{t}^{\mathrm{tail}})\bigr).$
+The teacher term $\log q_{t}^{\mathrm{tail}}$ is computed analogously.
+In this way, we avoid the numerical issues of the naive implementation.
+Listing 1: Pseudocode for the TA-OPD loss implementation.
+⬇
+def compute_taopd_loss(student_topk_log_probs, teacher_topk_log_probs, eps):
+# Input:
+# student_topk_log_probs: student log-probs on the teacher’s top-k tokens
+# teacher_topk_log_probs: teacher top-k log-probs, log q(v)
+# eps: small constant to keep the tail prob positive
+# Return:
+# loss: per-token TA-OPD reverse KL divergence on the augmented token set
+# 1. log total probability of the top-k tokens via logsumexp
+student_log_topk_prob = logsumexp(student_topk_log_probs, dim=-1) # log(1 - p_tail)
+teacher_log_topk_prob = logsumexp(teacher_topk_log_probs, dim=-1) # log(1 - q_tail)
+# 2. tail-token log-prob log(p_tail) via log1mexp
+student_tail_log_prob = log1mexp(clamp_max(student_log_topk_prob, -eps))
+teacher_tail_log_prob = log1mexp(clamp_max(teacher_log_topk_prob, -eps))
+# 3. append the tail token and compute reverse KL on the augmented token set
+student_log_p = cat([student_topk_log_probs, student_tail_log_prob], dim=-1)
+teacher_log_q = cat([teacher_topk_log_probs, teacher_tail_log_prob], dim=-1)
+taopd_loss = sum(exp(student_log_p) * (student_log_p - teacher_log_q), dim=-1)
+return taopd_loss
+Appendix E Extensive Study
+E.1 Synthetic experiment
+To provide an intuitive understanding of different OPD objectives, we construct a synthetic experiment based on a 30-armed bandit.
+Both the student and teacher policies are parameterized by vectors in $\mathbb{R}^{1\times 30}$ , and the corresponding probability distributions are obtained by applying the softmax function to these vectors.
+The teacher policy is kept fixed during training and is defined over the discrete class space $\mathcal{V}=\{1,\dots,30\}$ as the following bimodal distribution:
+$q(v)\propto\exp\!\left(-\frac{(v-10)^{2}}{2\cdot 2^{2}}\right)\;+\;0.88\cdot\exp\!\left(-\frac{(v-20)^{2}}{2\cdot 2^{2}}\right),\quad v\in\mathcal{V}.$
+The student policy is parameterized as a categorical distribution over $\mathcal{V}$ :
+$p_{\theta}(v)=\mathrm{softmax}(z_{\theta})_{v},\quad z_{\theta}\in\mathbb{R}^{30},$
+where $z_{\theta}$ is initialized from $\mathcal{N}(0,0.01^{2})$ .
+The student is optimized for 20000 steps using AdamW with learning rate $1\times 10^{-3}$ . We compare four objectives: full-vocabulary OPD, normalized top- $k$ OPD, TA-OPD, and sample-corrected TA-OPD.
+For top- $k$ OPD, $k$ is set to $8$ .
+Figure 12:
+Visualization of the student policies under different OPD objectives.
+Normalized top- $k$ OPD (Red) only matches the relative shape of the teacher distribution over the top- $k$ tokens, but fails to align the tail probability.
+In contrast, TA-OPD (Blue) and sample-corrected TA-OPD (Purple) closely recover the bimodal teacher distribution.
+TA-OPD matches both the shape and tail probability of the teacher policy.
+Figure 12 compares the final student policies trained with different OPD objectives.
+TA-OPD closely recovers the bimodal teacher distribution.
+While normalized top- $k$ OPD matches the relative shape over the teacher’s top- $k$ tokens, it assigns a substantially larger tail probability than the teacher.
+Overall, TA-OPD preserves the missing tail probability information and therefore provides a much closer approximation to the teacher policy than normalized top- $k$ OPD.
+Figure 13:
+Learning dynamics of different OPD objectives.
+TA-OPD better approximates the full-vocabulary OPD.
+TA-OPD better approximates the full-vocabulary OPD.
+Figure 13 further visualizes the optimization trajectories on the full-vocabulary reverse-KL landscape.
+In particular, we collect the logit trajectories of all methods together with the teacher logits, center them in logit space, and project them onto the first two principal components.
+We then evaluate the full-vocabulary reverse KL on this two-dimensional plane and overlay the trajectories of different objectives.
+The results show that full-vocabulary OPD and TA-OPD move toward the same low-loss region around the teacher policy, while normalized top- $k$ OPD converges to a point that remains far from the teacher under the full-vocabulary KL.
+Overall, TA-OPD’s objective provides a better top- $k$ estimate of the full-vocabulary reverse KL than the normalized objective.
+E.2 Top- $k$ Overlap Ratio of Different OPD Methods
+Li et al. (2026) find that the top- $k$ overlap ratio between the student and the teacher predicts the success of OPD well.
+Here we compare the two objectives under this metric.
+Setup.
+On each student-generated prefix, the top- $k$ overlap ratio is the fraction of the
+teacher’s top- $k$ tokens that also fall in the student’s top- $k$ tokens,
+$\mathrm{Overlap}_{t}^{k}=\frac{\bigl|\operatorname{TopK}(p_{t},k)\cap\operatorname{TopK}(q_{t},k)\bigr|}{k},$
+which we average over all tokens in a training batch.
+A higher ratio means the student and the teacher agree on which tokens are plausible,
+so the top- $k$ objective supervises a token set that is meaningful to the student.
+We use the three student–teacher pairs of Section 3.2 and
+report the ratio across training steps.
+Figure 14:
+Top- $k$ overlap ratio between the student and the teacher across training steps.
+TA-OPD achieves higher overlap ratios than normalized top- $k$ OPD across different model pairs.
+TA-OPD attains a higher top- $k$ overlap ratio.
+Figure 14 compares the overlap ratio of the two objectives.
+TA-OPD increases the overlap ratio monotonically and keeps it stable throughout training.
+In contrast, normalized top- $k$ OPD is consistently lower: for Qwen2.5-7B-Instruct the
+ratio peaks early and then collapses, and for Llama-3.1-8B it recovers only slowly and
+remains below TA-OPD for the entire run.
+Overall, TA-OPD keeps the student and the teacher aligned on the top- $k$ tokens, which is consistent with its stronger downstream accuracy.
+E.3 Computational Overhead of TA-OPD
+TA-OPD introduces no additional computational overhead compared with normalized top- $k$ OPD.
+Both methods require exactly the same teacher-side information: the log-probabilities of the teacher’s top- $k$ tokens.
+Given these quantities, TA-OPD only additionally computes the tail log-probabilities $\log p_{t}^{\mathrm{tail}}$ and $\log q_{t}^{\mathrm{tail}}$ , which involve a single log-sum-exp over $k$ values per token.
+This cost is negligible relative to the forward and backward passes of the student model.
+Sample-corrected TA-OPD additionally requires the teacher’s log-probability of the sampled token $\hat{y}_{t}$ .
+Although this appears to be an extra query, it incurs negligible additional cost in practice: when queried for the top- $k$ log-probabilities, inference engines such as vLLM (Kwon et al., 2023) always compute and return the sampled token’s log-probability as well, even if it falls outside the top- $k$ tokens.
+Therefore, the teacher-query cost of sample-corrected TA-OPD is identical to that of TA-OPD.
+We empirically verify this by measuring the wall-clock cost of the sampled-token OPD, normalized top- $k$ OPD, TA-OPD, and sample-corrected TA-OPD under the same setup.
+We use Qwen3-1.7B as the student and Qwen3-30B-A3B-Instruct-2507 as the teacher, with all other settings following Table 4.
+As shown in Figure 15 (a), completing the full $300$ training steps takes $23$ h $2$ m $18$ s for TA-OPD and $22$ h $47$ m $56$ s for normalized top- $k$ OPD, i.e., a difference of $14$ m $22$ s, or $1.05\%$ of the total runtime.
+This 14-minute gap might stem from the slightly longer average response length under TA-OPD.
+Figure 15 (b) further compares the per-step throughput distributions, whose medians are around $1000$ and $1005$ tokens/s for TA-OPD and normalized top- $k$ OPD, respectively.
+Overall, TA-OPD incurs negligible computational cost compared to normalized top- $k$ OPD.
+(a) Total training runtime.
+(b) Throughput distribution during training.
+Figure 15: Computational overhead comparison between sampled-token OPD, normalized Top- $k$ OPD, TA-OPD, and sample-corrected TA-OPD.
+Left: total training runtime. Right: throughput distribution across training steps.
+The student and teacher models are Qwen3-1.7B and Qwen3-30B-A3B-Instruct-2507, respectively.
+E.4 Ablation on the Tail Token
+Our analysis attributes the tail probability increase issue to top- $k$ normalization.
+A natural question is therefore whether simply removing the normalization is
+already sufficient, making the tail token in TA-OPD unnecessary.
+We show that it is not: without the tail token $v_{\mathrm{tail}}$ , training will diverge.
+Setup.
+We ablate the tail token by comparing TA-OPD with unnormalized top- $k$ OPD, which removes the tail term in TA-OPD’s loss function.
+Specifically, its loss function is given by:
+$\ell_{t}^{\mathrm{unnorm}}=\sum_{v\in S_{t}^{k}}p_{t}(v)\log\frac{p_{t}(v)}{q_{t}(v)}=\ell_{t}^{\mathrm{TA}}-p_{t}^{\mathrm{tail}}\log\frac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}.$
+The student and teacher are Qwen2.5-7B-Instruct and OpenThinker3-7B, with all
+other settings following Table 4.
+Figure 16:
+The student’s tail probability, the teacher’s tail probability, and the student’s
+token-level entropy across training steps.
+Without the tail token, the student’s tail probability rises above $0.9$ and training collapses.
+Table 5:
+Avg@8 of unnormalized top- $k$ OPD and TA-OPD.
+The Avg. column represents the macro-average across all six benchmarks.
+Best results are shown in bold.
+Methods
+MATH500
+Minerva
+Olympiad
+AMC
+AIME 24
+AIME 25
+Avg.
+Student: Qwen2.5-7B-Instruct
+Teacher: OpenThinker3-7B
+UnNorm. top- $k$
+3.35
+1.70
+1.42
+3.00
+0.42
+0.42
+1.72
+TA-OPD (Ours)
+77.88
+32.58
+42.41
+45.03
+16.67
+17.50
+38.68
+Removing the tail token collapses training.
+Figure 16 compares the training dynamics of the two objectives.
+Under unnormalized top- $k$ OPD, the student’s tail probability rises above $0.9$ within
+50 steps and its entropy grows monotonically, while the teacher’s tail probability
+increases in tandem.
+The collapse is reflected in downstream accuracy (Table 5):
+its Avg@8 on MATH500 is only 3.35%, whereas TA-OPD reaches 77.88%.
+The unnormalized objective is not a divergence.
+The failure is not an optimization artifact but a property of the objective itself:
+the objective is not minimized at $p_{t}=q_{t}$ .
+Its minimizer admits the closed form
+$p_{t}^{\star}(v)=q_{t}(v)/e\quad\forall v\in S_{t}^{k},\qquad\text{hence}\qquad p_{t}^{\mathrm{tail},\star}=1-\frac{1-q_{t}^{\mathrm{tail}}}{e}\;\geq\;1-e^{-1}\approx 0.63.$
+That is, the objective is minimized by deflating every top- $k$ probability by a
+factor of $e$ and assigning the removed mass to the tail, which drives the loss negative.
+The optimum therefore assigns at least $63\%$ of the probability mass outside the
+teacher’s top- $k$ tokens, regardless of the teacher distribution.
+Adding the tail token contributes exactly the missing term
+$p_{t}^{\mathrm{tail}}\log(p_{t}^{\mathrm{tail}}/q_{t}^{\mathrm{tail}})$ , which turns the
+objective into a reverse KL divergence on $S_{t}^{+}$ : it is non-negative and uniquely
+minimized when the student matches the teacher on both the top- $k$ tokens and the tail.
+Overall, introducing the tail token is necessary for TA-OPD.
+E.5 Discussion of EMA-PG
+Exponential Moving Average-Policy Gradient (EMA-PG) (Zhang and Ba, 2026) proposes a top- $k$ KL estimator that is related but distinct from our sample-corrected TA-OPD.
+Its per-token loss is:
+$\ell_{t}^{\mathrm{EMA}}=\underbrace{\sum_{v\in S_{t}^{k}}p_{t}(v)\operatorname{sg}\!\left(\log\frac{p_{t}(v)}{q_{t}(v)}\right)}_{\textstyle=\;\ell_{t}^{\mathrm{unnorm}}\ \text{in value}}+\mathbf{1}[\hat{y}_{t}\notin S_{t}^{k}]\,\frac{p_{t}(\hat{y}_{t})}{\operatorname{sg}(p_{t}(\hat{y}_{t}))}\operatorname{sg}\!\left(\log\frac{p_{t}(\hat{y}_{t})}{q_{t}(\hat{y}_{t})}\right).$
+(22)
+In contrast, sample-corrected TA-OPD’s per-token loss is given by:
+$\ell_{t}^{\mathrm{SC\text{-}TA}}=\underbrace{\sum_{v\in S_{t}^{+}}p_{t}(v)\operatorname{sg}\!\left(\log\frac{p_{t}(v)}{q_{t}(v)}\right)}_{\textstyle=\;\ell_{t}^{\mathrm{TA}}\ \text{in value}}+\mathbf{1}[\hat{y}_{t}\notin S_{t}^{k}]\,\frac{p_{t}(\hat{y}_{t})}{\operatorname{sg}(p_{t}(\hat{y}_{t}))}\operatorname{sg}\!\left(\log\frac{p_{t}(\hat{y}_{t})/p_{t}^{\mathrm{tail}}}{q_{t}(\hat{y}_{t})/q_{t}^{\mathrm{tail}}}\right).$
+Both estimators are unbiased in value and in gradient to full-vocabulary reverse KL divergence, but they differ in where the truncation is placed and in what the sampled token is used to estimate.
+EMA-PG estimates the entire tail contribution $\sum_{v\notin S_{t}^{k}}p_{t}(v)\log\frac{p_{t}(v)}{q_{t}(v)}$ with the sampled token.
+Instead, our estimator starts from $\ell_{t}^{\mathrm{TA}}$ , which already accounts for the
+tail probability through the tail token, and uses the sampled token only to estimate the
+residual $p_{t}^{\mathrm{tail}}D_{\mathrm{KL}}(\tilde{p}_{t}\|\tilde{q}_{t})$ identified in
+Proposition 4.
+In other words, our estimator is obtained by debiasing TA-OPD, whereas EMA-PG debiases the unnormalized top- $k$ objective.
+Behavior when the sampled token falls inside the top- $k$ tokens.
+When $\hat{y}_{t}\in S_{t}^{k}$ , which occurs with probability $1-p_{t}^{\mathrm{tail}}$ and thus
+covers most tokens, the correction term vanishes for both losses.
+In this case, $\ell_{t}^{\mathrm{EMA}}$ reduces to the unnormalized top- $k$ loss
+$\ell_{t}^{\mathrm{unnorm}}$ , while $\ell_{t}^{\mathrm{SC\text{-}TA}}$ reduces to
+$\ell_{t}^{\mathrm{TA}}$ .
+As shown in Appendix E.4, $\ell_{t}^{\mathrm{TA}}$ is superior to $\ell_{t}^{\mathrm{unnorm}}$ .
+Consequently, although EMA-PG is unbiased in expectation, on most tokens its realized
+objective is the unnormalized top- $k$ loss function that we have shown to collapse training, and it relies on infrequent
+sampled-token corrections to compensate; our estimator instead falls back to a well-defined divergence on $S_{t}^{+}$ that is uniquely minimized at $p_{t}=q_{t}$ .
+Variance analysis.
+Since both estimators are unbiased, a natural criterion for comparing them is the variance
+of the estimate.
+A direct computation gives
+$\operatorname{Var}\bigl(\ell_{t}^{\mathrm{EMA}}\bigr)-\operatorname{Var}\bigl(\ell_{t}^{\mathrm{SC\text{-}TA}}\bigr)=p_{t}^{\mathrm{tail}}\bigl(1-p_{t}^{\mathrm{tail}}\bigr)\,\log\frac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}\left(\log\frac{p_{t}^{\mathrm{tail}}}{q_{t}^{\mathrm{tail}}}+2\,D_{\mathrm{KL}}(\tilde{p}_{t}\|\tilde{q}_{t})\right).$
+(23)
+Since $D_{\mathrm{KL}}(\tilde{p}_{t}\|\tilde{q}_{t})\geq 0$ , the gap is strictly positive whenever
+$p_{t}^{\mathrm{tail}}>q_{t}^{\mathrm{tail}}$ , i.e. whenever the student’s tail probability
+exceeds the teacher’s, which is likely to happen when using the teacher’s top- $k$ support.
+Since the support $S_{t}^{k}$ consists of the teacher’s top- $k$ tokens, the teacher’s tail probability is typically smaller than the student’s.
+Figures 4 confirms this
+empirically, where $q_{t}^{\mathrm{tail}}$ is below $p_{t}^{\mathrm{tail}}$ throughout
+training across all model pairs.
+Overall, our loss objective tends to have lower variance than EMA-PG.
+Appendix F Detailed Results
+F.1 Training Dynamics of Additional Model Pairs
+Figure 17 presents additional comparisons between TA-OPD and normalized top- $k$ OPD in terms of tail probability and token-level entropy during training.
+Results are shown on three student–teacher pairs: Qwen3-1.7B paired with Qwen3-30B-A3B-Instruct-2507, Llama-3.1-8B paired with DeepSeek-R1-Distill-Llama-8B, Qwen3-1.7B-Base paired with Qwen3-8B.
+Qwen3-1.7B (Student) $\rightarrow$ Qwen3-30B-A3B-Instruct-2507 (Teacher)
+Llama-3.1-8B (Student) $\rightarrow$ DeepSeek-R1-Distill-Llama-8B (Teacher)
+Qwen3-1.7B-Base (Student) $\rightarrow$ Qwen3-8B (Teacher)
+Figure 17:
+Tail probability and token-level entropy over training for TA-OPD and Normalized top- $k$ OPD.
+Each row corresponds to a different student-teacher pair.
+Qwen2.5-Math-1.5B (Student) $\rightarrow$ JustRL-DeepSeek-1.5B (Teacher)
+DeepSeek-R1-Distill-Qwen-1.5B (Student) $\rightarrow$ JustRL-DeepSeek-1.5B (Teacher)
+Figure 18: Tail probability and token-level entropy over training for TA-OPD and Normalized top- $k$ OPD under different student-teacher capability gaps.
+The tail probability increase only occurs for Qwen2.5-Math-1.5B but not for DeepSeek-R1-Distill-Qwen-1.5B.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

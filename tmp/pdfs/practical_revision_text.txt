@@ -1,0 +1,1025 @@
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+000
+001
+      GPAS: O PTIMIZER -AWARE A LLOCATION
+002   FOR M ULTI -T EACHER O N -P OLICY D ISTILLATION
+003
+004
+005    Anonymous authors
+006    Paper under double-blind review
+007
+008
+009                                               A BSTRACT
+010
+011            Multi-teacher on-policy distillation (MOPD) combines task-specific teacher feed-
+012            back in a shared student. Its training budget must accommodate tasks whose
+013            responses differ in length and whose gradients vary in reliability. Dense top-
+014            k supervision already uses several teacher scores at each position, but different
+015            prompts and student-generated trajectories still produce different updates. We in-
+016
+               troduce Gradient-Preconditioned Adaptive Sampling (GPAS), a micro-batch allo-
+               cation method that uses this remaining variation to decide how much computation
+017
+               each task receives. GPAS averages each task’s gradients under fixed objective
+018
+               weights and assigns more micro-batches to tasks with larger fluctuations after the
+019            optimizer’s coordinate scaling. It reuses gradients from ordinary training and sup-
+020            ports a cost-aware mode that also accounts for task-dependent running time. We
+021            study four-domain distillation into Qwen3-1.7B, comparing training efficiency,
+022            capability integration, and allocation dynamics under existing dense distillation
+023            losses. [TODO: Report the measured efficiency difference, per-domain capa-
+024            bility changes, and the contribution of optimizer-aware allocation.]
+025
+026
+      1   I NTRODUCTION
+027
+028
+      Multi-teacher on-policy distillation (MOPD) provides a practical way to combine capabilities in
+029
+      one language model. The student generates responses, and each response is scored by the teacher
+030   assigned to its task (Ma et al., 2026). This allows specialist teachers to be developed separately and
+031   their feedback to be combined during student training. The same approach can add a new capability
+032   while using an earlier model as a teacher to preserve existing ones (Liu et al., 2026). Once the
+033   teachers are available, a recurring engineering question is how to divide the student’s training budget
+034   among their tasks.
+035
+      Existing recipes address several parts of this problem. Open-MOPD adjusts loss weights to com-
+036   pensate for response-length imbalance and to emphasize domains with larger teacher–student gaps
+037   (Gao et al., 2026). D3 -MOPD changes the sampling mixture using the remaining gap and its recent
+038   rate of decrease (Sun et al., 2026). These approaches make the allocation responsive to task balance
+039   and learning progress. They also motivate a complementary question: for a chosen balance of task
+040   objectives, how many samples are needed to obtain a reliable update from each task?
+041
+      Consider two equally weighted tasks. One gives similar gradients across micro-batches, while the
+042   other gives gradients that fluctuate widely with the sampled prompts and responses. Equal counts
+043   spend the same computation on both estimates even though the second is less precise. Giving the
+044   second task more micro-batches can make the combined update more reliable. Its objective weight
+045   can stay the same: first average the gradients within each task, then combine those averages with
+046   the chosen weights. Task importance and the amount of computation used to estimate its update are
+047   separate choices.
+048   This distinction remains useful with dense distillation. MOPD already supports a teacher top-k loss,
+049   and recent methods improve how retained tokens and the distribution tail contribute to supervision
+050   (Ma et al., 2026; Huang & Wei, 2026). Even when all retained-token contributions are computed
+051   at a fixed prefix, different prompts and student rollouts still yield different gradients. The relevant
+052   signal for allocation is therefore the variability of the actual training gradient. Teacher loss alone
+053   does not describe that variability: two tasks can have similar losses but different gradient directions
+      and response lengths.
+
+
+                                                        1
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+054
+                            Spend more samples on less precise task updates
+055
+056
+            1 Measure variability                    2 Allocate micro-batches              3 Keep task weights fixed
+057
+            Ordinary dense-loss gradients
+058                                                            mi ∝ wi√ ei                         Average within each task
+              Apply optimizer scaling D
+                                                       Example: 16 micro-batches
+059                                                                                                 A = 14 ḡMath + 14 ḡCode
+060            Math                                   Math                         2
+061                                                                                                  +14 ḡIF + 14 ḡScience
+               Code                                   Code                         6
+062
+                 IF                                     IF                         4
+063                                                                                                Different sample counts
+              Science                                Science                       4          Same intended task balance
+064
+065              Measured noise ei                     More noise, more samples                Then take the AdamW step
+066
+067                                       Reuse this step's statistics to allocate the next step
+068                                       Cost-aware mode also uses measured time per task
+069
+070   Figure 1: GPAS separates task importance from computation. Task means are combined with fixed
+071   weights w, while counts m adapt to the variation of ordinary dense-distillation gradients. The opti-
+072   mizer’s pre-step scaling D determines how those fluctuations affect the update. Observed noise and
+073   running time guide the next allocation. The task profiles are schematic.
+074
+075   We propose Gradient-Preconditioned Adaptive Sampling (GPAS), which allocates micro-batches
+076   using the gradient variation observed during ordinary MOPD training. GPAS measures this varia-
+077   tion after the optimizer’s coordinate scaling. This matters because a fluctuation has a larger effect on
+078   an update when the optimizer amplifies the coordinates in which it occurs. With fixed task weights,
+079   the resulting rule gives each task a count proportional to its weighted preconditioned standard devi-
+080   ation. A cost-aware mode also uses measured running time, allowing the same scheduler to target
+081   efficiency per step or per GPU hour.
+082   Our study follows this practical sequence: compare learning curves and per-domain capability, ex-
+083   amine where GPAS spends computation, and measure the contributions of optimizer scaling and
+084   running time. All core allocation comparisons use the same existing top-k loss. A second dense
+085   loss tests the same scheduling idea with tail-aware supervision. [TODO: Summarize the main
+086   efficiency and capability results and the allocation pattern that explains them.]
+087   The paper makes three contributions:
+088
+089            • a practical separation of task weights and micro-batch counts for MOPD, so computation
+090              can adapt while each task retains its intended contribution to the expected gradient;
+091            • an optimizer-aware allocation method that reuses micro-batch gradients, with a cost-aware
+092              mode based on measured task time;
+093            • a four-domain study relating training efficiency and capability integration to gradient vari-
+094              ability, learning progress, and the allocation of computation.
+095
+096
+      2      D ISTILLATION AND TASK A LLOCATION
+097
+098
+      2.1     D ENSE SUPERVISION ON STUDENT ROLLOUTS
+099
+100   There are M tasks with prompt distributions Di and assigned frozen teachers πTi . The student and
+101   teachers share a vocabulary. For a task-i prompt x, the student generates a response y. At position
+102   t, the teacher scores the student-generated prefix c = (x, y<t ). Write pθ (a | c) = πθ (a | c) and
+103   qi (a | c) = πTi (a | c).
+104   We use the teacher top-k loss from MOPD (Ma et al., 2026). Let Si (c) = TopKk (qi (· | c)). The
+105   position loss is
+106                                X                                                       
+                        (k)                             pθ (a | c)
+107                    ℓi (θ; c) =       pθ (a | c) log            − pθ (a | c) + qi (a | c) .     (1)
+                                                        qi (a | c)
+                                          a∈Si (c)
+
+
+                                                                    2
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+108
+      The probabilities retain their full-vocabulary normalization. The −pθ + qi correction makes the loss
+109   smallest when student and teacher probabilities agree on the retained tokens. Both the teacher scores
+110   and the generated prefixes are held fixed during the update. This retained-support objective gives
+111   a dense gradient at each observed position using a small teacher payload. GPAS operates on the
+112   resulting micro-batch gradients; the allocation method also applies to other distillation losses.
+113
+      We average position losses within each response, then average responses within a task. Positive
+114
+      weights wi , fixed before training and summing to one, specify the desired balance:
+115
+116                                                    M
+                                                       X
+117                                          F (θ) =            wi Li (θ).                              (2)
+118                                                    i=1
+
+119   Here Li is the expected response-mean loss under the current rollout distribution. Each update
+120   differentiates the loss on those sampled prefixes; Appendix A.4 gives the corresponding step-local
+121   objective. Our main study uses equal task weights.
+122
+123   2.2   AVERAGING TASK GRADIENTS BEFORE COMBINING THEM
+124
+125   A micro-batch contains b prompts from one task. An optimizer step processes G micro-batches,
+126   with task i receiving mi of them. The counts sum to G and satisfy mmin ≤ mi ≤ mmax . We use
+127
+      mmin ≥ 2 to estimate each task’s variability from the same step.
+128   Let gi,s be the gradient of the response-mean loss in micro-batch s of task i. GPAS accumulates
+129
+                                                 M               im
+130                                              X           1 X
+                                           A=          wi          gi,s .                               (3)
+131                                                         mi s=1
+                                                 i=1
+132                                                         | {z }
+                                                                task mean
+133
+134   Implementation only requires multiplying each micro-batch loss by wi /mi . For example, an equally
+135   weighted task contributes one quarter of the combined mean whether it receives two or six micro-
+136   batches; six micro-batches give a more precise estimate of that mean.
+137
+138
+                                              P data. If fresh task-i micro-batches have mean µi at the
+      Counts are chosen before drawing the step’s
+      current training state, then E[A | m] = i wi µi . Thus, the scheduler can change counts without
+139   changing the intended weighted mean. Response-level averaging also prevents a task from gaining
+140   extra loss weight simply because its responses are longer. This addresses the length imbalance
+141   highlighted by Open-MOPD (Gao et al., 2026), while making the response the unit of averaging
+142   within each task.
+143
+144
+      3     GPAS: S PENDING C OMPUTATION ON N OISY TASK E STIMATES
+145
+146
+      3.1   M EASURE FLUCTUATIONS WHERE THEY AFFECT THE UPDATE
+147
+148   GPAS asks how much a task’s micro-batch gradient varies around its own mean. A large gradient
+149   shared by every micro-batch is a consistent learning signal. A large fluctuation between micro-
+150   batches is something additional samples can average out. We measure the latter after the optimizer’s
+151   coordinate scaling, so the statistic reflects the coordinates in which the update will move.
+152   Let D be the diagonal scaling   available at the start of the step. For SGD, D = I; for Adam-type
+153   optimizers, D = diag(( vbpre + ϵ)−1 ), where vbpre is the pre-step bias-corrected second moment.
+                               p
+154   Define the task’s noise and the combined-gradient variance as
+155
+                                                                                M
+156                                                                             X w 2 ei
+                                                                                      i
+157
+                      ei = E∥D(gi − µi )∥22 ,      V (m) = E∥D(A − µ)∥22 =                 ,            (4)
+                                                                                i=1
+                                                                                      mi
+158
+                    P
+159   where µ =        i wi µi . The equality follows from conditionally independent micro-batches at a
+160   fixed training state. It captures a simple benefit of averaging: doubling a task’s count halves its
+161   contribution to the variance. We use the pre-step D as a local measure for AdamW and leave the
+      optimizer update unchanged.
+
+
+                                                            3
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+162
+      The minimum-variance continuous allocation is
+163                                                         √
+164                                                  mi ∝ wi ei .                                          (5)
+165   This is the classical Neyman allocation (Neyman, 1934; Cochran, 1977), applied to MOPD micro-
+166   batches in the optimizer’s coordinates. For equally weighted tasks, nine times the noise calls for
+167   three times as many micro-batches. The square root reflects diminishing returns: as a task receives
+168   more samples, its mean becomes more precise and further samples help less. We scale the counts to
+169   sum to G, enforce the bounds, and round by largest remainder. Appendix A.5 gives the derivation
+170   and Appendix A.6 connects the variance to a local descent bound.
+171
+172   3.2   R EUSE THE GRADIENTS ALREADY COMPUTED
+173
+      After processing a task’s micro-batches, let ḡi be their sample mean. The observed noise is
+174
+                                                       mi
+175                                               1    X
+176
+                                        ebi =              ∥D(gi,s − ḡi )∥22 .                            (6)
+                                                mi − 1 s=1
+177
+178   We smooth these measurements across steps, eei ← ρei + (1 − ρ)b ei , and use eei in the next allocation.
+179   Smoothing lets individual long or unusual responses influence the schedule gradually. The first step
+180
+      uses Uniform counts and initializes the moving averages.
+181   Tasks are processed in blocks. A running mean and a scalar sum of squared deviations give Equa-
+182   tion 6 without retaining every micro-batch gradient. The same parameter-sized mean buffer is reused
+183   for each task. The additional work consists of vector reductions and the count calculation; rollout,
+184   teacher scoring, and backward passes are the ordinary training passes. We measure the memory and
+185   running-time cost of collecting these statistics.
+186   This measurement also makes the schedule easy to interpret. We log task loss, response length,
+187   measured noise, and assigned counts together. Loss tracks the remaining distillation gap; noise
+188   tracks how variable the estimate of its update is. GPAS can therefore give two tasks with similar
+189   losses different counts, or change their relative counts as the optimizer’s scaling evolves. These
+190   trajectories connect the allocation to the training process directly, without requiring a separate token-
+191   level noise model.
+192
+193   3.3   ACCOUNT FOR THE TIME A MICRO - BATCH TAKES
+194
+      Tasks also differ in cost. A long code response may occupy the rollout engine and teacher service
+195
+      much longer than a short instruction-following response. GPAS has a cost-aware mode that uses
+196
+      measured time alongside gradient noise.
+197
+198   Let τi be the marginal time for a task-i micro-batch and C the fixed time for
+                                                                                  P synchronization, the
+199   optimizer, and other step-level work. For a step-time model T (m) = C + i mi τi , the scheduler
+200
+      minimizes                                                       !
+                                                             X          X w 2 ei
+201                                                                           i
+                             JC (m) = T (m)V (m) = C +          mi τi             .                  (7)
+202                                                           i          i
+                                                                             m  i
+203   This local criterion balances precision per update against updates per unit time. With four tasks,
+204   we enumerate the feasible
+                         p        integer count vectors. When fixed time is negligible, the continuous rule
+205   becomes mi ∝ wi ei /τi : an expensive task needs more variability to justify the same number of
+206   micro-batches. As fixed step time grows, the choice approaches the per-step rule. We fit the timing
+207   model to the training trace and evaluate efficiency using end-to-end GPU hours.
+208
+209   4     E XPERIMENTAL S ETUP
+210
+211   4.1   A FOUR - DOMAIN DISTILLATION SETTING
+212
+213   We study mathematics, code, instruction following, and science with a Qwen3-1.7B student in
+214   non-thinking mode. Mathematics and instruction following use domain-specific Qwen3-1.7B RL
+215   teachers. Code and science are routed to the same frozen Qwen3-4B model through separate task
+      endpoints. This setting combines specialized feedback and a larger generalist teacher in one student.
+
+
+                                                           4
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+216         1. Choose counts m from the previous noise and time averages; use Uniform on the first step. Read
+217            the pre-step optimizer scaling D.
+218         2. For each task, generate mi micro-batches and obtain its teacher’s top-k scores on the student
+219            responses.
+220         3. Compute the ordinary dense loss. Accumulate the task’s gradients, record their variation under
+221            D, and add the task mean to A with weight wi .
+222         4. Update the noise and time averages, then apply the usual optimizer step with gradient A.
+223
+224                                 Algorithm 1: One training step with GPAS.
+225
+226
+      The default loss is Equation 1 with teacher k = 64, and each task has weight wi = 1/4. Each step
+227
+      processes G = 16 micro-batches of b = 4 responses, with 2 ≤ mi ≤ 8. Uniform uses four micro-
+228
+      batches per task. Runs last 500 steps; each task supplies a shuffled stream of 16,000 unique prompts,
+229   and each response is capped at 4,096 tokens. There is one optimizer update per fresh rollout batch.
+230   Noise and time estimates use EMA decay 0.9. All runs use AdamW, the same task prompt orders,
+231   and one training seed per method.
+232
+      One 96-GB GPU trains the student, and one 48-GB GPU serves student rollouts and teacher scoring.
+233
+      The two generalist task endpoints share their teacher weights in memory. Appendix A.1 records the
+234
+      configuration. [TODO: Complete the exact checkpoint and data revisions, optimizer settings,
+235   software versions, and measured resource use.]
+236
+237
+      4.2   C OMPARISONS
+238
+239   The core comparison keeps the loss, response averaging, and task weights fixed, varying how the 16
+240   micro-batches are assigned:
+241
+242         • Uniform: four micro-batches per task.
+243         • GPAS (per step): counts from smoothed preconditioned gradient noise.
+244
+            • GPAS (cost-aware): counts from the time–variance criterion in Equation 7.
+245
+246         • Unpreconditioned allocation: the same variance rule with D = I for count selection;
+247           AdamW still performs the update.
+248         • D3 signal, fixed weights: counts from D3 -MOPD’s remaining-gap and descent-velocity
+249           signal, combined with our fixed task-mean weights. This compares learning progress with
+250           gradient variability as a scheduling signal.
+251
+252
+      We also include two recipe-level comparisons. D3 -MOPD scheduling uses the same gap–velocity
+      scheduling rule but averages responses across the step, so a task’s effective weight follows mi /G.
+253
+      Open-MOPD (K = 1) uses its student top-16 dense loss, token-share balancing, and gap-aware
+254
+      weighting with one update per rollout batch. Student reward refresh has no intervening update to
+255   correct in this K = 1 setting. These are adaptations to our model, data, and training budget; their
+256   task objectives differ from the fixed-weight comparison. Appendix A.3 specifies the adaptations.
+257
+258
+      Finally, TA-OPD + Uniform and TA-OPD + GPAS use the tail-aware loss of Huang & Wei (2026)
+      at the same k = 64. This pair evaluates whether the allocation remains useful when the dense
+259
+      supervision also accounts for the omitted probability mass. It brings the study to nine training
+260
+      configurations.
+261
+262
+      4.3   C APABILITY, EFFICIENCY, AND ALLOCATION TRACES
+263
+264   Capability and learning curves. We report MATH-500 greedy pass@1, a fixed LiveCodeBench
+265   pass@1 slice, IFBench strict accuracy, and GPQA-Diamond average@4. The initial student and
+266   assigned teachers are evaluated with the same benchmark protocols. The main table reports all four
+267   scores and their unweighted mean. Every 50 steps, we also evaluate 128 fixed held-out prompts
+268   per task using the common teacher top-64 loss and equal task weights. This provides a common
+269   distillation metric even for recipes trained with different losses or task weights. Shared evalua-
+      tion seeds allow paired prompt-level bootstrap intervals; these describe evaluation uncertainty, not
+
+
+                                                           5
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+270   Table 1: Capability and training efficiency in the four-domain study. Feval is the common equal-
+271   weight teacher top-64 evaluation loss. Time to target is reported within the default-loss, fixed-weight
+272   group. Dashes denote inapplicable entries; blank cells await measurements.
+273
+274             Method                        Math Code IF Science Mean Feval GPU h to target
+275             Initial student                                                          —
+276             Assigned teachers                                             —          —
+277
+                Uniform
+278             GPAS (per step)
+279             GPAS (cost-aware)
+280             Unpreconditioned allocation
+281             D3 signal, fixed weights
+282             D3 -MOPD scheduling                                                      —
+283             Open-MOPD (K = 1)                                                        —
+284             TA-OPD + Uniform                                                         —
+                TA-OPD + GPAS                                                            —
+285
+286
+287
+288
+289
+290
+          [TODO: Plot common held-out teacher loss against optimizer steps and measured GPU
+291
+           hours. Include Uniform, the two GPAS modes, and the scheduling comparisons; give
+292                        the recipe-level comparisons in a companion panel.]
+293
+294
+295
+296
+297
+                      Figure 2: Learning progress per update and per unit of computation.
+298
+299
+300
+      training-seed variation. [TODO: Insert benchmark versions, the code evaluation date range,
+301
+      and complete decoding settings.]
+302
+303
+304   Measured efficiency. We plot the common held-out loss against both optimizer steps and GPU
+305   hours. GPU hours include all time on the two reserved devices, including waiting, synchronization,
+306
+      statistics, and checkpointing. For the fixed-weight default-loss methods, we also report the time to
+      Uniform’s final held-out loss, interpolating between adjacent evaluations and marking unreached
+307
+      targets. Capability scores accompany this loss-based comparison because teacher agreement and
+308
+      task performance need not improve together.
+309
+310
+311
+      Understanding the allocation. The ordinary training loop logs task loss, its recent rate of change,
+      response length, preconditioned and unpreconditioned noise, assigned counts, and time per micro-
+312
+      batch. These traces show when a task receives more computation and whether the decision follows
+313
+      remaining gap, gradient variability, or cost. We report the time and memory used by the GPAS
+314   statistics as part of the implementation cost.
+315
+316
+317   5     R ESULTS
+318
+319   5.1   T RAINING EFFICIENCY AND PER - DOMAIN CAPABILITY
+320
+321   Table 1 and Figure 2 evaluate whether the allocation translates into useful training progress.
+322   [TODO: Report measured efficiency and every per-domain score change relative to Uniform.
+323   Describe the observed tradeoff between the two GPAS modes and the recipe-level compar-
+      isons.]
+
+
+                                                        6
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+324
+325
+326
+327
+328       [TODO: For each task, align smoothed gradient noise, allocated micro-batches, teacher
+329       loss and its rate of change, and response length over training. Show preconditioned and
+330                           unpreconditioned noise with clear, separate scales.]
+331
+332
+333
+334
+335
+      Figure 3: Allocation dynamics from the ordinary training trace. The panels connect changes in
+336   computation to changes in the task-gradient estimates and learning progress.
+337
+338
+339   5.2   W HERE DOES THE COMPUTATION GO ?
+340
+341   Figure 3 follows the decisions behind the learning curves. The comparison with unpreconditioned
+342   allocation isolates the optimizer’s coordinate scaling; the fixed-weight D3 signal compares noise
+343   with remaining gap and learning velocity. [TODO: Describe the main allocation shifts and their
+344
+      timing. Explain where the signals agree or disagree using the task traces, and relate those
+      decisions to the capability and efficiency results.]
+345
+346
+347   5.3   C OST- AWARE ALLOCATION AND REUSE WITH A SECOND DENSE LOSS
+348
+      The cost-aware run uses the observed time of each task alongside its gradient variability. We report
+349
+      the fitted step-time components, observed step times, and the time spent collecting GPAS statistics.
+350   [TODO: Report the measured cost differences and the resulting allocation and GPU-hour
+351   differences between the two GPAS modes.]
+352
+353
+      The TA-OPD pair reuses the same scheduler with tail-aware supervision. [TODO: Report the
+      capability and learning-curve differences between TA-OPD + Uniform and TA-OPD + GPAS.
+354
+      Compare the resulting allocation patterns with those under the default teacher top-64 loss.]
+355
+356
+357   6     R ELATED W ORK
+358
+359   Multi-teacher distillation in practice. MOPD combines domain teachers through supervision on
+360   student-generated responses (Ma et al., 2026); recent systems also use a specialist together with
+361   an earlier checkpoint to add skills while preserving general capability (Liu et al., 2026). Open-
+362   MOPD identifies response-token imbalance, uneven learning progress, and stale student-dependent
+363
+      rewards, addressing them through loss weighting and reward refresh (Gao et al., 2026). D3 -MOPD
+      adapts domain sampling using the remaining teacher gap and its descent velocity (Sun et al., 2026).
+364
+      GPAS addresses the precision of task-gradient estimates under specified objective weights, using
+365
+      their measured variability and computational cost.
+366
+367
+      Dense losses and token estimators. MOPD includes both sampled-token policy gradients and
+368
+      a corrected reverse-KL loss on the teacher’s top-k tokens (Ma et al., 2026). Open-MOPD uses
+369   student top-k candidates with probability-weighted log-ratio advantages; its released dense imple-
+370   mentation computes candidate-wise losses before summing across the retained set (Gao et al., 2026;
+371   BytedTsinghua-SIA, 2026). EMA-PG combines an exact retained-set contribution with a sampled
+372   tail (Zhang & Ba, 2026), TA-OPD includes the probability mass outside the teacher’s top-k set
+373   (Huang & Wei, 2026), and vOPD uses a control-variate baseline for sampled-token distillation (Oh
+374   et al., 2026). We build on existing dense losses and apply GPAS to the micro-batch gradients they
+375   produce.
+376
+377   Learning dynamics and capability integration. Teacher–student compatibility and the capabili-
+      ties supplied by the teacher shape OPD outcomes (Li et al., 2026). CaMOPD studies counteracting
+
+
+                                                       7
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+378
+      recovery and preservation updates and combines alternating training with gap-based selection (Chen
+379   et al., 2026). Recent work also finds that diverse queries can provide broad state coverage while the
+380   student continues to absorb supervision slowly (Fu et al., 2026). These studies motivate examin-
+381   ing the update process alongside teacher loss. Our measurements relate gradient variability, sample
+382   allocation, and learning efficiency.
+383
+384   Task weighting and stochastic optimization. Multi-task learning adapts loss weights and gradi-
+385   ent directions (Chen et al., 2018; Sener & Koltun, 2019; Yu et al., 2020); language-model training
+386   also adapts data mixtures from learning progress (Albalak et al., 2023; Wang et al., 2025). Impor-
+387   tance sampling and online variance reduction improve stochastic gradient estimates (Katharopoulos
+388   & Fleuret, 2018; Borsos et al., 2018). GPAS uses within-task standard deviations, following Neyman
+389   allocation and its unequal-cost extension (Neyman, 1934; Cochran, 1977). The interaction between
+390
+      non-uniform sampling and adaptive optimizers (Lahire, 2023) motivates measuring those deviations
+      after the optimizer’s coordinate scaling.
+391
+392
+393   7   D ISCUSSION AND C ONCLUSION
+394
+395   GPAS treats task importance and gradient-estimation effort as separate decisions. Existing dense
+396   distillation provides the learning signal; the scheduler uses its observed variability to decide where
+397   more micro-batches are useful. The same principle gives a per-step rule and a cost-aware rule,
+398   both using statistics collected during ordinary training. [TODO: Conclude with the measured
+399   efficiency difference and the task-level learning pattern that explains it.]
+400   The present study covers a Qwen3-1.7B student, four domains, one training seed per method, and
+401   one hardware layout. The method is most directly applicable when an optimizer step contains sev-
+402   eral micro-batches from each task; larger task collections call for less frequent task measurements.
+403   The pre-step optimizer scaling and measured time model provide local allocation signals, and their
+404   practical effect is evaluated with the complete AdamW training loop. Task compatibility and student
+405   capacity remain important for capability integration. GPAS offers a way to improve how a chosen
+406   collection of task objectives uses computation.
+407
+408   AI USE STATEMENT
+409
+410   Generative AI tools assisted with language editing and manuscript organization. The authors remain
+411
+      responsible for reviewing the text, claims, proofs, code, and experimental results before submission.
+412
+413   E THICS STATEMENT
+414
+      The study evaluates optimization methods for existing language models with reasoning and
+415
+      instruction-following datasets and automated verifiers. Model and dataset biases can affect capa-
+416
+      bility scores. The final artifact will record data provenance, invalid outputs, and verifier failures to
+417   support careful interpretation.
+418
+419
+      R EPRODUCIBILITY STATEMENT
+420
+421   Section 4 specifies the micro-batch composition, fixed objective weights, integer allocation, resource
+422   accounting, baselines, held-out evaluation, and matched prompt streams. The current artifact in-
+423   cludes the manuscript sources and figure code; earlier synthetic calculations are retained separately
+424   from the planned MOPD study. [TODO: Before submission, add the frozen run configuration,
+425   model and tokenizer revisions, fixed task weights, prompt streams, optimizer and allocation
+426   states, micro-batch counts, noise and timing logs, per-prompt evaluation outputs, and source
+427   data for every empirical figure and table.]
+428
+429   R EFERENCES
+430
+431   Alon Albalak, Liangming Pan, Colin Raffel, and William Yang Wang. Efficient online data mixing
+        for language model pre-training, 2023. URL https://arxiv.org/abs/2312.02406.
+
+
+                                                         8
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+432
+      Zalan Borsos, Andreas Krause, and Kfir Y. Levy. Online variance reduction for stochastic opti-
+433     mization. In Proceedings of the 31st Conference on Learning Theory, pp. 324–357, 2018. URL
+434     https://proceedings.mlr.press/v75/borsos18a.html.
+435
+436   BytedTsinghua-SIA. Open-MOPD: Dense distillation implementation. GitHub, 2026. URL
+437     https://github.com/BytedTsinghua-SIA/Open-MOPD. Revision 4809a96cf85a,
+438
+        actor and dense-loss implementation.
+439   Tianlei Chen, Jiao Ou, Ziyuan Liu, Ruiming Tang, Jian Liang, and Han Li. Counteraction-aware
+440     multi-teacher on-policy distillation for general capability recovery with domain preservation,
+441     2026. URL https://arxiv.org/abs/2605.27115.
+442
+443
+      Zhao Chen, Vijay Badrinarayanan, Chen-Yu Lee, and Andrew Rabinovich. Gradnorm: Gradi-
+        ent normalization for adaptive loss balancing in deep multitask networks. In Proceedings of
+444
+        the 35th International Conference on Machine Learning, pp. 794–803, 2018. URL https:
+445
+        //proceedings.mlr.press/v80/chen18a.html.
+446
+447   William G. Cochran. Sampling Techniques. Wiley, 3 edition, 1977.
+448
+      Zixuan Fu, Bingxiang He, Yuxin Zuo, Haohuan Huang, Jinqian Zhang, Ruhang Xiao, Cheng Qian,
+449
+        Qinyu Luo, Huan ang Gao, Yudong Wang, Zhiyuan Liu, Ning Ding, and Chaojun Xiao. Re-
+450
+        thinking on-policy distillation of large language models II: One training example, 2026. URL
+451     https://arxiv.org/abs/2609.04172.
+452
+453   Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang, Bingxiang He,
+454     Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou. Open-MOPD: Diagnosing and fixing capability
+455     imbalance in multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/
+456
+        2608.19098.
+457   Huipeng Huang and Hongxin Wei. Tail-aware top-k on-policy distillation, 2026. URL https:
+458     //arxiv.org/abs/2608.14728.
+459
+460   Angelos Katharopoulos and François Fleuret. Not all samples are created equal: Deep learn-
+461
+        ing with importance sampling. In Proceedings of the 35th International Conference on Ma-
+        chine Learning, pp. 2525–2534, 2018. URL https://proceedings.mlr.press/v80/
+462
+        katharopoulos18a.html.
+463
+464   Thibault Lahire. Non-uniform sampling and adaptive optimizers in deep learning. OPT 2023:
+465     Optimization for Machine Learning, 2023. URL https://opt-ml.org/papers/2023/
+466     paper20.pdf.
+467
+      Yaxuan Li, Yuxin Zuo, Bingxiang He, Jinqian Zhang, Chaojun Xiao, Cheng Qian, Tianyu Yu, Huan
+468
+        ang Gao, Wenkai Yang, Zhiyuan Liu, and Ning Ding. Rethinking on-policy distillation of large
+469     language models: Phenomenology, mechanism, and recipe, 2026. URL https://arxiv.
+470     org/abs/2604.13016.
+471
+472   Jiang Liu, Sudhanshu Ranjan, Prakamya Mishra, Yonatan Dukler, Gowtham Ramesh, Jialian Wu,
+473      Ximeng Sun, Wen Xie, Chaojun Hou, Vikram Appia, Zhenyu Gu, Zicheng Liu, and Emad
+474
+         Barsoum. Instella-MoE technical report, 2026. URL https://arxiv.org/abs/2609.
+         00791.
+475
+476   Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+477    Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli Luo. MOPD: Multi-teacher on-
+478    policy distillation for capability integration in llm post-training, 2026. URL https://arxiv.
+479    org/abs/2606.30406.
+480
+      Jerzy Neyman. On the two different aspects of the representative method: The method of stratified
+481
+         sampling and the method of purposive selection. Journal of the Royal Statistical Society, 97(4):
+482
+         558–625, 1934. doi: 10.2307/2342192.
+483
+484   Minjae Oh, Sangjun Song, Gyubin Choi, Yunho Choi, and Yohan Jo. KL for a KL: On-policy
+485    distillation with control variate baseline, 2026. URL https://arxiv.org/abs/2605.
+       07865.
+
+
+                                                      9
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+486
+      Qwen Team. Qwen3 technical report, 2025. URL https://arxiv.org/abs/2505.09388.
+487
+488   Ozan Sener and Vladlen Koltun. Multi-task learning as multi-objective optimization, 2019. URL
+489     https://arxiv.org/abs/1810.04650.
+490
+491   Zechen Sun, Zhiwei Zhang, Fei Zhao, Juntao Li, Mu Chuan, Huayu Deng, Guojian Zhan, Wenliang
+492
+        Chen, Yao Hu, and Min Zhang. D3 -MOPD: Adaptive dynamic domain scheduling for efficient
+        multi-teacher distillation, 2026. URL https://arxiv.org/abs/2608.24987.
+493
+494   Zhenting Wang, Guofeng Cui, Kun Wan, and Wentian Zhao. DUMP: Automated distribution-level
+495     curriculum learning for RL-based LLM post-training, 2025. URL https://arxiv.org/
+496     abs/2504.09710.
+497
+498   Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine, Karol Hausman, and Chelsea Finn.
+499
+        Gradient surgery for multi-task learning, 2020. URL https://arxiv.org/abs/2001.
+        06782.
+500
+501   Lunjun Zhang and Jimmy Ba. EMA policy gradient: Taming reinforcement learning for LLMs with
+502     EMA anchor and top-k KL, 2026. URL https://arxiv.org/abs/2602.04417.
+503
+504
+505   A      I MPLEMENTATION AND S UPPORTING D ERIVATIONS
+506
+507   A.1     C ONFIGURATION
+508
+509   Table A1: Configuration of the four-domain study. Entries marked TODO require the corresponding
+510   training or evaluation artifact.
+511
+512       Component           Configuration
+513
+          Student             Qwen3-1.7B (Qwen Team, 2025), non-thinking mode; [TODO: frozen model
+514                           and tokenizer revisions]
+515       Teachers            Domain-specific Qwen3-1.7B RL checkpoints for math and instruction follow-
+516                           ing; one shared Qwen3-4B weight set for code and science. All use the same
+517                           vocabulary and tokenizer. [TODO: exact checkpoint identifiers, RL training
+                              recipes, and scores]
+518
+          Training data       16,000 unique prompts per task, shuffled once and consumed without replace-
+519                           ment. [TODO: datasets, versions, licenses, filters, and held-out split]
+520       Default loss        Teacher top-64 corrected reverse KL (Equation 1); full-vocabulary probabilities;
+521                           position mean within response, response mean within task; wi = 1/4
+522       Rollout             One response per prompt and one update per fresh batch; maximum response
+                              length 4,096; truncated responses retained. [TODO: temperature, EOS han-
+523
+                              dling, and decoding settings]
+524       Step and budget     b = 4, G = 16, 2 ≤ mi ≤ 8, 500 steps, 32,000 attempted responses per run,
+525                           one seed per method
+526       Optimizer           AdamW; [TODO: learning rate and schedule, betas, epsilon, weight decay,
+527                           clipping, precision, and memory configuration]
+          GPAS                Pre-step bias-corrected Adam second moment for D; noise and time EMA decay
+528
+                              0.9; first step Uniform; bounded proportional rounding for per-step counts and
+529                           integer enumeration for cost-aware counts
+530       Evaluation          128 held-out prompts per task every 50 steps; MATH-500, LiveCodeBench, IF-
+531                           Bench, and GPQA-Diamond. [TODO: versions, evaluation seeds, and decod-
+532                           ing protocols]
+          System              One 96 GB learner GPU and one 48 GB rollout/teacher GPU; the code and sci-
+533
+                              ence endpoints share weights. [TODO: GPU models, inference and training
+534                           software revisions, peak memory, and GPU hours]
+535
+536
+537   A.2     D ENSE LOSS IMPLEMENTATION AND ONLINE STATISTICS
+538
+539   At each student-generated prefix, the teacher returns the identifiers and full-vocabulary log proba-
+      bilities of its top-64 tokens. The student computes its full-vocabulary log normalizer and gathers
+
+
+                                                        10
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+540
+      its probabilities at those identifiers. Autodifferentiation is applied to the whole expression in Equa-
+541   tion 1, including the −pθ term. The retained probabilities are not renormalized within the top-k set,
+542   and the loss does not use a sampled tail correction. The operation is dense over the retained set and
+543   uses sparse teacher output.
+544
+      GPAS collects statistics from unweighted micro-batch gradients. For a task block, initialize its
+545
+      running mean h = 0 and scalar S = 0. After micro-batch s, form δ = gi,s − h, then update
+546
+547                                                          s−1
+                                   h ← h + δ/s,      S←S+          ∥Dδ∥22 .                          (8)
+548                                                             s
+549   At the end of the block, ebi = S/(mi − 1) and A ← A + wi h. The mean buffer is reused for the
+550   next task. The same recurrence with D = I records unpreconditioned noise. Reductions use float32
+551   accumulation. Gradients are unscaled before measurement if mixed-precision loss scaling is active,
+552   and clipping is applied to the assembled gradient A.
+553   The optimizer state is fixed during this collection. Before an Adam second moment is available, the
+554   first Uniform step uses D = I. Subsequent steps use the pre-step bias-corrected second moment.
+555   The first observation initializes each noise EMA; later observations use decay 0.9. The scheduler
+556   reads the completed step’s averages before generating the next step’s data.
+557
+                                           √                               P
+      For per-step allocation, set ai = wi eei and find a scale λ such that i clip(λai , mmin , mmax ) = G.
+558   Floor these counts and assign remaining units in descending order of fractional remainder, respecting
+559   the bounds; ties follow the fixed task order. Zero-noise tasks receive the lower bound unless the
+560   other tasks reach their upper bounds; if all scores are zero, use Uniform. The cost-aware scheduler
+561   evaluates all feasible integer vectors using the smoothed noise and timing estimates.
+562
+563   A.3   C OMPARISON RECIPES
+564
+565   D3 -MOPD scheduling. We use the remaining-gap and descent-velocity construction of Sun et al.
+566
+      (2026). Let L̄i (t) be the smoothed task loss and L0i the mean of its first five observations. With
+      W = 10 and up to R = 3 available windows, the composite signal is
+567
+568                     ri (t) = L̄i (t)/L0i ,
+                                                                                        
+569                                      1 RX  ′
+                                                  −1
+570
+                                                     L̄i (t − (j + 1)W ) − L̄i (t − jW ) 
+                        vi (t) = max 0, ′                                                  ,             (9)
+571                                      R
+                                               j=0
+                                                              L̄i (t − (j + 1)W )        
+572
+                        si (t) = ri (t)vi (t).
+573
+574   We retain the published max-normalization, softmax temperature 0.5, per-domain probability floor
+575   0.10, and multiplicative batch jitter of amplitude 0.30. The scheduler refreshes every 10 steps, using
+576
+      the paper’s history warmup and EMA window of 10. All KL denominators use the published floor of
+      0.15. The signal is computed from the default dense task loss in our pipeline. The resulting mixture
+577
+      is converted to micro-batch counts with the shared bounds [2, 8]. Thus this is a controlled adaptation
+578
+      to our loss scale, micro-batch unit, and budget.
+579
+      The two D3 rows use the same scheduling
+                                                                                                   P
+580                                          P       rule. The fixed-weight row assembles A = i wi ḡi ;
+581   the recipe-level row assembles A = i (mi /G)ḡi . This makes the effect of task weighting visible
+582
+      alongside the comparison of scheduling signals.
+583
+      Open-MOPD with one update per rollout. We follow the released student top-16 dense candi-
+584
+      date loss, token-share balancing, and gap-aware weighting (Gao et al., 2026; BytedTsinghua-SIA,
+585
+      2026). The released implementation multiplies candidate-wise detached advantages by candidate-
+586   wise student probability ratios and then sums over candidates. Each retained token therefore con-
+587   tributes its own gradient. In our setting, the initial task target is uniform, and each batch contains
+588   four micro-batches per task. The recipe’s token and gap weights remain active. One optimizer step
+589   per rollout batch corresponds to K = 1, so there is no reuse-induced reward staleness. [TODO:
+590   Record the exact configuration for gap smoothing, floors, and weight normalization from the
+591   integrated implementation.]
+592
+593   Tail-aware supervision. TA-OPD (Huang & Wei, 2026) groups    P the omitted vocabulary into
+      one tail event. For teacher support Si (c), write ptail = 1 − a∈Si (c) pθ (a | c) and qtail =
+
+
+                                                        11
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+594         P
+      1−     a∈Si (c) qi (a | c). Its position loss is
+595
+596                                      X                            pθ (a | c)             ptail
+597                            ℓTA
+                                i  =              pθ (a | c) log                 + ptail log       .            (10)
+                                                                      qi (a | c)             qtail
+598                                    a∈Si (c)
+599
+600
+      Both runs use k = 64, the same response averaging and fixed task weights, and the same training
+      budget as the core comparison. Only the allocation differs between TA-OPD + Uniform and TA-
+601
+      OPD + GPAS.
+602
+603
+604   A.4   S TEP - LOCAL OBJECTIVE
+605
+      Let θt be the current student and Rti its distribution over task-i prompts and responses at step t. The
+606
+      local objective differentiated by dense OPD is
+607
+608
+                                                                                    
+                                                                  |y|
+609
+                                       X                      1  X     (k)
+                              Ft (θ) =     wi E(x,y)∼Rti             ℓi (θ; x, y<u ) .                  (11)
+610                                      i
+                                                             |y| u=1
+611
+612   The rollout distribution is held fixed in this derivative. Thus the mean micro-batch update at θt
+613   is ∇Ft (θt ). The distribution is refreshed at the next step. Fixing wi preserves the chosen task
+614   weighting through this sequence of local objectives.
+615
+616   A.5   VARIANCE AND THE ALLOCATION RULE
+617
+618   Condition on the current state and pre-step scaling D. In the independent micro-batch model, cross-
+619   task centered terms have zero expectation, giving
+620
+                                                     X                                     X w 2 ei
+                                                                                                       i
+621                          E∥D(A − µ)∥22 =                 wi2 E∥D(ḡi − µi )∥22 =                        .   (12)
+622                                                      i                                         i
+                                                                                                       mi
+623
+624   Equation
+        √      6 is the ordinary sample variance summed over preconditioned coordinates. Writing ai =
+625   wi ei , Cauchy–Schwarz gives
+626                                                  !                 !                  !2
+627
+                                          X                  X a2              X
+                                                                  i
+                                                mi                         ≥         ai        .                (13)
+628
+                                            i                i
+                                                                 mi              i
+629
+630   Equality holds at mi ∝ ai , yielding the continuous per-step rule. With unequal costs and zero fixed
+631   step time,
+632                                           !          !                !2
+                                    X            X a2           X √
+                                                       i
+633                                     mi τi              ≥         ai τi ,                          (14)
+634                                  i             i
+                                                      mi          i
+635                              √
+      with equality at mi ∝ ai / τi . Positive fixed time and integer bounds are handled by the finite
+636
+      search used in the cost-aware implementation.
+637
+638
+639   A.6   C ONNECTION TO A LOCAL UPDATE
+640
+641
+      For an L-smooth Ft and the frozen-preconditioner step θ′ = θ −ηDA, let µ = ∇Ft (θ). Smoothness
+      and the bias–variance identity give
+642
+643                                                                      η2 L
+                             EFt (θ′ ) ≤ Ft (θ) − ηµ⊤ Dµ +                    ∥Dµ∥22 + V (m) .
+                                                                                            
+644                                                                                                             (15)
+                                                                          2
+645
+646   At the fixed state, the allocation-dependent term is V (m). This motivates measuring noise in update
+647   coordinates. GPAS uses this local criterion with ordinary AdamW; momentum, clipping, and the
+      new second-moment update remain part of that optimizer.
+
+
+                                                                 12
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+648
+      A.7   T IMING AND RELEASED TRACES
+649
+650   Task blocks record rollout, teacher-scoring, backward, and statistics time, together with response
+651   lengths and peak memory. The marginal per-micro-batch estimates form τi ; synchronization, opti-
+652   mizer work, and other count-independent step operations form C. Their EMA estimates use decay
+653   0.9. We compare predicted and observed step times and evaluate efficiency with actual elapsed time
+654   on both reserved GPUs. Evaluation compute is reported separately. If a deployment overlaps task
+655   blocks, its timing predictor should represent that execution schedule.
+656   Checkpoints retain optimizer state, task stream positions, counts, and noise and time averages. The
+657   released traces include per-task held-out loss, prompt consumption, response length and truncation,
+658   micro-batch counts, noise estimates, and measured step time. [TODO: Add the artifact location
+659   and populate the configuration and empirical figures from these records.]
+660
+661
+662
+663
+664
+665
+666
+667
+668
+669
+670
+671
+672
+673
+674
+675
+676
+677
+678
+679
+680
+681
+682
+683
+684
+685
+686
+687
+688
+689
+690
+691
+692
+693
+694
+695
+696
+697
+698
+699
+700
+701
+
+
+
+                                                      13
+

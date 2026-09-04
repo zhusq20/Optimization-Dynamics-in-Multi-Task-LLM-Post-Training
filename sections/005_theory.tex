@@ -1,110 +1,240 @@
 % ============================================================================
-\section{GPAS Micro-Batch Allocation}
+\section{When Can a Shared Update Make Joint Progress?}
 \label{sec:theory}
 % ============================================================================
 
-\subsection{Noise in optimizer coordinates}
+\subsection{How teacher information produces a task gradient}
+\label{sec:teacher_signal}
 
-AdamW divides coordinate $k$ of the gradient by $\sqrt{v_k}+\epsilon$, so
-noise in coordinate $k$ affects the update in proportion to
-$D_k=(\sqrt{v_k}+\epsilon)^{-1}$. We therefore measure gradient noise in these
-coordinates, treating $D$ as fixed within a step and micro-batches as
-independent. Let $e_i$ be the noise of one task-$i$ micro-batch and $V(m)$ the
-noise of the accumulated gradient $A$:
+An ideal reference distinguishes the teacher's target from the implemented
+update. If a sequence-level teacher is exactly
+$T_i^*(y\mid x)\propto\pi_0(y\mid x)\exp(R_i(x,y)/\beta_i)$,
+minimizing full-sequence reverse KL is equivalent to maximizing expected
+reward with KL regularization of strength $\beta_i$, up to a positive
+scale and an additive constant. Appendix~\ref{app:ideal_teacher} derives
+the identity and its temperature-dependent mixture weights. It requires
+an exact teacher for the stated reward and reference. It does not make
+our fixed-prefix, response-mean, top-$k$ update a full-sequence RL gradient.
+
+For the implemented loss, let $\nu_i^t$ be the prefix distribution induced
+by sampling $(x,y)\sim\mathcal R_i^t$ and then a position uniformly within
+$y$. At $\theta_t$, define
 \begin{equation}
-    e_i=\mathbb E\bigl\|D(g_i-\mathbb E[g_i])\bigr\|_2^2,
-    \qquad
-    V(m)=\mathbb E\bigl\|D(A-\nabla F)\bigr\|_2^2
-        =\sum_{i=1}^M\frac{w_i^2e_i}{m_i}.
+    s_\theta(c,a)=\nabla_\theta\log p_\theta(a\mid c),\qquad
+    z_i(c,a)=\mathbf1_{\{a\in S_i(c)\}}
+                   \log\frac{q_i(a\mid c)}{p_\theta(a\mid c)}.
+    \label{eq:masked_teacher_signal}
+\end{equation}
+Differentiating Equation~\ref{eq:dense_topk_loss} and using the
+full-vocabulary score identity gives
+\begin{equation}
+\begin{split}
+    -\mu_i
+      &=\mathbb E_{\nu_i^t,p_\theta}[z_i s_\theta]
+       =\mathbb E_{\nu_i^t,p_\theta}
+          [(z_i-\mathbb E[z_i\mid c])s_\theta],\\
+    \|\mu_i\|_2
+      &\leq\sqrt{\mathbb E_{\nu_i^t}\operatorname{Var}_{p_\theta}
+                      (z_i\mid c)}
+             \sqrt{\mathbb E_{\nu_i^t,p_\theta}\|s_\theta\|_2^2}.
+\end{split}
+\label{eq:teacher_signal_projection}
+\end{equation}
+Teacher differences produce an update through their correlation with the
+student's score on visited prefixes. A large signal variance does not
+imply a large or useful gradient, and this variance is not micro-batch
+gradient covariance. Centering applies to the complete masked signal $z_i$:
+subtracting a baseline only inside $S_i(c)$ generally changes the update,
+since $\sum_{a\in S_i(c)}p_\theta s_\theta=
+\nabla_\theta p_\theta(S_i(c)\mid c)$ need not vanish.
+Appendix~\ref{app:masked_signal} gives the proof and teacher-error
+qualification. These relations identify how prefix coverage, teacher
+probabilities, and retained support determine the mean gradient that
+the following analysis combines.
+
+\subsection{Expected progress under the chosen task mixture}
+
+Condition on the training state, freeze the rollout distributions in
+$L_i^t$, and choose counts before sampling. Let
+$\mu_i=\nabla L_i^t(\theta_t)$ and
+$\Sigma_i=\operatorname{Cov}(g_{i,s})$. For the following local analysis,
+micro-batches are independent and have finite second moments. The
+diagnostic experiment uses independent draws; the training streams require
+the finite-population qualification in Appendix~\ref{app:local_objective}.
+
+Let $D$ be a positive diagonal scaling fixed before the step. For SGD,
+$D=I$; for Adam, we use
+$D=\operatorname{diag}((\sqrt{\widehat v_{\rm pre}}+\epsilon)^{-1})$,
+where $\widehat v_{\rm pre}$ is the pre-step bias-corrected second moment.
+For the idealized update $\theta'=\theta_t-\eta DA$, define
+\begin{equation}
+    \mu_w=\sum_jw_j\mu_j,\qquad
+    K_{ij}=\mu_i^\top D\mu_j,\qquad
+    a_i=(Kw)_i=\mu_i^\top D\mu_w.
+    \label{eq:transfer_margins}
+\end{equation}
+The expected first-order change in task $i$'s loss is $-\eta a_i$.
+Thus all $a_i>0$ means that the chosen mean update is a common descent
+direction. A small positive $a_i$ leaves little margin against sampling
+noise. If $a_i\leq0$, changing counts at fixed weights cannot produce
+strictly positive expected first-order progress for that task.
+
+This last statement concerns this mixture at this checkpoint. It does
+not rule out another mixture, another update direction, or later recovery.
+Pairwise negative gradient cosines do not determine the signs of $Kw$.
+The relevant interaction uses one $D$; cosines between $D\mu_i$ and
+$D\mu_j$ instead use $D^2$. Actual AdamW includes momentum, an updated
+second moment, clipping, and weight decay. Its branch updates must be
+measured separately from this frozen-scaling approximation.
+
+\subsection{Common descent can still be slow}
+\label{sec:local_rates}
+
+The signs of $a_i$ do not specify the rate of progress. Consider exact
+gradients, $D=I$, equal weights, and
+\begin{equation}
+    L_1(x,y)=\tfrac12x^2,\qquad
+    L_2(x,y)=\tfrac{\gamma}{2}y^2,\qquad 0<\gamma<1.
+    \label{eq:zero_conflict_losses}
+\end{equation}
+The task gradients are orthogonal everywhere. From $x(0)=y(0)=1$,
+gradient flow for $(L_1+L_2)/2$ gives
+\begin{equation}
+    \frac{L_1(t)}{L_1(0)}=e^{-t},\qquad
+    \frac{L_2(t)}{L_2(0)}=e^{-\gamma t}.
+    \label{eq:zero_conflict_rates}
+\end{equation}
+Both tasks improve at every finite time, with no sampling uncertainty,
+yet their decay-rate ratio is $1/\gamma$.
+Figure~\ref{fig:joint_progress_teaser}(a) uses $\gamma=0.1$.
+More generally, near a common matching solution of fixed-prefix losses,
+the local quadratic model has
+$\dot e=-D H(w)e$, where $H(w)=\sum_iw_iH_i$.
+For the corrected top-$k$ loss, each matching-point $H_i$ is the
+score second moment on the retained support, not generally the full
+Fisher matrix. Appendix~\ref{app:local_rates} states the assumptions.
+
+This example establishes a possible cause of slow progress, not a
+convergence model for the full MOPD run. Small raw gradient inner products
+also do not establish improved angles: shrinking opposed gradients have
+inner products tending to zero with cosine $-1$, while nonzero orthogonal
+gradients already have zero inner product.
+Changing the task weights can change deterministic rates; changing counts
+$m_i$ at fixed weights preserves the local mean field. The separable
+minimum-time weight calculation in Appendix~\ref{app:static_allocation}
+therefore does not justify GPAS's sample allocation.
+
+\subsection{Sampling uncertainty relative to task progress}
+
+Let $X_i=\mu_i^\top DA$ be the sampled first-order progress. Its variance is
+\begin{equation}
+    v_i(m)=\operatorname{Var}(X_i)
+      =\sum_j\frac{w_j^2}{m_j}
+          \mu_i^\top D\Sigma_jD\mu_i.
+    \label{eq:directional_variance}
+\end{equation}
+For $a_i>0$, the one-sided Chebyshev--Cantelli inequality gives
+\begin{equation}
+    \Pr(X_i\leq0)\leq\frac{v_i(m)}{v_i(m)+a_i^2},\qquad
+    \Pr(\exists i:X_i\leq0)
+      \leq\min\!\left\{1,\sum_i\frac{v_i(m)}{v_i(m)+a_i^2}\right\},
+    \label{eq:directional_reliability}
+\end{equation}
+where the joint bound requires every $a_i>0$. Reliability therefore
+depends on noise relative to the progress margin, not on raw noise alone.
+These bounds require no Gaussian assumption, but can be loose. Replacing
+population quantities with noisy estimates does not produce a statistical
+certificate. Appendix~\ref{app:joint_progress} proves the bounds;
+Appendices~\ref{app:budget_reliability} and~\ref{app:descent} give a
+sufficient sampling budget and the additional curvature conditions for
+finite-step descent. Directional sampling tests and stochastic
+multiobjective sampling have established precedents
+\citep{bollapragada2018adaptive,zhao2024adaptive}; our empirical question
+is whether these quantities predict MOPD regressions and useful interventions.
+
+\subsection{GPAS controls a conservative variance bound}
+
+GPAS measures total gradient variation after optimizer scaling:
+\begin{equation}
+    e_i=\mathbb E\|D(g_i-\mu_i)\|_2^2,\qquad
+    V(m)=\mathbb E\|D(A-\mu_w)\|_2^2
+         =\sum_i\frac{w_i^2e_i}{m_i}.
     \label{eq:batch_variance}
 \end{equation}
-For a fixed student state and step size, the allocation enters the one-step
-descent bound only through $V(m)$ (Appendix~\ref{app:descent}). Minimizing
-$V(m)$ subject to $\sum_i m_i=G$ gives
+It controls each directional variance through
 \begin{equation}
-    m_i\ \propto\ w_i\sqrt{e_i}.
+    v_i(m)\leq\|\mu_i\|_2^2 V(m).
+    \label{eq:trace_directional_bound}
+\end{equation}
+This is a conservative surrogate: fluctuations orthogonal to a task's
+gradient contribute to $V$ without affecting its first-order progress.
+Appendix~\ref{app:trace_counterexample} gives aligned task means for
+which trace-optimal allocation has worse directional reliability than
+another allocation. GPAS is therefore an intervention to test, not an
+optimal rule for joint-progress probability.
+
+Ignoring integer bounds, minimizing $V$ at $\sum_i m_i=G$ yields
+\begin{equation}
+    m_i\propto w_i\sqrt{e_i}.
     \label{eq:batch_gpas_allocation}
 \end{equation}
-We call this rule Gradient-Preconditioned Adaptive Sampling (GPAS). It is
-Neyman allocation, the classical rule that samples each stratum in proportion
-to its standard deviation, applied in the coordinates AdamW uses. The
-continuous counts are clipped to $[m_{\min},m_{\max}]$, the unclipped ones
-rescaled to sum to $G$, and the result rounded by largest remainder
-(Appendix~\ref{app:allocation_proofs}).
+This is classical Neyman allocation
+\citep{neyman1934representative,cochran1977sampling} in the optimizer's
+coordinates. The four-task implementation enumerates all feasible
+integer counts and minimizes the estimated $V$ exactly over that set;
+Appendix~\ref{app:allocation_proofs} gives the derivation. Under the
+study's bounds, $m_i\leq8$ versus Uniform's $m_i=4$ implies
+$V_{\rm Uniform}/V(m)\leq2$ when the denominator is positive.
+This limits variance reduction under the local model, not training speed.
 
-The coordinates matter because raw and scaled noise can rank tasks
-differently. In a controlled three-task example whose scaling reverses the
-ranking, allocating by raw noise raises the scaled variance to $2.3\times$
-that of Uniform, whereas GPAS lowers it to $0.68\times$
-(Appendix~\ref{app:controlled}).
+\subsection{Online estimates and measured computation}
+\label{sec:online_estimates}
 
-\subsection{Cost-GPAS}
-
-Long-response tasks cost more per micro-batch, so the allocation with the
-least variance per step need not have the least variance per hour. Let
-$\tau_i$ be the measured time of one task-$i$ micro-batch and $C$ the fixed
-time per step for rollout, synchronization, and the optimizer update,
-so that a step takes $C+\sum_i m_i\tau_i$. A wall-clock budget $T$ then allows
-$T/(C+\sum_i m_i\tau_i)$ steps, and the variance of the gradient averaged
-over those steps is proportional to
+GPAS reuses the unweighted micro-batch gradients. With task mean $\bar g_i$,
 \begin{equation}
-    J_C(m)=\Bigl(C+\sum_{i=1}^M m_i\tau_i\Bigr)\,V(m).
-    \label{eq:batch_cost_objective}
-\end{equation}
-Cost-GPAS minimizes $J_C$ over the feasible integer counts, a small
-enumeration for four tasks. With $C=0$ the minimizer is
-$m_i\propto w_i\sqrt{e_i/\tau_i}$ (Appendix~\ref{app:allocation_proofs}); as
-$C$ grows relative to $\sum_i m_i\tau_i$, the minimizer approaches GPAS.
-
-\subsection{Online estimates and implementation}
-
-Every statistic for the next allocation comes from the step just completed.
-Let $\bar g_i$ be the mean of task $i$'s micro-batch gradients in that step.
-Then
-\begin{equation}
-    \widehat e_i=\frac{1}{m_i-1}\sum_{s=1}^{m_i}
-    \bigl\|D(g_{i,s}-\bar g_i)\bigr\|_2^2
+    \widehat e_i=\frac1{m_i-1}\sum_{s=1}^{m_i}
+                    \|D(g_{i,s}-\bar g_i)\|_2^2.
     \label{eq:noise_estimate}
 \end{equation}
-is the unbiased within-step estimate of $e_i$, and $m_{\min}=2$ makes it
-available on every step. The allocation uses the current estimate without
-smoothing. \missing{Confirm from the logged step-to-step change of
-$\widehat e_i$; add smoothing only if the trace is unstable.} Response lengths
-make timings noisy, so $\tau_i$ and $C$ are exponential averages of measured
-values with decay $0.9$. We also log the predicted variance ratio relative to
-Uniform,
+The next step uses the moving average
+$\widetilde e_i\leftarrow\rho\widetilde e_i+(1-\rho)\widehat e_i$.
+A running mean and scalar squared-deviation sum avoid retaining all
+micro-batch gradients; one parameter-sized mean buffer is reused across
+task blocks. The first step uses Uniform. We measure the additional
+reductions, memory, and time rather than assuming negligible overhead.
+
+For marginal micro-batch time $\tau_i$ and fixed step time $C$, the
+cost-aware mode minimizes
 \begin{equation}
-    H=\frac{V(m^{\rm unif})}{V(m)},
-    \label{eq:allocation_variance_ratio}
+    J_C(m)=T(m)V(m)
+      =\left(C+\sum_i m_i\tau_i\right)
+         \sum_i\frac{w_i^2e_i}{m_i}.
+    \label{eq:batch_cost_objective}
 \end{equation}
-which is at most $2$ because Uniform assigns $4$ micro-batches and
-$m_i\leq8$. The first step uses Uniform because no statistics exist yet.
+This criterion measures time times variance; it does not generally equal
+learning progress per second. The continuous rule without count bounds at
+$C=0$ is $m_i\propto w_i\sqrt{e_i/\tau_i}$, and the finite implementation
+enumerates feasible counts. The timing model is fitted to measured task
+times and checked against end-to-end GPU hours. Directional allocation
+is a conditional extension in Appendix~\ref{app:directional_extension},
+to be investigated only if trace noise fails to predict the uncertainty
+that affects task progress.
 
-Computing $\widehat e_i$ needs one parameter-sized buffer for $\bar g_i$, a
-few elementwise passes over the parameters per micro-batch, and one scalar
-all-reduce; it adds no forward or backward pass. GPAS runs with conventional
-AdamW. The allocation changes the noise term of AdamW's second moment, as any
-change in batch composition does; Appendix~\ref{app:moment_target_proof}
-bounds this change under the count limits and describes an optional
-allocation-independent second-moment observation that the experiments do not
-use. Algorithm~\ref{alg:batch_gpas} summarizes one step.
-
-\begin{algorithm}[H]
-\caption{One optimizer step with GPAS.}
+\begin{algorithm}[t]
+\caption{One training step with GPAS.}
 \label{alg:batch_gpas}
 \small
 \begin{minipage}{0.97\linewidth}
 \begin{enumerate}
-    \item Choose bounded integer counts $m$ from the previous step's
-    $\widehat e_i$ (and $\tau_i$, $C$ for Cost-GPAS); use Uniform on the first
-    step.
-    \item For every task $i$, take $m_ib$ new prompts, sample one response
-    per prompt, obtain token-level teacher feedback, and accumulate each
-    micro-batch gradient with weight $w_i/m_i$.
-    \item From the same gradients and execution trace, compute
-    $\widehat e_i$, update the timing averages, and log counts, losses,
-    tokens, $H$, and timing.
-    \item Apply one AdamW update.
+    \item Choose feasible integer counts from the previous noise and time
+    averages; use Uniform on the first step. Read the pre-step scaling $D$.
+    \item For each task, generate $m_i$ micro-batches and obtain its
+    teacher's top-$k$ scores on the student responses.
+    \item Compute the dense loss, accumulate unweighted task gradients,
+    record their variation under $D$, and add the task mean to $A$ with
+    weight $w_i$.
+    \item Update the noise and time averages, then apply the usual
+    optimizer step with gradient $A$.
 \end{enumerate}
 \end{minipage}
 \end{algorithm}

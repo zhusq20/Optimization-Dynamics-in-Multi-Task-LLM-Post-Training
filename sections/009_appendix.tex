@@ -1,242 +1,776 @@
 % ============================================================================
-\section{Supplementary Tables, Derivations, and Details}
+\section{Implementation and Supporting Derivations}
 % ============================================================================
 
-\subsection{Notation and configuration}
+\subsection{Configuration}
 \label{app:reference_tables}
 
 \begin{table}[H]
 \centering
-\small
-\caption{Notation and the values used in the four-teacher study.}
-\label{tab:notation}
-\begin{tabular}{cll}
-\toprule
-Symbol & Meaning & Value in this study \\
-\midrule
-$M$ & number of tasks and teachers & $4$ \\
-$w_i$ & fixed objective weight & inverse initial loss, normalized \\
-$G$ & micro-batches per optimizer step & $16$ \\
-$b$ & prompts per micro-batch, one response each & $4$ \\
-$m_i$ & task-$i$ micro-batch count & $2\leq m_i\leq8$ \\
-$g_{i,s}$ & unweighted micro-batch gradient & from the backward pass \\
-$D$ & AdamW diagonal scaling & $(\sqrt v+\epsilon)^{-1}$ \\
-$e_i,\ \widehat e_i$ & scaled one-micro-batch noise; its within-step estimate & estimated each step \\
-$\tau_i,\ C$ & time per task-$i$ micro-batch; fixed time per step & exponential averages \\
-$H$ & predicted variance ratio relative to Uniform & $H\leq2$ \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{table}[H]
-\centering
 \footnotesize
-\caption{Four-teacher MOPD configuration.}
+\caption{Configuration of the four-domain study. Entries marked TODO
+require the corresponding training or evaluation artifact.}
 \label{tab:pipeline}
-\begin{tabular}{p{0.20\linewidth}p{0.72\linewidth}}
+\begin{tabular}{p{0.19\linewidth}p{0.73\linewidth}}
 \toprule
 Component & Configuration \\
 \midrule
-Student & Qwen3-1.7B \citep{qwen2025qwen3} in non-thinking mode; exact frozen
-revision in Table~\ref{tab:v4_frozen_assets}; \missing{initial scores} \\
-Teachers & Math and instruction following use task-specific Qwen3-1.7B RL
-checkpoints at step 299; code and science use one frozen Qwen3-4B weight set
-through separate task endpoints. All run in non-thinking mode and have
-byte-identical tokenizer files. Exact identifiers are in
-Table~\ref{tab:v4_frozen_assets}; \missing{RL recipe and teacher scores} \\
-Training prompts & $16{,}000$ unique prompts per task, shuffled once and read
-without replacement; \missing{dataset names, versions, licenses, and filters} \\
-Rollout and loss & One response per prompt; one update per rollout batch;
-sampled-token reverse KL, averaged over valid tokens and then prompts;
-maximum response length $4{,}096$, truncated responses kept;
-\missing{temperature, ratio-truncation rule, and observed truncation rate by
-task} \\
-Step and budget & $b=4$ prompts per micro-batch, $G=16$ micro-batches per
-step, $500$ steps, and $32{,}000$ attempted responses; $2\leq m_i\leq8$ \\
-Optimization & AdamW; inverse-initial-loss objective weights fixed before
-training; \missing{learning rate and schedule, $\beta_1$, $\beta_2$,
-$\epsilon$, weight decay, gradient clipping, precision, and sharding} \\
-Evaluation & Held-out teacher loss on $128$ fixed prompts per task from
-checkpoints every $50$ steps; MATH-500, LiveCodeBench slice, IFBench,
-GPQA-Diamond; \missing{benchmark versions and decoding settings} \\
-Seeds & $1$ per method \\
-System & Two GPUs per run: one 96\,GB GPU trains the student, one 48\,GB GPU
-serves rollouts and holds the four resident teachers; \missing{GPU models,
-inference engine, software revisions, and GPU hours per run} \\
+Student & Qwen3-1.7B \citep{qwen2025qwen3}, non-thinking mode;
+\missing{frozen model and tokenizer revisions} \\
+Teachers & Domain-specific Qwen3-1.7B RL checkpoints for math and
+instruction following; one shared Qwen3-4B weight set for code and science.
+All use the same vocabulary and tokenizer.
+\missing{exact checkpoint identifiers, RL training recipes, and scores} \\
+Training data & $16{,}000$ unique prompts per task. Joint runs consume
+shuffled streams without replacement; single-task references reshuffle
+only after exhausting the first cycle.
+\missing{datasets, versions, licenses, filters, and held-out split} \\
+Default loss & Teacher top-$64$ corrected reverse KL
+(Equation~\ref{eq:dense_topk_loss}); full-vocabulary probabilities;
+position mean within response, response mean within task; $w_i=1/4$ \\
+Rollout & One response per prompt and one update per fresh batch;
+maximum response length $4{,}096$; truncated responses retained.
+\missing{temperature, EOS handling, and decoding settings} \\
+Step and budget & Joint runs: $b=4$, $G=16$, $2\leq m_i\leq8$,
+$500$ updates and $32{,}000$ attempted responses per run. Uniform and
+per-step GPAS: three training seeds; seven other configurations: one
+exploratory seed each. Four single-task references: one seed each,
+$G=16$ on the active task and $500$ updates \\
+Optimizer & AdamW;
+\missing{learning rate and schedule, betas, epsilon, weight decay,
+clipping, precision, and memory configuration} \\
+GPAS & Pre-step bias-corrected Adam second moment for $D$;
+noise and time EMA decay $0.9$; first step Uniform;
+exact feasible-integer enumeration for both per-step and cost-aware
+counts \\
+Checkpoint diagnostics & All three Uniform seeds at updates $50$, $250$,
+and $450$; seed-1 update $50$ sets the prediction rule. Calibration:
+$32$ independent micro-batches per domain split into two halves for
+cross-fitted margins; independent trial and evaluation data.
+Precise gradient: $32$ micro-batches per domain; equal-count sweep:
+$m_i\in\{2,4,8,16,32\}$ outside the main run's count caps \\
+Evaluation & $128$ held-out prompts per task every $50$ steps;
+MATH-500, LiveCodeBench, IFBench, and GPQA-Diamond.
+\missing{versions, evaluation seeds, and decoding protocols} \\
+System & One 96\,GB learner GPU and one 48\,GB rollout/teacher GPU;
+the code and science endpoints share weights.
+\missing{GPU models, inference and training software revisions,
+peak memory, and GPU hours} \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\input{sections/table_v4_frozen_assets}
+\subsection{Dense loss implementation and online statistics}
+\label{app:implementation}
 
-\subsection{One-step variance criterion}
-\label{app:descent}
+At each student-generated prefix, the teacher returns the identifiers
+and full-vocabulary log probabilities of its top-$64$ tokens. The
+student computes its full-vocabulary log normalizer and gathers its
+probabilities at those identifiers. Autodifferentiation is applied to
+the whole expression in Equation~\ref{eq:dense_topk_loss}, including
+the $-p_\theta$ term. The retained probabilities are not renormalized
+within the top-$k$ set, and the loss does not use a sampled tail
+correction. The operation is dense over the retained set and uses
+sparse teacher output.
 
-Let $D$ be fixed within the step. If $F$ is $L$-smooth and
-$\theta'=\theta-\eta DA$, then
+GPAS collects statistics from unweighted micro-batch gradients. For a
+task block, initialize its running mean $h=0$ and scalar $S=0$.
+After micro-batch $s$, form $\delta=g_{i,s}-h$, then update
 \begin{equation}
-    \mathbb E[F(\theta')]
-    \leq F(\theta)-\eta\nabla F^\top D\nabla F
-    +\frac{\eta^2L}{2}
-      \left(\|D\nabla F\|_2^2+V(m)\right).
-    \label{eq:one_step_descent}
+    h\leftarrow h+\delta/s,\qquad
+    S\leftarrow S+\frac{s-1}{s}\|D\delta\|_2^2.
+    \label{eq:welford}
 \end{equation}
-For a fixed student state, $D$, and step size, only $V(m)$ depends on the
-allocation. This local bound motivates the variance criterion; the
-end-to-end experiment includes momentum and gradient clipping.
+At the end of the block, $\widehat e_i=S/(m_i-1)$ and
+$A\leftarrow A+w_i h$. The mean buffer is reused for the next task.
+The same recurrence with $D=I$ records unpreconditioned noise.
+Reductions use float32 accumulation. Gradients are unscaled before
+measurement if mixed-precision loss scaling is active, and clipping
+is applied to the assembled gradient $A$.
 
-\subsection{Gradient variance, its estimate, and the allocation rules}
+The optimizer state is fixed during this collection. Before an Adam
+second moment is available, the first Uniform step uses $D=I$.
+Subsequent steps use the pre-step bias-corrected second moment.
+The first observation initializes each noise EMA; later observations
+use decay $0.9$. The scheduler reads the completed step's averages
+before generating the next step's data.
+
+For both allocation modes, enumerate
+$\mathcal M=\{m\in\mathbb Z^M: \sum_i m_i=G,\,
+m_{\min}\leq m_i\leq m_{\max}\}$ and evaluate the objective using
+the previous step's smoothed statistics. Per-step GPAS minimizes
+$\sum_i w_i^2\widetilde e_i/m_i$; the cost-aware mode minimizes its
+product with the estimated step time. Ties first minimize distance
+to Uniform and then follow lexicographic task order. If all noise
+estimates are zero, use Uniform. This finite search is exact for the
+estimated objective and stated integer constraints. Largest-remainder
+rounding of the continuous solution does not in general solve that
+integer problem. No current-step observations are used to select
+the counts of the same step.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/gpas_main_figure.pdf}
+    \caption{GPAS combines task means with fixed weights $w$ while
+    allocating counts $m$ from observed gradient variation and, in its
+    cost-aware mode, measured time. The pre-step scaling $D$ defines the
+    variance statistic. The profiles are schematic and do not report
+    measured MOPD results or certify joint task progress.}
+    \label{fig:gpas_overview}
+\end{figure}
+
+\subsection{Comparison recipes}
+\label{app:baselines}
+
+\paragraph{D$^3$-MOPD scheduling.}
+We use the remaining-gap and descent-velocity construction of
+\citet{sun2026d3mopd}. Let $\bar L_i(t)$ be the smoothed task loss
+and $L_i^0$ the mean of its first five observations. With $W=10$,
+$R'\leq R=3$ the number of available windows, and
+$\epsilon_{\rm KL}=0.15$, the composite signal is
+\begin{equation}
+\begin{split}
+    r_i(t)&=\bar L_i(t)/\max\{L_i^0,\epsilon_{\rm KL}\},\\
+    \nu_i(t)&=\max\left\{0,\frac1{R'}
+       \sum_{j=0}^{R'-1}
+       \frac{\bar L_i(t-(j+1)W)-\bar L_i(t-jW)}
+            {\max\{\bar L_i(t-(j+1)W),\epsilon_{\rm KL}\}}\right\},\\
+    s_i(t)&=r_i(t)\nu_i(t).
+\end{split}
+\end{equation}
+We retain the published max-normalization, softmax temperature $0.5$,
+per-domain probability floor $0.10$, and multiplicative batch jitter
+of amplitude $0.30$. The scheduler refreshes every $10$ steps,
+using the paper's history warmup and EMA window of $10$.
+All KL denominators use the published floor of $0.15$.
+The signal is computed from the default dense task loss in our pipeline.
+The resulting mixture is converted to micro-batch counts with the
+shared bounds $[2,8]$. Thus this is a controlled adaptation to our loss
+scale, micro-batch unit, and budget.
+
+The two D$^3$ rows use the same scheduling rule. The fixed-weight
+row assembles $A=\sum_iw_i\bar g_i$; the recipe-level row assembles
+$A=\sum_i(m_i/G)\bar g_i$. This makes the effect of task weighting
+visible alongside the comparison of scheduling signals.
+
+\paragraph{Open-MOPD with one update per rollout.}
+We follow the released student top-$16$ dense candidate loss,
+token-share balancing, and gap-aware weighting
+\citep{gao2026openmopddiagnosingfixingcapability,openmopd2026code}.
+The released implementation multiplies candidate-wise detached
+advantages by candidate-wise student probability ratios and then
+sums over candidates. Each retained token therefore contributes its own gradient. In our setting, the initial task target is uniform, and each
+batch contains four micro-batches per task. The recipe's token and
+gap weights remain active. One optimizer step per rollout batch
+corresponds to $K=1$, so there is no reuse-induced reward staleness.
+\missing{Record the exact configuration for gap smoothing, floors,
+and weight normalization from the integrated implementation.}
+
+\paragraph{Tail-aware supervision.}
+TA-OPD \citep{huang2026tailaware} groups the omitted vocabulary
+into one tail event. For teacher support $S_i(c)$, write
+$p_{\rm tail}=1-\sum_{a\in S_i(c)}p_\theta(a\mid c)$ and
+$q_{\rm tail}=1-\sum_{a\in S_i(c)}q_i(a\mid c)$. Its position loss is
+\begin{equation}
+    \ell_i^{\rm TA}=
+       \sum_{a\in S_i(c)}p_\theta(a\mid c)
+                     \log\frac{p_\theta(a\mid c)}{q_i(a\mid c)}
+       +p_{\rm tail}\log\frac{p_{\rm tail}}{q_{\rm tail}}.
+\end{equation}
+Both runs use $k=64$, the same response averaging and fixed task
+weights, and the same training budget as the core comparison.
+Only the allocation differs between TA-OPD + Uniform and
+TA-OPD + GPAS.
+
+\subsection{Frozen objectives, sampling, and state-distribution change}
+\label{app:local_objective}
+
+The task loss $L_i^t$ in Equation~\ref{eq:local_task_loss} holds the
+student's step-$t$ rollout distribution $\mathcal R_i^t$ fixed while
+varying $\theta$. Under differentiation--expectation interchange,
+$\mu_i=\nabla L_i^t(\theta_t)$ and
+$\mu_w=\nabla F_t(\theta_t)$. Counts chosen from history before sampling
+preserve this weighted mean when the conditional task sampling
+law is unchanged. This is a sequence of frozen-distribution objectives;
+it does not differentiate through the policy that generated the prefixes.
+
+Equation~\ref{eq:policy_drift} separates optimization on the old states
+from the change in visited states. More explicitly, if
+$f_i(\theta;x,y)$ is the response-mean retained-support loss, its second
+term is
+\begin{equation}
+    \int f_i(\theta_{t+1};x,y)\,
+          d(\mathcal R_i^{t+1}-\mathcal R_i^t)(x,y).
+\end{equation}
+This term has no general sign. For example, lower moving-policy loss
+could reflect a shift toward prefixes on which agreement was already
+higher. Fixed-reference loss, fresh-policy loss, and downstream
+capability are therefore separate measurements. A finite-$k$ loss
+measures the stated retained-support surrogate, not unbiased
+full-vocabulary KL.
+
+\paragraph{Finite prompt streams.}
+The independent micro-batch covariance model is exact for the independent
+diagnostic draws, conditional on the fixed state. Joint training consumes
+prompts without replacement, so its batch means are correlated. To state
+the correction, consider a uniform sample of $n_i=bm_i$ distinct prompts
+from a remaining task pool of size $N_i$. At a fixed student state, let
+$u_i(x)$ be the response-averaged expected gradient for prompt $x$,
+$R_i(x)$ the conditional rollout-gradient covariance, $S_{u,i}$ the
+finite-population covariance of $u_i$ with denominator $N_i-1$, and
+$\bar R_i$ the population average of $R_i(x)$. With independent response
+randomness conditional on prompts,
+\begin{equation}
+    \operatorname{Cov}(\bar g_i)
+      =\frac1{n_i}\left(1-\frac{n_i}{N_i}\right)S_{u,i}
+        +\frac1{n_i}\bar R_i.
+    \label{eq:finite_population_covariance}
+\end{equation}
+The first term follows from finite-population sampling; the second
+follows by conditioning on the selected prompts and averaging their
+independent rollout noise. For independent task pools, the covariance of
+$A$ is the sum of these matrices weighted by $w_i^2$. The local progress
+and Cantelli arguments continue to hold with this covariance, but the
+simple $\Sigma_i/m_i$ formula is then an approximation. GPAS uses that
+approximation during training. Logs must record remaining pool sizes so
+its accuracy can be checked; the finite-population correction is small
+only when the sampled fraction and the relevant prompt-mean contribution
+make it small. Exhausting and reshuffling a specialist's stream also
+changes the conditional prompt pool and must be recorded.
+
+\subsection{Ideal sequence-level teachers and the scope of RL equivalence}
+\label{app:ideal_teacher}
+
+For this subsection only, consider complete response distributions.
+Task $i$ has reward $R_i(x,y)$, temperature $\beta_i>0$, and the
+shared reference $\pi_0(y\mid x)$. Assume the required expectations and
+derivatives exist, the policies have compatible support, and the
+partition function below is finite. Define
+\begin{equation}
+\begin{split}
+ J_i^{\rm RL}(\theta)
+   &=
+   \mathbb E_{x\sim\mathcal D_i,y\sim\pi_\theta}R_i(x,y)
+   -\beta_i\mathbb E_x
+       \operatorname{KL}(\pi_\theta(\cdot\mid x)\|\pi_0(\cdot\mid x)),\\
+ T_i^\star(y\mid x)
+   &=\frac{\pi_0(y\mid x)\exp(R_i(x,y)/\beta_i)}{Z_i(x)},\qquad
+ Z_i(x)=\mathbb E_{y\sim\pi_0}\exp(R_i(x,y)/\beta_i).
+\end{split}
+\label{eq:ideal_teacher_definition}
+\end{equation}
+The ideal teacher is the unrestricted KL-regularized RL optimum.
+Substitution of
+$\log T_i^\star=\log\pi_0+R_i/\beta_i-\log Z_i$ gives
+\begin{equation}
+\begin{split}
+ \mathcal F_i^\star(\theta)
+ &:=-\mathbb E_x\operatorname{KL}(\pi_\theta\|T_i^\star)
+ =\frac{J_i^{\rm RL}(\theta)}{\beta_i}
+   -\mathbb E_x\log Z_i(x),\\
+ \nabla\mathcal F_i^\star
+ &=\frac{\nabla J_i^{\rm RL}}{\beta_i}.
+\end{split}
+\label{eq:ideal_teacher_identity}
+\end{equation}
+Sharing an initialization does not establish these assumptions.
+In particular, an approximately trained teacher need not be the
+Boltzmann distribution for its stated reward and temperature.
+
+For normalized target RL weights $w_i$, normalized distillation weights
+\begin{equation}
+ \alpha_i=\frac{w_i\beta_i}{\sum_jw_j\beta_j}
+\label{eq:ideal_temperature_weights}
+\end{equation}
+make $\sum_i\alpha_i\nabla\mathcal F_i^\star$ a positive global
+multiple of $\sum_iw_i\nabla J_i^{\rm RL}$. The coefficient condition
+$\alpha_i/\beta_i=cw_i$ is also necessary if this identity must hold
+for arbitrary task fields. It need not be necessary at a particular
+checkpoint where those fields are linearly dependent.
+For teachers queried on the same prompt, their unrestricted reverse-KL
+mixture has optimum
+$T_\alpha(y\mid x)\propto\prod_i T_i^\star(y\mid x)^{\alpha_i}$:
+expansion gives
+$\sum_i\alpha_i\operatorname{KL}(\pi\|T_i^\star)
+=\operatorname{KL}(\pi\|T_\alpha)-\log Z_\alpha(x)$,
+where $Z_\alpha(x)=\sum_y\prod_iT_i^\star(y\mid x)^{\alpha_i}$.
+Thus changing objective weights can change the target distribution.
+
+These sequence-level identities do not identify the implemented
+frozen-prefix update with an RL gradient. Differentiating a sequence
+KL includes derivatives of the student's prefix visitation law.
+Equation~\ref{eq:local_task_loss} freezes that law, averages positions
+within responses, and uses a finite retained support. Each distinction
+must be accounted for before transferring an objective equivalence to
+an update rule.
+
+Positive task-wise scaling preserves gradient cosines and scales raw
+inner products by $1/(\beta_i\beta_j)$. If every task field tends to
+zero, Cauchy--Schwarz implies that all cross-task inner products tend
+to zero. The converse is false: $(1,0)^\top$ and $(0,1)^\top$ have
+zero inner product without either field vanishing. Aggregate stationarity
+is also insufficient: gradients $1$ and $-1$ cancel under equal weights
+but have inner product $-1$. Finally, opposing fields can shrink while
+their cosine remains $-1$. Raw inner-product contraction alone therefore
+establishes neither improved angular alignment nor task-wise convergence.
+
+\subsection{Centered signals for the implemented retained-support loss}
+\label{app:masked_signal}
+
+Fix $\mathcal R_i^t$. Its response averaging induces a prefix law
+$\nu_i^t$: draw $(x,y)\sim\mathcal R_i^t$, choose a position uniformly
+within the nonempty response, and retain its prefix $c$.
+Let $s_\theta(c,a)=\nabla_\theta\log p_\theta(a\mid c)$ and
+\begin{equation}
+ z_i(c,a)=\mathbf 1_{\{a\in S_i(c)\}}
+                   \log\frac{q_i(a\mid c)}{p_\theta(a\mid c)}.
+\label{eq:appendix_masked_signal}
+\end{equation}
+All probabilities retain full-vocabulary normalization. Since
+$\nabla[p\log(p/q)-p+q]=\log(p/q)\nabla p$ for fixed $q$,
+the descent field of Equation~\ref{eq:local_task_loss} is
+\begin{equation}
+ h_i^{(k)}(\theta):=-\nabla L_i^t(\theta)
+   =\mathbb E_{c\sim\nu_i^t,a\sim p_\theta}
+         [z_i(c,a)s_\theta(c,a)].
+\label{eq:appendix_masked_field}
+\end{equation}
+In particular, $h_i^{(k)}(\theta_t)=-\mu_i$.
+The score identity
+$\mathbb E_{a\sim p_\theta}[s_\theta(c,a)\mid c]=0$ implies
+\begin{equation}
+\begin{split}
+ h_i^{(k)}(\theta)
+   &=\mathbb E[(z_i-\mathbb E[z_i\mid c])s_\theta],\\
+ \|h_i^{(k)}(\theta)\|
+   &\leq
+   \sqrt{\mathbb E_c\operatorname{Var}_{a\sim p_\theta}(z_i\mid c)}
+   \sqrt{\mathbb E\|s_\theta\|^2}.
+\end{split}
+\label{eq:appendix_centered_signal_bound}
+\end{equation}
+The inequality follows from Cauchy--Schwarz, assuming finite second
+moments. It bounds the update from above; a large centered signal
+does not ensure a large update, because its correlation with the
+score also matters.
+
+The centering applies to the entire masked signal $z_i$.
+It does not permit arbitrary baseline subtraction inside the retained
+support, since
+\begin{equation}
+ \mathbb E_{a\sim p_\theta}
+     [\mathbf 1_{\{a\in S_i(c)\}}s_\theta(c,a)\mid c]
+   =\nabla_\theta p_\theta(S_i(c)\mid c),
+\label{eq:retained_support_baseline}
+\end{equation}
+which is generally nonzero. In particular, prefix-only partition terms
+in a reward-to-teacher log-ratio decomposition cannot simply be
+discarded from the retained-support field.
+
+Teacher mismatch can be isolated when the prefix law and retained
+support $S$ are held fixed. For positive teacher distributions $q$
+and $\widetilde q$, define
+$r(c,a)=\mathbf 1_{\{a\in S(c)\}}\log(q(a\mid c)/\widetilde q(a\mid c))$.
+Their descent fields satisfy
+\begin{equation}
+ \begin{split}
+ h(q;S)-h(\widetilde q;S)
+   &=\mathbb E[(r-\mathbb E[r\mid c])s_\theta],\\
+ \|h(q;S)-h(\widetilde q;S)\|
+   &\leq\sqrt{\mathbb E_c\operatorname{Var}(r\mid c)}
+         \sqrt{\mathbb E\|s_\theta\|^2}.
+ \end{split}
+\label{eq:teacher_field_residual}
+\end{equation}
+Thus the field error depends on teacher differences on the student's
+evaluated states and their correlation with its score. A standalone
+teacher capability score does not determine this error.
+If the two teachers instead select different supports $S$ and
+$\widetilde S$, the difference additionally contains
+$\mathbb E[(\mathbf 1_S-\mathbf 1_{\widetilde S})
+\log(\widetilde q/p_\theta)s_\theta]$; the common-support residual alone
+does not describe that comparison.
+
+\subsection{Local curvature and slow progress without interference}
+\label{app:local_rates}
+
+Keep prefix laws and teacher supports fixed, and suppose a common
+parameter $\theta^\dagger$ matches each teacher on every retained
+token almost surely under its prefix law. At this point, each
+retained-support loss has zero gradient. Differentiating once more
+and using $\log(p_{\theta^\dagger}/q_i)=0$ on the support gives
+\begin{equation}
+ H_i^\dagger
+ :=\nabla^2L_i^t(\theta^\dagger)
+ =\mathbb E_{c\sim\nu_i^t}
+       \sum_{a\in S_i(c)}
+       p_{\theta^\dagger}(a\mid c)
+       s_{\theta^\dagger}(c,a)s_{\theta^\dagger}(c,a)^\top
+ \succeq0.
+\label{eq:partial_fisher_matching}
+\end{equation}
+For full vocabulary this is the conditional Fisher matrix averaged
+over prefixes. For finite $k$ it is a partial score second moment;
+matching the retained probabilities need not determine the distribution
+within the omitted tail. Away from a matching point, the Hessian need
+not equal this matrix or be positive semidefinite.
+
+For $e=\theta-\theta^\dagger$, a local quadratic approximation with
+fixed weights and fixed $D$ gives
+\begin{equation}
+ \dot e=-DH_w^\dagger e,\qquad
+ H_w^\dagger=\sum_iw_iH_i^\dagger,\qquad
+ e(t)=\exp(-DH_w^\dagger t)e(0).
+\label{eq:local_weighted_flow}
+\end{equation}
+This solves the linearized flow, not the general nonlinear training
+trajectory. For positive diagonal $D$, the decay rates are determined
+by $D^{1/2}H_w^\dagger D^{1/2}$; null directions need not contract.
+The constant-matrix solution does not generally apply when weights,
+prefix laws, or adaptive optimizer state change.
+
+For an exact two-coordinate example, take
+$L_1(x,y)=x^2/2$ and $L_2(x,y)=0.1y^2/2$, with $D=I$ and
+$w_1=w_2=1/2$. The task gradients are orthogonal everywhere and there
+is no sampling noise. Nevertheless,
+\begin{equation}
+ \begin{gathered}
+ x(t)=x(0)e^{-t/2},\qquad y(t)=y(0)e^{-0.05t},\\
+ \frac{L_1(t)}{L_1(0)}=e^{-t},\quad
+ \frac{L_2(t)}{L_2(0)}=e^{-0.1t},
+ \end{gathered}
+\label{eq:orthogonal_loss_rates}
+\end{equation}
+where normalized losses assume nonzero initial coordinates. The second
+task takes ten times as long to reach the same fractional loss reduction.
+More precise gradient estimates cannot improve this noiseless flow.
+This example establishes a limitation of interference and variance
+diagnostics; it does not identify the cause of slow MOPD training.
+
+\subsection{Minimum completion time in a separable exposure model}
+\label{app:static_allocation}
+
+Consider a separate model in which nonnegative task coefficients
+$\alpha_i$ sum to one and directly set the mean learning rates:
+\begin{equation}
+ \ell_i(t)=\ell_i(0)\exp(-2\alpha_i\gamma_i t),\qquad
+ \gamma_i>0.
+\label{eq:separable_exposure_model}
+\end{equation}
+Time here measures total task exposure with equal unit costs.
+A factorization $\gamma_i=\kappa_i\lambda_i$, with
+$\kappa_i,\lambda_i>0$, can distinguish a phenomenological signal scale
+from a curvature scale, but the model depends only on their product.
+It does not derive either factor from MOPD training.
+
+For positive loss thresholds $\delta_i$, define
+\begin{equation}
+ B_i=
+ \begin{cases}
+  0,&\ell_i(0)\leq\delta_i,\\
+  \log(\ell_i(0)/\delta_i)/(2\gamma_i),
+       &\ell_i(0)>\delta_i.
+ \end{cases}
+\end{equation}
+Reaching all thresholds by $T$ is equivalent to
+$\alpha_iT\geq B_i$ for every task. Summing yields
+$T\geq\sum_iB_i$. If this sum is positive, the static choice
+\begin{equation}
+ T^\star=\sum_iB_i,\qquad
+ \alpha_i^\star=\frac{B_i}{\sum_jB_j}
+\label{eq:separable_completion_allocation}
+\end{equation}
+attains the bound. If all $B_i=0$, no training is required:
+$T^\star=0$ and any feasible coefficients suffice.
+
+This result assumes independent exponential loss dynamics and
+unconstrained continuous coefficients. It is not a minimum-time
+guarantee for shared neural parameters, unequal compute costs, or
+AdamW. Moreover, its $\alpha_i$ change the mean field, whereas GPAS
+changes sample counts $m_i$ while preserving the chosen weights $w_i$
+in Equation~\ref{eq:batch_gradient_observation}. The two allocation
+problems have different objectives; this completion-time formula
+does not establish optimal training time for GPAS.
+
+\subsection{Mean progress and directional reliability}
+\label{app:joint_progress}
+
+All quantities below are conditional on the same checkpoint, chosen
+counts, and fixed positive diagonal $D$. Suppose the $g_{j,s}$ are
+independent with mean $\mu_j$ and covariance $\Sigma_j$. Then
+\begin{equation}
+    \mathbb E A=\mu_w,\qquad
+    \Sigma(m):=\operatorname{Cov}(A)
+      =\sum_j\frac{w_j^2}{m_j}\Sigma_j.
+    \label{eq:combined_covariance}
+\end{equation}
+Linearity gives $\mathbb E X_i=\mu_i^\top D\mu_w=a_i$, and the
+variance of a linear functional gives
+$\operatorname{Var}(X_i)=\mu_i^\top D\Sigma(m)D\mu_i=v_i(m)$.
+The first-order loss change is $-\eta X_i$. Consequently, if
+$a_i\leq0$, its expectation is nonnegative for every admissible count
+vector. Additional samples can change the variance and finite-step
+curvature contribution, but cannot make this expected first-order
+change negative at the fixed mean and $D$.
+
+For completeness, write $Z_i=a_i-X_i$, so that
+$\mathbb E Z_i=0$ and $\mathbb E Z_i^2=v_i$. For any $\lambda\geq0$
+and $a_i>0$, Markov's inequality implies
+\begin{equation}
+    \Pr(X_i\leq0)=\Pr(Z_i\geq a_i)
+      \leq\frac{\mathbb E(Z_i+\lambda)^2}{(a_i+\lambda)^2}
+      =\frac{v_i+\lambda^2}{(a_i+\lambda)^2}.
+\end{equation}
+Choosing $\lambda=v_i/a_i$ proves
+$\Pr(X_i\leq0)\leq v_i/(v_i+a_i^2)$, including the zero-variance
+case. The union bound gives Equation~\ref{eq:directional_reliability}
+without requiring the $X_i$ to be independent. These random variables
+usually share the same $A$ and are dependent.
+
+The matrix $K$ is a Gram matrix in the inner product induced by $D$;
+it is positive semidefinite, but $Kw$ can have nonpositive entries.
+The signs of those entries determine expected task progress for the
+chosen mixture. Neither an off-diagonal negative entry nor a local
+nonpositive margin establishes that the capability targets are globally
+unattainable. The analysis also permits successful trajectories with
+temporary task regressions.
+
+\subsection{A sufficient local sampling budget}
+\label{app:budget_reliability}
+
+Assume $a_i>0$ for every domain. For positive fractions $q_j$ summing
+to one, suppose the counts $m_j=Gq_j$ are integers and satisfy any
+applicable bounds. Define
+\begin{equation}
+    B_i(q)=\sum_j
+        \frac{w_j^2\mu_i^\top D\Sigma_jD\mu_i}{q_j a_i^2}.
+\end{equation}
+Then $v_i(m)/a_i^2=B_i(q)/G$. For any $0<\delta<1$, the sufficient
+condition
+\begin{equation}
+    G\geq\frac{M-\delta}{\delta}\max_i B_i(q)
+    \label{eq:reliability_budget}
+\end{equation}
+ensures $\Pr(\exists i:X_i\leq0)\leq\delta$.
+Indeed, each Cantelli term is $B_i/(G+B_i)$, which is at most
+$\delta/M$ under the stated condition; summing proves the claim.
+If all $B_i=0$, the sampled first-order progress is deterministic.
+
+This is a sufficient condition on known population quantities. Rounding
+counts requires recomputing the bound for the resulting allocation.
+Count caps may prevent the budget from being attained. The condition
+also omits estimation uncertainty, finite-population corrections,
+curvature, and state evolution; it is not an operational guarantee for
+AdamW or a requirement for long-run capability integration.
+
+\subsection{Trace variance and exact integer allocation}
 \label{app:allocation_proofs}
 
-Independence across tasks and micro-batches gives
+By Equation~\ref{eq:combined_covariance},
 \begin{equation}
-\mathbb E\|D(A-\mathbb E[A])\|_2^2
-=\sum_iw_i^2\,\mathbb E\|D(\bar g_i-\mathbb E[g_i])\|_2^2
-=\sum_i\frac{w_i^2}{m_i}\,\mathbb E\|D(g_i-\mathbb E[g_i])\|_2^2,
+    V(m)=\operatorname{tr}(D\Sigma(m)D)
+      =\sum_i\frac{w_i^2\operatorname{tr}(D\Sigma_iD)}{m_i}
+      =\sum_i\frac{w_i^2e_i}{m_i}.
 \end{equation}
-which is Equation~\ref{eq:batch_variance}. Within a step,
-$\sum_s\|D(g_{i,s}-\bar g_i)\|_2^2=\sum_s\|Dg_{i,s}\|_2^2-m_i\|D\bar g_i\|_2^2$,
-so Equation~\ref{eq:noise_estimate} is the usual unbiased sample variance
-summed over the scaled coordinates and is defined whenever $m_i\geq2$.
+For the positive semidefinite matrix $Q=D\Sigma(m)D$,
+$\mu_i^\top Q\mu_i\leq\|\mu_i\|_2^2\lambda_{\max}(Q)
+\leq\|\mu_i\|_2^2\operatorname{tr}(Q)$, proving
+Equation~\ref{eq:trace_directional_bound}.
+Equation~\ref{eq:noise_estimate} is the sum of coordinate-wise sample
+variances and is unbiased for $e_i$ under independent sampling.
+The moving average is an allocation estimate, not an unbiased estimate
+of a changing current-state covariance.
 
-Write $q_i=w_i\sqrt{e_i}$. With equal micro-batch cost, the Cauchy--Schwarz
-inequality
+Write $c_i=w_i\sqrt{e_i}$. Cauchy--Schwarz gives
 \begin{equation}
-\Bigl(\sum_i m_i\Bigr)\Bigl(\sum_i\frac{q_i^2}{m_i}\Bigr)
-\geq\Bigl(\sum_i q_i\Bigr)^2
+    \left(\sum_i m_i\right)
+    \left(\sum_i\frac{c_i^2}{m_i}\right)
+      \geq\left(\sum_i c_i\right)^2.
 \end{equation}
-holds with equality at $m_i\propto q_i$, which is GPAS. With task-dependent
-cost and zero fixed overhead,
+When all $c_i>0$, equality holds at
+$m_i=Gc_i/(\sum_jc_j)$, yielding the continuous per-step rule without
+count bounds. Positive lower and upper bounds lead to the corresponding clipped
+continuous rule by the Karush--Kuhn--Tucker conditions. Zero-noise
+components are handled by the bounds and remaining budget.
+We do not claim that rounding this continuous solution solves the
+integer problem. Both GPAS modes evaluate their estimated objectives
+on every $m\in\mathcal M$ as defined in
+Appendix~\ref{app:implementation}.
+
+With positive marginal times and zero fixed step time,
 \begin{equation}
-\Bigl(\sum_i m_i\tau_i\Bigr)\Bigl(\sum_i\frac{q_i^2}{m_i}\Bigr)
-\geq\Bigl(\sum_i q_i\sqrt{\tau_i}\Bigr)^2,
+    \left(\sum_i m_i\tau_i\right)
+    \left(\sum_i\frac{c_i^2}{m_i}\right)
+      \geq\left(\sum_i c_i\sqrt{\tau_i}\right)^2,
 \end{equation}
-with equality at $m_i\propto q_i/\sqrt{\tau_i}$. For $C>0$, Cost-GPAS
-evaluates Equation~\ref{eq:batch_cost_objective} over the feasible integer
-counts. In both rules the continuous counts are clipped to
-$[m_{\min},m_{\max}]$ by solving for the scale at which the clipped counts sum
-to $G$, and the result is rounded by largest remainder.
+with equality at $m_i\propto c_i/\sqrt{\tau_i}$ when this continuous
+allocation is feasible. Positive fixed time and integer bounds are
+handled by enumeration. As $C$ grows on the finite feasible set,
+minimizing $CV(m)+(\sum_i m_i\tau_i)V(m)$ eventually selects a
+minimum-variance allocation, with time breaking any remaining variance
+ties. The product criterion alone does not establish a learning-rate
+or time-to-capability improvement.
 
-\subsection{Allocation and AdamW's second moment}
-\label{app:moment_target_proof}
+For the study's Uniform counts of four and cap of eight,
+$V(m)\geq\sum_i w_i^2e_i/8=V_{\rm Uniform}/2$.
+This proves the stated factor-of-two ceiling under the independent,
+fixed-state model for any feasible allocation. All these statements
+concern the same means and covariances, not different training states
+reached by different schedules.
 
-For a fixed allocation, assume task-$i$ micro-batch gradients are independent
-with mean $h_i$ and coordinatewise variance $\sigma_i^2$. Equation
-\ref{eq:batch_gradient_observation} gives
+\subsection{Trace-optimal allocation need not preserve task directions best}
+\label{app:trace_counterexample}
+
+Consider two tasks with $D=I$, $w_1=w_2=1/2$, and
+$\mu_1=\mu_2=(1,0)^\top$. Let
 \begin{equation}
-    \mathbb E[A]=\sum_iw_i h_i,
-    \qquad
-    \mathbb E[A^2]=\Bigl(\sum_iw_i h_i\Bigr)^2
-    +\sum_i\frac{w_i^2}{m_i}\sigma_i^2,
-    \label{eq:conventional_batch_second_moment}
+    \Sigma_1=\begin{pmatrix}1&0\\0&80\end{pmatrix},\qquad
+    \Sigma_2=\begin{pmatrix}9&0\\0&0\end{pmatrix}.
 \end{equation}
-so the noise term of AdamW's second-moment observation depends on the
-allocation, as it does under any change of batch composition. Within the
-count bounds each task's term lies between $0.5\times$ and $2\times$ its
-Uniform value, and the observation enters the update through the square root
-of an exponential average, so the update magnitude in a noise-dominated
-coordinate changes by less than a factor of $\sqrt2$ in the worst case. The
-experiments use conventional AdamW.
-
-An allocation-independent observation is available if desired:
+Both progress margins equal one. For $G=40$ with positive counts and
+no additional caps, the trace noises $(e_1,e_2)=(81,9)$ give the
+GPAS optimum $(m_1,m_2)=(30,10)$ and
 \begin{equation}
-    U=\sum_{i=1}^M\frac{w_i}{m_i}\sum_{s=1}^{m_i}g_{i,s}^2,
-    \qquad
-    \mathbb E[U/G]=\frac1G\sum_iw_i\bigl(h_i^2+\sigma_i^2\bigr),
-    \label{eq:taskwise_square_observation}
+    v_1=v_2=\frac14\left(\frac1{30}+\frac9{10}\right)
+      =\frac7{30}.
 \end{equation}
-whose expectation does not depend on $m$. At proportional allocation
-$m_i=Gw_i$ its noise term equals that of
-Equation~\ref{eq:conventional_batch_second_moment}; using $U$ without the
-$1/G$ factor would enlarge the target by about $G$ and shrink updates by about
-$\sqrt G$ in noise-dominated coordinates. In the controlled check below,
-reallocating from Uniform to GPAS changes the conventional $A^2$ observation
-by $0.543$ in relative norm (calculated $0.542$) and the $U/G$ observation by
-$0.0009$ (calculated $0$).
+The allocation $(10,30)$ instead gives
+$v_1=v_2=\tfrac14(1/10+9/30)=1/10$.
+The latter allocation minimizes the common directional variance:
+its relevant standard deviations are in the ratio $1:3$.
+The trace variances are respectively $9/10$ and $21/10$, so the
+trace and directional objectives prefer different allocations.
 
-\subsection{Controlled calculation}
-\label{app:controlled}
+If the independent micro-batch noise is Gaussian, then
+$X_1=X_2$ is Gaussian with mean one and the stated variance.
+Its exact non-descent probability is $\Phi(-1/\sqrt{v_1})$, where
+$\Phi$ is the standard normal distribution function. Thus $(10,30)$
+also has lower exact failure probability, not merely a lower bound.
+The discrepancy comes from task 1's second-coordinate variance, which
+is orthogonal to both task means. This is an analytical counterexample;
+its two-task budget is separate from the four-domain training protocol.
 
-The controlled check uses three Gaussian micro-batch gradients in three
-coordinates and a diagonal AdamW scaling that reverses their noise ranking.
-Every step contains $G=16$ micro-batches with $2\leq m_i\leq12$. Bounded
-rounding gives counts $(6,5,5)$ for Uniform, $(11,3,2)$ for RawNoise,
-$(3,3,10)$ for GPAS, and $(3,5,8)$ for zero-overhead Cost-GPAS. All methods
-use the same fixed weights and common random numbers over $20{,}000$ trials.
-GPAS attains $0.679\times$ Uniform's scaled variance (calculated $0.681$),
-RawNoise $2.316\times$, and Cost-GPAS a time--variance product of
-$0.857\times$ Uniform (calculated $0.854$). The second-moment panel uses
-$200{,}000$ simulated steps.
+\subsection{Finite-step progress and the optimizer approximation}
+\label{app:descent}
 
-\input{sections/table_controlled_values}
-
-\begin{figure}[H]
-    \centering
-    \includegraphics[width=0.98\linewidth]{figures/controlled_optimizer_sampling.pdf}
-    \caption{Controlled checks. Bars are Monte Carlo estimates and crosses are
-    calculated values. GPAS uses AdamW-scaled within-task noise; Cost-GPAS also
-    uses task cost. The last panel compares second-moment observations after
-    an integer reallocation.}
-    \label{fig:controlled_checks}
-\end{figure}
-
-\subsection{MOPD loss and micro-batch normalization}
-\label{app:opd_estimators}
-
-For a student-generated prefix $z$, write
-$q_v=\pi_\theta(v\mid z)$ and $t_v=T_i(v\mid z)$. The sampled-token reverse-KL
-score is
+Suppose $L_i^t$ is $\mathcal L_i$-smooth along every update segment
+under consideration. For the idealized update,
 \begin{equation}
-    \operatorname{sg}\!\left[\log\frac{q_V}{t_V}\right]
-    \nabla_\theta\log q_V,\qquad V\sim q.
+    L_i^t(\theta_t-\eta DA)-L_i^t(\theta_t)
+      \leq-\eta X_i+
+         \frac{\eta^2\mathcal L_i}{2}\|DA\|_2^2.
+    \label{eq:finite_step_descent}
 \end{equation}
-The implementation averages valid tokens within one response and then the
-$b=4$ responses from distinct prompts in a micro-batch. Any configured
-importance-ratio truncation is applied before these means; the fixed-objective
-factor $w_i/m_i$ is applied after them. There is no groupwise advantage
-normalization and no outcome-reward term.
+Taking expectations gives
+\begin{equation}
+    \mathbb E[\Delta L_i^t]
+      \leq-\eta a_i+\frac{\eta^2\mathcal L_i}{2}
+          \left(\|D\mu_w\|_2^2+V(m)\right).
+    \label{eq:expected_task_descent}
+\end{equation}
+Consequently, when all margins are positive, a sufficient condition
+for every expected task-loss change to be negative is
+\begin{equation}
+    0<\eta<\min_i
+       \frac{2a_i}{\mathcal L_i(\|D\mu_w\|_2^2+V(m))},
+\end{equation}
+with an infinite threshold for a zero smoothness constant.
+A realized first-order descent sign by itself is insufficient:
+Equation~\ref{eq:finite_step_descent} additionally requires
+$X_i>\eta\mathcal L_i\|DA\|_2^2/2$ to certify a strict decrease.
 
-\subsection{Held-out gradient variance protocol}
-\label{app:heldout}
+A probability version requires control of update magnitude as well.
+If $\Pr(\|DA\|_2>R)\leq\varepsilon_R$ and
+$d_i=a_i-\eta\mathcal L_iR^2/2>0$ for all $i$, Cantelli and a union
+bound give
+\begin{equation}
+    \Pr(\exists i:\Delta L_i^t\geq0)
+       \leq\min\left\{1,\varepsilon_R+
+             \sum_i\frac{v_i(m)}{v_i(m)+d_i^2}\right\}.
+\end{equation}
+The event of a nondecrease with $\|DA\|_2\leq R$ implies
+$X_i\leq\eta\mathcal L_iR^2/2$ for some $i$, which proves the bound.
+These assumptions need to be verified before interpreting the expression
+as a finite-step guarantee.
 
-At each of three Uniform checkpoints (steps \missing{50, 250, 500}) and for
-each task, we generate $32$ fresh micro-batches from the held-out prompts and
-record $\|Dg_{i,s}\|_2^2$ and $\|D\bar g_i\|_2^2$ for each half, with $D$ from
-the checkpoint's AdamW state. Half $\mathcal A$ gives
-$\widehat e^{\mathcal A}_i$, from which each rule computes its allocation
-$m^{\mathcal A}$ (LossGap uses the checkpoint's held-out losses); half
-$\mathcal B$ gives $\widehat e^{\mathcal B}_i$, and the
-held-out variance of that allocation is
-$\sum_iw_i^2\widehat e^{\mathcal B}_i/m^{\mathcal A}_i$, reported relative to
-the same quantity at Uniform counts. We exchange the halves and average. The
-estimator error $|\widehat e^{\mathcal A}_i-\widehat e^{\mathcal B}_i|
-/\widehat e^{\mathcal B}_i$ is also computed from subsets of two and four
-micro-batches to match the online estimate. Only scalar norms are stored.
+A second-order expansion states how covariance direction and curvature
+enter more precisely. Let $H_i=\nabla^2L_i^t(\theta_t)$. If the Hessian
+is $\kappa_i$-Lipschitz on all update segments and
+$\mathbb E\|DA\|_2^3<\infty$, then
+\begin{equation}
+\begin{split}
+    \mathbb E[\Delta L_i^t]
+       ={}&-\eta a_i+\frac{\eta^2}{2}
+          \left[(D\mu_w)^\top H_i(D\mu_w)
+          +\operatorname{tr}(H_iD\Sigma(m)D)\right]+\mathcal E_i,\\
+    |\mathcal E_i|\leq{}&\frac{\kappa_i\eta^3}{6}\mathbb E\|DA\|_2^3.
+\end{split}
+\end{equation}
+This follows by Taylor's theorem and the quadratic-form
+bias--variance identity. The curvature-weighted covariance term can
+have either sign when the Hessian is indefinite. The smoothness bound
+replaces this directional dependence with the conservative trace term.
 
-\subsection{System timing and logs}
+For the weighted frozen objective $F_t$, the same argument gives, with
+$\mathcal L$ a smoothness constant,
+\begin{equation}
+    \mathbb E F_t(\theta_t-\eta DA)
+       \leq F_t(\theta_t)-\eta\mu_w^\top D\mu_w
+       +\frac{\eta^2\mathcal L}{2}
+         \left(\|D\mu_w\|_2^2+V(m)\right).
+\end{equation}
+Improving this weighted bound does not ensure progress for every task.
+The idealized update is also not the actual AdamW update: momentum,
+current-gradient second moments, clipping, and decay can change its
+mean and direction. Allocation can alter these states over training.
+The common-checkpoint experiment therefore compares frozen-$D$
+predictions with actual optimizer branches using identical saved states.
+
+\subsection{Conditional extension: allocation for directional uncertainty}
+\label{app:directional_extension}
+
+If measurements show that trace noise is a poor proxy for relevant
+uncertainty, a possible extension is to choose counts by
+\begin{equation}
+    \min_{m\in\mathcal M}\max_{1\leq i\leq M}
+           \frac{v_i(m)}{a_i^2},\qquad a_i>0\quad\text{for every }i.
+    \label{eq:directional_extension}
+\end{equation}
+With known positive margins and covariances, each normalized variance
+is a sum of nonnegative multiples of $1/m_j$. It is convex on positive
+counts; their maximum is convex, and the sum and box constraints are
+convex in the continuous relaxation. With four tasks the integer
+problem can again be solved by finite enumeration. This criterion
+minimizes the worst normalized directional variance, and hence the
+worst Cantelli bound, under the stated local model. It need not minimize
+the true joint failure probability or long-run capability loss.
+
+If any margin is nonpositive, the criterion does not resolve joint
+progress. Excluding that domain would conceal the unresolved task
+tradeoff. Changing weights, the update direction, or parameter sharing
+requires a separate intervention. Estimating directional covariances
+also adds computation: independent calibration and trial samples, or
+historical estimates fixed before the trial, are needed to test the
+predictions without reusing the same noise optimistically. The proposed
+study first tests GPAS and its trace statistic. This extension is a
+research hypothesis, not an implemented or validated algorithm.
+
+\subsection{Timing and planned training records}
 \label{app:system_details}
 
-For each task in a step, the log records rollout, scoring, backward, and
-optimizer time, peak memory, attempted responses, and valid and generated
-tokens. $\tau_i$ is the scoring and backward time of task $i$'s micro-batches
-divided by $m_i$; $C$ is the remaining step time, including rollout, weight
-synchronization to the inference GPU, and the optimizer update. GPU hours are
-wall time times the two reserved GPUs, including all waiting. Checkpoints
-store the allocation, noise estimates, timing averages, and prompt positions,
-and a resume test reproduces the next allocation and parameter update. A
-layout that scores tasks concurrently with training has a step time closer to
-$C+\max_i m_i\tau_i$ than to the serial sum; the fixed-objective scaling and
-GPAS are unchanged, and Cost-GPAS should use the step-time model fitted for
-that layout.
+Task blocks record rollout, teacher-scoring, backward, and statistics
+time, together with response lengths and peak memory. The marginal
+per-micro-batch estimates form $\tau_i$; synchronization, optimizer
+work, and other count-independent step operations form $C$.
+Their EMA estimates use decay $0.9$. We compare predicted and
+observed step times and evaluate efficiency with actual elapsed
+time on both reserved GPUs. Evaluation compute is reported separately.
+If a deployment overlaps task blocks, its timing predictor should
+represent that execution schedule.
 
-\subsection{Full task-level trajectories}
-
-\begin{figure}[H]
-    \centering
-    \missingfigure[0.18\textheight]{Insert per-task held-out and training
-    losses, prompt consumption, response length and truncation, count-bound
-    occupancy, and step-time quantiles from the released logs.}
-    \caption{Task-level training and system traces.
-    \missing{Replace after the four-teacher runs finish.}}
-    \label{fig:appendix_task_curves}
-\end{figure}
+Checkpoints retain optimizer state, task stream positions, counts,
+and noise and time averages. The planned traces include per-task
+held-out loss, prompt consumption, response length and truncation,
+micro-batch counts, noise estimates, and measured step time.
+\missing{Add the artifact location and populate the configuration
+and empirical figures from these records.}

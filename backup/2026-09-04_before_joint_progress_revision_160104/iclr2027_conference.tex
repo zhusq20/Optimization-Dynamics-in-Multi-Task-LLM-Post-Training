@@ -1,0 +1,83 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2027_conference,times}
+
+
+% ------------------------------ Preamble ------------------------------------
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{subcaption}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\newfloat{algorithm}{t}{loa}
+\floatname{algorithm}{Algorithm}
+
+\usepackage{amsmath,amssymb,mathtools,bm}
+\usepackage{amsthm}
+
+\newtheorem{definition}{Definition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\cD}{\mathcal{D}}
+\newcommand{\cV}{\mathcal{V}}
+\newcommand{\sg}{\operatorname{sg}}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\newcommand{\inner}[2]{\left\langle #1,#2 \right\rangle}
+\newcommand{\pospart}[1]{\left[#1\right]_{+}}
+\newcommand{\ctr}[2]{\operatorname{ctr}_{#1}\!\left[#2\right]}
+\newcommand{\chisq}[2]{\chi^2\!\left(#1\,\|\,#2\right)}
+\newcommand{\siqi}[1]{\textcolor{blue}{[siqi: #1]}}
+\newcommand{\missing}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\missingfigure}[2][0.15\textheight]{%
+  \fbox{\begin{minipage}[c][#1][c]{0.94\linewidth}
+  \centering\missing{#2}
+  \end{minipage}}}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{hyperref}
+\hypersetup{hidelinks}
+\usepackage{url}
+
+
+\title{GPAS: Optimizer-Aware Allocation\\for Multi-Teacher On-Policy Distillation}
+
+\author{Anonymous Authors}
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+%\iclrfinalcopy
+\begin{document}
+
+
+\maketitle
+
+\input{sections/001_abstract}
+\input{sections/002_introduction}
+\input{sections/004_preliminary}
+\input{sections/005_theory}
+\input{sections/005_experiment}
+\input{sections/003_relatedwork}
+\input{sections/007_discussion}
+\input{sections/008_checklist}
+
+\bibliography{iclr2027_conference}
+\bibliographystyle{iclr2027_conference}
+
+\appendix
+
+\setcounter{table}{0}
+\renewcommand{\thetable}{A\arabic{table}}
+
+\input{sections/009_appendix}
+
+
+\end{document}

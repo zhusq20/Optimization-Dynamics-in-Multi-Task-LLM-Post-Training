@@ -1,0 +1,706 @@
+MOPD: Multi-Teacher On-Policy Distillation for Capability Integration in LLM Post-Training
+// Restore the saved color scheme preference, or
+// enact the browser preference if "automatic",
+// without expecting DOM load to have completed.
+//
+// Also restore any saved readingmode and ToC display preferences.
+function initializeReadingPreferences() {
+let saved_theme = localStorage.getItem("ar5iv_theme") || "automatic";
+if (saved_theme === "automatic") {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+saved_theme = "dark";
+}
+}
+if (saved_theme == "dark") {
+document.documentElement.setAttribute("data-theme", "dark");
+} else {
+document.documentElement.setAttribute("data-theme", "light");
+}
+const tocDisplay = localStorage.getItem('arxiv_html_paper_toc_display');
+if (tocDisplay) {
+document.documentElement.setAttribute("data-toc-display", tocDisplay);
+}
+const readingMode = localStorage.getItem('arxiv_html_paper_reading_mode');
+if (readingMode) {
+document.documentElement.setAttribute("data-reading-mode", readingMode);
+}
+// Pre-apply spinout-banner dismissal here, before the banner paints, so it
+// never flashes in only to be hidden later by the deferred arxiv-header.js.
+// Key matches arxiv-header.js: "arxiv-banner-dismissed:" + data-banner-name.
+if (localStorage.getItem('arxiv-banner-dismissed:spinout-nonprofit')) {
+document.documentElement.setAttribute("data-banner-dismissed", "");
+}
+}
+// Run as soon as JS starts, to minimize repainting
+initializeReadingPreferences();
+/* Banner pre-dismissal (set above before paint -> no flash-then-hide) and
+reading-mode chrome hiding. */
+html[data-banner-dismissed] .ds-announcement { display: none; }
+html[data-reading-mode="enabled"] .ds-announcement,
+html[data-reading-mode="enabled"] .ds-site-footer { display: none; }
+/* Keep the announcement text dark on the Open-Blue band in both colour themes
+(otherwise it inherits the paper's warm-wash text in dark mode and washes out). */
+.ds-announcement-text { color: var(--arxiv-ink, #1c1a17); }
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Work
+Reinforcement learning for LLM.
+Distillation for LLMs.
+Model merging.
+3 Method
+3.1 Pipeline
+3.2 Algorithm
+3.2.1 Policy-gradient implementation
+3.2.2 Top- $k$ distillation implementation
+3.3 Infrastructure
+4 Experiments
+4.1 Experimental setup
+SFT model.
+Tasks and evaluation.
+Baselines.
+Evaluation metric.
+4.2 Main results
+4.3 Scaling to a 309B-parameter model
+4.4 Analysis
+4.4.1 Policy-gradient and top- $k$ distillation perform comparably
+4.4.2 Same-origin teachers stabilize distillation
+4.4.3 Multi-round student–teacher evolution
+5 Discussion
+6 Conclusion
+References
+A Training Details
+Training data.
+Hyperparameters.
+B Evaluation Details
+License: arXiv.org perpetual non-exclusive license
+arXiv:2606.30406v1 [cs.CL] 29 Jun 2026
+MOPD: Multi-Teacher On-Policy Distillation for Capability Integration in LLM Post-Training
+Wenhan Ma
+Note: Work done during an internship at Xiaomi.
+Affiliation: Peking University
+Affiliation: LLM Core, Xiaomi
+Jianyu Wei
+Affiliation: LLM Core, Xiaomi
+Liang Zhao
+Affiliation: LLM Core, Xiaomi
+Hailin Zhang
+Affiliation: LLM Core, Xiaomi
+Bangjun Xiao
+Affiliation: Peking University
+Affiliation: LLM Core, Xiaomi
+Lei Li
+Affiliation: LLM Core, Xiaomi
+Affiliation: University of Hong Kong
+Qibin Yang
+Affiliation: Peking University
+Affiliation: LLM Core, Xiaomi
+Bofei Gao
+Affiliation: Peking University
+Affiliation: LLM Core, Xiaomi
+Yudong Wang
+Affiliation: Peking University
+Affiliation: LLM Core, Xiaomi
+Rang Li
+Affiliation: Peking University
+Affiliation: LLM Core, Xiaomi
+Jinhao Dong
+Affiliation: LLM Core, Xiaomi
+Affiliation: Renmin University of China
+Zhifang Sui
+Note: Co-corresponding authors.
+Affiliation: Peking University
+Fuli Luo22footnotemark:
+2
+Affiliation: LLM Core, Xiaomi
+Abstract
+Modern large language models (LLMs) rely on reinforcement learning during post-training to push specific capabilities, yet integrating multiple capabilities into one model remains hard. Existing methods, such as Off-Policy Finetune and Mix-RL, are either inefficient or lose performance. In this work, we propose Multi-teacher On-Policy Distillation (MOPD), a post-training paradigm for combining the capabilities of multiple domain RL teachers: we first run per-domain specialised RL to obtain a set of domain teachers, then distill these teachers into the student on its own rollouts. This eliminates exposure bias and provides a dense optimization signal. On Qwen3-30B-A3B, MOPD outperforms Mix-RL, Cascade RL, Off-Policy Finetune, and Param-Merge baselines, inheriting nearly all of each teacher’s capability. MOPD also enables parallel, independent development of domain teachers, removing the cross-domain coupling typical of multi-domain post-training. MOPD has been deployed in the post-training of MiMo-V2-Flash, an industrial-scale frontier model, demonstrating its practical value for capability integration in frontier-scale LLMs.
+1 Introduction
+Reinforcement learning (RL) has emerged as an important method for improving the capabilities of large language models (LLMs) (Ouyang et al., 2022; Schulman et al., 2017; Shao et al., 2024). Different task domains rely on different RL pipelines. Mathematical reasoning is now trained with verifiable-answer RL (Shao et al., 2024; Guo et al., 2025); software engineering with agent-style RL in executable sandboxes (Wei et al., 2025; Jain et al., 2025); instruction following and creative writing with rubric-based RL (Ouyang et al., 2022); and search-oriented agents with web-environment RL (Nakano et al., 2022; Jin et al., 2025). Each pipeline reliably improves the model’s capability on its target domain. However, what we ultimately want is a single model that performs well across all of these domains. Yet building such a model remains an open problem in modern LLM post-training.
+Table 1: Capability-integration paradigms compared across three axes that matter in practice. MOPD is the only method that simultaneously attains dense optimization, on-policy training, and a parallelisable pipeline.
+Dense optimization
+On-policy
+Parallelisable
+Param-Merge
+$\times$
+—
+$\checkmark$
+Off-Policy Finetune
+$\checkmark$
+$\times$
+$\checkmark$
+Mix-RL
+$\times$
+$\checkmark$
+$\times$
+Cascade RL
+$\times$
+$\checkmark$
+$\times$
+MOPD (ours)
+$\checkmark$
+$\checkmark$
+$\checkmark$
+Prior approaches to this capability-integration problem fall into four families (Table 1). (1) Mix-RL (Yang et al., 2025) pools prompts from every domain into one dataset and runs joint RL, but cross-domain training signals interfere, producing the see-saw effect (Standley et al., 2020) and leaving the joint model below per-domain teachers. (2) Cascade RL (Wang et al., 2026) trains domains sequentially, so earlier-stage capabilities may decay as later stages progress and the long overall run amplifies stability risks. (3) Off-Policy Finetune (Liu et al., 2025) trains per-domain RL teachers and then fine-tunes the student on their rollouts via SFT; this off-policy supervision induces the canonical exposure bias (Ranzato et al., 2016). (4) Param-Merge (Wortsman et al., 2022; Ilharco et al., 2023) averages teacher weights or composes task vectors in weight space, but the fused model is typically unstable and fails to match all teachers’ full capability. In short, these methods trade off learning efficiency, attainable peak, and training stability against one another, leaving no satisfactory middle ground.
+To overcome these limitations, we propose Multi-teacher On-Policy Distillation (MOPD), a post-training paradigm that performs multi-teacher capability integration directly in policy space, rather than in weight space or in a static dataset space. MOPD first conducts specialised RL independently on each domain to obtain a collection of strong domain teachers. Then the capabilities of these teachers are distilled into a single student model via on-policy distillation (Hinton et al., 2015; Gu et al., 2026; Agarwal et al., 2024). This design has three structural benefits: (1) the training signal is dense and comes directly from each specialised teacher, so the student inherits the bulk of every teacher’s capability; (2) training runs entirely on the student’s own rollout distribution, which eliminates exposure bias by construction; (3) capability integration is realised in policy space through per-prompt routing rather than weight-space fusion, yielding a markedly more stable procedure.
+We empirically validate MOPD on two base models of different scales and architectures. On Qwen3-30B-A3B (Yang et al., 2025), we compare Mix-RL, Cascade RL, Off-Policy Finetune, Param-Merge, and MOPD across three domains (Math, Instruction Following, and Software Engineering (Jimenez et al., 2024; OpenAI, 2024)); MOPD leads the strongest baseline by $5.5$ points on the normalised score ( $0.937$ vs. $0.882$ ). We further deploy MOPD on the industrial-scale model MiMo-V2-Flash (Team et al., 2026), demonstrating its practical effectiveness in frontier-scale settings. Further analysis verifies the top- $k$ distillation instantiation, confirms that same-origin teachers are critical for stable optimization, and demonstrates the benefits of multi-round iterative refinement.
+Our contributions are summarised as follows. (i) We propose MOPD, a post-training paradigm that effects multi-teacher capability integration through dense, token-level supervision delivered on the student’s own rollouts. (ii) We validate MOPD on Qwen3-30B-A3B, showing that it outperforms existing capability-integration baselines, and further apply it to the industrial-scale MiMo-V2-Flash to confirm practical viability.
+2 Related Work
+Reinforcement learning for LLM.
+In reinforcement learning with verifiable rewards (RLVR), PPO-style (Schulman et al., 2017) and GRPO-style (Shao et al., 2024) outcome-reward optimization has become standard practice. These RL pipelines span a diverse task landscape, including math reasoning (Guo et al., 2025; Shao et al., 2024), software engineering (Wei et al., 2025; Jain et al., 2025), instruction following and creative writing (Ouyang et al., 2022), and search agents (Nakano et al., 2022; Jin et al., 2025). Each such pipeline yields a strong domain expert, and consolidating them into a single model naturally raises the multi-domain / multi-task question. For this setting, prior work mainly takes two routes: mixed RL (Yang et al., 2025), which puts samples from different domains into the same training batch (each sample still uses its own per-domain reward and advantage), and cascade RL (Wang et al., 2026), which trains the domains one after another.
+Distillation for LLMs.
+Classical distillation (Hinton et al., 2015; Kim and Rush, 2016) minimises a forward KL on a fixed corpus of teacher completions and is thus off-policy, so the student’s inference-time trajectories can drift from the training distribution. On-policy distillation addresses this by training on the student’s own rollouts with the teacher as a scoring signal, as in MiniLLM (Gu et al., 2026) (reverse KL) and teacher-as-reward variants (Agarwal et al., 2024; Meng et al., 2024). However, it is restricted to a single teacher and a single domain. MOPD keeps the “student samples, teacher scores” template and extends it to multiple, prompt-routed domain teachers, validated on production-scale base models.
+Model merging.
+Model merging fuses multiple model checkpoints in weight space to obtain a combined model without additional training. Model Soups (Wortsman et al., 2022) averages the weights of independently fine-tuned models from the same initialisation. Task arithmetic (Ilharco et al., 2023) composes capabilities by adding and subtracting task vectors in weight space, while subsequent work mitigates parameter conflicts via TIES-Merging (Yadav et al., 2023), DARE (Yu et al., 2024), and AdaMerging (Yang et al., 2024).
+3 Method
+3.1 Pipeline
+MOPD structures post-training as three sequential stages: general SFT, domain-specialised RL training, and a final MOPD pass that fuses the per-domain experts into a single model (Fig. ).
+•
+Stage 1: General SFT. We first fine-tune the base model on a broad corpus that covers all the base capabilities we care about, yielding an SFT checkpoint. This checkpoint serves as the shared initialisation for the domain-specialised RL training in Stage 2. And it is also used as the initialisation for the student of MOPD in Stage 3.
+•
+Stage 2: Domain-specialised RL training. In this stage, for each domain $d$ , we train a domain expert $\pi_{\phi_{d}}$ starting from the Stage-1 checkpoint. Each expert is trained with the RL recipe most natural for its domain, e.g., verifiable-answer RL for math and executable-sandbox agent RL for software engineering. The per-domain training are independent and can be executed fully in parallel.
+•
+Stage 3: MOPD. The student is initialised from the Stage-1 SFT checkpoint, and the Stage-2 domain experts $\{\pi_{\phi_{d}}\}$ are frozen and form the teacher group; then we train the student on a multi-domain dataset, where each optimization step performs the following operations: (1) we sample a batch of prompts from the dataset; (2) the student generates a trajectory for each prompt and records its per-token probability distribution along the trajectory; (3) each trajectory is dispatched to its corresponding domain teacher according to the task’s domain, and then the teacher prefills on the trajectory to obtain its per-token probability distribution; (4) the student is updated by minimising the per-token reverse KL between the student and the domain teacher along the trajectory. After training, Stage 3 yields a single unified model that has acquired capabilities across all domains.
+MOPD offers several structural advantages over existing capability-integration paradigms:
+•
+No exposure bias. The student is trained on its own rollouts, so the training and inference state distributions match by construction.
+•
+Dense per-token supervision. The teacher provides a probability distribution at every token of the trajectory. This is far denser than the trajectory-level reward used in standard RL, which lowers variance and improves sample efficiency.
+•
+Stable integration in policy space. Capabilities are merged by routing each prompt to its matching teacher, not by averaging or task arithmetic on teacher parameters. This avoids the instability typical of weight-space fusion.
+•
+Modular and parallel teachers. Teacher RL training runs fully in parallel, and each teacher can use its own hyperparameter configuration. An unexpected failure or hyperparameter adjustment in one teacher’s RL training does not affect the training of other teachers.
+•
+Same-origin teacher stability. Because each teacher is produced by domain-specific RL from the same SFT checkpoint that initialises the student, teacher and student share a closely aligned policy distribution. This ensures low initial KL divergence and smooth, stable optimization throughout distillation (§4.4.2).
+3.2 Algorithm
+In Stage 3, the student is optimised against a per-token reverse KL toward the dispatched teacher:
+$\mathcal{L}_{\mathrm{rev\text{-}KL}}=\mathbb{E}_{x,\,y\sim\pi_{\theta}}\!\Big[\tfrac{1}{|y|}\sum_{t}\sum_{v}\pi_{\theta}(v)\log\tfrac{\pi_{\theta}(v)}{\pi_{\phi_{d}}(v)}\Big],$
+(1)
+where $\pi_{\phi_{d}}$ is the teacher dispatched to prompt $x$ , and $\pi_{\theta}(v)$ , $\pi_{\phi_{d}}(v)$ are shorthand for $\pi_{\theta}(v\mid x,y_{<t})$ , $\pi_{\phi_{d}}(v\mid x,y_{<t})$ (same shorthand applied below). We give two efficient implementations of this objective in the next two subsections.
+3.2.1 Policy-gradient implementation
+Following MiniLLM (Gu et al., 2026), we cast MOPD distillation as an RL process. The gradient of (1) is
+$\nabla_{\theta}\mathcal{L}=-\mathbb{E}_{x,y}\!\Big[\tfrac{1}{|y|}\sum_{t}\log\tfrac{\pi_{\phi_{d}}(y_{t})}{\pi_{\theta}(y_{t})}\nabla_{\theta}\log\pi_{\theta}(y_{t})\Big],$
+(2)
+which is exactly the policy-gradient form, with the teacher–student log-difference acting as a per-token advantage:
+$\hat{A}_{\text{MOPD},t}=\mathrm{sg}[\,\log\pi_{\phi_{d}}(y_{t})-\log\pi_{\theta}(y_{t})\,].$
+(3)
+For training stability, we two-side-clip the advantage, $\hat{A}^{\mathrm{clip}}_{\text{MOPD},t}=\mathrm{clip}(\hat{A}_{\text{MOPD},t},-A_{\max},+A_{\max})$ , giving the final loss
+$\mathcal{L}^{\mathrm{PG}}_{\text{MOPD}}(\theta)=-\mathbb{E}_{x,y}\!\Big[\tfrac{1}{|y|}\sum_{t}\hat{A}^{\mathrm{clip}}_{\text{MOPD},t}\,\log\pi_{\theta}(y_{t})\Big].$
+(4)
+This form drops directly into existing PPO/GRPO training frameworks; the advantage computation is the only change.
+3.2.2 Top- $k$ distillation implementation
+The policy-gradient form uses only the single sampled token at each rollout position. A lower-variance alternative is to distill on the teacher’s top- $k$ tokens (Peng et al., 2024), which exploits more of the teacher’s distribution while keeping the implementation simple. Let $\mathcal{T}^{d}_{t}=\mathrm{TopK}_{k}(\pi_{\phi_{d}}(\cdot\mid x,y_{<t}))$ be the top- $k$ token set under the teacher at position $t$ . We use the following distillation loss:
+$\mathcal{L}^{\mathrm{TopK}}_{\text{MOPD}}(\theta)=\mathbb{E}_{x,y}\!\Big[\tfrac{1}{|y|}\sum_{t}\sum_{v\in\mathcal{T}^{d}_{t}}\!\big[\,\pi_{\theta}(v)\log\tfrac{\pi_{\theta}(v)}{\pi_{\phi_{d}}(v)}-\pi_{\theta}(v)+\pi_{\phi_{d}}(v)\big]\Big],$
+(5)
+where $\pi_{\theta}(v)$ and $\pi_{\phi_{d}}(v)$ are both conditioned on $(x,y_{<t})$ ; we drop the conditioning for brevity.
+We have added an extra $\pi_{\phi_{d}}(v)-\pi_{\theta}(v)$ term beyond the standard reverse KL. This added term corrects the bias introduced by top- $k$ truncation, ensuring that the loss is minimised at $\pi_{\theta}=\pi_{\phi_{d}}$ on the top- $k$ tokens; without it, the naive top- $k$ -truncated reverse KL does not have this property.
+Beyond correctness, the top- $k$ form also reduces the infrastructure burden: it keeps the teacher-prefill payload small enough to be transmitted like a lightweight reward signal, in contrast to full-vocabulary distillation which requires shipping the entire vocabulary distribution per token.
+3.3 Infrastructure
+The additional operation in Stage 3 is the teacher prefill: every student rollout has to be passed through the dispatched teacher to obtain per-token log-probabilities (or top- $k$ logits). A natural baseline is to fold teacher prefill into the RL training loop, but this complicates the infrastructure and adds extra serial latency. We observe that the teacher prefill computation has the same nature as reward computation in RL, so we instead deploy each domain teacher as a stand-alone prefill service sitting outside the RL trainer.
+The runtime works as follows. The student sampler keeps generating rollouts; as soon as one sequence’s rollout finishes, the trainer fires an asynchronous prefill request to the corresponding teacher service. The teacher service computes and returns the per-token log-probabilities. Because teacher prefill and other sequences’ sampling overlap in time, the wall-clock cost of MOPD is dominated by sampling alone, and the teacher cost is essentially hidden behind student sampling. In our deployments, the teacher contributed nearly no measurable wall-clock overhead.
+4 Experiments
+We compare MOPD against four capability-integration paradigms on Qwen3-30B-A3B under controlled conditions (§4.1–4.2) and validate it on the industrial-scale frontier model MiMo-V2-Flash (§4.3). Finally, §4.4 presents our analysis.
+4.1 Experimental setup
+SFT model.
+Our starting checkpoint is Qwen3-30B-A3B-Base (Yang et al., 2025). To make it a strong starting point for RL, we fine-tune it on a broad-coverage corpus spanning all target domains. All baselines and MOPD start from this same SFT checkpoint.
+Tasks and evaluation.
+Our tasks span three domains: math (evaluated on AIME25 and AIME26), instruction following (evaluated on IFBench (Pyatkin et al., 2025) and IFEval (Zhou et al., 2023)), and software engineering (evaluated on SWE-bench Verified (Jimenez et al., 2024)). Training data sources and hyperparameters are described in Appendix A.
+Baselines.
+We compare five capability-integration paradigms: (i) Mix-RL, joint RL on a dataset that pools prompts from every domain; (ii) Cascade RL, per-domain RL applied sequentially with each stage initialised from the previous; (iii) Off-Policy Finetune, offline SFT of the student on rollouts produced by the Stage-2 teachers; (iv) Param-Merge, linear / task-arithmetic merge of the Stage-2 teachers; and (v) MOPD (ours).
+Evaluation metric.
+The three domains differ substantially in absolute headroom, so a raw accuracy average over-weights the wider-headroom domains. To put the domains on a common scale we report a normalised score. Let $\mathcal{D}$ denote the set of evaluation domains. For each $d\in\mathcal{D}$ , let $s_{d}^{\text{s}}$ be the Stage-1 SFT student accuracy on that domain and $s_{d}^{\text{t}}$ the corresponding Stage-2 per-domain specialist accuracy; for a method with domain accuracy $s_{d}$ , the per-domain normalised score is $\tilde{s}_{d}=(s_{d}-s_{d}^{\text{s}})/(s_{d}^{\text{t}}-s_{d}^{\text{s}})$ , which equals $0$ at the Stage-1 student and $1$ at the per-domain specialist teacher. The headline figure we report is the uniform average $\bar{\tilde{s}}=\tfrac{1}{|\mathcal{D}|}\sum_{d\in\mathcal{D}}\tilde{s}_{d}$ across domains; values above $1$ indicate improvement beyond the specialist teacher, values below $0$ indicate a regression from the Stage-1 student.
+4.2 Main results
+Table 2: Qwen3-30B-A3B: multi-domain capability integration. Per-benchmark columns are accuracy (%); higher is better. “RL Teacher” is the Stage-2 specialised RL teacher for that domain. The Norm. score column is the normalised score defined in §4.1; higher is better. Within the six integration methods we bold the column best and underline the runner-up.
+Math
+Instruction Following
+SWE
+Method
+AIME25
+AIME26
+IFBench
+IFEval
+SWE-bench Verified
+Norm.
+score
+Student (SFT-only)
+45.42
+54.48
+42.69
+84.17
+35.80
+0.0000
+RL Teacher
+54.79
+63.65
+78.40
+95.50
+51.20
+1.0000
+Mix-RL
+52.71
+63.75
+75.00
+94.58
+48.80
+0.8818
+Cascade RL
+48.54
+61.88
+77.11
+95.80
+47.80
+0.7752
+Off-Policy Finetune
+51.56
+63.44
+80.95
+93.35
+45.80
+0.8241
+Param-Merge (Avg.)
+47.81
+59.58
+53.74
+88.79
+39.60
+0.3280
+Param-Merge (Task Arith.)
+49.38
+63.96
+78.23
+95.81
+48.80
+0.8574
+MOPD (ours)
+51.46
+65.31
+77.89
+93.84
+50.40
+0.9373
+$\Delta$ (MOPD $-$ RL Teacher)
+$-3.33$
+$+1.66$
+$-0.51$
+$-1.66$
+$-0.80$
+$-0.0627$
+Figure 1: Training dynamics on Qwen3-30B-A3B. Each panel is a domain-level accuracy (%); the $x$ -axis is cumulative training samples (K). Domain-RL (purple) is the single-domain specialist teacher for reference.
+Table 2 reports per-benchmark accuracy and the normalised score across all three domains. Figure 1 tracks domain-level accuracy against per-domain training samples. We make four observations.
+•
+Mix-RL, Cascade RL, and Off-Policy Finetune each leave domain-specific gaps, in different shapes.
+The three methods reach normalised scores of $0.882$ , $0.775$ , and $0.824$ respectively, similar in aggregate but with distinct per-domain weaknesses. Cascade RL (trained in order IF $\to$ Math $\to$ SWE) exhibits cross-domain interference: the first-trained IF domain closes $98\%$ of the headroom, but Math (second stage) closes only $57\%$ ; Figure 1 further shows that Math accuracy degrades during the subsequent SWE stage. Off-Policy Finetune exceeds the teacher on IF (per-domain normalised score $1.01$ ) yet closes only $65\%$ on SWE, suggesting that offline imitation of teacher trajectories transfers unevenly across task types. Mix-RL is the most balanced baseline (per-domain range $0.064$ ) but still trails MOPD by $5.5$ points overall.
+•
+MOPD achieves the highest normalised score with the most uniform profile.
+MOPD reaches a normalised score of $0.937$ , $+0.055$ over the next-best method (Mix-RL at $0.882$ ). Its three per-domain normalised scores fall in $[0.91,0.95]$ , a range of only $0.044$ , the smallest of any method. No other approach closes the headroom this uniformly: Cascade RL spans $0.57$ – $0.98$ (range $0.41$ ) and Off-Policy Finetune spans $0.65$ – $1.01$ (range $0.36$ ).
+•
+Param-Merge is highly sensitive to the merging recipe.
+Linear averaging fails broadly (normalised score $0.328$ ); Task Arithmetic recovers to $0.857$ , but its per-domain profile varies widely: it exceeds the teacher on IF ( $1.00$ ) yet closes only $73\%$ on Math. The outcome depends on both the merging coefficients and the benchmark, making parameter merging an unreliable integration tool.
+•
+MOPD is markedly more sample-efficient.
+As Figure 1 shows (x-axis: per-domain samples consumed), MOPD reaches the teacher-level plateau on IF within ${\sim}25$ K IF samples and on SWE within ${\sim}30$ K SWE samples, whereas Mix-RL requires the full $150$ – $180$ K sample budget in each domain to approach a comparable level. The dense per-token supervision from the teacher provides richer gradient signal per sample than trajectory-level RL reward, explaining the faster convergence.
+4.3 Scaling to a 309B-parameter model
+Table 3: MiMo-V2-Flash: integration via the full MOPD pipeline. All teachers are RL-trained.
+AIME25
+HMMT25
+LCB
+IFBench
+SWE-Bench V.
+$\tau^{2}$ -Bench
+$\tau^{2}$ -Telecom
+Student
+89.3
+76.9
+77.5
+55.4
+67.8
+75.9
+92.7
+Teacher
+93.9
+82.6
+82.6
+68.9
+74.2
+79.6
+95.0
+MOPD
+94.1
+84.4
+83.2
+66.7
+73.4
+80.3
+95.3
+$\Delta$
+$+0.2$
+$+1.8$
+$+0.6$
+$-2.2$
+$-0.8$
+$+0.7$
+$+0.3$
+To confirm that MOPD carries over to industrial-scale frontier models, we apply the full three-stage pipeline to MiMo-V2-Flash. We use domain teachers covering Math, Code, IF, SWE, and Tool Use.
+Table 3 presents the MOPD results on MiMo-V2-Flash. MOPD matches or exceeds the corresponding teacher on most benchmarks. The two regressions, IFBench ( $-2.2$ ) and SWE-Bench Verified ( $-0.8$ ), are modest relative to the gains on the remaining benchmarks.
+4.4 Analysis
+4.4.1 Policy-gradient and top- $k$ distillation perform comparably
+§3.2 introduced two instantiations of the MOPD distillation loss: the policy-gradient form (4) and the top- $k$ form (5). We compare the two on Qwen3-30B-A3B under an otherwise identical pipeline (same teachers, data budget, and hyperparameters), with $k=64$ for the top- $k$ variant.
+The top two rows of Table report the comparison. Top- $k$ distillation is comparable on Math and slightly worse on IF and SWE; the two forms reach overall similar capability, with normalised scores of $0.909$ vs. $0.937$ . Figure corroborates this: under same-origin teachers, both loss forms produce nearly overlapping training trajectories: math accuracy climbs smoothly, the per-token reverse KL decreases monotonically from an already low initial value ( ${\sim}0.04$ ), and policy entropy remains stable around $0.30$ throughout. When teacher and student share a closely related distribution, the student’s rollouts concentrate in the teacher’s high-probability region, so both gradient estimators receive similar informative signal and converge to comparable endpoints. This indicates that, with same-origin teachers, the policy-gradient form is already sufficiently stable; introducing top- $k$ does not yield additional stability or variance reduction.
+4.4.2 Same-origin teachers stabilize distillation
+MOPD’s domain teachers are obtained by RL training from the student. This means that teachers and the student share a similar policy distribution. Recent studies (Li et al., 2026; Ko et al., 2026) discuss the relationship between teacher–student policy divergence and on-policy distillation stability. A natural question arises: would replacing a teacher with a stronger but distributionally different external model yield better results? To test this, we design a controlled experiment: in the Math domain of MOPD, we replace the original Qwen3-30B-A3B Math RL teacher with Qwen3-235B-A22B, a significantly larger model with stronger math capability. All other settings (IF and SWE teachers, data, hyperparameters) remain unchanged.
+The bottom two rows of Table report the results. Despite Qwen3-235B-A22B’s substantially stronger absolute math capability, the MOPD student’s Math performance degrades under both loss variants. Figure reveals the mechanism. The initial per-token KL is approximately $5{\times}$ higher than the same-origin setting ( ${\sim}0.19$ vs. ${\sim}0.04$ ), quantitatively confirming the large distributional gap. Under the policy-gradient form, math accuracy degrades progressively while entropy contracts from $0.30$ to $0.21$ ; the student’s policy narrows toward a single mode as it receives predominantly punitive gradient signal from the teacher’s low-probability region. Under the top- $k$ form, the collapse is even more severe: training diverges catastrophically around step 18, with wild oscillation in both KL and entropy, indicating a complete loss of optimization stability. These results underscore that MOPD’s use of same-origin teachers is critical: the close distributional alignment ensures stable optimization throughout training, yielding reliable and consistent gains.
+4.4.3 Multi-round student–teacher evolution
+A single round of MOPD closes most of the student–teacher headroom on every domain, but Table 4 shows that headroom remains in the Math and IF domains. We propose using the post-MOPD model as a new student and repeating the procedure: retrain each per-domain teacher from this student, then perform another MOPD integration with the new teachers.
+We validate one such follow-up round on Qwen3-30B-A3B. After the first round, the student becomes the initialisation for the next round’s per-domain RL teachers, which drive the second MOPD pass. In this round, we apply RL training and MOPD distillation to the Math and IF domains only (for SWE, we perform neither RL training nor distillation).
+Table 4: Multi-round student–teacher evolution on Qwen3-30B-A3B. Per-benchmark columns are accuracy (%); the last column is the normalised score defined in §4.1. Iter-2 RL Teacher is the per-domain RL teacher initialised from the Iter-1 MOPD student; Iter-2 MOPD is the student produced from those teachers. No new SWE teacher was trained at Iter 2; the SWE scores reflect only indirect effects of Math/IF distillation.
+Math
+Instruction Following
+SWE
+Round
+AIME25
+AIME26
+IFBench
+IFEval
+SWE-bench Verified
+Norm.
+score
+Iter 1 MOPD
+51.46
+65.31
+77.89
+93.84
+50.40
+0.937
+Iter 2 RL Teacher
+54.27
+65.52
+81.46
+95.65
+50.40
+1.030
+Iter 2 MOPD
+53.44
+64.90
+79.76
+95.44
+50.20
+0.986
+We observe: (i) initialising the next round’s per-domain RL from the Iter-1 student does produce stronger teachers: the Iter-2 RL Teacher reaches a normalised score of $1.030$ , $+0.093$ over Iter-1 MOPD; this confirms that per-domain capability headroom remains beyond what a single MOPD round extracts. (ii) Guided by the Iter-2 RL teachers, the Iter-2 student improves further on Math and IF, with its normalised score rising from $0.937$ to $0.986$ ( $+0.049$ ), showing that the MOPD pipeline can continuously absorb capability from stronger teachers.
+5 Discussion
+Beyond its empirical gains, MOPD structurally decouples the serial dependencies intrinsic to multi-domain post-training, separating capability production (Stage-2 per-domain RL) from capability integration (Stage-3 distillation). Three workflow consequences follow:
+•
+Parallel development. Stage-2 teachers are mutually independent: each domain team iterates on its own rewards, sandboxes, and data pipelines concurrently, with no fixed ordering. Given sufficient compute, this directly raises the team’s overall development throughput.
+•
+Recipe-level decoupling. Each domain is free to choose its own RL recipe (algorithm, rollout procedure, reward function, hyperparameters, and so on) without worrying about conflicts with other domains or about its own optimization choices interfering with theirs.
+•
+Risk isolation. RL training often requires iterative tuning of algorithms and hyperparameters (whether to push capability higher or simply to address stability issues), and each such adjustment forces a training restart. Under joint multi-domain RL, a restart sends the entire run back to the start; under MOPD’s parallel teacher development, a restart is confined to the single affected domain and the other teachers continue undisturbed.
+6 Conclusion
+We proposed MOPD (Multi-Teacher On-Policy Distillation), a post-training paradigm that performs multi-domain capability integration in policy space: the student samples from its own rollouts, each prompt is routed to the corresponding frozen domain teacher, and the teacher provides a dense, token-level log-probability signal at every position. On Qwen3-30B-A3B, MOPD attains the best aggregate integration among Mix-RL, Cascade RL, Off-Policy Finetune, and Param-Merge, leading the next-best integration method by $5.5$ normalised-score points while closing $91$ – $95\%$ of the student–teacher headroom on every domain; on MiMo-V2-Flash, the same recipe matches or exceeds the corresponding teacher on most benchmarks. Our analysis further shows that both policy-gradient and top- $k$ loss forms perform comparably, that same-origin teachers are critical for stable optimization, and that the pipeline supports multi-round student–teacher evolution. Combined with the structural decoupling discussed in §5, we believe MOPD offers an engineering path for LLM post-training at scale that supports parallel development and rapid integration.
+References
+Agarwal et al. (2024)
+R. Agarwal, N. Vieillard, Y. Zhou, P. Stanczyk, S. Ramos, M. Geist, and O. Bachem
+On-policy distillation of language models: learning from self-generated mistakes.
+External Links: 2306.13649,
+Link
+Cited by: §1,
+§2.
+Albalak et al. (2025)
+A. Albalak, D. Phung, N. Lile, R. Rafailov, K. Gandhi, L. Castricato, A. Singh, C. Blagden, V. Xiang, D. Mahan, and N. Haber
+Big-math: a large-scale, high-quality math dataset for reinforcement learning in language models.
+External Links: 2502.17387,
+Link
+Cited by: item 1.
+Gu et al. (2026)
+Y. Gu, L. Dong, F. Wei, and M. Huang
+MiniLLM: on-policy distillation of large language models.
+External Links: 2306.08543,
+Link
+Cited by: §1,
+§2,
+§3.2.1.
+Guo et al. (2025)
+D. Guo, D. Yang, H. Zhang, J. Song, P. Wang, Q. Zhu, R. Xu, R. Zhang, S. Ma, X. Bi, X. Zhang, X. Yu, Y. Wu, Z. F. Wu, Z. Gou, Z. Shao, Z. Li, Z. Gao, A. Liu, B. Xue, B. Wang, B. Wu, B. Feng, C. Lu, C. Zhao, C. Deng, C. Ruan, D. Dai, D. Chen, D. Ji, E. Li, F. Lin, F. Dai, F. Luo, G. Hao, G. Chen, G. Li, H. Zhang, H. Xu, H. Ding, H. Gao, H. Qu, H. Li, J. Guo, J. Li, J. Chen, J. Yuan, J. Tu, J. Qiu, J. Li, J. L. Cai, J. Ni, J. Liang, J. Chen, K. Dong, K. Hu, K. You, K. Gao, K. Guan, K. Huang, K. Yu, L. Wang, L. Zhang, L. Zhao, L. Wang, L. Zhang, L. Xu, L. Xia, M. Zhang, M. Zhang, M. Tang, M. Zhou, M. Li, M. Wang, M. Li, N. Tian, P. Huang, P. Zhang, Q. Wang, Q. Chen, Q. Du, R. Ge, R. Zhang, R. Pan, R. Wang, R. J. Chen, R. L. Jin, R. Chen, S. Lu, S. Zhou, S. Chen, S. Ye, S. Wang, S. Yu, S. Zhou, S. Pan, S. S. Li, S. Zhou, S. Wu, T. Yun, T. Pei, T. Sun, T. Wang, W. Zeng, W. Liu, W. Liang, W. Gao, W. Yu, W. Zhang, W. L. Xiao, W. An, X. Liu, X. Wang, X. Chen, X. Nie, X. Cheng, X. Liu, X. Xie, X. Liu, X. Yang, X. Li, X. Su, X. Lin, X. Q. Li, X. Jin, X. Shen, X. Chen, X. Sun, X. Wang, X. Song, X. Zhou, X. Wang, X. Shan, Y. K. Li, Y. Q. Wang, Y. X. Wei, Y. Zhang, Y. Xu, Y. Li, Y. Zhao, Y. Sun, Y. Wang, Y. Yu, Y. Zhang, Y. Shi, Y. Xiong, Y. He, Y. Piao, Y. Wang, Y. Tan, Y. Ma, Y. Liu, Y. Guo, Y. Ou, Y. Wang, Y. Gong, Y. Zou, Y. He, Y. Xiong, Y. Luo, Y. You, Y. Liu, Y. Zhou, Y. X. Zhu, Y. Huang, Y. Li, Y. Zheng, Y. Zhu, Y. Ma, Y. Tang, Y. Zha, Y. Yan, Z. Z. Ren, Z. Ren, Z. Sha, Z. Fu, Z. Xu, Z. Xie, Z. Zhang, Z. Hao, Z. Ma, Z. Yan, Z. Wu, Z. Gu, Z. Zhu, Z. Liu, Z. Li, Z. Xie, Z. Song, Z. Pan, Z. Huang, Z. Xu, Z. Zhang, and Z. Zhang
+DeepSeek-r1 incentivizes reasoning in llms through reinforcement learning.
+Nature 645 (8081), pp. 633–638.
+External Links: ISSN 1476-4687,
+Link,
+Document
+Cited by: §1,
+§2.
+Hinton et al. (2015)
+G. Hinton, O. Vinyals, and J. Dean
+Distilling the knowledge in a neural network.
+External Links: 1503.02531,
+Link
+Cited by: §1,
+§2.
+Hu et al. (2025)
+J. Hu, Y. Zhang, Q. Han, D. Jiang, X. Zhang, and H. Shum
+Open-reasoner-zero: an open source approach to scaling up reinforcement learning on the base model.
+External Links: 2503.24290,
+Link
+Cited by: item 1.
+Hugging Face (2025)
+Hugging Face
+Open R1: a fully open reproduction of DeepSeek-R1.
+Note: https://github.com/huggingface/open-r1Mixture-of-Thoughts dataset at https://huggingface.co/datasets/open-r1/Mixture-of-Thoughts
+Cited by: item 1.
+Ilharco et al. (2023)
+G. Ilharco, M. T. Ribeiro, M. Wortsman, S. Gururangan, L. Schmidt, H. Hajishirzi, and A. Farhadi
+Editing models with task arithmetic.
+External Links: 2212.04089,
+Link
+Cited by: §1,
+§2.
+Jain et al. (2025)
+N. Jain, J. Singh, M. Shetty, L. Zheng, K. Sen, and I. Stoica
+R2E-gym: procedural environments and hybrid verifiers for scaling open-weights swe agents.
+External Links: 2504.07164,
+Link
+Cited by: item 3,
+§1,
+§2.
+Jimenez et al. (2024)
+C. E. Jimenez, J. Yang, A. Wettig, S. Yao, K. Pei, O. Press, and K. Narasimhan
+SWE-bench: can language models resolve real-world github issues?.
+External Links: 2310.06770,
+Link
+Cited by: §1,
+§4.1.
+Jin et al. (2025)
+B. Jin, H. Zeng, Z. Yue, J. Yoon, S. Arik, D. Wang, H. Zamani, and J. Han
+Search-r1: training llms to reason and leverage search engines with reinforcement learning.
+External Links: 2503.09516,
+Link
+Cited by: §1,
+§2.
+Kim and Rush (2016)
+Y. Kim and A. M. Rush
+Sequence-level knowledge distillation.
+External Links: 1606.07947,
+Link
+Cited by: §2.
+Ko et al. (2026)
+J. Ko, S. Abdali, Y. J. Kim, T. Chen, and P. Cameron
+Scaling reasoning efficiently via relaxed on-policy distillation.
+External Links: 2603.11137,
+Link
+Cited by: §4.4.2.
+Li et al. (2026)
+Y. Li, Y. Zuo, B. He, J. Zhang, C. Xiao, C. Qian, T. Yu, H. Gao, W. Yang, Z. Liu, and N. Ding
+Rethinking on-policy distillation of large language models: phenomenology, mechanism, and recipe.
+External Links: 2604.13016,
+Link
+Cited by: §4.4.2.
+Liu et al. (2025)
+A. Liu, A. Mei, B. Lin, B. Xue, B. Wang, B. Xu, B. Wu, B. Zhang, C. Lin, C. Dong, C. Lu, C. Zhao, C. Deng, C. Xu, C. Ruan, D. Dai, D. Guo, D. Yang, D. Chen, E. Li, F. Zhou, F. Lin, F. Dai, G. Hao, G. Chen, G. Li, H. Zhang, H. Xu, H. Li, H. Liang, H. Wei, H. Zhang, H. Luo, H. Ji, H. Ding, H. Tang, H. Cao, H. Gao, H. Qu, H. Zeng, J. Huang, J. Li, J. Xu, J. Hu, J. Chen, J. Xiang, J. Yuan, J. Cheng, J. Zhu, J. Ran, J. Jiang, J. Qiu, J. Li, J. Song, K. Dong, K. Gao, K. Guan, K. Huang, K. Zhou, K. Huang, K. Yu, L. Wang, L. Zhang, L. Wang, L. Zhao, L. Yin, L. Guo, L. Luo, L. Ma, L. Wang, L. Zhang, M. S. Di, M. Y. Xu, M. Zhang, M. Zhang, M. Tang, M. Zhou, P. Huang, P. Cong, P. Wang, Q. Wang, Q. Zhu, Q. Li, Q. Chen, Q. Du, R. Xu, R. Ge, R. Zhang, R. Pan, R. Wang, R. Yin, R. Xu, R. Shen, R. Zhang, S. H. Liu, S. Lu, S. Zhou, S. Chen, S. Cai, S. Chen, S. Hu, S. Liu, S. Hu, S. Ma, S. Wang, S. Yu, S. Zhou, S. Pan, S. Zhou, T. Ni, T. Yun, T. Pei, T. Ye, T. Yue, W. Zeng, W. Liu, W. Liang, W. Pang, W. Luo, W. Gao, W. Zhang, X. Gao, X. Wang, X. Bi, X. Liu, X. Wang, X. Chen, X. Zhang, X. Nie, X. Cheng, X. Liu, X. Xie, X. Liu, X. Yu, X. Li, X. Yang, X. Li, X. Chen, X. Su, X. Pan, X. Lin, X. Fu, Y. Q. Wang, Y. Zhang, Y. Xu, Y. Ma, Y. Li, Y. Li, Y. Zhao, Y. Sun, Y. Wang, Y. Qian, Y. Yu, Y. Zhang, Y. Ding, Y. Shi, Y. Xiong, Y. He, Y. Zhou, Y. Zhong, Y. Piao, Y. Wang, Y. Chen, Y. Tan, Y. Wei, Y. Ma, Y. Liu, Y. Yang, Y. Guo, Y. Wu, Y. Wu, Y. Cheng, Y. Ou, Y. Xu, Y. Wang, Y. Gong, Y. Wu, Y. Zou, Y. Li, Y. Xiong, Y. Luo, Y. You, Y. Liu, Y. Zhou, Z. F. Wu, Z. Z. Ren, Z. Zhao, Z. Ren, Z. Sha, Z. Fu, Z. Xu, Z. Xie, Z. Zhang, Z. Hao, Z. Gou, Z. Ma, Z. Yan, Z. Shao, Z. Huang, Z. Wu, Z. Li, Z. Zhang, Z. Xu, Z. Wang, Z. Gu, Z. Zhu, Z. Li, Z. Zhang, Z. Xie, Z. Gao, Z. Pan, Z. Yao, B. Feng, H. Li, J. L. Cai, J. Ni, L. Xu, M. Li, N. Tian, R. J. Chen, R. L. Jin, S. S. Li, S. Zhou, T. Sun, X. Q. Li, X. Jin, X. Shen, X. Chen, X. Song, X. Zhou, Y. X. Zhu, Y. Huang, Y. Li, Y. Zheng, Y. Zhu, Y. Ma, Z. Huang, Z. Xu, Z. Zhang, D. Ji, J. Liang, J. Guo, J. Chen, L. Xia, M. Wang, M. Li, P. Zhang, R. Chen, S. Sun, S. Wu, S. Ye, T. Wang, W. L. Xiao, W. An, X. Wang, X. Sun, X. Wang, Y. Tang, Y. Zha, Z. Zhang, Z. Ju, Z. Zhang, and Z. Qu
+DeepSeek-v3.2: pushing the frontier of open large language models.
+External Links: 2512.02556,
+Link
+Cited by: §1.
+Meng et al. (2024)
+Y. Meng, M. Xia, and D. Chen
+SimPO: simple preference optimization with a reference-free reward.
+External Links: 2405.14734,
+Link
+Cited by: §2.
+Nakano et al. (2022)
+R. Nakano, J. Hilton, S. Balaji, J. Wu, L. Ouyang, C. Kim, C. Hesse, S. Jain, V. Kosaraju, W. Saunders, X. Jiang, K. Cobbe, T. Eloundou, G. Krueger, K. Button, M. Knight, B. Chess, and J. Schulman
+WebGPT: browser-assisted question-answering with human feedback.
+External Links: 2112.09332,
+Link
+Cited by: §1,
+§2.
+OpenAI et al. (2025)
+OpenAI, :, S. Agarwal, L. Ahmad, J. Ai, S. Altman, A. Applebaum, E. Arbus, R. K. Arora, Y. Bai, B. Baker, H. Bao, B. Barak, A. Bennett, T. Bertao, N. Brett, E. Brevdo, G. Brockman, S. Bubeck, C. Chang, K. Chen, M. Chen, E. Cheung, A. Clark, D. Cook, M. Dukhan, C. Dvorak, K. Fives, V. Fomenko, T. Garipov, K. Georgiev, M. Glaese, T. Gogineni, A. Goucher, L. Gross, K. G. Guzman, J. Hallman, J. Hehir, J. Heidecke, A. Helyar, H. Hu, R. Huet, J. Huh, S. Jain, Z. Johnson, C. Koch, I. Kofman, D. Kundel, J. Kwon, V. Kyrylov, E. Y. Le, G. Leclerc, J. P. Lennon, S. Lessans, M. Lezcano-Casado, Y. Li, Z. Li, J. Lin, J. Liss, Lily, Liu, J. Liu, K. Lu, C. Lu, Z. Martinovic, L. McCallum, J. McGrath, S. McKinney, A. McLaughlin, S. Mei, S. Mostovoy, T. Mu, G. Myles, A. Neitz, A. Nichol, J. Pachocki, A. Paino, D. Palmie, A. Pantuliano, G. Parascandolo, J. Park, L. Pathak, C. Paz, L. Peran, D. Pimenov, M. Pokrass, E. Proehl, H. Qiu, G. Raila, F. Raso, H. Ren, K. Richardson, D. Robinson, B. Rotsted, H. Salman, S. Sanjeev, M. Schwarzer, D. Sculley, H. Sikchi, K. Simon, K. Singhal, Y. Song, D. Stuckey, Z. Sun, P. Tillet, S. Toizer, F. Tsimpourlas, N. Vyas, E. Wallace, X. Wang, M. Wang, O. Watkins, K. Weil, A. Wendling, K. Whinnery, C. Whitney, H. Wong, L. Yang, Y. Yang, M. Yasunaga, K. Ying, W. Zaremba, W. Zhan, C. Zhang, B. Zhang, E. Zhang, and S. Zhao
+Gpt-oss-120b & gpt-oss-20b model card.
+External Links: 2508.10925,
+Link
+Cited by: item 2.
+OpenAI (2024)
+OpenAI
+Introducing SWE-bench Verified.
+Note: https://openai.com/index/introducing-swe-bench-verified/
+Cited by: §1.
+Ouyang et al. (2022)
+L. Ouyang, J. Wu, X. Jiang, D. Almeida, C. L. Wainwright, P. Mishkin, C. Zhang, S. Agarwal, K. Slama, A. Ray, J. Schulman, J. Hilton, F. Kelton, L. Miller, M. Simens, A. Askell, P. Welinder, P. Christiano, J. Leike, and R. Lowe
+Training language models to follow instructions with human feedback.
+External Links: 2203.02155,
+Link
+Cited by: §1,
+§2.
+Peng et al. (2024)
+H. Peng, X. Lv, Y. Bai, Z. Yao, J. Zhang, L. Hou, and J. Li
+Pre-training distillation for large language models: a design space exploration.
+External Links: 2410.16215,
+Link
+Cited by: §3.2.2.
+Pyatkin et al. (2025)
+V. Pyatkin, S. Malik, V. Graf, H. Ivison, S. Huang, P. Dasigi, N. Lambert, and H. Hajishirzi
+Generalizing verifiable instruction following.
+External Links: 2507.02833,
+Link
+Cited by: item 2,
+§4.1.
+Ranzato et al. (2016)
+M. Ranzato, S. Chopra, M. Auli, and W. Zaremba
+Sequence level training with recurrent neural networks.
+External Links: 1511.06732,
+Link
+Cited by: §1.
+Schulman et al. (2017)
+J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov
+Proximal policy optimization algorithms.
+External Links: 1707.06347,
+Link
+Cited by: §1,
+§2.
+Shao et al. (2024)
+Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi, H. Zhang, M. Zhang, Y. K. Li, Y. Wu, and D. Guo
+DeepSeekMath: pushing the limits of mathematical reasoning in open language models.
+External Links: 2402.03300,
+Link
+Cited by: Appendix A,
+§1,
+§2.
+Standley et al. (2020)
+T. Standley, A. R. Zamir, D. Chen, L. Guibas, J. Malik, and S. Savarese
+Which tasks should be learned together in multi-task learning?.
+External Links: 1905.07553,
+Link
+Cited by: §1.
+Team et al. (2026)
+C. Team, B. Xiao, B. Xia, B. Yang, B. Gao, B. Shen, C. Zhang, C. He, C. Lou, F. Luo, G. Wang, G. Xie, H. Zhang, H. Lv, H. Li, H. Chen, H. Xu, H. Zhang, H. Liu, J. Duo, J. Wei, J. Xiao, J. Dong, J. Shi, J. Hu, K. Bao, K. Zhou, L. Li, L. Zhao, L. Zhang, P. Li, Q. Chen, S. Liu, S. Yu, S. Cao, S. Chen, S. Yu, S. Liu, T. Zhou, W. Su, W. Wang, W. Ma, X. Deng, B. Mao, B. Ye, C. Cai, C. Wang, C. Zhu, C. Ma, C. Chen, C. Li, D. Zhu, D. Xiao, D. Zhang, D. Zhang, F. Liu, F. Yang, F. Shi, G. Wang, H. Tian, H. Wu, H. Qu, H. Yi, H. An, H. Guan, X. Zhang, Y. Song, Y. Yan, Y. Zhao, Y. Lai, Y. Gao, Y. Cheng, Y. Tian, Y. Wang, Z. Tang, Z. Tang, Z. Wen, Z. Song, Z. Zheng, Z. Jiang, J. Wen, J. Sun, J. Li, J. Xue, J. Xia, K. Fang, M. Zhu, N. Chen, Q. Tu, Q. Zhang, Q. Wang, R. Li, R. Ma, S. Zhang, S. Wang, S. Li, S. Gu, S. Ren, S. Deng, T. Guo, T. Lu, W. Zhuang, W. Zhang, W. Xiong, W. Huang, W. Yang, X. Zhang, X. Yong, X. Wang, X. Xie, Y. Jiang, Y. Yang, Y. He, Y. Tu, Y. Dong, Y. Liu, Y. Ma, Y. Yu, Y. Xiang, Z. Huang, Z. Lin, Z. Xu, Z. Chen, Z. Deng, Z. Zhang, and Z. Yue
+MiMo-v2-flash technical report.
+External Links: 2601.02780,
+Link
+Cited by: §1.
+Wang et al. (2026)
+B. Wang, C. Lee, N. Lee, S. Lin, W. Dai, Y. Chen, Y. Chen, Z. Yang, Z. Liu, M. Shoeybi, B. Catanzaro, and W. Ping
+Nemotron-cascade: scaling cascaded reinforcement learning for general-purpose reasoning models.
+External Links: 2512.13607,
+Link
+Cited by: §1,
+§2.
+Wei et al. (2025)
+Y. Wei, O. Duchenne, J. Copet, Q. Carbonneaux, L. Zhang, D. Fried, G. Synnaeve, R. Singh, and S. I. Wang
+SWE-rl: advancing llm reasoning via reinforcement learning on open software evolution.
+External Links: 2502.18449,
+Link
+Cited by: §1,
+§2.
+Wortsman et al. (2022)
+M. Wortsman, G. Ilharco, S. Y. Gadre, R. Roelofs, R. Gontijo-Lopes, A. S. Morcos, H. Namkoong, A. Farhadi, Y. Carmon, S. Kornblith, and L. Schmidt
+Model soups: averaging weights of multiple fine-tuned models improves accuracy without increasing inference time.
+External Links: 2203.05482,
+Link
+Cited by: §1,
+§2.
+Yadav et al. (2023)
+P. Yadav, D. Tam, L. Choshen, C. Raffel, and M. Bansal
+TIES-merging: resolving interference when merging models.
+External Links: 2306.01708,
+Link
+Cited by: §2.
+Yang et al. (2025)
+A. Yang, A. Li, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Gao, C. Huang, C. Lv, C. Zheng, D. Liu, F. Zhou, F. Huang, F. Hu, H. Ge, H. Wei, H. Lin, J. Tang, J. Yang, J. Tu, J. Zhang, J. Yang, J. Yang, J. Zhou, J. Zhou, J. Lin, K. Dang, K. Bao, K. Yang, L. Yu, L. Deng, M. Li, M. Xue, M. Li, P. Zhang, P. Wang, Q. Zhu, R. Men, R. Gao, S. Liu, S. Luo, T. Li, T. Tang, W. Yin, X. Ren, X. Wang, X. Zhang, X. Ren, Y. Fan, Y. Su, Y. Zhang, Y. Zhang, Y. Wan, Y. Liu, Z. Wang, Z. Cui, Z. Zhang, Z. Zhou, and Z. Qiu
+Qwen3 technical report.
+External Links: 2505.09388,
+Link
+Cited by: §1,
+§1,
+§2,
+§4.1.
+Yang et al. (2024)
+E. Yang, Z. Wang, L. Shen, S. Liu, G. Guo, X. Wang, and D. Tao
+AdaMerging: adaptive model merging for multi-task learning.
+External Links: 2310.02575,
+Link
+Cited by: §2.
+Yu et al. (2024)
+L. Yu, B. Yu, H. Yu, F. Huang, and Y. Li
+Language models are super mario: absorbing abilities from homologous models as a free lunch.
+External Links: 2311.03099,
+Link
+Cited by: §2.
+Yu et al. (2025)
+Q. Yu, Z. Zhang, R. Zhu, Y. Yuan, X. Zuo, Y. Yue, W. Dai, T. Fan, G. Liu, L. Liu, X. Liu, H. Lin, Z. Lin, B. Ma, G. Sheng, Y. Tong, C. Zhang, M. Zhang, W. Zhang, H. Zhu, J. Zhu, J. Chen, J. Chen, C. Wang, H. Yu, Y. Song, X. Wei, H. Zhou, J. Liu, W. Ma, Y. Zhang, L. Yan, M. Qiao, Y. Wu, and M. Wang
+DAPO: an open-source llm reinforcement learning system at scale.
+External Links: 2503.14476,
+Link
+Cited by: Appendix A.
+Zhou et al. (2023)
+J. Zhou, T. Lu, S. Mishra, S. Brahma, S. Basu, Y. Luan, D. Zhou, and L. Hou
+Instruction-following evaluation for large language models.
+External Links: 2311.07911,
+Link
+Cited by: §4.1.
+Appendix A Training Details
+Training data.
+Our training tasks span three domains:
+1.
+Math. SFT data come primarily from the math subset of the Mixture-of-Thoughts dataset (Hugging Face, 2025); RL training data are collected and filtered from many open-source datasets, including BigMath (Albalak et al., 2025) and ORZ (Hu et al., 2025). The maximum sequence length is 32,768.
+2.
+Instruction following. SFT prompts are constructed following the method introduced by IFBench (Pyatkin et al., 2025) and distilled on gpt-oss-120b (OpenAI et al., 2025); RL training data are similarly synthesised following the IFBench recipe. The maximum sequence length is 32,768.
+3.
+Software engineering. SFT data are distilled from R2E-Gym tasks via open-source models; RL training data use R2E-Gym-Lite (Jain et al., 2025). The maximum sequence length is 65,536 and the number of interaction turns is capped at 50.
+Hyperparameters.
+For RL training, we use an on-policy GRPO (Shao et al., 2024) algorithm with Dynamic Sampling (Yu et al., 2025): data generated from each rollout is used for a single gradient update and then discarded. For per-domain RL, we set the learning rate to $3\times 10^{-6}$ . For Math and IF training, we set batch size (BS) to $144$ with $N=8$ rollouts per prompt, training approximately $175$ K sequences. For SWE, we set BS to $80$ with $N=8$ , training approximately $150$ K sequences. Cascade RL uses the same configuration as per-domain RL, with domains trained in the order IF $\to$ Math $\to$ SWE. For Mix-RL, we set the learning rate to $4\times 10^{-6}$ , BS $256$ , $N=8$ , with a per-batch domain ratio of Math : IF : SWE $=0.35:0.35:0.3$ . For MOPD, we do not use Dynamic Sampling and set BS $2048$ , $N=1$ , with a per-batch domain ratio of Math : IF : SWE $=0.35:0.35:0.3$ . The default advantage clip maximum is $5$ for the policy-gradient form; the default $k$ is $64$ for the top- $k$ distillation form.
+Appendix B Evaluation Details
+We describe the evaluation protocol used for all reported results. For the two math benchmarks, AIME25 and AIME26, we sample $32$ times per question and report the average accuracy (avg@32) to reduce the variance inherent to low-sample-count, high-difficulty math evaluation. For instruction following, we evaluate each question once on both IFBench and IFEval. For software engineering, we evaluate each task once on SWE-bench Verified.
+For all benchmarks, decoding uses a sampling temperature of $1.0$ , with neither top- $p$ nor top- $k$ truncation applied.
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

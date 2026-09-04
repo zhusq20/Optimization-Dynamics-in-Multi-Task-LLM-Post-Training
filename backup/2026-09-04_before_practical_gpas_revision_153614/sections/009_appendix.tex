@@ -1,0 +1,322 @@
+% ============================================================================
+\section{Supplementary Tables, Derivations, and Details}
+% ============================================================================
+
+\subsection{Notation and configuration}
+\label{app:reference_tables}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Notation and the values used in the four-teacher study.}
+\label{tab:notation}
+\begin{tabular}{cll}
+\toprule
+Symbol & Meaning & Value in this study \\
+\midrule
+$M$ & number of tasks and teachers & $4$ \\
+$w_i$ & fixed objective weight & inverse initial loss, normalized \\
+$G$ & micro-batches per optimizer step & $16$ \\
+$b$ & prompts per micro-batch, one response each & $4$ \\
+$m_i$ & task-$i$ micro-batch count & $2\leq m_i\leq8$ \\
+$g_{i,s}$ & unweighted micro-batch gradient & from the backward pass \\
+$D$ & diagonal preconditioner; identity for SGD & pre-step optimizer state \\
+$e_i,\ \widehat e_i$ & preconditioned one-micro-batch noise; its estimate & estimated each step \\
+$\tau_i,\ C$ & time per task-$i$ micro-batch; fixed time per step & exponential averages \\
+$H$ & predicted variance ratio relative to Uniform & bounded by count limits \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Four-teacher MOPD configuration.}
+\label{tab:pipeline}
+\begin{tabular}{p{0.20\linewidth}p{0.72\linewidth}}
+\toprule
+Component & Configuration \\
+\midrule
+Student & Qwen3-1.7B \citep{qwen2025qwen3} in non-thinking mode;
+\missing{exact frozen revision and initial scores} \\
+Teachers & Math and instruction following use task-specific Qwen3-1.7B RL
+checkpoints; code and science use one frozen Qwen3-4B weight set through
+separate task endpoints. All run in non-thinking mode and have byte-identical
+tokenizer files; \missing{exact identifiers and checkpoint steps, RL recipe,
+and teacher scores} \\
+Training prompts & $16{,}000$ unique prompts per task, shuffled once and read
+without replacement; \missing{dataset names, versions, licenses, and filters} \\
+Rollout and loss & One response per prompt; one update per rollout batch;
+top-$k$ reverse-KL estimator with $k=16$, averaged over valid tokens and then
+responses; teacher scores the student top-$k$ union the sampled token;
+maximum response length $4{,}096$, truncated responses kept;
+\missing{temperature, ratio-truncation rule, and observed truncation rate by
+task} \\
+Step and budget & $b=4$ prompts per micro-batch, $G=16$ micro-batches per
+step, $500$ steps, and $32{,}000$ attempted responses; $2\leq m_i\leq8$ \\
+Optimization & AdamW; inverse-initial-loss objective weights fixed before
+training; timing-average decay $0.9$; \missing{learning rate and schedule,
+$\beta_1$, $\beta_2$,
+$\epsilon$, weight decay, gradient clipping, precision, and sharding} \\
+Evaluation & Held-out teacher loss on $128$ fixed prompts per task from
+checkpoints every $50$ steps; MATH-500, LiveCodeBench slice, IFBench,
+GPQA-Diamond; \missing{benchmark versions and decoding settings} \\
+Seeds & $1$ per method \\
+System & Two GPUs per run: one 96\,GB GPU trains the student, one 48\,GB GPU
+serves rollouts and holds the four resident teachers; \missing{exact GPU
+models, inference engine, software revisions, and GPU hours per run} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{One-step variance criterion}
+\label{app:descent}
+
+Condition on the pre-step history $\mathcal F$ and let the positive diagonal
+matrix $D$ be fixed before the current micro-batches are drawn. Suppose the
+conditional mean $\mu=\mathbb E[A\mid\mathcal F]$ is the gradient of an
+$L$-smooth local surrogate $F_{\mathcal F}$. Smoothness gives, for the local
+frozen-preconditioner update $\theta'=\theta-\eta DA$,
+\begin{equation}
+\begin{aligned}
+    F_{\mathcal F}(\theta')
+    &\leq F_{\mathcal F}(\theta)-\eta\mu^\top DA
+       +\frac{\eta^2L}{2}\|DA\|_2^2,\\
+    \mathbb E[F_{\mathcal F}(\theta')\mid\mathcal F]
+    &\leq F_{\mathcal F}(\theta)-\eta\mu^\top D\mu
+       +\frac{\eta^2L}{2}
+        \left(\|D\mu\|_2^2+V(m)\right).
+\end{aligned}
+    \label{eq:one_step_descent}
+\end{equation}
+The second line uses $\mathbb E[A\mid\mathcal F]=\mu$ and the bias--variance
+identity.
+For a fixed student state, $D$, and step size, only $V(m)$ depends on the
+allocation. This local bound motivates the allocation score; an Adam-type
+optimizer with momentum, a current-gradient second-moment update, and gradient
+clipping is not identical to the frozen-preconditioner step, and the experiment
+measures the end-to-end effect with its conventional optimizer.
+
+\subsection{Gradient variance, its estimate, and the allocation rules}
+\label{app:allocation_proofs}
+
+Micro-batches that are conditionally independent across draws and identically
+distributed within each task, with a common task mean and covariance, give
+\begin{equation}
+\mathbb E\|D(A-\mu)\|_2^2
+=\sum_iw_i^2\,\mathbb E\|D(\bar g_i-\mu_i)\|_2^2
+=\sum_i\frac{w_i^2}{m_i}\,\mathbb E\|D(g_i-\mu_i)\|_2^2,
+\end{equation}
+which is Equation~\ref{eq:batch_variance}. Within a step,
+$\sum_s\|D(g_{i,s}-\bar g_i)\|_2^2=\sum_s\|Dg_{i,s}\|_2^2-m_i\|D\bar g_i\|_2^2$,
+so Equation~\ref{eq:noise_estimate} is the usual unbiased sample variance
+summed over the preconditioned coordinates and is defined whenever
+$m_i\geq2$.
+
+In the positive-real relaxation without box constraints, write
+$a_i=w_i\sqrt{e_i}$. With equal micro-batch cost, the Cauchy--Schwarz
+inequality
+\begin{equation}
+\Bigl(\sum_i m_i\Bigr)\Bigl(\sum_i\frac{a_i^2}{m_i}\Bigr)
+\geq\Bigl(\sum_i a_i\Bigr)^2
+\end{equation}
+holds with equality at $m_i\propto a_i$, which is GPAS. With task-dependent
+cost and zero fixed overhead,
+\begin{equation}
+\Bigl(\sum_i m_i\tau_i\Bigr)\Bigl(\sum_i\frac{a_i^2}{m_i}\Bigr)
+\geq\Bigl(\sum_i a_i\sqrt{\tau_i}\Bigr)^2,
+\end{equation}
+with equality at $m_i\propto a_i/\sqrt{\tau_i}$. With positive fixed time, the
+cost-aware mode evaluates Equation~\ref{eq:batch_cost_objective} over the
+feasible integer counts. When fixed time dominates the count-dependent term,
+that objective is a constant multiple of $V(m)$ to first order and its
+minimizer approaches the per-step rule.
+
+For the scoring-noise decomposition in Section~\ref{sec:gap_noise}, let
+$\mathcal R_i$ contain the sampled prompts, complete rollouts, observed
+prefixes, and response lengths. For
+$a\in\{\mathrm{samp},\mathrm{top}k\}$, hold $\mathcal R_i$ fixed and let
+$G_i^a$ be the micro-batch gradient obtained by independent scoring-token
+draws at those prefixes. Conditional unbiasedness gives the common mean
+$\bar G_i=\mathbb E[G_i^a\mid\mathcal R_i]$; define its unconditional value as
+$\mu_i^{\mathrm{diag}}=\mathbb E[G_i^a]$. Orthogonality of a
+conditional-mean residual gives
+\begin{equation*}
+\begin{aligned}
+\mathbb E\|D(G_i^a-\mu_i^{\mathrm{diag}})\|_2^2
+={}&\mathbb E\|D(\bar G_i-\mu_i^{\mathrm{diag}})\|_2^2\\
+ &+\mathbb E\|D(G_i^a-\bar G_i)\|_2^2.
+\end{aligned}
+\end{equation*}
+These three quantities are, respectively, $e_{i,\mathrm{diag}}^a$,
+$e_{i,\mathrm{diag}}^{\mathrm{resp}}$, and
+$e_{i,\mathrm{diag}}^{\mathrm{tok},a}$ in the main text. Conditional on $\mathcal R_i$,
+response lengths and averaging coefficients are fixed; with independent
+scoring draws, the last term is the sum of the per-position conditional
+variances after those coefficients and $D$ are applied. The top-$k$ estimator
+integrates the retained-token terms in this second stage and leaves a sampled
+tail residual.
+
+\subsection{Allocation and Adam-type second moments}
+\label{app:moment_target_proof}
+
+SGD has no second-moment state and is unaffected by this issue. For an
+Adam-type optimizer and a fixed allocation, assume task-$i$ micro-batch
+gradients are independent with mean $h_i$ and coordinatewise variance
+$\sigma_i^2$. Equation~\ref{eq:batch_gradient_observation} gives the
+componentwise identity
+\begin{equation}
+    \mathbb E[A\odot A]
+    =\Bigl(\sum_iw_i h_i\Bigr)\odot\Bigl(\sum_iw_i h_i\Bigr)
+     +\sum_i\frac{w_i^2}{m_i}\sigma_i^2.
+    \label{eq:conventional_batch_second_moment}
+\end{equation}
+Thus the current noise contribution to the second-moment observation depends
+on the allocation, as it does whenever batch composition changes. Under the
+study's count limits, each task's contribution lies between $0.5\times$ and
+$2\times$ its Uniform value. The experiments use conventional AdamW and test
+the complete parameter update rather than inferring it from this observation
+alone.
+
+For completeness, an allocation-independent observation can define a distinct
+optimizer design:
+\begin{equation}
+    U=\sum_{i=1}^M\frac{w_i}{m_i}\sum_{s=1}^{m_i}
+      g_{i,s}\odot g_{i,s},
+    \qquad
+    \mathbb E[U/G]=\frac1G\sum_iw_i
+      \bigl(h_i\odot h_i+\sigma_i^2\bigr),
+    \label{eq:taskwise_square_observation}
+\end{equation}
+Its expectation does not depend on the counts. At proportional allocation its
+noise term has the same scale as the conventional observation, but its signal
+term differs, so it is not an interchangeable Adam target and is not used in
+our training runs. In the controlled check below, reallocating from Uniform to
+GPAS changes the conventional observation by $0.543$ in relative norm
+(calculated $0.542$) and the $U/G$ observation by $0.0009$ (calculated zero).
+
+\subsection{Controlled calculation}
+\label{app:controlled}
+
+This illustrative calculation has its own task count and count bounds; they
+are not the experimental configuration. It uses three Gaussian micro-batch
+gradients in three coordinates and a diagonal preconditioner that reverses
+their noise ranking. Each step contains $G=16$ micro-batches with
+$2\leq m_i\leq12$. Bounded rounding gives counts $(6,5,5)$ for Uniform,
+$(11,3,2)$ for counts from unpreconditioned noise, $(3,3,10)$ for GPAS, and
+$(3,5,8)$ for GPAS in the zero-fixed-time cost-aware mode. All methods use the
+same fixed weights and common random numbers over $20{,}000$ trials. GPAS
+attains $0.679\times$ Uniform's preconditioned variance (calculated
+$0.681\times$), the unpreconditioned count rule reaches $2.316\times$, and the
+cost-aware mode reaches a time--variance product of $0.857\times$ Uniform
+(calculated $0.854\times$). The second-moment panel uses $200{,}000$ simulated
+steps.
+
+\input{sections/table_controlled_values}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.98\linewidth]{figures/controlled_optimizer_sampling.pdf}
+    \caption{Synthetic three-task controlled checks with zero fixed time.
+    Bars are Monte Carlo estimates and crosses are calculated values. The
+    per-GPU-hour label denotes the predicted time--variance product under the
+    synthetic task costs, not measured GPU hours. The last panel compares
+    second-moment observations after an integer reallocation.}
+    \label{fig:controlled_checks}
+\end{figure}
+
+\subsection{Conditional unbiasedness of the \texorpdfstring{top-$k$}{top-k}
+estimator}
+\label{app:opd_estimators}
+
+Fix a prompt $x$ and student-generated response prefix $y_{<t}$, and use the
+notation of Section~\ref{sec:setting}. Linearity of expectation separates the
+exact retained set from the sampled tail:
+\begin{equation}
+\begin{aligned}
+&\mathbb E_{y_t}\!\left[
+  \widehat h_i^{\mathrm{top}k}(x,y_{<t},y_t)\mid x,y_{<t}\right]\\
+&=\sum_{a\in\mathcal K_k(x,y_{<t})}
+    \pi_\theta(a\mid x,y_{<t})r_{i,a}(x,y_{<t})
+  +\sum_{a\notin\mathcal K_k(x,y_{<t})}
+    \pi_\theta(a\mid x,y_{<t})r_{i,a}(x,y_{<t})\\
+&=\sum_a\pi_\theta(a\mid x,y_{<t})r_{i,a}(x,y_{<t})\\
+&=\mathbb E_{y_t}\!\left[
+  \widehat h_i^{\mathrm{samp}}(x,y_{<t},y_t)\mid x,y_{<t}\right].
+\end{aligned}
+\end{equation}
+Thus the estimator is conditionally unbiased at every fixed prefix. In an
+automatic-differentiation implementation, the top-$k$ membership and the
+coefficients $\pi_\theta(a\mid x,y_{<t})
+[\log\pi_\theta(a\mid x,y_{<t})-\log\pi_{T_i}(a\mid x,y_{<t})]$ are
+detached; otherwise extra derivative terms would be introduced. The exact term
+removes randomness among retained tokens, but the tail indicator and tail-token
+identity remain random, so the net variance change is measured rather than
+assumed. The equality above is position-level; the paired protocol fixes
+rollouts, prefixes, and response lengths before it compares scoring estimators.
+If importance-ratio truncation is used, the same proof applies to the resulting
+truncated surrogate rather than to the untruncated reverse KL.
+
+\subsection{Held-out gradient variance protocol}
+\label{app:heldout}
+
+At the early, middle, and late Uniform checkpoints, each task supplies $32$
+fresh micro-batches from held-out prompts. We first compute each actual top-$k$
+training gradient, using the rollout token for its tail correction; these
+gradients supply the held-out $\widehat e_i$ used to select and score
+allocations. Separately, after fixing the sampled responses, prefixes, and
+lengths, we independently draw one scoring token from $q(\cdot\mid z)$ at every
+prefix and use the same draw for the sampled estimator and the top-$k$ tail
+correction. For each diagnostic version we record
+$\|Dg_{i,s}\|_2^2$ and the squared norm of the preconditioned half-sample mean,
+using $D$ from the checkpoint's pre-step AdamW state. The paired diagnostic
+difference
+\begin{equation}
+    \widehat\Delta_{i,\mathrm{diag}}
+      =\widehat e_{i,\mathrm{diag}}^{\mathrm{samp}}
+       -\widehat e_{i,\mathrm{diag}}^{\mathrm{top}k}
+\end{equation}
+is the operational estimate of the change in the fixed-prefix token component.
+We report its sign and uncertainty; it is an empirical variance change, not a
+guarantee that the top-$k$ estimator lowers total trajectory variance.
+
+Half $\mathcal A$ estimates actual top-$k$ training noise and supplies each count rule with an
+allocation $m^{\mathcal A}$; counts from loss gap use the checkpoint's held-out
+losses. For the per-GPU-hour row, $\tau_i$ and $C$ are the training-time
+exponential averages frozen immediately before that checkpoint, rather than
+timings from the fresh diagnostic pool. Half $\mathcal B$ scores that allocation
+with actual top-$k$ gradients by
+$\sum_iw_i^2\widehat e_i^{\mathcal B}/m_i^{\mathcal A}$ relative to Uniform.
+We exchange the halves and average. We also compute the relative error between
+half-sample noise estimates and repeat the estimate on subsets matching the
+online count range. Only scalar norms and the three gap diagnostics are stored.
+
+\subsection{System timing and logs}
+\label{app:system_details}
+
+For each task in a step, the log records rollout, scoring, backward, and
+optimizer time, peak memory, attempted responses, and valid and generated
+tokens. We fit the additive model $C+\sum_i m_i\tau_i$ to measured step times:
+$\tau_i$ absorbs all task-$i$ work that changes with its count, including
+marginal generation, teacher scoring, and backward work, while $C$ contains
+only count-independent synchronization, optimizer, and logging time. We report
+fit residuals and do not infer that a response-length cap makes rollout time
+constant. GPU hours are wall time times the two reserved GPUs, including all
+waiting. Checkpoints store the allocation, noise estimates, timing averages,
+and prompt positions, and a resume test reproduces the next allocation and
+parameter update. A layout with a parallel critical path should replace the
+additive model by its fitted step-time function; the fixed objective and
+per-step GPAS rule are unchanged.
+
+\subsection{Full task-level trajectories}
+
+\begin{figure}[H]
+    \centering
+    \missingfigure[0.18\textheight]{Insert per-task held-out and training
+    losses, prompt consumption, response length and truncation, count-bound
+    occupancy, and step-time quantiles from the released logs.}
+    \caption{Task-level training and system traces.
+    \missing{Replace after the four-teacher runs finish.}}
+    \label{fig:appendix_task_curves}
+\end{figure}

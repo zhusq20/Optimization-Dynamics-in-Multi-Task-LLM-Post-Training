@@ -1,0 +1,22 @@
+% ============================================================================
+\section{Discussion and Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+GPAS treats task importance and gradient-estimation effort as separate
+decisions. Existing dense distillation provides the learning signal;
+the scheduler uses its observed variability to decide where more
+micro-batches are useful. The same principle gives a per-step rule and a
+cost-aware rule, both using statistics collected during ordinary training.
+\missing{Conclude with the measured efficiency difference and the task-level
+learning pattern that explains it.}
+
+The present study covers a Qwen3-1.7B student, four domains, one training
+seed per method, and one hardware layout. The method is most directly
+applicable when an optimizer step contains several micro-batches from each
+task; larger task collections call for less frequent task measurements.
+The pre-step optimizer scaling and measured time model provide local
+allocation signals, and their practical effect is evaluated with the
+complete AdamW training loop. Task compatibility and student capacity
+remain important for capability integration. GPAS offers a way to improve
+how a chosen collection of task objectives uses computation.

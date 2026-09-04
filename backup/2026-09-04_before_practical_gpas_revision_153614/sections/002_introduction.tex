@@ -1,0 +1,76 @@
+% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+% ============================================================================
+
+Multi-teacher on-policy distillation (MOPD) merges several specialist teachers
+into one student: the student generates a response, and the specialist for its
+task scores that response token by token
+\citep{ma2026mopdmultiteacheronpolicydistillation}. Existing recipes must also
+choose a task mixture. Token-share balancing changes that mixture to compensate
+for response-length imbalance \citep{gao2026openmopddiagnosingfixingcapability},
+whereas gap-following changes it as teachers become easier or harder to imitate
+\citep{sun2026d3mopd}. In either case, the same mixture controls what the
+student learns and how much evidence estimates each task gradient.
+
+A mixture is one knob doing two jobs. Sampling a task more often changes both
+the objective the student minimizes and how many samples estimate that task's
+gradient, so any mixture that adapts to training progress changes what is
+learned and how precisely at the same time. The precision side is not a detail:
+the noise of a task's gradient differs across tasks, drifts during training,
+and reaches the optimizer only after it preconditions each coordinate, so the
+task whose noise dominates a step depends on which optimizer is used.
+
+On-policy distillation weights every sampled token by the difference between
+the student's and the teacher's log-probability. Averaged under the student,
+this difference is the local reverse-KL gap; after centering, its variation
+across tokens interacts with the score function to determine the gradient.
+At one position, two tokens of similar student probability can carry weights
+of opposite sign and very different magnitude. That spread creates sampling
+noise and can differ across teachers because teachers differ in how far they
+are from the student. The teacher already computes a distribution at every
+position, yet the usual sampled-token estimator keeps only one entry. We test
+whether larger measured gaps predict larger spread rather than assuming that
+relationship as a theorem.
+
+We keep the objective fixed, compute each task's gradient with an estimator
+that integrates the top-$k$ token contribution analytically, and spend
+micro-batches on the noise that remains, measured in the coordinates the
+optimizer's preconditioner defines.
+
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=\linewidth]{figures/gpas_main_figure.pdf}
+    \caption{GPAS fixes the objective weights $w$ and adapts only the count
+    vector $m=(m_1,\ldots,m_M)$. Each micro-batch gradient comes from the
+    top-$k$ estimator. The completed step supplies the preconditioned gradient
+    $Dg$, where $D$ comes from the optimizer and is the identity for SGD;
+    measured time enables the optional cost-aware mode. No additional model
+    pass is required. Segment widths and noise profiles are schematic.}
+    \label{fig:gpas_overview}
+\end{figure}
+
+\missing{First empirical law: quantify the cross-task range and training drift
+of preconditioned noise, and report how often its ranking differs from the
+unpreconditioned ranking.} \missing{Second empirical law: report how the token
+component tracks teacher--student gap and teacher origin, and how much the
+top-$k$ estimator narrows the remaining cross-task spread.} \missing{Third
+empirical law: at matched steps, report the separate and joint gains from
+integrating the retained-token contribution and allocating the residual noise,
+including the loss-gap control.} \missing{Fourth empirical law: report the overhead ratio and the GPU
+hours saved by the cost-aware mode, together with every task's downstream
+change relative to Uniform.}
+
+Our contributions are:
+\begin{itemize}
+    \item a fixed-objective MOPD estimator whose micro-batch counts change
+    variance but not expectation, with a local variance metric defined by any
+    optimizer's pre-step diagonal preconditioner;
+    \item a diagnosis connecting teacher--student gap to token-level noise, a
+    conditionally unbiased top-$k$ estimator that integrates its retained-set
+    component, and a complementary rule that allocates counts using the noise
+    that remains;
+    \item a four-teacher study of Qwen3-1.7B organized around the resulting
+    empirical laws, with matched-step and matched-time comparisons and
+    per-task capability measurements.
+\end{itemize}

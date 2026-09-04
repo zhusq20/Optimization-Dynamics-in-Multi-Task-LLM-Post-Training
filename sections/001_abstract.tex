@@ -1,25 +1,24 @@
 \begin{abstract}
-
-Multi-teacher on-policy distillation (MOPD) trains one student on its own
-rollouts, each scored token by token by the specialist teacher for its task.
-In current methods the task mixture sets both the objective weights and the
-compute each task receives, so adapting the mixture changes what the student
-learns and how precisely each task gradient is estimated at the same time. We
-separate the two. The objective weights are fixed, every task appears in every
-optimizer step, and the only adaptive quantity is the number of fixed-size
-micro-batches each task receives. Scaling each micro-batch loss by its task
-weight divided by its count keeps the expected gradient the same under every
-allocation, so the allocation changes only the variance of the gradient
-estimate. Gradient-Preconditioned Adaptive Sampling (GPAS) minimizes this
-variance in AdamW's preconditioned coordinates: each task receives
-micro-batches in proportion to its weight times its gradient standard
-deviation after AdamW's diagonal scaling. Cost-GPAS also accounts for the
-measured time per micro-batch. Both rules use gradients and timings the
-trainer already produces and add no forward or backward passes. In
-four-teacher distillation of Qwen3-1.7B on mathematics, code, instruction
-following, and science, \missing{GPAS lowers held-out teacher loss by X\% at
-matched optimizer steps, Cost-GPAS reaches Uniform's final loss in Y\% fewer
-GPU hours, and no task falls below its Uniform counterpart on downstream
-benchmarks.}
-
+Multi-teacher on-policy distillation (MOPD) aims to combine capabilities
+from several teachers in one student. Successful transfer from each teacher
+separately does not establish that their combined updates improve every
+task. We derive how teacher log-ratio signals on retained tokens produce
+the student's task gradients, then separate the mean update's direction
+and rate from uncertainty due to finite sampling. An exact quadratic
+example has no task conflict or sampling noise but unequal convergence
+rates. For losses on
+fixed student-generated states and a frozen optimizer scaling, we bound the
+probability of any non-descent first-order direction when the mean update
+improves every task to first order. The analysis distinguishes harmful mean
+interactions, which allocation at fixed weights cannot correct in this local
+model, from sampling errors in otherwise useful directions.
+Gradient-Preconditioned Adaptive Sampling (GPAS) minimizes an estimated
+total-variance criterion; an
+analytical example shows why this need not minimize uncertainty in task
+progress. We specify a four-domain study with separate-distillation
+references, controlled updates from common checkpoints, and repeated
+training comparisons. The evaluation distinguishes fixed-state loss,
+fresh-policy loss, downstream capability, and computation.
+\missing{Add the observed integration gap, diagnostic prediction accuracy,
+and measured capability and compute effects after completing the study.}
 \end{abstract}

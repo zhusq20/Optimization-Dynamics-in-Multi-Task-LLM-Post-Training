@@ -1,0 +1,79 @@
+% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+% ============================================================================
+
+Multi-teacher on-policy distillation (MOPD) provides a practical way to
+combine capabilities in one language model. The student generates responses,
+and each response is scored by the teacher assigned to its task
+\citep{ma2026mopdmultiteacheronpolicydistillation}. This allows specialist
+teachers to be developed separately and their feedback to be combined during
+student training. The same approach can add a new capability while using an
+earlier model as a teacher to preserve existing ones
+\citep{liu2026instella}. The intended outcome is a student that acquires
+useful capabilities across tasks. A decrease in average teacher loss alone
+does not establish that outcome.
+
+Three questions must be distinguished. Can this student acquire each
+capability through separate distillation? Can one shared model attain
+those capability levels together? Can training reach them with the
+available computation? Open-MOPD uses separately distilled students as
+references and identifies capability imbalance in joint training
+\citep{gao2026openmopddiagnosingfixingcapability}. These references establish
+what the student learns separately; a gap in joint training can still
+reflect task exposure, interacting updates, or other optimization effects.
+
+We study a local question about the training process:
+\begin{quote}
+Given capabilities that a student can acquire separately, when does a
+shared MOPD update improve task objectives together, and how much
+computation is needed to make that progress reliable?
+\end{quote}
+A task can receive a harmful update for two distinct reasons. The weighted
+mean gradient after optimizer scaling may oppose its loss gradient, or a
+useful mean direction may be estimated too imprecisely. Additional samples
+address the second cause.
+Under fixed task weights and optimizer scaling, they cannot change the
+expected first-order effect of the mean direction.
+
+Existing work motivates testing both causes. CaMOPD studies counteracting
+recovery and preservation gradients \citep{chen2026camopd}; D$^3$-MOPD
+allocates samples using the remaining teacher gap and descent velocity
+\citep{sun2026d3mopd}. Slow alignment has also been observed when the
+training states are held fixed \citep{fu2026rethinkingopd2}. These findings
+do not determine whether sampling uncertainty limits a particular MOPD
+run. Dense top-$k$ supervision already computes multiple token
+contributions at each prefix, while prompts and student trajectories
+continue to produce variable gradients
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+
+Our analysis measures each task's alignment with the combined mean update
+and the uncertainty along its loss gradient. A classical one-sided
+probability bound then relates sampling to the reliability of first-order
+progress. The analysis concerns losses on fixed student-generated states;
+we separately measure the effect of changing the states visited by the
+student. Positive local progress is a diagnostic, not a requirement that
+every task improve at every step of a successful training run.
+
+Gradient-Preconditioned Adaptive Sampling (GPAS) provides an allocation
+intervention for this analysis. It applies Neyman allocation to gradient
+variance after optimizer scaling and preserves the specified task mean
+weights. Its per-step rule minimizes an estimate of total update variance,
+a conservative measure of uncertainty in task progress. We give an
+analytical example in which the
+variance-minimizing allocation has greater directional uncertainty than
+another allocation. The experiment protocol tests when this distinction
+affects actual updates and downstream capability.
+
+The paper develops three components:
+\begin{itemize}
+    \item a local analysis separating mean task interactions from sampling
+    uncertainty, with sufficient conditions for reliable joint descent;
+    \item a characterization of what GPAS's total-variance criterion controls,
+    including a counterexample to directional optimality;
+    \item a four-domain experimental protocol testing these quantities
+    against controlled updates, separately acquired capabilities, and
+    end-to-end training efficiency.
+\end{itemize}
+\missing{Replace the protocol contribution with measured findings after
+the diagnostic and training comparisons are complete.}

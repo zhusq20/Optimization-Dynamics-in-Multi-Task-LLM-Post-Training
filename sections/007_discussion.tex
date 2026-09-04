@@ -1,21 +1,33 @@
 % ============================================================================
-\section{Limitations and Conclusion}
+\section{Discussion and Conclusion}
 \label{sec:conclusion}
 % ============================================================================
 
-The study covers one student scale, four tasks, one seed per method, and one
-system layout. GPAS
-is a one-step rule: it treats micro-batches within a step as independent,
-holds the AdamW scaling fixed within the step, and its variance reduction is
-bounded by the count limits ($H\leq2$). The additive step-time model was
-fitted to one layout, in which rollout dominates the fixed time; other layouts
-need their own fit. The method needs at least two micro-batches per task per step, so
-settings with many more tasks than micro-batches need a task-subsampling
-variant.
+Teacher information produces an update through its correlation with the
+student's score on visited prefixes and retained tokens. The local analysis
+then distinguishes the direction and rate of mean progress from sampling
+uncertainty. The zero-conflict example shows that exact common descent
+can still have very different task learning rates. When a task's progress margin is
+nonpositive, changing sample counts at fixed weights cannot make its
+expected first-order progress positive under the frozen-preconditioner
+model. For positive margins, additional samples can reduce uncertainty;
+this does not ensure sufficient progress within the training budget.
+GPAS allocates samples to reduce total update variance, which bounds
+directional variance conservatively. Directional variance determines a more specific
+bound for each task; the two allocation criteria need not agree.
 
-GPAS fixes the objective weights and adapts only how many micro-batches each
-task contributes, so the allocation changes gradient variance and nothing
-else. The counts follow Neyman allocation in AdamW coordinates, Cost-GPAS adds
-measured time, and both use statistics that MOPD training already produces.
-\missing{Replace this sentence with the main four-teacher empirical
-conclusion.}
+The proposed study tests these quantities against updates from identical
+checkpoints and against complete training runs. Separate-distillation
+references assess individual transfer, while fixed-state loss, fresh-policy
+loss, and capability evaluation measure different aspects of training.
+\missing{Report which diagnostics predicted observed failures, when GPAS
+improved capability or compute efficiency, and which failures remained.}
+
+These local conditions do not establish joint capability attainability or
+global convergence. Successful training may temporarily increase a task
+loss, and a local conflict does not prove a capacity limit. The empirical
+scope is one student size, four domains, and one hardware layout; the
+repeated core comparison estimates training variation within that scope.
+Finite-sample diagnostic error, changing optimizer states, and changing
+rollout distributions must be assessed before using the local bounds to
+make training decisions.

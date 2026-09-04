@@ -1,0 +1,154 @@
+% ============================================================================
+\section{When Can a Shared Update Make Joint Progress?}
+\label{sec:theory}
+% ============================================================================
+
+\subsection{Expected progress under the chosen task mixture}
+
+Condition on the training state, freeze the rollout distributions in
+$L_i^t$, and choose counts before sampling. Let
+$\mu_i=\nabla L_i^t(\theta_t)$ and
+$\Sigma_i=\operatorname{Cov}(g_{i,s})$. For the following local analysis,
+micro-batches are independent and have finite second moments. The
+diagnostic experiment uses independent draws; the training streams require
+the finite-population qualification in Appendix~\ref{app:local_objective}.
+
+Let $D$ be a positive diagonal scaling fixed before the step. For SGD,
+$D=I$; for Adam, we use
+$D=\operatorname{diag}((\sqrt{\widehat v_{\rm pre}}+\epsilon)^{-1})$,
+where $\widehat v_{\rm pre}$ is the pre-step bias-corrected second moment.
+For the idealized update $\theta'=\theta_t-\eta DA$, define
+\begin{equation}
+    \mu_w=\sum_jw_j\mu_j,\qquad
+    K_{ij}=\mu_i^\top D\mu_j,\qquad
+    a_i=(Kw)_i=\mu_i^\top D\mu_w.
+    \label{eq:transfer_margins}
+\end{equation}
+The expected first-order change in task $i$'s loss is $-\eta a_i$.
+Thus all $a_i>0$ means that the chosen mean update is a common descent
+direction. A small positive $a_i$ leaves little margin against sampling
+noise. If $a_i\leq0$, changing counts at fixed weights cannot produce
+strictly positive expected first-order progress for that task.
+
+This last statement concerns this mixture at this checkpoint. It does
+not rule out another mixture, another update direction, or later recovery.
+Pairwise negative gradient cosines do not determine the signs of $Kw$.
+The relevant interaction uses one $D$; cosines between $D\mu_i$ and
+$D\mu_j$ instead use $D^2$. Actual AdamW includes momentum, an updated
+second moment, clipping, and weight decay. Its branch updates must be
+measured separately from this frozen-scaling approximation.
+
+\subsection{Sampling uncertainty relative to task progress}
+
+Let $X_i=\mu_i^\top DA$ be the sampled first-order progress. Its variance is
+\begin{equation}
+    v_i(m)=\operatorname{Var}(X_i)
+      =\sum_j\frac{w_j^2}{m_j}
+          \mu_i^\top D\Sigma_jD\mu_i.
+    \label{eq:directional_variance}
+\end{equation}
+For $a_i>0$, the one-sided Chebyshev--Cantelli inequality gives
+\begin{equation}
+    \Pr(X_i\leq0)\leq\frac{v_i(m)}{v_i(m)+a_i^2},\qquad
+    \Pr(\exists i:X_i\leq0)
+      \leq\min\!\left\{1,\sum_i\frac{v_i(m)}{v_i(m)+a_i^2}\right\},
+    \label{eq:directional_reliability}
+\end{equation}
+where the joint bound requires every $a_i>0$. Reliability therefore
+depends on noise relative to the progress margin, not on raw noise alone.
+These bounds require no Gaussian assumption, but can be loose. Replacing
+population quantities with noisy estimates does not produce a statistical
+certificate. Appendix~\ref{app:joint_progress} proves the bounds;
+Appendices~\ref{app:budget_reliability} and~\ref{app:descent} give a
+sufficient sampling budget and the additional curvature conditions for
+finite-step descent. Directional sampling tests and stochastic
+multiobjective sampling have established precedents
+\citep{bollapragada2018adaptive,zhao2024adaptive}; our empirical question
+is whether these quantities predict MOPD regressions and useful interventions.
+
+\subsection{GPAS controls a conservative variance bound}
+
+GPAS measures total gradient variation after optimizer scaling:
+\begin{equation}
+    e_i=\mathbb E\|D(g_i-\mu_i)\|_2^2,\qquad
+    V(m)=\mathbb E\|D(A-\mu_w)\|_2^2
+         =\sum_i\frac{w_i^2e_i}{m_i}.
+    \label{eq:batch_variance}
+\end{equation}
+It controls each directional variance through
+\begin{equation}
+    v_i(m)\leq\|\mu_i\|_2^2 V(m).
+    \label{eq:trace_directional_bound}
+\end{equation}
+This is a conservative surrogate: fluctuations orthogonal to a task's
+gradient contribute to $V$ without affecting its first-order progress.
+Appendix~\ref{app:trace_counterexample} gives aligned task means for
+which trace-optimal allocation has worse directional reliability than
+another allocation. GPAS is therefore an intervention to test, not an
+optimal rule for joint-progress probability.
+
+Ignoring integer bounds, minimizing $V$ at $\sum_i m_i=G$ yields
+\begin{equation}
+    m_i\propto w_i\sqrt{e_i}.
+    \label{eq:batch_gpas_allocation}
+\end{equation}
+This is classical Neyman allocation
+\citep{neyman1934representative,cochran1977sampling} in the optimizer's
+coordinates. The four-task implementation enumerates all feasible
+integer counts and minimizes the estimated $V$ exactly over that set;
+Appendix~\ref{app:allocation_proofs} gives the derivation. Under the
+study's bounds, $m_i\leq8$ versus Uniform's $m_i=4$ implies
+$V_{\rm Uniform}/V(m)\leq2$ when the denominator is positive.
+This limits variance reduction under the local model, not training speed.
+
+\subsection{Online estimates and measured computation}
+\label{sec:online_estimates}
+
+GPAS reuses the unweighted micro-batch gradients. With task mean $\bar g_i$,
+\begin{equation}
+    \widehat e_i=\frac1{m_i-1}\sum_{s=1}^{m_i}
+                    \|D(g_{i,s}-\bar g_i)\|_2^2.
+    \label{eq:noise_estimate}
+\end{equation}
+The next step uses the moving average
+$\widetilde e_i\leftarrow\rho\widetilde e_i+(1-\rho)\widehat e_i$.
+A running mean and scalar squared-deviation sum avoid retaining all
+micro-batch gradients; one parameter-sized mean buffer is reused across
+task blocks. The first step uses Uniform. We measure the additional
+reductions, memory, and time rather than assuming negligible overhead.
+
+For marginal micro-batch time $\tau_i$ and fixed step time $C$, the
+cost-aware mode minimizes
+\begin{equation}
+    J_C(m)=T(m)V(m)
+      =\left(C+\sum_i m_i\tau_i\right)
+         \sum_i\frac{w_i^2e_i}{m_i}.
+    \label{eq:batch_cost_objective}
+\end{equation}
+This criterion measures time times variance; it does not generally equal
+learning progress per second. The continuous rule without count bounds at
+$C=0$ is $m_i\propto w_i\sqrt{e_i/\tau_i}$, and the finite implementation
+enumerates feasible counts. The timing model is fitted to measured task
+times and checked against end-to-end GPU hours. Directional allocation
+is a conditional extension in Appendix~\ref{app:directional_extension},
+to be investigated only if trace noise fails to predict the uncertainty
+that affects task progress.
+
+\begin{algorithm}[t]
+\caption{One training step with GPAS.}
+\label{alg:batch_gpas}
+\small
+\begin{minipage}{0.97\linewidth}
+\begin{enumerate}
+    \item Choose feasible integer counts from the previous noise and time
+    averages; use Uniform on the first step. Read the pre-step scaling $D$.
+    \item For each task, generate $m_i$ micro-batches and obtain its
+    teacher's top-$k$ scores on the student responses.
+    \item Compute the dense loss, accumulate unweighted task gradients,
+    record their variation under $D$, and add the task mean to $A$ with
+    weight $w_i$.
+    \item Update the noise and time averages, then apply the usual
+    optimizer step with gradient $A$.
+\end{enumerate}
+\end{minipage}
+\end{algorithm}

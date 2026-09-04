@@ -1,0 +1,102 @@
+% ============================================================================
+\section{Preliminaries}
+\label{sec:setting}
+% ============================================================================
+
+\subsection{The MOPD objective}
+
+There are $M$ tasks, each with a fixed specialist teacher. For a prompt $x$
+from task $i$, the student samples one response $y$, and teacher $i$, denoted
+by $\pi_{T_i}$, scores every position. At position $t$, the conditioning
+context consists of the prompt $x$ and the student-generated response prefix
+$y_{<t}$. If $y_t$ is sampled from the student's next-token distribution, the
+usual reverse-KL token-gradient estimator is
+\begin{multline*}
+    \widehat h_i^{\mathrm{samp}}(x,y_{<t},y_t)\\[-0.4em]
+    =\operatorname{sg}\!\left[
+        \log \pi_\theta(y_t\mid x,y_{<t})
+        -\log \pi_{T_i}(y_t\mid x,y_{<t})
+      \right]\\[-0.2em]
+    {}\times\nabla_\theta\log \pi_\theta(y_t\mid x,y_{<t}),
+    \qquad y_t\sim\pi_\theta(\cdot\mid x,y_{<t}).
+\end{multline*}
+where $\operatorname{sg}$ stops gradients through the log-probability
+difference. Thus the student is pulled toward the teacher on the tokens it
+actually produced.
+
+The teacher already computes scores over the vocabulary, and the student
+already identifies its own high-probability tokens. Let
+$\mathcal K_k(x,y_{<t})$ be the student's top-$k$ set at this context. For a
+candidate token $a$, define
+\[
+    r_{i,a}(x,y_{<t})
+    =\operatorname{sg}\!\left[
+        \log \pi_\theta(a\mid x,y_{<t})
+        -\log \pi_{T_i}(a\mid x,y_{<t})
+      \right]
+      \nabla_\theta\log \pi_\theta(a\mid x,y_{<t}).
+\]
+We compute the token gradient as
+\begin{multline*}
+    \widehat h_i^{\mathrm{top}k}(x,y_{<t},y_t)\\[-0.4em]
+    =\sum_{a\in\mathcal K_k(x,y_{<t})}
+       \pi_\theta(a\mid x,y_{<t})r_{i,a}(x,y_{<t})\\[-0.2em]
+    {}+\mathbf{1}\!\left\{y_t\notin\mathcal K_k(x,y_{<t})\right\}
+       r_{i,y_t}(x,y_{<t}),
+    \qquad y_t\sim\pi_\theta(\cdot\mid x,y_{<t}).
+\end{multline*}
+At every fixed prefix this has the same expected gradient as the sampled-token
+form; it integrates out which retained token was sampled, while the observed
+token supplies an unbiased correction for the omitted tail (proof in
+Appendix~\ref{app:opd_estimators}). It requires no additional teacher or
+student pass because both distributions used by the expression are already
+computed. In automatic differentiation, the top-$k$ membership and the
+coefficients
+$\pi_\theta(a\mid x,y_{<t})
+ [\log\pi_\theta(a\mid x,y_{<t})-\log\pi_{T_i}(a\mid x,y_{<t})]$
+are treated as stopped constants.
+
+For each task, token contributions are averaged within a response and response
+means are then averaged within a micro-batch; $L_i(\theta)$ denotes the
+expectation of that task-level loss. Fixed positive weights, chosen before
+training and summing to one, define the learning objective
+\begin{equation}
+    F(\theta)=\sum_{i=1}^M w_i L_i(\theta).
+    \label{eq:fixed_multitask_objective}
+\end{equation}
+The fixed $w_i$ specify what the student learns, independently of how many
+micro-batches estimate each term.
+
+\subsection{Gradient of a mixed batch}
+
+A micro-batch is a group of $b$ prompts from one task, processed in one
+backward pass. An optimizer step accumulates $G$ micro-batches; task $i$
+contributes the integer count $m_i$, the counts sum to $G$, and each count lies
+between $m_{\min}$ and $m_{\max}$. The lower bound is at least two so that a
+within-task sample variance exists on every step.
+
+Let $g_{i,s}$ be the unweighted gradient of micro-batch $s$ from task $i$,
+computed with the top-$k$ estimator above. Multiplying its loss by $w_i/m_i$
+after the token and response averages gives the accumulated gradient
+\begin{equation}
+    A=\sum_{i=1}^M\frac{w_i}{m_i}\sum_{s=1}^{m_i}g_{i,s}.
+    \label{eq:batch_gradient_observation}
+\end{equation}
+For fresh micro-batches that are conditionally independent across draws and
+identically distributed within each task, with a common task mean and
+covariance, let
+$\mu_i(\theta)=\mathbb E[g_{i,s}\mid\theta]$ and
+$\mu(\theta)=\sum_iw_i\mu_i(\theta)$. Every feasible allocation satisfies
+$\mathbb E[A\mid m,\theta]=\mu(\theta)$, so changing the counts changes
+precision but not the fixed weighted expected semi-gradient. When the rollout
+distribution and all stopped coefficients are frozen at the current student,
+$\mu$ is the gradient of the corresponding step-local surrogate for $F$. Any importance-ratio truncation is applied before the token
+and response averages, and the factor $w_i/m_i$ is applied after them; in that
+case the common expectation is for the same truncated surrogate.
+
+A single mean over all valid tokens in the step would instead give a task more
+influence when it contributes either more responses or longer responses. This
+is the length-driven imbalance reported by Open-MOPD; response-level averaging
+followed by $w_i/m_i$ weighting removes it by construction
+\citep{gao2026openmopddiagnosingfixingcapability}. Table~\ref{tab:notation}
+collects the notation.

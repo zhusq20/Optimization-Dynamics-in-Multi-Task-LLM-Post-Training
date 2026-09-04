@@ -1,0 +1,56 @@
+% ============================================================================
+\section{Related Work}
+% ============================================================================
+
+\paragraph{Multi-teacher distillation in practice.}
+MOPD combines domain teachers through supervision on student-generated
+responses \citep{ma2026mopdmultiteacheronpolicydistillation}; recent systems
+also use a specialist together with an earlier checkpoint to add skills
+while preserving general capability \citep{liu2026instella}.
+Open-MOPD identifies response-token imbalance, uneven learning progress,
+and stale student-dependent rewards, addressing them through loss weighting
+and reward refresh \citep{gao2026openmopddiagnosingfixingcapability}.
+D$^3$-MOPD adapts domain sampling using the remaining teacher gap and its
+descent velocity \citep{sun2026d3mopd}. GPAS addresses the precision of
+task-gradient estimates under specified objective weights, using their
+measured variability and computational cost.
+
+\paragraph{Dense losses and token estimators.}
+MOPD includes both sampled-token policy gradients and a corrected reverse-KL
+loss on the teacher's top-$k$ tokens
+\citep{ma2026mopdmultiteacheronpolicydistillation}. Open-MOPD uses student
+top-$k$ candidates with probability-weighted log-ratio advantages; its
+released dense implementation computes candidate-wise losses before
+summing across the retained set
+\citep{gao2026openmopddiagnosingfixingcapability,openmopd2026code}.
+EMA-PG combines an exact retained-set contribution with a sampled tail
+\citep{zhang2026emapg}, TA-OPD includes the probability mass outside the
+teacher's top-$k$ set \citep{huang2026tailaware}, and vOPD uses a
+control-variate baseline for sampled-token distillation
+\citep{oh2026vopd}. We build on existing dense losses and apply GPAS to the
+micro-batch gradients they produce.
+
+\paragraph{Learning dynamics and capability integration.}
+Teacher--student compatibility and the capabilities supplied by the teacher
+shape OPD outcomes \citep{li2026rethinkingopd}.
+CaMOPD studies counteracting recovery and preservation updates and combines
+alternating training with gap-based selection \citep{chen2026camopd}.
+Recent work also finds that diverse queries can provide broad state coverage
+while the student continues to absorb supervision slowly
+\citep{fu2026rethinkingopd2}. These studies motivate examining the update
+process alongside teacher loss. Our measurements relate gradient
+variability, sample allocation, and learning efficiency.
+
+\paragraph{Task weighting and stochastic optimization.}
+Multi-task learning adapts loss weights and gradient directions
+\citep{chen2018gradnorm,sener2019multitasklearningmultiobjectiveoptimization,
+yu2020gradientsurgerymultitasklearning}; language-model training also adapts
+data mixtures from learning progress \citep{albalak2023efficient,wang2025dump}.
+Importance sampling and online variance reduction improve stochastic
+gradient estimates \citep{katharopoulos2018samplescreatedequaldeep,
+borsos2018online}. GPAS uses within-task standard deviations, following
+Neyman allocation and its unequal-cost extension
+\citep{neyman1934representative,cochran1977sampling}.
+The interaction between non-uniform sampling and adaptive optimizers
+\citep{lahire2023nonuniformadaptive} motivates measuring those deviations
+after the optimizer's coordinate scaling.

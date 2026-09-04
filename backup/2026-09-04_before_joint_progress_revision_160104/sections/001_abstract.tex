@@ -1,0 +1,19 @@
+\begin{abstract}
+Multi-teacher on-policy distillation (MOPD) combines task-specific teacher
+feedback in a shared student. Its training budget must accommodate tasks
+whose responses differ in length and whose gradients vary in reliability.
+Dense top-$k$ supervision already uses several teacher scores at each
+position, but different prompts and student-generated trajectories still
+produce different updates. We introduce Gradient-Preconditioned Adaptive
+Sampling (GPAS), a micro-batch allocation method that uses this remaining
+variation to decide how much computation each task receives. GPAS averages
+each task's gradients under fixed objective weights and assigns more
+micro-batches to tasks with larger fluctuations after the optimizer's
+coordinate scaling. It reuses gradients from ordinary training and supports
+a cost-aware mode that also accounts for task-dependent running time.
+We study four-domain distillation into Qwen3-1.7B, comparing training
+efficiency, capability integration, and allocation dynamics under existing
+dense distillation losses.
+\missing{Report the measured efficiency difference, per-domain capability changes,
+and the contribution of optimizer-aware allocation.}
+\end{abstract}

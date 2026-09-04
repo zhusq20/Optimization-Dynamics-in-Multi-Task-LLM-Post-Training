@@ -1,0 +1,2543 @@
+EMA Policy Gradient:Taming Reinforcement Learning for LLMs with EMA Anchor and Top-k KL
+// Restore the saved color scheme preference, or
+// enact the browser preference if "automatic",
+// without expecting DOM load to have completed.
+//
+// Also restore any saved readingmode and ToC display preferences.
+function initializeReadingPreferences() {
+let saved_theme = localStorage.getItem("ar5iv_theme") || "automatic";
+if (saved_theme === "automatic") {
+if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+saved_theme = "dark";
+}
+}
+if (saved_theme == "dark") {
+document.documentElement.setAttribute("data-theme", "dark");
+} else {
+document.documentElement.setAttribute("data-theme", "light");
+}
+const tocDisplay = localStorage.getItem('arxiv_html_paper_toc_display');
+if (tocDisplay) {
+document.documentElement.setAttribute("data-toc-display", tocDisplay);
+}
+const readingMode = localStorage.getItem('arxiv_html_paper_reading_mode');
+if (readingMode) {
+document.documentElement.setAttribute("data-reading-mode", readingMode);
+}
+// Pre-apply spinout-banner dismissal here, before the banner paints, so it
+// never flashes in only to be hidden later by the deferred arxiv-header.js.
+// Key matches arxiv-header.js: "arxiv-banner-dismissed:" + data-banner-name.
+if (localStorage.getItem('arxiv-banner-dismissed:spinout-nonprofit')) {
+document.documentElement.setAttribute("data-banner-dismissed", "");
+}
+}
+// Run as soon as JS starts, to minimize repainting
+initializeReadingPreferences();
+/* Banner pre-dismissal (set above before paint -> no flash-then-hide) and
+reading-mode chrome hiding. */
+html[data-banner-dismissed] .ds-announcement { display: none; }
+html[data-reading-mode="enabled"] .ds-announcement,
+html[data-reading-mode="enabled"] .ds-site-footer { display: none; }
+/* Keep the announcement text dark on the Open-Blue band in both colour themes
+(otherwise it inherits the paper's warm-wash text in dark mode and washes out). */
+.ds-announcement-text { color: var(--arxiv-ink, #1c1a17); }
+Report GitHub Issue
+×
+Title:
+Content selection saved. Describe the issue below:
+Description:
+Submit without GitHub
+Submit in GitHub
+arXiv is now an independent nonprofit!
+Learn more
+×
+Back to arXiv
+Why HTML?
+Report Issue
+Back to Abstract
+Download PDF
+Abstract
+1 Introduction
+2 Related Work
+Improving RL for LLMs
+KL Estimators for LLMs
+EMA in Deep Learning
+3 Background
+Reinforcement Learning (RL)
+Exponential Moving Average (EMA)
+Local Quadratic Approximation of KL
+4 Training Dynamics of the EMA Anchor
+5 KL Estimators: Which and Why
+5.1 Sequence-level KL or Token-level KL?
+5.2 Exact KL or Sampled KL?
+5.3 Top-k KL Estimator
+6 Experiments
+Math Reasoning.
+Agentic RL for Search.
+Effect of EMA anchor
+Effect of Top-k KL
+Other design choices
+7 Conclusion
+References
+A Algorithm Box for EMA Policy Gradient
+Details of Top-k KL:
+Details of the Base RL Algorithm
+B Additional Results
+C Derivations for EMA Policy Gradient Dynamics
+Fisher matrix
+Setup.
+C.1 Policy Gradient Dynamics under Local Quadratic KL Approximation
+C.2 Quasi-steady state analysis over a $k$ -step window (Proof of Lemma 4.1)
+Assumption (frozen gradient and Fisher).
+C.2.1 Closed form for $\delta_{t+k}$
+C.2.2 Invertibility of $I-D$ and closed form for $S_{k}$
+C.2.3 Closed form for $\theta_{t+k}$ and the $M_{k}$ matrix
+Closed form for $M_{k}$ .
+C.3 Eigen-decomposition of Fisher and mode-wise dynamics (Proof of Lemma 4.2)
+C.4 Stability and oscillations
+C.4.1 Stability condition
+C.4.2 Non-oscillatory vs. oscillatory transients
+C.5 Steady-state lag and bounds
+C.5.1 Euclidean norm upper bound
+C.5.2 Quasi-steady KL magnitude
+D Sequence-level KL vs. Token-level KL
+Notation and setup
+D.1 Sequence-level KL gradients
+D.2 Analysis of sequence-level KL gradients
+Why the “past” terms vanish
+Step 1: the score has zero mean.
+Step 2: past log-ratios are constant under $\mathbb{E}_{n}[\cdot]$ .
+Step 3: unconditional past terms also vanish.
+D.3 Token-level KL gradients
+Comparison
+E Derivation of Sampled Reverse KL Estimator
+Reverse KL at a fixed prefix.
+Exact reverse-KL gradient.
+$\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ versus $\nabla_{\theta}\mathbb{E}_{p}[\cdot]$
+E.1 Sampled KL estimators (K1 / K2 / K3) and their expected values
+E.2 Gradients of K1 / K2 / K3 under autodiff $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$
+K1: correct value but wrong gradient.
+K2: correct reverse-KL gradient but wrong value.
+K3: yields the forward-KL gradient under $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ .
+E.3 The $\boldsymbol{r}$ -trick restores $\nabla_{\theta}\mathbb{E}_{p}[\cdot]$ from $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ .
+E.4 ${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$ yields unbiased reverse-KL values and gradients
+E.4.1 Alternative Proof
+E.5 K4 yields unbiased reverse-KL values and gradients
+F Derivation of Sampled Forward KL Estimator
+F.1 Forward KL and its gradient
+F.2 The K5 estimator has unbiased value
+F.3 The K5 estimator has unbiased gradient
+F.4 Variance reduction in K5 gradients
+G Bias-Variance Tradeoff in Top-k KL: An Illustrative Synthetic Setup
+G.1 Token-wise i.i.d. simplification
+G.2 Synthetic task and metric
+Controlling concentration via top-32 mass.
+Estimators and error metric.
+Critical sample size.
+H Top-k $\boldsymbol{f}$ -Divergence Estimator
+Setup and notation.
+H.1 $f$ -divergence and its gradients
+H.1.1 Exact gradient w.r.t. $\theta$ (reference policy fixed)
+H.2 A generic, unbiased, sampled $f$ -divergence estimator
+Unbiased value.
+Unbiased gradient under $\mathbb{E}[\nabla_{\theta}(\cdot)]$ .
+H.3 Top-k $f$ -divergence estimator: A generalization of Top-k KL estimator
+Truncated exact term.
+Masked sampled tail term.
+Top-k $f$ -divergence estimator.
+Unbiased value.
+Unbiased gradient.
+A note on variance reduction in Forward and Reverse KL gradient estimators.
+I Optimal Policies under Forward vs Reverse KL Regularization
+Optimal Policy under Reverse KL
+Optimal Policy under Forward KL
+I.1 Reward transformation for equivalent optima between forward KL and reverse KL
+Inverse transformation:
+I.2 Reward transformation for equivalent optima across $f$ -divergences
+J Policy Gradient Methods can be Derived from Sampled KL Estimators
+J.1 K1 estimator leads to on-policy PPO / GRPO loss
+J.2 K2 estimator leads to APA / Kimi loss
+J.3 K5 estimator leads to RWR / MPO loss
+J.4 K3 / K3++ / K4 estimators lead to combined losses
+A Note on Off-policy Correction
+Summary of the Equivalence between Policy Gradient and Divergence Minimization
+K Policy Gradient as $\boldsymbol{f}$ -Divergence Minimization
+K.1 Minimizing $D_{f}(\pi_{\theta},\pi^{*})$
+K.2 Minimizing $D_{f}(\pi^{*},\pi_{\theta})$
+Summary of $f$ -divergence loss.
+The EM Algorithm
+License: CC BY 4.0
+arXiv:2602.04417v1 [cs.LG] 04 Feb 2026
+EMA Policy Gradient:
+Taming Reinforcement Learning for LLMs with EMA Anchor and Top-k KL
+Lunjun Zhang
+Affiliation: Department of Computer Science, University of Toronto
+Correspondence to: lunjun@cs.toronto.edu
+Jimmy Ba
+Affiliation: Department of Computer Science, University of Toronto
+Abstract
+Reinforcement Learning (RL) has enabled Large Language Models (LLMs) to acquire increasingly complex reasoning and agentic behaviors. In this work, we propose two simple techniques to improve policy gradient algorithms for LLMs. First, we replace the fixed anchor policy during RL with an Exponential Moving Average (EMA), similar to a target network in deep Q-learning. Second, we introduce Top- $k$ KL estimator, which allows for flexible interpolation between exact KL and sampled KL.
+We derive the stability conditions for using EMA anchor; moreover, we show that our Top- $k$ KL estimator yields both unbiased KL values and unbiased gradients at any $k$ , while bringing the benefits of exact KL.
+When combined with GRPO, the two techniques (EMA-PG) lead to a significant performance boost. On math reasoning, it allows R1-distilled Qwen-1.5B to reach 53.9% on OlympiadBench compared to 50.8% by GRPO. On agentic RL domains, with Qwen-3B base, EMA-PG improves GRPO by an average of 33.3% across 7 datasets of Q&A with search engines, including 29.7% $\rightarrow$ 44.1% on HotpotQA, 27.4% $\rightarrow$ 40.1% on 2WikiMultiHopQA. Overall, we show that EMA-PG is a simple, principled, and powerful approach to scaling RL for LLMs. Code: github.com/LunjunZhang/ema-pg.
+Keywords: Large Language Models, Reinforcement Learning
+Figure 1: Using EMA anchor policy and Top- $k$ KL estimator significantly improves the performance of RL algorithms like GRPO.
+Table 1: Token-level KL Estimators. For brevity, we omit the conditioning of $\pi_{\theta}$ and $\pi_{\text{ref}}$ on past tokens. Notations: $\mathrm{sg}$ is stop-gradient,
+${p\sim\pi_{\theta}(\cdot)}$ is the sampled token, ${r=\pi_{\theta}(p)/\mathrm{sg}(\pi_{\theta}(p))}$ , ${w=\pi_{\text{ref}}(p)/\pi_{\theta}(p)}$ ; $\mathcal{V}$ is the vocabulary, ${\widehat{w}(j)=\pi_{\text{ref}}(j)/\pi_{\theta}(j)},\forall j\in\mathcal{V}$ .
+The estimators being highlighted in blue are the KL estimators that provide both unbiased KL values and unbiased KL gradients.
+$\mathbb{E}_{\pi_{\theta}}[\hat{D}_{f}(\pi_{\theta},\pi_{\text{ref}})]$
+Expression
+Value
+Unbiased?
+Gradient
+Unbiased?
+Memory
+Overall
+Reverse KL: exact
+$\sum_{j\in\mathcal{V}}\pi_{\theta}(j)[-\log\widehat{w}(j)]$
+$\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$O(|\mathcal{V}|)$
+$\boldsymbol{\mathbin{\times}}$
+K1
+$-\log w$
+$\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$\nabla_{\theta}0$
+$\boldsymbol{\mathbin{\times}}$
+$O(1)$
+$\boldsymbol{\mathbin{\times}}$
+K2
+$(\log w)^{2}/2$
+$\mathbb{E}_{\pi_{\theta}}[(\log w)^{2}/2]$
+$\boldsymbol{\mathbin{\times}}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$O(1)$
+$\boldsymbol{\mathbin{\times}}$
+K3
+$-\log w+w-1$
+$\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+$\boldsymbol{\mathbin{\times}}$
+$O(1)$
+$\boldsymbol{\mathbin{\times}}$
+${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$
+$r\cdot(-\log w+w-1)$
+$\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$O(1)$
+$\checkmark$
+K4
+$r\cdot\mathrm{sg}(-\log w)$
+$\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$O(1)$
+$\checkmark$
+$\mathrm{Topk}$ Reverse $\mathrm{KL}$
+Alg 1
+$\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+${\checkmark}$
+$O(k)$
+$\checkmark$
+Forward KL: exact
+$\sum_{j\in\mathcal{V}}\pi_{\text{ref}}(j)[\log\widehat{w}(j)]$
+$\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+${\checkmark}$
+$O(|\mathcal{V}|)$
+$\boldsymbol{\mathbin{\times}}$
+K5
+$\mathrm{sg}(w)\log w+\log r$
+$\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+${\checkmark}$
+$O(1)$
+$\checkmark$
+$\mathrm{Topk}$ Forward $\mathrm{KL}$
+Alg 2
+$\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+${\checkmark}$
+$\nabla_{\theta}\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+${\checkmark}$
+$O(k)$
+$\checkmark$
+1 Introduction
+As the pre-training paradigm began to show diminishing returns for large-language models (LLMs), reinforcement learning (RL) has re-emerged as a powerful mechanism for LLMs to continually self-improve based on self-generated experience. While RL was initially only used for alignment within the RL from Human Feedback (RLHF) framework (Christiano et al., 2017; Ouyang et al., 2022; Bai et al., 2022a; Bai et al., 2022b), it has since then been applied to reasoning models such as o1 (Jaech et al., 2024) and R1 (Guo et al., 2025). Perhaps surprisingly, the predominant RL algorithm for LLMs today is still REINFORCE (Williams, 1992; Sutton et al., 1999) and its modern off-policy variants like PPO (Schulman et al., 2017b), GRPO (Shao et al., 2024), and CISPO (Chen et al., 2025). This motivates us to study the foundational building blocks of policy gradient algorithms, so that such advancements can be broadly applied to LLMs.
+The use of a target network has been the common practice since the dawn of deep Q-learning (Mnih et al., 2015). A target network uses an Exponential Moving Average (EMA) to update its knowledge while producing stable supervision targets. Using EMA has seen success in self-supervised learning as well (Grill et al., 2020b). In RLHF, the idea of an EMA anchor policy has been explored in TR-DPO (Gorbatovski et al., 2024) and WARP (Ramé et al., 2024). A crucial difference between our work and theirs is how the EMA anchor is used: prior work optimizes sequence-level KL, but we optimize token-level KL, which we show makes a crucial difference in reasoning and agentic settings.
+KL regularization is a key component of policy optimization. Initially, it was a way to enforce trust-region (Schulman et al., 2015) and ensure training stability. In LLM alignment, it mitigates reward hacking (Gao et al., 2023). In LLM reasoning, it helps preserve base model capabilities (Liu et al., 2025a). However, what KL estimator to use for LLM has long been a curious question. InstructGPT (Ouyang et al., 2022) adds a sequence-level sampled KL to the reward; GRPO (Shao et al., 2024) uses token-level sampled KL; the two objectives are different (Tang and Munos, 2025). Moreover, knowledge distillation (Hinton et al., 2015) shows that leveraging logits in KL computation can significantly facilitate learning. We analyze the tradeoffs between sequence-level KL vs token-level KL, sampled KL vs exact KL, to identify the best practices in Top-k KL.
+Algorithm 1 ${\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Reverse}\mathrm{KL}}(\pi_{\theta},\pi_{\text{ref}},\pi_{\text{sampling}},p,q)$
+0:
+Policy $\pi_{\theta}$ , Anchor $\pi_{\text{ref}}$ for $\mathrm{KL}(\pi_{\theta},\pi_{\text{ref}})$
+0:
+Sampling policy $\pi_{\text{sampling}}$ , sampled token ${p}$
+0:
+Set of top-K logit indices ${q}$ from sampling policy
+1:
+$\widehat{\mathrm{KL}}_{\text{trun}}=\sum_{{\color[rgb]{0,0.5,1}j\in q}}{\color[rgb]{0,0.5,1}\pi_{\theta}(j)[\log\pi_{\theta}(j)-\log\pi_{\text{ref}}(j)]}$
+2:
+$r_{\theta}=\pi_{\theta}(p)/\mathrm{sg}(\pi_{\theta}(p))$ , $w_{\theta}=\pi_{\text{ref}}(p)/\pi_{\theta}(p)$
+3:
+$\widehat{\mathrm{KL}}_{\text{sampled}}={\color[rgb]{0,0.5,1}r_{\theta}\cdot\mathrm{sg}(-\log w_{\theta})}$
+4:
+$s=\mathrm{sg}(\pi_{\theta}(p)/\pi_{\text{sampling}}(p))$ {clip to $[s_{\text{min}},s_{\text{max}}]$ }
+5:
+return $\widehat{\mathrm{KL}}_{\text{trun}}+{\color[rgb]{0.5,0.5,0.5}s}\,{\color[rgb]{0,0.5,1}\mathbbm{1}(p\not\in q)}\,\widehat{\mathrm{KL}}_{\text{sampled}}$
+We propose two very simple changes to policy gradients. Given an RL update for LLM $\pi_{\theta}$ on prompt $x$ :
+$\displaystyle\theta\leftarrow\theta+\alpha(\underbrace{{A}(x,y)\nabla_{\theta}\log\pi_{\theta}(y|x)}_{\text{Any policy gradient algorithm}}-\beta\underbrace{\nabla_{\theta}\widehat{\mathrm{KL}}}_{\text{What we change}})$
+where $y$ is the LLM response of length $L$ , and $A(x,y)$ is the advantage function. We only change what the KL is regularizing against and how the KL is computed:
+$\displaystyle\boxed{\widehat{\mathrm{KL}}={\textstyle\sum}_{l=0}^{L-1}{\color[rgb]{0,0.5,1}\mathrm{TopkKL}}(\pi_{\theta}(\cdot|x,y_{0:l-1}),\pi_{\color[rgb]{1,0,1}\theta_{\text{ema}}}(\cdot|x,y_{0:l-1}))}$
+where ${\color[rgb]{0,0.5,1}\mathrm{TopkKL}}$ is an unbiased token-level KL estimator that computes exact KL on the top- $k$ indices of logits and a sampled KL on the rest; ${\color[rgb]{1,0,1}\theta_{\text{ema}}}$ is an EMA target network:
+$\displaystyle\boxed{{\color[rgb]{1,0,1}\theta_{\text{ema}}}\leftarrow\eta\cdot{\color[rgb]{1,0,1}\theta_{\text{ema}}}+(1-\eta)\cdot\theta}$
+The two changes make a significant difference on RL training of reasoning and agentic models. On math, it allows R1-distilled Qwen-1.5B to reach 53.9% on OlympiadBench (text-only) (He et al., 2024) compared to 50.8% by GRPO. In agentic settings, with Qwen-3B base, EMA-PG improves GRPO by 33.3% across 7 datasets of Q&A with search engine, including 29.7% $\rightarrow$ 44.1% on HotpotQA (Yang et al., 2018), 27.4% $\rightarrow$ 40.1% on 2WikiMultiHopQA (Ho et al., 2020b), 12.8% $\rightarrow$ 33.1% on Bamboogle (Press et al., 2023).
+Algorithm 2 ${\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Forward}\mathrm{KL}}(\pi_{\theta},\pi_{\text{ref}},\pi_{\text{sampling}},p,q)$
+0:
+Policy $\pi_{\theta}$ , Anchor $\pi_{\text{ref}}$ for $\mathrm{KL}(\pi_{\text{ref}},\pi_{\theta})$
+0:
+Sampling policy $\pi_{\text{sampling}}$ , sampled token ${p}$
+0:
+Set of top-K logit indices ${q}$ from anchor policy
+1:
+$\widehat{\mathrm{KL}}_{\text{trun}}=\sum_{{\color[rgb]{0,0.5,1}j\in q}}{\color[rgb]{0,0.5,1}\pi_{\text{ref}}(j)[\log\pi_{\text{ref}}(j)-\log\pi_{\theta}(j)]}$
+2:
+$r_{\theta}=\pi_{\theta}(p)/\mathrm{sg}(\pi_{\theta}(p))$ , $w_{\theta}=\pi_{\text{ref}}(p)/\pi_{\theta}(p)$
+3:
+$\widehat{\mathrm{KL}}_{\text{sampled}}={\color[rgb]{0,0.5,1}\mathrm{sg}(w_{\theta})\log w_{\theta}+\log r_{\theta}}$
+4:
+$s=\mathrm{sg}(\pi_{\theta}(p)/\pi_{\text{sampling}}(p))$ {clip to $[s_{\text{min}},s_{\text{max}}]$ }
+5:
+return $\widehat{\mathrm{KL}}_{\text{trun}}+{\color[rgb]{0.5,0.5,0.5}s}\,{\color[rgb]{0,0.5,1}\mathbbm{1}(p\not\in q)}\,\widehat{\mathrm{KL}}_{\text{sampled}}$
+The rest of the paper is organized as the following. (1) We derive the stability condition for using an EMA anchor (§4). (2) We explain why token-level KL is more suited for reasoning models than sequence-level KL (§5.1). (3) For token-level KL, common KL estimators such as K1, K2, K3 are unable to yield unbiased KL estimates and unbiased gradients at the same time, so we construct estimators $\text{K3}^{++}$ , K4, and K5 that can (§5.2). (4) We propose Top-k KL estimators, which extract dense supervision from logits with low memory footprint (§5.3). Overall, EMA anchor and Top-k KL result in notable sample efficiency gain for RL.
+Figure 2: Top-k KL computes exact KL on the top-k indices, and adds a masked sampled KL to keep the estimator unbiased.
+2 Related Work
+Improving RL for LLMs
+Leveraging verifiable domains such as math and coding, lots of effort has gone into scaling RL for reasoning (Jaech et al., 2024; Guo et al., 2025; Chen et al., 2025) and agentic tasks (Kimi et al., 2025a; Comanici et al., 2025). The predominant algorithm for RL in reasoning, GRPO (Shao et al., 2024), has gained widespread adoption due to its effectiveness. Many works have tried to further improve it, which include removing bias in policy gradient (Liu et al., 2025b), better importance weight clipping (Yu et al., 2025), using sequence-level objective (Zheng et al., 2025), asynchronous data generation (Piché et al., 2025), better scaling practices (Khatri et al., 2025). Since we exclusively focus on the KL component in RL, our work is largely orthogonal to those techniques above.
+KL Estimators for LLMs
+KL estimation for LLMs is challenging due to autoregressive action space and large vocabulary size. Early work on RLHF adds a sequence-level KL penalty to the sequence-level reward (Ouyang et al., 2022; Bai et al., 2022a). As reasoning models begin to scale the sequence length of thinking traces, token-level KL regularization becomes popular (Guo et al., 2025). Token-level sampled KL estimators are typically K1, K2, and K3 (Schulman, 2020); K3 was used in GRPO. Since then, many works have pointed out that K3 gradients are forward KL gradients (Tang and Munos, 2025; Zhang et al., 2025; Shah et al., 2025). Sampled KL ignores the fact that we have white-box access to logits and next-token distributions; knowledge distillation has shown that such information is very useful to learning (Hinton et al., 2015; Kim and Rush, 2016; Agarwal et al., 2024; Zhou et al., 2024). When the vocabulary is large, storing full logits is too memory-intensive; our insight is to reduce the memory usage of logits via Top-k truncation.
+EMA in Deep Learning
+Deep Q-learning almost universally uses an EMA network to produce stable learning targets (Mnih et al., 2015; Lillicrap et al., 2015; Haarnoja et al., 2018). Self-supervised learning has also used EMA for stable bootstrapping (He et al., 2020; Grill et al., 2020b; Busbridge et al., 2023). EMA has been shown to improve generalization in deep learning (Nichol et al., 2018; Zhang et al., 2019). In the diffusion model literature, EMA is often used to produce the final model (Ho et al., 2020a). For RL on LLMs, prior work has also suggested using an EMA anchor for alignment (Gorbatovski et al., 2024; Ramé et al., 2024); our work differs in how the KL is computed. Elastic reset (Noukhovitch et al., 2023) also keeps an EMA copy during RL, but does not use it for reference policy. The effectiveness of EMA can be partially explained by Linear Mode Connectivity (Frankle et al., 2020) and Monotonic Linear Interpolation (Goodfellow et al., 2014; Lucas et al., 2021) between neural networks that share the same initialization.
+3 Background
+Reinforcement Learning (RL)
+Given a pre-trained LLM, RL trains the model to maximize a reward function while remaining close to the original model. Concretely, let $\pi_{\theta}$ denote a policy (language model) parameterized by $\theta\in\mathbb{R}^{d}$ , and let $R(x,y)$ be a reward function scoring response $y$ to prompt $x$ . The standard objective is to maximize:
+$\displaystyle\mathbb{E}_{x}\{\mathbb{E}_{\pi_{\theta}(y|x)}\bigl[R(x,y)\bigr]-\beta\mathrm{KL}\bigl(\pi_{\theta}(\cdot\mid x)\,\|\,\pi_{\text{ref}}(\cdot\mid x\bigr)\}$
+(1)
+where $x\sim\mathcal{D}$ is a sampled prompt, $\pi_{\text{ref}}$ is the reference policy (also called the anchor policy), $\beta$ controls how much $\pi_{\theta}$ is allowed to deviate from the anchor. The term $\mathrm{KL}(\pi_{\theta}\|\pi_{\text{ref}})=\mathbb{E}_{x}\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}[\log(\pi_{\theta}(y|x)/\pi_{\text{ref}}(y|x))]$ is the reverse KL divergence for the policy $\pi_{\theta}$ .
+Exponential Moving Average (EMA)
+EMA is a technique for maintaining a smoothed version of an iteratively updated quantity.
+Given a sequence $\{\theta_{t}\}_{t=0}^{\infty}$ and coefficient $\eta\in(0,1)$ , the EMA sequence $\{\theta_{\text{ema, }t}\}$ is:
+$\displaystyle\theta_{\text{ema, }0}=\theta_{0}\qquad\theta_{\text{ema, }{t+1}}$
+$\displaystyle=\eta\,\theta_{\text{ema, }t}+(1-\eta)\,\theta_{t}$
+(2)
+which is widely used in deep Q-learning as target network.
+Local Quadratic Approximation of KL
+The Fisher information matrix of a policy $\pi_{\theta}$ is defined as:
+$F_{\theta}\triangleq\mathbb{E}_{x\sim\mathcal{D}}\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\bigl[(\nabla_{\theta}\log\pi_{\theta}(y|x))(\nabla_{\theta}\log\pi_{\theta}(y|x))^{\top}\bigr]$
+which captures the local sensitivity of a policy’s output distribution to parameter changes. The natural gradient $F_{\theta}^{-1}g$ is the steepest-ascent direction under a local KL trust-region constraint. For $\theta^{\prime}=\theta+\delta$ with $\|\delta\|\to 0$ ,
+$\mathrm{KL}(\pi_{\theta}\|\pi_{\theta+\delta})=\delta^{\top}F_{\theta}\delta/2+O(\|\delta\|^{3}),$
+(3)
+and the gradient w.r.t $\theta$ is:
+$\nabla_{\theta}\mathrm{KL}(\pi_{\theta}\|\pi_{\theta^{\prime}})\approx F_{\theta}(\theta-\theta^{\prime})$ .
+Figure 3: On math reasoning datasets, using EMA Anchor improves not only Pass@1 but Pass@N as well compared to GRPO. Results obtained on a 1.5B model DeepSeek-R1-Distill-Qwen-1.5B (Guo et al., 2025).
+4 Training Dynamics of the EMA Anchor
+Consider the policy gradient $g_{t}=(R\,\nabla_{\theta}\log\pi_{\theta})|_{\theta=\theta_{t}}$ at $t$ :
+$\displaystyle\theta_{t+1}$
+$\displaystyle=\theta_{t}+\alpha[g_{t}-\beta\,\nabla_{\theta}\mathrm{KL}(\pi_{\theta}||\pi_{\theta_{\text{ema, }t}})|_{\theta=\theta_{t}}]$
+$\displaystyle\theta_{\text{ema, }t+1}$
+$\displaystyle=\eta\,\theta_{\text{ema, }t}+(1-\eta)\,\theta_{t}$
+We define the lag between current and EMA weights as:
+$\displaystyle\delta_{t}$
+$\displaystyle\coloneqq\theta_{t}-\theta_{\text{ema, }t}$
+(4)
+Using the local approximation (3), with $F_{t}=F_{\theta_{t}}$
+$\displaystyle\theta_{t+1}$
+$\displaystyle=\theta_{t}+\alpha g_{t}-\alpha\beta F_{t}\delta_{t}$
+(5)
+The joint dynamics of $\theta_{t}$ and $\delta_{t}$ becomes:
+$\begin{bmatrix}\theta_{t+1}\\
+\delta_{t+1}\end{bmatrix}=\begin{bmatrix}I&-\alpha\beta F_{t}\\
+0&\eta I-\alpha\beta F_{t}\\
+\end{bmatrix}\begin{bmatrix}\theta_{t}\\
+\delta_{t}\end{bmatrix}+\begin{bmatrix}\alpha I\\
+\alpha I\end{bmatrix}g_{t}$
+(6)
+Lemma 4.1.
+Quasi-steady state: If we assume that the gradient and the Fisher matrix change extremely slowly over $k$ steps, meaning that for $\Delta=0\cdots k-1$ :
+$\displaystyle g_{t+\Delta}\approx g,\qquad F_{t+\Delta}\approx F$
+(7)
+then, under the following definitions of matrices $D$ , $S_{k}$ , $M_{k}$ :
+$\displaystyle D$
+$\displaystyle=\eta I-\alpha\beta F\quad S_{k}={\sum}_{\Delta=0}^{k-1}D^{\Delta}\quad M_{k}={\sum}_{\Delta=0}^{k-1}S_{\Delta}$
+we have: firstly, $I-D$ is invertible and $S_{k}=(I-D^{k})(I-D)^{-1}$ , $M_{k}=(kI-S_{k})(I-D)^{-1}$ ; secondly, we have a closed-form dynamics of EMA Policy Gradient:
+$\begin{bmatrix}\theta_{t+k}\\
+\delta_{t+k}\\
+g\end{bmatrix}=\begin{bmatrix}I&-\alpha\beta FS_{k}&\alpha kI-\alpha^{2}\beta FM_{k}\\
+0&D^{k}&\alpha S_{k}\\
+0&0&I\end{bmatrix}\begin{bmatrix}\theta_{t}\\
+\delta_{t}\\
+g\end{bmatrix}$
+Lemma 4.2.
+Stability Condition: Let $\{v_{i}\}_{i=0}^{d-1}$ be the eigenbasis of the Fisher matrix $F$ , and $\{\lambda_{i}\}_{i=0}^{d-1}$ be its corresponding eigenvalues (with $\lambda_{\max}$ being the largest eigenvalue). The dynamics of the lag $\delta_{t}$ in the eigenbasis of the Fisher, where $\delta_{t}^{(i)}\coloneqq{\delta_{t}}^{\top}{v_{i}}$ and $g^{(i)}\coloneqq{g}^{\top}{v_{i}}$ , can be written as:
+$\displaystyle\delta_{t+k}^{(i)}=\underbrace{(\chi_{i})^{k}\delta_{t}^{(i)}}_{\text{transient}}+\underbrace{\alpha{\textstyle\frac{1-(\chi_{i})^{k}}{1-\chi_{i}}}g^{(i)}}_{\text{particular solution}}\quad\chi_{i}=\eta-\alpha\beta\lambda_{i}$
+(8)
+Thus, the stability condition of $\delta$ is:
+$\displaystyle\boxed{\alpha\beta\lambda_{\max}<1+\eta}$
+(9)
+Summary of Stability / Oscillation Conditions:
+1.
+$0\leq\alpha\beta\lambda_{\max}\leq\eta$ : stable, non-oscillatory.
+2.
+$\eta<\alpha\beta\lambda_{\max}<1+\eta$ : stable, oscillatory.
+3.
+$\alpha\beta\lambda_{\max}\geq 1+\eta$ : unstable.
+Which characterizes the exact conditions for stability in EMA-PG’s training dynamics under mild assumptions (7).
+Figure 4: Bias-variance tradeoff in Top-k KL estimator: Top- $k$ KL (unbiased) has lower gradient error than sampled KL (unbiased) in all regimes, but only outperforms Truncated KL (biased) beyond a certain critical sample size; we illustrate this bias-variance tradeoff in a synthetic setting (§G). Rule of thumb: when using a small $k$ , apply the tail correction (25) (default); for a large $k$ , consider Truncated KL.
+5 KL Estimators: Which and Why
+5.1 Sequence-level KL or Token-level KL?
+Because LLMs have an autoregressive action space, it is worth discussing whether we should apply sequence-level KL or token-level KL. For a language model, the KL component in (1) can be rewritten as the loss:
+$\displaystyle\widehat{\mathrm{KL}}_{\text{seq}}$
+$\displaystyle\triangleq-\log(\pi_{\theta}(y|x)/\pi_{\text{ref}}(y|x))$
+(10)
+$\displaystyle\nabla_{\theta}L_{\mathrm{KL}}^{\text{seq}}$
+$\displaystyle\triangleq\mathbb{E}_{\pi_{\theta}(y|x)}[-\mathrm{sg}(\widehat{\mathrm{KL}}_{\text{seq}})\nabla_{\theta}\log\pi_{\theta}(y|x)]$
+(11)
+where $\mathrm{sg}(\cdot)$ denotes the stop gradient operator. Note that this is an unbiased sequence-level KL estimator:
+$\displaystyle\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot\mid x)||\pi_{\text{ref}}(\cdot\mid x))=\nabla_{\theta}L_{\mathrm{KL}}^{\text{seq}}(\theta)$
+(12)
+This KL regularizer was used in both for InstructGPT (Ouyang et al., 2022) and WARP (Ramé et al., 2024). It is simple to implement: just adding a scalar sequence logprob difference to the scalar sequence-level reward would suffice. DPO (Rafailov et al., 2023) also uses sequence-level KL.
+In contrast, token-level KL regularization, as popularized by GRPO (Shao et al., 2024; Guo et al., 2025; Liu et al., 2025a), implements the following:
+$\displaystyle\widehat{\mathrm{KL}}_{n}\triangleq{\mathrm{KL}}(\pi_{\theta}(\cdot\mid x,y_{0:n-1})\|\pi_{\text{ref}}(\cdot\mid x,y_{0:n-1}))$
+(13)
+$\displaystyle\nabla_{\theta}L_{\mathrm{KL}}^{\text{token}}\triangleq\mathbb{E}_{\pi_{\theta}(y|x)}\Big[{\sum}_{n=0}^{L-1}\nabla_{\theta}\widehat{\mathrm{KL}}_{n}\Big]$
+(14)
+where the KL estimator is a design choice (See Tab 1). We assume the use of exact KL rather than sampled KL in our analysis of token-level KL. Token-level KL was traditionally seen as a surrogate objective for sequence-level KL; here we analyze their differences. Rewrite sequence-level KL as:
+$\displaystyle\rho_{n}$
+$\displaystyle\triangleq\log(\pi_{\theta}(y_{n}|x,y_{0:n-1})/\pi_{\text{ref}}(y_{n}|x,y_{0:n-1}))$
+$\displaystyle\omega_{n}$
+$\displaystyle\triangleq\nabla_{\theta}\log\pi_{\theta}(y_{n}|x,y_{0:n-1})$
+It can be shown that (§D):
+$\displaystyle\nabla_{\theta}L_{\mathrm{KL}}^{\text{seq}}$
+$\displaystyle=\mathbb{E}_{\pi_{\theta}(y|x)}\Big[\sum_{n}\Big(\sum_{{\color[rgb]{1,0,0}m\geq n}}{\color[rgb]{1,0,0}\rho_{m}}\Big)\,\omega_{n}\Big]$
+(15)
+$\displaystyle\nabla_{\theta}L_{\mathrm{KL}}^{\text{token}}$
+$\displaystyle=\mathbb{E}_{\pi_{\theta}(y|x)}\Big[\sum_{n}\big({\color[rgb]{1,0,0}\rho_{n}}\big)\,\omega_{n}\Big]$
+(16)
+The difference is clear: sequence-level KL punishes each current token for the divergence of all its future tokens until the end of sequence, while token-level KL does not.
+We find that in reasoning and agentic settings, since the sequence lengths of thinking traces are long and the rewards are reliable, sequence-level KL does not help; token-level KL should be used instead. In other words, during RL training for reasoning, KL should be token-wise in the loss, not added to the outcome reward, even though sequence-level KL may seem more “correct” (12) for objective (1).
+5.2 Exact KL or Sampled KL?
+For token-level KL estimation, one can technically implement exact KL, which is unbiased and low-variance, but at the cost of memory. We use following notations:
+$\displaystyle h_{n}\triangleq(x,y_{0:n-1}),\quad\mathbb{E}_{n}[\cdot]\triangleq\mathbb{E}_{y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})}[\cdot]$
+(17)
+In the case of reverse KL, for each token $y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})$ :
+$\displaystyle\mathrm{KL}_{n}\triangleq{\sum}_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\log\dfrac{\pi_{\theta}(j\mid h_{n})}{\pi_{\text{ref}}(j\mid h_{n})}$
+(18)
+Since this is the ground-truth definition of reverse KL, it naturally yields exact values and exact gradients. The problem with exact KL is that it requires storing full logits for every position in each sequence both for current policy $\pi_{\theta}$ and reference policy $\pi_{\text{ref}}$ , costing a memory of $O(|\mathcal{V}|)$ per token. The alternative, which has negligible memory footprint $O(1)$ , is sampled KL. For the $n$ -th position in $y$ , let
+$\displaystyle y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})\quad w_{n}\triangleq\pi_{\text{ref}}(y_{n}\mid h_{n})/\pi_{\theta}(y_{n}\mid h_{n})$
+(19)
+The K1, K2, K3 estimators (Schulman, 2020) are given by:
+$\displaystyle{(\text{K1})_{n}}$
+$\displaystyle\triangleq-\log w_{n}\quad{(\text{K2})_{n}}\triangleq(1/2)(\log w_{n})^{2}$
+$\displaystyle{(\text{K3})_{n}}$
+$\displaystyle\triangleq-\log w_{n}+w_{n}-1$
+None of the existing sampled KL estimators simultaneously gives both unbiased value and unbiased gradient on the token level. Ideally, we would like an KL estimator $\widehat{\mathrm{KL}}_{n}$ to suffice both conditions (with notations from (17)):
+$\displaystyle\mathbb{E}_{n}[\widehat{\mathrm{KL}}_{n}]=\mathrm{KL}_{n}\quad\mathbb{E}_{n}[\nabla_{\theta}\widehat{\mathrm{KL}}_{n}]=\nabla_{\theta}\mathrm{KL}_{n}$
+(20)
+K1 and K3 give the correct values but wrong gradients; K2 give the correct gradients but wrong values (see Tab 1). We show that K1 and K3 can be fixed with a simple trick. Let
+$\displaystyle r_{n}\triangleq\pi_{\theta}(y_{n}\mid h_{n})/\mathrm{sg}(\pi_{\theta}(y_{n}\mid h_{n}))$
+(21)
+where $\mathrm{sg}$ means stop gradient. We construct the following unbiased sampled KL estimators to satisfy (20):
+$\displaystyle{\boxed{({\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}})_{n}\triangleq r_{n}(-\log w_{n}+w_{n}-1)}}$
+(22)
+$\displaystyle{\boxed{({\color[rgb]{0,0.5,1}\textbf{K4}})_{n}\triangleq r_{n}\cdot\mathrm{sg}(-\log w_{n})}}$
+(23)
+Eq (22) is named ${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$ because of its resemblance to the modified K3 in (Liu et al., 2025a), but here we disentangle generic off-policy correction (which can be applied to any sampled KL estimator, not just K3; moreover, importance weights should be applied with $\mathrm{sg}(\cdot)$ on themselves) from an actual change in KL direction:
+•
+${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$ is obtained by multiplying existing K3 by $r_{n}$ in (21). This simple change alone converts the gradient from forward KL to reverse KL.
+•
+K4 is obtained by first doing stop gradient on K1 and then multiplying it by $r_{n}$ in (21). It is simpler, and it is unbiased as well.
+${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$ and K4 satisfy the conditions in (20): they yield both unbiased value and unbiased gradient for reverse KL.
+Figure 5: EMA-PG not only learns faster and but reaches higher asymptotic performance on agentic tasks of Q&A with search engine. Using Topk KL Estimator, forward KL learns slightly faster than reverse KL. Both forward and reverse Top-k KL significantly outperforms GRPO (and GRPO with EMA Anchor). This shows that the combination of EMA Anchor and Top-k KL is highly effective.
+In addition, the success of K3’s forward KL gradients raises the interesting question of whether forward KL is just as effective as reverse KL in regularizing RL training dynamics.
+We propose a forward KL estimator K5, which produces unbiased forward KL values and unbiased forward KL gradients under $\mathbb{E}_{n}[\cdot]$ (17) when sampling from (19):
+$\displaystyle{\boxed{({\color[rgb]{0,0.5,1}\textbf{K5}})_{n}\triangleq\mathrm{sg}(w_{n})\log w_{n}+\log r_{n}}}$
+(24)
+When sampling is off-policy ( $\pi_{\text{sampling}}\neq\pi_{\theta}$ ), any sampled KL estimator $\widehat{\mathrm{KL}}_{n}$ above simply needs to multiply the (stop-gradient) importance weight $\mathrm{sg}({\textstyle\frac{\pi_{\theta}}{\pi_{\text{sampling}}}})$ to remain unbiased. Concretely, when $y_{n}\sim\pi_{\text{sampling}}$ , any previously unbiased $\widehat{\mathrm{KL}}_{n}$ under $y_{n}\sim\pi_{\theta}$ will require an off-policy correction $\mathrm{KL}_{n}=\mathbb{E}_{y_{n}}[s_{n}\widehat{\mathrm{KL}}_{n}]$ with importance weight (IW) $s_{n}$ :
+$\displaystyle y_{n}\sim\pi_{\text{sampling}}(\cdot|h_{n})\quad s_{n}\triangleq\mathrm{sg}(\pi_{\theta}(y_{n}|h_{n})/\pi_{\text{sampling}}(y_{n}|h_{n}))$
+On the other hand, exact KL is always on-policy (but memory-intensive, with $O(|\mathcal{V}|)$ rather than $O(1)$ memory footprint), and thus does not require off-policy correction.
+5.3 Top-k KL Estimator
+We now aim to combine the best of both worlds of exact KL and sampled KL. We start from the observation that for modern LLMs, the probability mass tends to concentrate on a small number of top tokens at each generation step; it was for this reason that top- $k$ sampling (Fan et al., 2018) and nucleus sampling (Holtzman et al., 2019) were effective. The vocabulary size for modern LMs is very large (typically 100k-200k), so most of the logit indices in $\mathcal{V}$ contribute very minimally to the KL value or KL gradients.
+Our key insight is to only partially compute exact KL on the top-k logit indices of the policy under which the expectation is taken (which is current policy for reverse KL, reference policy for forward KL), and then use a partially masked sampled KL to correct for the tail of the distribution, so that we arrive at an unbiased estimator for KL values and gradients, with lower variance than sampled KL.
+First, we consider Reverse KL. Let $q_{n}$ be the set of top- $k$ logit indices from $\pi_{\theta}(\cdot\mid h_{n})$ at sequence position $n$ ,
+$\displaystyle q_{n}$
+$\displaystyle\leftarrow\mathrm{Topk}(\pi_{\theta}(\cdot\mid h_{n}))\qquad q_{n}\subseteq\mathcal{V}\qquad|q_{n}|=k$
+we can rewrite reverse KL by partitioning the vocabulary:
+$\displaystyle\underbrace{\sum_{\color[rgb]{1,0,0}{j\in q_{n}}}{\pi_{\theta}(j|h_{n})\log\dfrac{\pi_{\theta}(j|h_{n})}{\pi_{\text{ref}}(j|h_{n})}}}_{\text{`Truncated' KL: }(\widehat{\mathrm{KL}}_{\text{trun}})_{n}}+\underbrace{\sum_{\color[rgb]{1,0,0}{j\not\in q_{n}}}{\pi_{\theta}(j|h_{n})\log\dfrac{\pi_{\theta}(j|h_{n})}{\pi_{\text{ref}}(j|h_{n})}}}_{\text{`Tail' correction: }(\widehat{\mathrm{KL}}_{\text{tail}})_{n}}$
+The second term can be estimated using sampled KL:
+$\displaystyle(\widehat{\mathrm{KL}}_{\text{tail}})_{n}=\begin{cases}0&\text{if }y_{n}\in q_{n}\\
+({\color[rgb]{0,0.5,1}\textbf{K4}})_{n}&\text{if }y_{n}\notin q_{n}\end{cases}\quad y_{n}\sim\pi_{\theta}(\cdot|h_{n})$
+(25)
+The Top-k reverse KL estimator is an addition of the two:
+$\displaystyle\boxed{({\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Reverse}\mathrm{KL}})_{n}=(\widehat{\mathrm{KL}}_{\text{trun}})_{n}+(\widehat{\mathrm{KL}}_{\text{tail}})_{n}}$
+(26)
+Similarly, we can estimate forward KL by splitting it into a truncated exact KL and a sampled tail term:
+$\displaystyle q_{n}$
+$\displaystyle\leftarrow\mathrm{Topk}(\pi_{\text{ref}}(\cdot\mid h_{n}))$
+$\displaystyle(\widehat{\mathrm{FKL}}_{\text{trun}})_{n}$
+$\displaystyle={\sum}_{j\in q_{n}}{\pi_{\text{ref}}(j\mid h_{n})\log\dfrac{\pi_{\text{ref}}(j\mid h_{n})}{\pi_{\theta}(j\mid h_{n})}}$
+$\displaystyle(\widehat{\mathrm{FKL}}_{\text{tail}})_{n}$
+$\displaystyle=\begin{cases}0&\text{if }y_{n}\in q_{n}\\
+({\color[rgb]{0,0.5,1}\textbf{K5}})_{n}&\text{if }y_{n}\notin q_{n}\end{cases}\quad y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})$
+The Top-k forward KL estimator is therefore:
+$\displaystyle\boxed{({\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Forward}\mathrm{KL}})_{n}=(\widehat{\mathrm{FKL}}_{\text{trun}})_{n}+(\widehat{\mathrm{FKL}}_{\text{tail}})_{n}}$
+(27)
+Top-k KL estimators are unbiased regardless of whether the chosen logit indices are top- $k$ or not.
+Moreover, Top-k KL renders both exact KL and sampled KL as special cases. When $k=|\mathcal{V}|$ , it is exact KL; when $k=0$ , it is sampled KL. Top- $k$ KL allows for flexible interpolation between the two, remains unbiased at any $k$ , and only requires $O(k)$ memory. We generalize our estimator to any ${f}$ -divergence in §H.
+Method
+General QA
+Multi-Hop QA
+NQ
+TriviaQA
+PopQA
+HotpotQA
+2wiki
+Musique
+Bamboogle
+Avg.
+Qwen2.5-3B-Instruct (Prompting)
+CoT (no search) (Wei et al., 2022)
+0.106
+0.288
+0.108
+0.149
+0.244
+0.020
+0.024
+0.134
+Search-o1 (Li et al., 2025)
+0.238
+0.472
+0.262
+0.221
+0.218
+0.054
+0.320
+0.255
+RAG (Lewis et al., 2020)
+0.348
+0.544
+0.387
+0.255
+0.226
+0.047
+0.080
+0.270
+Qwen2.5-7B-Instruct (Prompting)
+RAG
+0.349
+0.585
+0.392
+0.299
+0.235
+0.058
+0.208
+0.304
+Qwen2.5-3B-Base (RL)
+before RL
+0.060
+0.122
+0.076
+0.047
+0.051
+0.009
+0.048
+0.059
+WARP
+0.114
+0.197
+0.116
+0.103
+0.140
+0.014
+0.056
+0.106
+PPO
+0.406
+0.587
+0.435
+0.284
+0.273
+0.049
+0.088
+0.303
+GRPO
+0.421
+0.583
+0.413
+0.297
+0.274
+0.066
+0.128
+0.312
+EMA-PG: w/ EMA Anchor
+0.468
+0.624
+0.445
+0.345
+0.277
+0.084
+0.194
+0.348
+$+$ Topk Forward KL
+0.469
+0.614
+0.443
+0.425
+0.385
+0.146
+0.363
+0.406
+$+$ Topk Reverse KL
+0.479
+0.631
+0.467
+0.441
+0.401
+0.163
+0.331
+0.416
+Improvement over GRPO
+13.8 $\%\uparrow$
+8.2 $\%\uparrow$
+13.1 $\%\uparrow$
+48.5 $\%\uparrow$
+46.3 $\%\uparrow$
+147.0 $\%\uparrow$
+158.6 $\%\uparrow$
+33.3 $\%\uparrow$
+Table 2: EMA-PG excels at agentic RL tasks that require using a search engine inside CoTs to reason about questions.
+6 Experiments
+We evaluate the efficacy of EMA Policy Gradients in reasoning RL and agentic RL. The base algorithm we use is GRPO (Shao et al., 2024) with clip-higher (Yu et al., 2025), a popular default for LLMs. To show that the two techniques we have introduced (EMA anchor and Topk KL) can benefit the base RL algorithm, we focus on the following tasks:
+Math Reasoning.
+We follow the DeepScaleR setting (Luo et al., 2025) and train DeepSeek-R1-Distill-Qwen-1.5B (Guo et al., 2025) on an RL dataset of 40k question-answer pairs that comprise of: AIME problems from 1984-2023, Omni-MATH dataset (Gao et al., 2024), AMC problems prior to 2023, Still datasets (Jiang et al., 2024; Min et al., 2024). We then evaluate on the datasets of: MATH500 (Hendrycks et al., 2021), Minerva (Lewkowycz et al., 2022), AIME 2024 / 2025, and OlympiadBench (He et al., 2024).
+Agentic RL for Search.
+We follow the Search-R1 setting (Jin et al., 2025) and train a Qwen-2.5 3B (Yang et al., 2024) to use the search engine with RL. GRPO being used here applies the RL loss only on CoT and action tokens, not on environment observation tokens that interleave with CoTs. RL uses the combined training sets of Natural Questions (NQ) (Kwiatkowski et al., 2019) and HotpotQA (Yang et al., 2018). After RL, we run the eval on both General QA and Multi-Hop QA. For General QA, we use the test set of NQ, TriviaQA (Joshi et al., 2017), PopQA (Mallen et al., 2023). For Multi-Hop QA, we use the test set of HotpotQA, 2WikiMultiHopQA (2wiki) (Ho et al., 2020b), Musique (Trivedi et al., 2022), and Bamboogle (Press et al., 2023).
+Figure 6: Ablation on $k$ of Top-k (reverse) KL in EMA-PG.
+Effect of EMA anchor
+We empirically demonstrate the benefits of using an EMA target network instead of a fixed anchor for RL on LLMs. Note that using EMA does not require storing an additional set of weights during training, since the anchor (reference) policy weights already need to be stored for standard KL-regularized policy gradients.
+First of all, we empirically find that keeping the KL with a small $\beta>0$ is necessary for preventing training collapse when doing full-finetuning (no LoRA). This is corroborated by with the common practice of still using KL in large-scale RL training runs (Liu et al., 2025a; Kimi et al., 2025a).
+Secondly, we find that in math reasoning, using an EMA anchor ( $\eta<1$ ) improves GRPO across all evaluated datasets, as shown in Tab 3. For instance, using the EMA anchor gives us a boost of 50.8% $\rightarrow$ 53.9% on OlympiadBench. In addition, using an EMA anchor improves not just Pass@1 but Pass@16 as well, as shown in Fig 3; this suggests that target networks can effectively mitigate Pass@N collapse that is common in reasoning RL (Yue et al., 2025).
+Using token-level KL instead of sequence-level KL is crucial for good performance. On agentic search, we compare against WARP (Ramé et al., 2024), which uses sequence-level KL (12) and EMA anchor; we find that WARP performs a lot worse than vanilla GRPO (10.6% vs 31.2%). When using token-level KL + EMA anchor, we see a gain from 31.2% $\rightarrow$ 34.8%. This validates our analysis in §5.1.
+Figure 7: When Top-k KL is used, EMA-PG is robust to various choices of EMA coefficient and KL direction. Here we show that EMA-PG can work well under many choices of KL and EMA $\eta$ (with $k=32$ ). We recommend setting $\eta$ to be in the range of [0.9, 0.95].
+Figure 8: Top-k KL performs best when tail correction and off-policy correction are jointly applied. The truncated KL part is always on-policy, and truncated KL alone already performs well; the tail term can either be dropped, or require off-policy correction (especially for reverse KL). Forward KL is not as sensitive to the absence of off-policy correction as reverse KL.
+Effect of Top-k KL
+We find that the use of Top-k KL can make a substantial difference in RL performance; both Topk Forward KL (Alg 2) and Topk Reverse KL (Alg 1) simultaneously improve sample efficiency and asymptotic performance of RL. It is shown in Fig 5 that, compared to sampled KL, Top-k KL enables the learning process to rapidly take off and avoid premature convergence. This is because Top-k KL works like knowledge distillation, which uses logit-level information to provide dense supervision and lower gradient variance. In terms of the final performance (Tab 2), when used with EMA anchor, Top-k forward KL obtains a 34.8% $\rightarrow$ 40.6% gain compared to K3; Top-k reverse KL performs even better, achieving 41.6%.
+The benefits of Top-k KL only appear when $k>0$ , but to save memory we need to keep $k$ small. In general, the larger the $k$ the better (with the limit being exact KL), but when $k$ is large, the tail correction term ( $\widehat{\mathrm{KL}}_{\text{tail}}$ and $\widehat{\mathrm{FKL}}_{\text{tail}}$ ) does not necessarily help, meaning that truncated KL alone might perform better. We illustrate this bias-variance tradeoff in a synthetic setting in Fig 4. For RL at scale, we empirically validate that increasing $k$ from $0\rightarrow 16\rightarrow 32$ does lead to improved performance (Fig 6). Moreover, Fig 8 shows that, when tail correction and off-policy correction are jointly applied, Top-k KL outperforms truncated KL across datasets. This suggests that in realistic LLM settings, our token-level KL estimator is typically past the critical sample size as illustrated in Fig 4, and we should use unbiased Top-k KL.
+We also study what EMA coefficients are effective when using Top-k KL. In Fig 7, we find that $\eta=0.9$ or $\eta=0.95$ for EMA are safe choices along with $k=32$ for Top-k KL.
+R1-Distill-Qwen-1.5B
+Base
+GRPO
+EMA-PG
+$\Delta$ (Rel)
+MATH500
+0.823
+0.871
+0.884
+$27\%\uparrow$
+AMC 2024
+0.499
+0.656
+0.686
+$19\%\uparrow$
+Minerva
+0.256
+0.304
+0.317
+$27\%\uparrow$
+AIME 2024
+0.306
+0.400
+0.446
+$49\%\uparrow$
+AIME 2025
+0.250
+0.277
+0.298
+$77\%\uparrow$
+OlympiadBench (text)
+0.446
+0.508
+0.539
+$50\%\uparrow$
+Average
+0.430
+0.503
+0.528
+$34\%\uparrow$
+Table 3: Pass@1 comparison across six math reasoning datasets. Relative Improvement $=(\text{EMA-PG}-\text{GRPO})/(\text{GRPO}-\text{Base})$ .
+Other design choices
+We now study two additional design choices in EMA-PG. (1) Firstly, since Fig 8 has found off-policy correction to be important especially for reverse KL, we study the clipping range for the importance weight (IW), which is $[s_{\min},s_{\max}]$ in Alg 1 and 2. Prior literature has mixed views: (Guo et al., 2025) uses no off-policy correction ( $s_{\min}=s_{\max}=1$ ); (Liu et al., 2025a) uses no clipping at all; (Zhang et al., 2025) uses aggressive clipping. Fig 9 finds that forward KL benefits from a tighter clipping range close to $1$ , but reverse KL benefits from more lenient clipping. This observation is consistent with the prevailing common practice that either uses forward KL (K3) without any off-policy correction or uses reverse KL with no clipping on IW. (2) Secondly, we also study whether the advantage normalization strategy inside the RL algorithm makes a difference in the presence of Top-k KL. The two choices are either group-wise normalization as done in GRPO or global advantage normalization (Hu et al., 2025) as done in the original PPO. We find that either choice did not make a noticeable difference to EMA-PG performance.
+7 Conclusion
+In this work, we introduced two simple changes to policy gradients on LLMs: EMA anchor, which changes what KL is regularizing against, and Top-k KL, which changes how KL gradients are computed. We showed that the two changes are highly effective. Future work includes further investigation into Top-k $f$ -divergence estimators (§H.2) beyond just KL, the application of Top-k KL to both offline and on-policy knowledge distillation of LLMs, and the application of our sampled KL (and more broadly, $f$ -divergence) estimators to the policy gradient operator itself (§J– §K).
+Acknowledgments
+LZ was supported by the Schwartz Reisman Institute for Technology and Society at the University of Toronto through a Schwartz Reisman Fellowship.
+References
+Abdolmaleki et al. (2018)
+A. Abdolmaleki, J. T. Springenberg, Y. Tassa, R. Munos, N. Heess, and M. Riedmiller
+Maximum a posteriori policy optimisation.
+arXiv preprint arXiv:1806.06920.
+Cited by: §J.3,
+Appendix I.
+Agarwal et al. (2024)
+R. Agarwal, N. Vieillard, Y. Zhou, P. Stanczyk, S. R. Garea, M. Geist, and O. Bachem
+On-policy distillation of language models: learning from self-generated mistakes.
+In The twelfth international conference on learning representations,
+Cited by: §2.
+Bai et al. (2022a)
+Y. Bai, A. Jones, K. Ndousse, A. Askell, A. Chen, N. DasSarma, D. Drain, S. Fort, D. Ganguli, T. Henighan, et al.
+Training a helpful and harmless assistant with reinforcement learning from human feedback.
+arXiv preprint arXiv:2204.05862.
+Cited by: §1,
+§2.
+Bai et al. (2022b)
+Y. Bai, S. Kadavath, S. Kundu, A. Askell, J. Kernion, A. Jones, A. Chen, A. Goldie, A. Mirhoseini, C. McKinnon, et al.
+Constitutional ai: harmlessness from ai feedback.
+arXiv preprint arXiv:2212.08073.
+Cited by: §1.
+Busbridge et al. (2023)
+D. Busbridge, J. Ramapuram, P. Ablin, T. Likhomanenko, E. G. Dhekane, X. Suau Cuadros, and R. Webb
+How to scale your ema.
+Advances in Neural Information Processing Systems 36, pp. 73122–73174.
+Cited by: §2.
+Chen et al. (2025)
+A. Chen, A. Li, B. Gong, B. Jiang, B. Fei, B. Yang, B. Shan, C. Yu, C. Wang, C. Zhu, et al.
+MiniMax-m1: scaling test-time compute efficiently with lightning attention.
+arXiv preprint arXiv:2506.13585.
+Cited by: 1st item,
+§1,
+§2.
+Christiano et al. (2017)
+P. F. Christiano, J. Leike, T. Brown, M. Martic, S. Legg, and D. Amodei
+Deep reinforcement learning from human preferences.
+Advances in neural information processing systems 30.
+Cited by: §1.
+Comanici et al. (2025)
+G. Comanici, E. Bieber, M. Schaekermann, I. Pasupat, N. Sachdeva, I. Dhillon, M. Blistein, O. Ram, D. Zhang, E. Rosen, et al.
+Gemini 2.5: pushing the frontier with advanced reasoning, multimodality, long context, and next generation agentic capabilities.
+arXiv preprint arXiv:2507.06261.
+Cited by: §2.
+Fan et al. (2018)
+A. Fan, M. Lewis, and Y. Dauphin
+Hierarchical neural story generation.
+arXiv preprint arXiv:1805.04833.
+Cited by: §5.3.
+Frankle et al. (2020)
+J. Frankle, G. K. Dziugaite, D. Roy, and M. Carbin
+Linear mode connectivity and the lottery ticket hypothesis.
+In International Conference on Machine Learning,
+pp. 3259–3269.
+Cited by: §2.
+Gao et al. (2024)
+B. Gao, F. Song, Z. Yang, Z. Cai, Y. Miao, Q. Dong, L. Li, C. Ma, L. Chen, R. Xu, et al.
+Omni-math: a universal olympiad level mathematic benchmark for large language models.
+arXiv preprint arXiv:2410.07985.
+Cited by: §6.
+Gao et al. (2023)
+L. Gao, J. Schulman, and J. Hilton
+Scaling laws for reward model overoptimization.
+In International Conference on Machine Learning,
+pp. 10835–10866.
+Cited by: §1.
+Ghasemipour et al. (2020)
+S. K. S. Ghasemipour, R. Zemel, and S. Gu
+A divergence minimization perspective on imitation learning methods.
+In Conference on robot learning,
+pp. 1259–1277.
+Cited by: Appendix K.
+Goodfellow et al. (2014)
+I. J. Goodfellow, O. Vinyals, and A. M. Saxe
+Qualitatively characterizing neural network optimization problems.
+arXiv preprint arXiv:1412.6544.
+Cited by: §2.
+Goodfellow et al. (2020)
+I. Goodfellow, J. Pouget-Abadie, M. Mirza, B. Xu, D. Warde-Farley, S. Ozair, A. Courville, and Y. Bengio
+Generative adversarial networks.
+Communications of the ACM 63 (11), pp. 139–144.
+Cited by: Appendix K.
+Gorbatovski et al. (2024)
+A. Gorbatovski, B. Shaposhnikov, A. Malakhov, N. Surnachev, Y. Aksenov, I. Maksimov, N. Balagansky, and D. Gavrilov
+Learn your reference model for real good alignment.
+arXiv preprint arXiv:2404.09656.
+Cited by: §1,
+§2.
+Grill et al. (2020a)
+J. Grill, F. Altché, Y. Tang, T. Hubert, M. Valko, I. Antonoglou, and R. Munos
+Monte-carlo tree search as regularized policy optimization.
+In International Conference on Machine Learning,
+pp. 3769–3778.
+Cited by: Appendix I.
+Grill et al. (2020b)
+J. Grill, F. Strub, F. Altché, C. Tallec, P. Richemond, E. Buchatskaya, C. Doersch, B. Avila Pires, Z. Guo, M. Gheshlaghi Azar, et al.
+Bootstrap your own latent-a new approach to self-supervised learning.
+Advances in neural information processing systems 33, pp. 21271–21284.
+Cited by: §1,
+§2.
+Guo et al. (2025)
+D. Guo, D. Yang, H. Zhang, J. Song, R. Zhang, R. Xu, Q. Zhu, S. Ma, P. Wang, X. Bi, et al.
+Deepseek-r1: incentivizing reasoning capability in llms via reinforcement learning.
+arXiv preprint arXiv:2501.12948.
+Cited by: Table 4,
+Table 4,
+§1,
+§2,
+§2,
+Figure 3,
+Figure 3,
+§5.1,
+§6,
+§6.
+Haarnoja et al. (2018)
+T. Haarnoja, A. Zhou, P. Abbeel, and S. Levine
+Soft actor-critic: off-policy maximum entropy deep reinforcement learning with a stochastic actor.
+In International conference on machine learning,
+pp. 1861–1870.
+Cited by: Appendix J,
+§2.
+He et al. (2024)
+C. He, R. Luo, Y. Bai, S. Hu, Z. Thai, J. Shen, J. Hu, X. Han, Y. Huang, Y. Zhang, et al.
+Olympiadbench: a challenging benchmark for promoting agi with olympiad-level bilingual multimodal scientific problems.
+In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+pp. 3828–3850.
+Cited by: §1,
+§6.
+He et al. (2020)
+K. He, H. Fan, Y. Wu, S. Xie, and R. Girshick
+Momentum contrast for unsupervised visual representation learning.
+In Proceedings of the IEEE/CVF conference on computer vision and pattern recognition,
+pp. 9729–9738.
+Cited by: §2.
+Hendrycks et al. (2021)
+D. Hendrycks, C. Burns, S. Kadavath, A. Arora, S. Basart, E. Tang, D. Song, and J. Steinhardt
+Measuring mathematical problem solving with the math dataset.
+arXiv preprint arXiv:2103.03874.
+Cited by: §6.
+Hinton et al. (2015)
+G. Hinton, O. Vinyals, and J. Dean
+Distilling the knowledge in a neural network.
+arXiv preprint arXiv:1503.02531.
+Cited by: §1,
+§2.
+Ho and Ermon (2016)
+J. Ho and S. Ermon
+Generative adversarial imitation learning.
+Advances in neural information processing systems 29.
+Cited by: Appendix K.
+Ho et al. (2020a)
+J. Ho, A. Jain, and P. Abbeel
+Denoising diffusion probabilistic models.
+Advances in neural information processing systems 33, pp. 6840–6851.
+Cited by: §2.
+Ho et al. (2020b)
+X. Ho, A. D. Nguyen, S. Sugawara, and A. Aizawa
+Constructing a multi-hop qa dataset for comprehensive evaluation of reasoning steps.
+arXiv preprint arXiv:2011.01060.
+Cited by: §1,
+§6.
+Holtzman et al. (2019)
+A. Holtzman, J. Buys, L. Du, M. Forbes, and Y. Choi
+The curious case of neural text degeneration.
+arXiv preprint arXiv:1904.09751.
+Cited by: §5.3.
+Hu et al. (2022)
+E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, W. Chen, et al.
+Lora: low-rank adaptation of large language models..
+ICLR 1 (2), pp. 3.
+Cited by: 2nd item.
+Hu et al. (2025)
+J. Hu, J. K. Liu, and W. Shen
+Reinforce++: an efficient rlhf algorithm with robustness to both prompt and reward models.
+arXiv preprint arXiv:2501.03262.
+Cited by: Appendix B,
+§6.
+Jaech et al. (2024)
+A. Jaech, A. Kalai, A. Lerer, A. Richardson, A. El-Kishky, A. Low, A. Helyar, A. Madry, A. Beutel, A. Carney, et al.
+Openai o1 system card.
+arXiv preprint arXiv:2412.16720.
+Cited by: §1,
+§2.
+Jiang et al. (2024)
+J. Jiang, Z. Chen, Y. Min, J. Chen, X. Cheng, J. Wang, Y. Tang, H. Sun, J. Deng, W. X. Zhao, Z. Liu, D. Yan, J. Xie, Z. Wang, and J. Wen
+Enhancing llm reasoning with reward-guided tree search.
+arXiv preprint arXiv:2411.11694.
+Cited by: §6.
+Jin et al. (2025)
+B. Jin, H. Zeng, Z. Yue, J. Yoon, S. Arik, D. Wang, H. Zamani, and J. Han
+Search-r1: training llms to reason and leverage search engines with reinforcement learning.
+arXiv preprint arXiv:2503.09516.
+Cited by: §6.
+Joshi et al. (2017)
+M. Joshi, E. Choi, D. S. Weld, and L. Zettlemoyer
+Triviaqa: a large scale distantly supervised challenge dataset for reading comprehension.
+arXiv preprint arXiv:1705.03551.
+Cited by: §6.
+Ke et al. (2020)
+L. Ke, S. Choudhury, M. Barnes, W. Sun, G. Lee, and S. Srinivasa
+Imitation learning as f-divergence minimization.
+In International workshop on the algorithmic foundations of robotics,
+pp. 313–329.
+Cited by: Appendix K.
+Khatri et al. (2025)
+D. Khatri, L. Madaan, R. Tiwari, R. Bansal, S. S. Duvvuri, M. Zaheer, I. S. Dhillon, D. Brandfonbrener, and R. Agarwal
+The art of scaling reinforcement learning compute for llms.
+arXiv preprint arXiv:2510.13786.
+Cited by: §2.
+Kim and Rush (2016)
+Y. Kim and A. M. Rush
+Sequence-level knowledge distillation.
+In Proceedings of the 2016 conference on empirical methods in natural language processing,
+pp. 1317–1327.
+Cited by: §2.
+Kimi et al. (2025a)
+Kimi, Y. Bai, Y. Bao, G. Chen, J. Chen, N. Chen, R. Chen, Y. Chen, Y. Chen, Y. Chen, et al.
+Kimi k2: open agentic intelligence.
+arXiv preprint arXiv:2507.20534.
+Cited by: §2,
+§6.
+Kimi et al. (2025b)
+Kimi, A. Du, B. Gao, B. Xing, C. Jiang, C. Chen, C. Li, C. Xiao, C. Du, C. Liao, et al.
+Kimi k1. 5: scaling reinforcement learning with llms.
+arXiv preprint arXiv:2501.12599.
+Cited by: §J.2.
+Kingma (2014)
+D. P. Kingma
+Adam: a method for stochastic optimization.
+arXiv preprint arXiv:1412.6980.
+Cited by: 2nd item.
+Kwiatkowski et al. (2019)
+T. Kwiatkowski, J. Palomaki, O. Redfield, M. Collins, A. Parikh, C. Alberti, D. Epstein, I. Polosukhin, J. Devlin, K. Lee, et al.
+Natural questions: a benchmark for question answering research.
+Transactions of the Association for Computational Linguistics 7, pp. 453–466.
+Cited by: §6.
+Lewis et al. (2020)
+P. Lewis, E. Perez, A. Piktus, F. Petroni, V. Karpukhin, N. Goyal, H. Küttler, M. Lewis, W. Yih, T. Rocktäschel, et al.
+Retrieval-augmented generation for knowledge-intensive nlp tasks.
+Advances in neural information processing systems 33, pp. 9459–9474.
+Cited by: Table 2.
+Lewkowycz et al. (2022)
+A. Lewkowycz, A. Andreassen, D. Dohan, E. Dyer, H. Michalewski, V. Ramasesh, A. Slone, C. Anil, I. Schlag, T. Gutman-Solo, et al.
+Solving quantitative reasoning problems with language models.
+Advances in neural information processing systems 35, pp. 3843–3857.
+Cited by: §6.
+Li et al. (2025)
+X. Li, G. Dong, J. Jin, Y. Zhang, Y. Zhou, Y. Zhu, P. Zhang, and Z. Dou
+Search-o1: agentic search-enhanced large reasoning models.
+arXiv preprint arXiv:2501.05366.
+Cited by: Table 2.
+Lillicrap et al. (2015)
+T. P. Lillicrap, J. J. Hunt, A. Pritzel, N. Heess, T. Erez, Y. Tassa, D. Silver, and D. Wierstra
+Continuous control with deep reinforcement learning.
+arXiv preprint arXiv:1509.02971.
+Cited by: §2.
+Liu et al. (2025a)
+A. Liu, A. Mei, B. Lin, B. Xue, B. Wang, B. Xu, B. Wu, B. Zhang, C. Lin, C. Dong, et al.
+Deepseek-v3. 2: pushing the frontier of open large language models.
+arXiv preprint arXiv:2512.02556.
+Cited by: 1st item,
+§1,
+§5.1,
+§5.2,
+§6,
+§6.
+Liu et al. (2025b)
+Z. Liu, C. Chen, W. Li, P. Qi, T. Pang, C. Du, W. S. Lee, and M. Lin
+Understanding r1-zero-like training: a critical perspective.
+arXiv preprint arXiv:2503.20783.
+Cited by: §2.
+Loshchilov and Hutter (2017)
+I. Loshchilov and F. Hutter
+Decoupled weight decay regularization.
+arXiv preprint arXiv:1711.05101.
+Cited by: 2nd item.
+Lucas et al. (2021)
+J. Lucas, J. Bae, M. R. Zhang, S. Fort, R. Zemel, and R. Grosse
+Analyzing monotonic linear interpolation in neural network loss landscapes.
+arXiv preprint arXiv:2104.11044 1.
+Cited by: §2.
+Luo et al. (2025)
+M. Luo, S. Tan, J. Wong, X. Shi, W. Y. Tang, M. Roongta, C. Cai, J. Luo, T. Zhang, L. E. Li, et al.
+Deepscaler: surpassing o1-preview with a 1.5 b model by scaling rl.
+Notion Blog.
+Cited by: §6.
+Mallen et al. (2023)
+A. Mallen, A. Asai, V. Zhong, R. Das, D. Khashabi, and H. Hajishirzi
+When not to trust language models: investigating effectiveness of parametric and non-parametric memories.
+In Proceedings of the 61st Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers),
+pp. 9802–9822.
+Cited by: §6.
+Min et al. (2024)
+Y. Min, Z. Chen, J. Jiang, J. Chen, J. Deng, Y. Hu, Y. Tang, J. Wang, X. Cheng, H. Song, W. X. Zhao, Z. Liu, Z. Wang, and J. Wen
+Imitate, explore, and self-improve: a reproduction report on slow-thinking reasoning systems.
+arXiv preprint arXiv:2412.09413.
+Cited by: §6.
+Mnih et al. (2015)
+V. Mnih, K. Kavukcuoglu, D. Silver, A. A. Rusu, J. Veness, M. G. Bellemare, A. Graves, M. Riedmiller, A. K. Fidjeland, G. Ostrovski, et al.
+Human-level control through deep reinforcement learning.
+nature 518 (7540), pp. 529–533.
+Cited by: §1,
+§2.
+Nichol et al. (2018)
+A. Nichol, J. Achiam, and J. Schulman
+On first-order meta-learning algorithms.
+arXiv preprint arXiv:1803.02999.
+Cited by: §2.
+Noukhovitch et al. (2023)
+M. Noukhovitch, S. Lavoie, F. Strub, and A. C. Courville
+Language model alignment with elastic reset.
+Advances in Neural Information Processing Systems 36, pp. 3439–3461.
+Cited by: §2.
+Nowozin et al. (2016)
+S. Nowozin, B. Cseke, and R. Tomioka
+F-gan: training generative neural samplers using variational divergence minimization.
+Advances in neural information processing systems 29.
+Cited by: Appendix K.
+Ouyang et al. (2022)
+L. Ouyang, J. Wu, X. Jiang, D. Almeida, C. Wainwright, P. Mishkin, C. Zhang, S. Agarwal, K. Slama, A. Ray, et al.
+Training language models to follow instructions with human feedback.
+Advances in neural information processing systems 35, pp. 27730–27744.
+Cited by: §1,
+§1,
+§2,
+§5.1.
+Peters et al. (2010)
+J. Peters, K. Mulling, and Y. Altun
+Relative entropy policy search.
+In Proceedings of the AAAI Conference on Artificial Intelligence,
+Vol. 24, pp. 1607–1612.
+Cited by: Appendix I.
+Peters and Schaal (2007)
+J. Peters and S. Schaal
+Reinforcement learning by reward-weighted regression for operational space control.
+In Proceedings of the 24th international conference on Machine learning,
+pp. 745–750.
+Cited by: §J.3,
+Appendix J.
+Piché et al. (2025)
+A. Piché, E. Kamalloo, R. Pardinas, X. Chen, and D. Bahdanau
+Pipelinerl: faster on-policy reinforcement learning for long sequence generation.
+arXiv preprint arXiv:2509.19128.
+Cited by: §2.
+Press et al. (2023)
+O. Press, M. Zhang, S. Min, L. Schmidt, N. A. Smith, and M. Lewis
+Measuring and narrowing the compositionality gap in language models.
+In Findings of the Association for Computational Linguistics: EMNLP 2023,
+pp. 5687–5711.
+Cited by: §1,
+§6.
+Rafailov et al. (2023)
+R. Rafailov, A. Sharma, E. Mitchell, C. D. Manning, S. Ermon, and C. Finn
+Direct preference optimization: your language model is secretly a reward model.
+Advances in neural information processing systems 36, pp. 53728–53741.
+Cited by: Appendix K,
+§5.1.
+Ramé et al. (2024)
+A. Ramé, J. Ferret, N. Vieillard, R. Dadashi, L. Hussenot, P. Cedoz, P. G. Sessa, S. Girgin, A. Douillard, and O. Bachem
+Warp: on the benefits of weight averaged rewarded policies.
+arXiv preprint arXiv:2406.16768.
+Cited by: §1,
+§2,
+§5.1,
+§6.
+Schulman et al. (2017a)
+J. Schulman, X. Chen, and P. Abbeel
+Equivalence between policy gradients and soft q-learning.
+arXiv preprint arXiv:1704.06440.
+Cited by: Appendix J,
+Appendix K,
+Appendix I.
+Schulman et al. (2015)
+J. Schulman, S. Levine, P. Abbeel, M. Jordan, and P. Moritz
+Trust region policy optimization.
+In International conference on machine learning,
+pp. 1889–1897.
+Cited by: §1.
+Schulman et al. (2017b)
+J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov
+Proximal policy optimization algorithms.
+arXiv preprint arXiv:1707.06347.
+Cited by: 1st item,
+§J.1,
+Appendix B,
+§1.
+Schulman (2020)
+J. Schulman
+Approximating kl divergence.
+John Schulman’s Homepage.
+Cited by: §2,
+§5.2.
+Shah et al. (2025)
+V. Shah, J. Obando-Ceron, V. Jain, B. Bartoldson, B. Kailkhura, S. Mittal, G. Berseth, P. S. Castro, Y. Bengio, N. Malkin, et al.
+A comedy of estimators: on kl regularization in rl training of llms.
+arXiv preprint arXiv:2512.21852.
+Cited by: §2.
+Shao et al. (2024)
+Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi, H. Zhang, M. Zhang, Y. Li, Y. Wu, et al.
+Deepseekmath: pushing the limits of mathematical reasoning in open language models.
+arXiv preprint arXiv:2402.03300.
+Cited by: 1st item,
+§J.1,
+§1,
+§1,
+§2,
+§5.1,
+§6.
+Sutton et al. (1999)
+R. S. Sutton, D. McAllester, S. Singh, and Y. Mansour
+Policy gradient methods for reinforcement learning with function approximation.
+Advances in neural information processing systems 12.
+Cited by: §1.
+Tang and Munos (2025)
+Y. Tang and R. Munos
+On a few pitfalls in kl divergence gradient estimation for rl.
+arXiv preprint arXiv:2506.09477.
+Cited by: §1,
+§2.
+Trivedi et al. (2022)
+H. Trivedi, N. Balasubramanian, T. Khot, and A. Sabharwal
+MuSiQue: multihop questions via single-hop question composition.
+Transactions of the Association for Computational Linguistics 10, pp. 539–554.
+Cited by: §6.
+Wang et al. (2023)
+C. Wang, Y. Jiang, C. Yang, H. Liu, and Y. Chen
+Beyond reverse kl: generalizing direct preference optimization with diverse divergence constraints.
+arXiv preprint arXiv:2309.16240.
+Cited by: Appendix K,
+§I.2.
+Wang et al. (2020)
+Y. Wang, H. He, and X. Tan
+Truly proximal policy optimization.
+In Uncertainty in artificial intelligence,
+pp. 113–122.
+Cited by: 1st item.
+Wei et al. (2022)
+J. Wei, X. Wang, D. Schuurmans, M. Bosma, F. Xia, E. Chi, Q. V. Le, D. Zhou, et al.
+Chain-of-thought prompting elicits reasoning in large language models.
+Advances in neural information processing systems 35, pp. 24824–24837.
+Cited by: Table 2.
+Williams (1992)
+R. J. Williams
+Simple statistical gradient-following algorithms for connectionist reinforcement learning.
+Machine learning 8 (3), pp. 229–256.
+Cited by: §1.
+Yang et al. (2024)
+A. Yang, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Li, D. Liu, F. Huang, H. Wei, et al.
+Qwen2.5 technical report.
+arXiv preprint arXiv:2412.15115.
+Cited by: §6.
+Yang et al. (2018)
+Z. Yang, P. Qi, S. Zhang, Y. Bengio, W. Cohen, R. Salakhutdinov, and C. D. Manning
+HotpotQA: a dataset for diverse, explainable multi-hop question answering.
+In Proceedings of the 2018 conference on empirical methods in natural language processing,
+pp. 2369–2380.
+Cited by: §1,
+§6.
+Yu et al. (2025)
+Q. Yu, Z. Zhang, R. Zhu, Y. Yuan, X. Zuo, Y. Yue, W. Dai, T. Fan, G. Liu, L. Liu, et al.
+Dapo: an open-source llm reinforcement learning system at scale.
+arXiv preprint arXiv:2503.14476.
+Cited by: 1st item,
+§2,
+§6.
+Yue et al. (2025)
+Y. Yue, Z. Chen, R. Lu, A. Zhao, Z. Wang, S. Song, and G. Huang
+Does reinforcement learning really incentivize reasoning capacity in llms beyond the base model?.
+arXiv preprint arXiv:2504.13837.
+Cited by: §6.
+Zhang et al. (2021)
+L. Zhang, G. Yang, and B. C. Stadie
+World model as a graph: learning latent landmarks for planning.
+In International conference on machine learning,
+pp. 12611–12620.
+Cited by: 4th item.
+Zhang et al. (2019)
+M. Zhang, J. Lucas, J. Ba, and G. E. Hinton
+Lookahead optimizer: k steps forward, 1 step back.
+Advances in neural information processing systems 32.
+Cited by: §2.
+Zhang et al. (2025)
+Y. Zhang, Y. Liu, H. Yuan, Y. Yuan, Q. Gu, and A. C. Yao
+On the design of kl-regularized policy gradient algorithms for llm reasoning.
+arXiv preprint arXiv:2505.17508.
+Cited by: §2,
+§6.
+Zheng et al. (2025)
+C. Zheng, S. Liu, M. Li, X. Chen, B. Yu, C. Gao, K. Dang, Y. Liu, R. Men, A. Yang, et al.
+Group sequence policy optimization.
+arXiv preprint arXiv:2507.18071.
+Cited by: 1st item,
+§2.
+Zhou et al. (2024)
+Y. Zhou, K. Lyu, A. S. Rawat, A. K. Menon, A. Rostamizadeh, S. Kumar, J. Kagy, and R. Agarwal
+Distillspec: improving speculative decoding via knowledge distillation.
+In The Twelfth International Conference on Learning Representations,
+Cited by: §2.
+Zhu et al. (2023)
+B. Zhu, H. Sharma, F. V. Frujeri, S. Dong, C. Zhu, M. I. Jordan, and J. Jiao
+Fine-tuning language models with advantage-induced policy alignment.
+arXiv preprint arXiv:2306.02231.
+Cited by: §J.2.
+Ziebart et al. (2008)
+B. D. Ziebart, A. L. Maas, J. A. Bagnell, A. K. Dey, et al.
+Maximum entropy inverse reinforcement learning.
+In Aaai,
+Vol. 8, pp. 1433–1438.
+Cited by: Appendix K.
+Appendix Contents
+•
+A Algorithm Box for EMA Policy Gradient
+A
+•
+B Additional Experimental Results
+B
+•
+C Derivations for EMA Policy Gradient Dynamics
+–
+C.1 Policy gradient dynamics under local quadratic KL approximation
+.C.1
+–
+C.2 Quasi-steady state analysis over a $k$ -step window (Proof of Lemma 4.1)
+.C.2
+–
+C.3 Eigen-decomposition of Fisher and mode-wise dynamics (Proof of Lemma 4.2)
+.C.3
+–
+C.4 Stability and oscillations
+.C.4
+–
+C.5 Steady-state lag and bounds
+.C.5
+•
+D Sequence-level KL vs. Token-level KL
+–
+D.1 Sequence-level KL gradients
+.D.1
+–
+D.2 Analysis of sequence-level KL gradients
+.D.2
+–
+D.3 Token-level KL gradients
+.D.3
+•
+E Derivation of Sampled Reverse KL Estimators
+–
+E.1 Sampled KL estimators (K1 / K2 / K3) and their expected values
+.E.1
+–
+E.2 Gradients of K1 / K2 / K3 under autodiff $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$
+.E.2
+–
+E.3 The $\boldsymbol{r}$ -trick restores $\nabla_{\theta}\mathbb{E}_{p}[\cdot]$ from $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ .
+.E.3
+–
+E.4 ${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$ yields unbiased reverse-KL values and gradients
+.E.4
+–
+E.5 K4 yields unbiased reverse-KL values and gradients
+.E.5
+•
+F Derivation of Sampled Forward KL Estimators
+–
+F.1 Forward KL and its gradient
+.F.1
+–
+F.2 K5 yields unbiased forward KL values
+.F.2
+–
+F.3 K5 yields unbiased forward KL gradients
+.F.3
+–
+F.4 Variance reduction in K5 gradients
+.F.4
+•
+G Bias-Variance Tradeoff in Top-k KL: An Illustrative Synthetic Setup
+G
+•
+H Top-k $\boldsymbol{f}$ -Divergence Estimator
+–
+H.1 $f$ -divergence and its gradients
+.H.1
+–
+H.2 A generic, unbiased, sampled $f$ -divergence estimator
+.H.2
+–
+H.3 Top-k $f$ -divergence estimator: A generalization of Top-k KL estimator
+.H.3
+•
+I Optimal Policies under Forward vs Reverse KL Regularization
+–
+I.1 Reward transformation for equivalent optima between Forward KL and Reverse KL
+.I.1
+–
+I.2 Reward transformation for equivalent optima across $f$ -divergences
+.I.2
+•
+J Policy Gradient Methods can be Derived from Sampled KL Estimators
+–
+J.1 K1 estimator leads to on-policy PPO / GRPO loss
+.J.1
+–
+J.2 K2 estimator leads to APA / Kimi loss
+.J.2
+–
+J.3 K5 estimator leads to RWR / MPO loss
+.J.3
+–
+J.4 K3 / K3++ / K4 estimators lead to combined losses
+.J.4
+•
+K Policy Gradient as $\boldsymbol{f}$ -Divergence Minimization
+K
+Appendix A Algorithm Box for EMA Policy Gradient
+Algorithm 3 EMA Policy Gradient with $\mathrm{TopkKL}$
+0:
+Prompt set $\mathcal{D}(x)$ , LLM $\pi_{\theta}(y|x)$ , reward $R(x,y)$ .
+0:
+Anchor policy $\pi_{\theta_{\text{ema}}}(y|x)$ .
+1:
+$\theta_{\text{ema}}\leftarrow\theta$
+2:
+for iteration $t=1,2,\dots$ do
+3:
+Sample task prompt ${x}\sim\mathcal{D}$
+4:
+$\theta_{\text{old}}\leftarrow\theta$ for sampling
+5:
+Sample ${y}\sim\pi_{\theta_{\text{old}}}(\cdot\mid{x})$ ; let $L$ be the length of $y$
+6:
+Compute $\log\pi_{\theta_{\text{old}}}({y}_{n}\mid{x},y_{0:n-1})$ and $\log\pi_{\text{ref}}({y}_{n}\mid{x},y_{0:n-1})$ for $n=0,\dots,L-1$
+7:
+if using reverse KL then
+8:
+Compute $[q_{0},\dots,q_{L-1}]$ , where $q_{n}$ is the top- $k$ logit indices from $\pi_{\theta_{\text{old}}}(\cdot\mid x,y_{0:n-1})$ {In reverse KL, the expectation is taken under $\pi_{\theta}$ }
+9:
+else
+10:
+Compute $[q_{0},\dots,q_{L-1}]$ , where $q_{n}$ is the top- $k$ logit indices from $\pi_{{\color[rgb]{1,0,1}\theta_{\text{ema}}}}(\cdot\mid x,y_{0:n-1})$ {In forward KL, the expectation is taken under $\pi_{{\color[rgb]{1,0,1}\theta_{\text{ema}}}}$ }
+11:
+end if
+12:
+Use $R({x},{y})$ to compute advantage function ${{A}}$
+13:
+for $\upsilon=1,\dots,\Lambda$ do
+14:
+Compute $\log\pi_{\theta}({y}_{n}\mid{x},y_{0:n-1})$ for $n=0,\dots,L-1$
+15:
+Let ${s}_{n}=\mathrm{sg}(\pi_{\theta}(y_{n}\mid x,y_{0:n-1})/\pi_{\theta_{\text{old}}}(y_{n}\mid x,y_{0:n-1}))$
+16:
+$\mathcal{J}({\theta})=\sum_{n=0}^{L-1}s_{n}\,A\,\log\pi_{\theta}(y_{n}\mid x,y_{0:n-1})$ , clip $\mathcal{J}({\theta})$ in PPO-style
+17:
+if using reverse KL then
+18:
+$\widehat{\mathrm{KL}}={\textstyle\sum}_{n=0}^{L-1}{\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Reverse}\mathrm{KL}}(\pi_{\theta}(\cdot|x,y_{0:n-1}),\pi_{\color[rgb]{1,0,1}\theta_{\text{ema}}}(\cdot|x,y_{0:n-1}),\pi_{\text{old}}(\cdot|x,y_{0:n-1}),y_{n},q_{n})$
+19:
+else
+20:
+$\widehat{\mathrm{KL}}={\textstyle\sum}_{n=0}^{L-1}{\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Forward}\mathrm{KL}}(\pi_{\theta}(\cdot|x,y_{0:n-1}),\pi_{\color[rgb]{1,0,1}\theta_{\text{ema}}}(\cdot|x,y_{0:n-1}),\pi_{\text{old}}(\cdot|x,y_{0:n-1}),y_{n},q_{n})$
+21:
+end if
+22:
+$L(\theta)=-\mathcal{J}(\theta)+\beta\,\widehat{\mathrm{KL}}$
+23:
+$\theta\leftarrow\theta-\alpha\,\nabla_{\theta}L(\theta)$
+24:
+end for
+25:
+if $t\text{ mod }T_{\text{ema}}=0$ then
+26:
+$\theta_{\text{ema}}\leftarrow\eta\,\theta_{\text{ema}}+(1-\eta)\,\theta$
+27:
+end if
+28:
+end for
+The changes required to modify any policy gradient method into EMA-PG (with EMA anchor and Top-k KL) are highlighted above.
+Details of Top-k KL:
+For completeness, we write down the full expression of Top-k KL terms. Using common notations:
+$\displaystyle y\sim\pi_{\text{old}}(\cdot\mid x)\quad h_{n}=(x,y_{0:n-1})\quad s_{n}=\mathrm{sg}\bigg({\frac{\pi_{\theta}(y_{n}\mid h_{n})}{\pi_{\theta_{\text{old}}}(y_{n}\mid h_{n})}}\bigg)\quad{s}_{n}^{\text{clip}}=\mathrm{clip}(s_{n},s_{\min},s_{\max})$
+The Top-k Reverse KL can be written as:
+$\displaystyle q_{n}\leftarrow\mathrm{Topk}(\pi_{\theta_{\text{old}}}(\cdot\mid h_{n}))\qquad(\widehat{\mathrm{KL}}_{\text{sampled}})_{n}=\dfrac{\pi_{\theta}(y_{n}\mid h_{n})}{\mathrm{sg}(\pi_{\theta}(y_{n}\mid h_{n}))}\,\mathrm{sg}\bigg(\log\dfrac{\pi_{\text{ref}}(y_{n}\mid h_{n})}{\pi_{\theta}(y_{n}\mid h_{n})}\bigg)$
+$\displaystyle({\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Reverse}\mathrm{KL}})_{n}=\sum_{\color[rgb]{1,0,0}{j\in q_{n}}}{\pi_{\theta}(j\mid h_{n})\log\dfrac{\pi_{\theta}(j\mid h_{n})}{\pi_{\text{ref}}(j\mid h_{n})}}+\mathbbm{1}(y_{n}\not\in q_{n})\cdot{s}_{n}^{\text{clip}}\cdot(\widehat{\mathrm{KL}}_{\text{sampled}})_{n}$
+And the Top-k Forward KL can be written as:
+$\displaystyle q_{n}\leftarrow\mathrm{Topk}(\pi_{\text{ref}}(\cdot\mid h_{n}))\qquad(\widehat{\mathrm{FKL}}_{\text{sampled}})_{n}=\mathrm{sg}\bigg(\dfrac{\pi_{\text{ref}}(y_{n}\mid h_{n})}{\pi_{\theta}(y_{n}\mid h_{n})}\bigg)\log\dfrac{\pi_{\text{ref}}(y_{n}\mid h_{n})}{\pi_{\theta}(y_{n}\mid h_{n})}+\log\dfrac{\pi_{\theta}(y_{n}|h_{n})}{\mathrm{sg}(\pi_{\theta}(y_{n}|h_{n}))}$
+$\displaystyle({\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Forward}\mathrm{KL}})_{n}=\sum_{\color[rgb]{1,0,0}{j\in q_{n}}}{\pi_{\text{ref}}(j\mid h_{n})\log\dfrac{\pi_{\text{ref}}(j\mid h_{n})}{\pi_{\theta}(j\mid h_{n})}}+\mathbbm{1}(y_{n}\not\in q_{n})\cdot{s}_{n}^{\text{clip}}\cdot(\widehat{\mathrm{FKL}}_{\text{sampled}})_{n}$
+Then we sum up the token-wise KL along the sequence length:
+$\displaystyle\widehat{\mathrm{KL}}={\sum}_{n=0}^{L-1}({\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Reverse}\mathrm{KL}})_{n}\qquad\widehat{\mathrm{FKL}}={\sum}_{n=0}^{L-1}({\color[rgb]{0,0.5,1}\mathrm{Topk}\textbf{Forward}\mathrm{KL}})_{n}$
+Details of the Base RL Algorithm
+We discuss some additional implementation details below.
+•
+For the policy gradient loss function $\mathcal{J}(\theta)$ , we use a standard version of GRPO: PPO-style clipping (Schulman et al., 2017b), Monte-Carlo estimation of advantages (Shao et al., 2024; Liu et al., 2025a), with clip-higher (Yu et al., 2025):
+$\displaystyle y^{(i)}\sim\log\pi_{\theta_{\text{old}}}(\cdot\mid x),\quad i=0,\dots,N-1$
+$\displaystyle V(x)={\textstyle\frac{1}{N}}{\sum}_{i=0}^{N-1}R(x,y^{(i)})$
+$\displaystyle A(x,y^{(i)})=R(x,y^{(i)})-V(x)\qquad\mathrm{std}(x)=\sqrt{{\textstyle\frac{1}{N-1}}{\sum}_{i=0}^{N-1}\Big(R(x,y^{(i)})-V(x)\Big)^{2}}$
+$\displaystyle s_{n}^{(i)}=\mathrm{sg}\bigg({\frac{\pi_{\theta}(y^{(i)}_{n}\mid x,y^{(i)}_{0:n-1})}{\pi_{\theta_{\text{old}}}(y^{(i)}_{n}\mid x,y^{(i)}_{0:n-1})}}\bigg)\qquad M_{n}^{(i)}=\begin{cases}0&\text{if }A(x,y^{(i)})>0\text{ and }s_{l}^{(i)}>1+\epsilon_{\text{high}},\\
+0&\text{if }A(x,y^{(i)})<0\text{ and }s_{l}^{(i)}<1-\epsilon_{\text{low}},\\
+1&\text{otherwise}.\end{cases}$
+$\displaystyle\mathcal{J}^{\text{clip}}(x)={\textstyle\frac{1}{N}}{\textstyle\frac{1}{L}}{\sum}_{i=0}^{N-1}\Big({\sum}_{n=0}^{L-1}s_{n}^{(i)}\,M_{n}^{(i)}\,\log\pi_{\theta}(y^{(i)}_{n}\mid x,y^{(i)}_{0:n-1})\Big)\,A(x,y^{(i)})$
+$\displaystyle\mathcal{J}(\theta)=\mathbb{E}_{x\sim\mathcal{D}}\Big[\mathcal{J}^{\text{clip}}(x)\,/\,\mathrm{std}(x)\Big]$
+where $\epsilon_{\text{high}}=0.28$ and $\epsilon_{\text{low}}=0.2$ . $\mathcal{J}^{\text{clip}}$ applies the PPO-clip objective written in an equivalent form using binary masks (Wang et al., 2020; Chen et al., 2025). Note that the two techniques of EMA-PG are orthogonal to how we compute $\mathcal{J}(\theta)$ ; we can in principle also choose to use CISPO (Chen et al., 2025) or GSPO (Zheng et al., 2025) as the base algorithm.
+•
+For the optimizer, we use Adam (Kingma, 2014) with decoupled weight decay (Loshchilov and Hutter, 2017), with a learning rate of 1e-6 for full finetuning. Since the focus of our study is to device a better algorithm for full-scale post-training, we do not use any low-rank adaptation (LoRA) (Hu et al., 2022) in our experiments.
+•
+$\beta=0.001$ for KL regularization.
+•
+$T_{\text{ema}}=10$ , following prior empirical practice among practitioners of Deep Q-learning that target networks (even though under EMA soft update) still only get updated every $T_{\text{ema}}$ iterations; (Zhang et al., 2021) set the value to $10$ (see target_update_freq $=10$ in their implementation).
+Appendix B Additional Results
+Method
+NQ
+TriviaQA
+PopQA
+HotpotQA
+2wiki
+Musique
+Bamboogle
+Avg.
+Qwen2.5-3B-Instruct (RL)
+before RL
+0.205
+0.427
+0.277
+0.199
+0.200
+0.044
+0.153
+0.215
+PPO
+0.341
+0.545
+0.378
+0.324
+0.319
+0.103
+0.264
+0.325
+GRPO
+0.397
+0.565
+0.391
+0.331
+0.310
+0.124
+0.232
+0.336
+EMA-PG (Reverse KL)
+0.411
+0.581
+0.405
+0.360
+0.337
+0.144
+0.355
+0.370
+Improvement over GRPO
+3.5 $\%\uparrow$
+2.8 $\%\uparrow$
+3.6 $\%\uparrow$
+8.8 $\%\uparrow$
+8.7 $\%\uparrow$
+16.1 $\%\uparrow$
+53.0 $\%\uparrow$
+10.1 $\%\uparrow$
+Table 4: EMA-PG outperforms GRPO on Instruct model as well, but interestingly, the gain is not as significant as on base model. This empirically shows that the cold-start strategy (Guo et al., 2025) is a valid and well-justified strategy.
+Figure 9: Ablation on importance weight (IW) clip range and advantage normalization strategies (group-wise vs global).
+The off-policy importance weight (IW) clipping range is the one specified in
+$\displaystyle{s}_{n}^{\text{clip}}=\mathrm{clip}(s_{n},s_{\min},s_{\max})$
+which is used in both Reverse KL (Rev) and Forward KL (Fwd); we study the IW clip range in both situations. For Forward KL, using a tighter clipping range $[0,2.5]$ helps; for reverse KL, using a more lenient clipping range $[0,10]$ seems to perform better. Note that ignoring off-policy correction is equivalent to setting the clip range to $s_{\min}=s_{\max}=1$ .
+In addition, we also study the advantage normalization strategies in the $\mathcal{J}(\theta)$ , in particular global advantage normalization in the original PPO (Schulman et al., 2017b). This has been shown to slightly improve performance in (Hu et al., 2025). It essentially adds additional normalization on advantages $\boldsymbol{A}\in\mathbb{R}^{B\times N}$ across an entire batch of $B$ problems $\{x^{(1)},\dots,x^{(B)}\}$ :
+$\displaystyle(\boldsymbol{A}-\mathrm{mean}(\boldsymbol{A}))/\mathrm{std}(\boldsymbol{A})$
+which does a $z$ -score normalization on the flattened $\boldsymbol{A}$ of shape $(B\times N)$ , and discards per-problem normalization based on $\mathrm{std}(x)$ . We find that this helps slightly but did not make a significant difference on performance.
+Appendix C Derivations for EMA Policy Gradient Dynamics
+Fisher matrix
+The Fisher information matrix of a policy $\pi_{\theta}$ is:
+$F_{\theta}\triangleq\mathbb{E}_{x\sim\mathcal{D}}\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\bigl[(\nabla_{\theta}\log\pi_{\theta}(y|x))(\nabla_{\theta}\log\pi_{\theta}(y|x))^{\top}\bigr]$
+The Fisher matrix is positive semidefinite (PSD), so all eigenvalues satisfy $\lambda_{i}\geq 0$ . Consequently,
+$\displaystyle\lambda_{\max}(F_{\theta})\leq\mathrm{tr}(F_{\theta})=\mathbb{E}_{\begin{subarray}{c}x\sim\mathcal{D}\\
+y\sim\pi_{\theta}(\cdot\mid x)\end{subarray}}\!\big[\|\nabla_{\theta}\log\pi_{\theta}(y|x)\|_{2}^{2}\big]$
+(28)
+giving us a practical way of estimating an upper bound on the largest Fisher eigenvalue of a policy under $\mathcal{D}$ .
+Setup.
+Let $J(\theta)\coloneqq R(\pi_{\theta})$ denote the (expected) RL objective.
+Define the EMA parameters and the lag
+$\displaystyle\theta_{\text{ema},t+1}$
+$\displaystyle=\eta\,\theta_{\text{ema},t}+(1-\eta)\,\theta_{t},\qquad\eta\in[0,1),$
+$\displaystyle\delta_{t}$
+$\displaystyle\coloneqq\theta_{t}-\theta_{\text{ema},t}.$
+Let $g_{t}\coloneqq\nabla_{\theta}J(\theta)\rvert_{\theta=\theta_{t}}$ be the policy-gradient (or any ascent direction).
+We consider the update
+$\displaystyle\theta_{t+1}=\theta_{t}+\alpha\Big[g_{t}-\beta\,\nabla_{\theta}\mathrm{KL}(\pi_{\theta}\,\|\,\pi_{\theta_{\text{ema},t}})\Big]_{\theta=\theta_{t}},$
+(29)
+with step size $\alpha>0$ and regularization coefficient $\beta\geq 0$ .
+C.1 Policy Gradient Dynamics under Local Quadratic KL Approximation
+We assume a local quadratic approximation of the KL around $\theta_{t}$ :
+$\displaystyle\mathrm{KL}(\pi_{\theta_{t}}\,\|\,\pi_{\theta_{\text{ema},t}})\;\approx\;\frac{1}{2}(\theta_{t}-\theta_{\text{ema},t})^{\top}F_{t}(\theta_{t}-\theta_{\text{ema},t})\;=\;\frac{1}{2}\delta_{t}^{\top}F_{t}\delta_{t},$
+(30)
+where $F_{t}\coloneqq F_{\theta_{t}}$ is the (empirical) Fisher information matrix at $\theta_{t}$ . Differentiating the RHS of (30) w.r.t. $\theta_{t}$ yields
+$\displaystyle\nabla_{\theta_{t}}\,\mathrm{KL}(\pi_{\theta_{t}}\,\|\,\pi_{\theta_{\text{ema},t}})\;\approx\;\nabla_{\theta_{t}}\Big(\tfrac{1}{2}\delta_{t}^{\top}F_{t}\delta_{t}\Big)\;=\;F_{t}\delta_{t},$
+(31)
+where we treat $F_{t}$ as locally constant under this approximation.
+Substituting (31) into (29) gives
+$\displaystyle\theta_{t+1}$
+$\displaystyle=\theta_{t}+\alpha g_{t}-\alpha\beta F_{t}\delta_{t}.$
+(32)
+Lemma C.1 (Lag dynamics).
+Under (32) and the EMA recursion, the lag obeys
+$\displaystyle\delta_{t+1}=(\eta I-\alpha\beta F_{t})\,\delta_{t}+\alpha g_{t}.$
+(33)
+Proof.
+By definition $\delta_{t+1}=\theta_{t+1}-\theta_{\text{ema},t+1}$ , and by the EMA update,
+$\displaystyle\theta_{\text{ema},t+1}=\eta\theta_{\text{ema},t}+(1-\eta)\theta_{t}\;\Rightarrow\;\theta_{t}-\theta_{\text{ema},t+1}=\theta_{t}-\eta\theta_{\text{ema},t}-(1-\eta)\theta_{t}=\eta(\theta_{t}-\theta_{\text{ema},t})=\eta\,\delta_{t}.$
+(34)
+Therefore,
+$\displaystyle\delta_{t+1}$
+$\displaystyle=(\theta_{t+1}-\theta_{t})+(\theta_{t}-\theta_{\text{ema},t+1})=(\theta_{t+1}-\theta_{t})+\eta\,\delta_{t}.$
+(35)
+Using (32), $\theta_{t+1}-\theta_{t}=\alpha g_{t}-\alpha\beta F_{t}\delta_{t}$ , so
+$\displaystyle\delta_{t+1}=\eta\delta_{t}+\alpha g_{t}-\alpha\beta F_{t}\delta_{t}=(\eta I-\alpha\beta F_{t})\delta_{t}+\alpha g_{t}.$
+(36)
+∎
+Define the (time-varying) linear operator
+$\displaystyle D_{t}\coloneqq\eta I-\alpha\beta F_{t}.$
+(37)
+Collecting (32) and (33) gives the affine joint update
+$\displaystyle\begin{bmatrix}\theta_{t+1}\\
+\delta_{t+1}\end{bmatrix}=\begin{bmatrix}I&-\alpha\beta F_{t}\\
+0&\eta I-\alpha\beta F_{t}\end{bmatrix}\begin{bmatrix}\theta_{t}\\
+\delta_{t}\end{bmatrix}+\begin{bmatrix}\alpha I\\
+\alpha I\end{bmatrix}g_{t}.$
+(38)
+C.2 Quasi-steady state analysis over a $k$ -step window (Proof of Lemma 4.1)
+Assumption (frozen gradient and Fisher).
+Fix an integer $k\geq 1$ and assume that over the window $\{t,\dots,t+k-1\}$ ,
+$\displaystyle g_{t+j}\approx g,\qquad F_{t+j}\approx F\qquad\text{for }j=0,\dots,k-1,$
+(39)
+for some constant vectors/matrices $g,F$ .
+Define the corresponding constant operator
+$\displaystyle D\coloneqq\eta I-\alpha\beta F.$
+(40)
+C.2.1 Closed form for $\delta_{t+k}$
+Unrolling (33) with constant $D$ and $g$ yields
+$\displaystyle\delta_{t+1}$
+$\displaystyle=D\delta_{t}+\alpha g,$
+$\displaystyle\delta_{t+2}$
+$\displaystyle=D\delta_{t+1}+\alpha g=D^{2}\delta_{t}+\alpha(D+I)g,$
+$\displaystyle\;\;\vdots$
+$\displaystyle\delta_{t+k}$
+$\displaystyle=D^{k}\delta_{t}+\alpha\sum_{j=0}^{k-1}D^{j}g.$
+(41)
+Define the geometric-series matrix
+$\displaystyle S_{k}\coloneqq\sum_{j=0}^{k-1}D^{j}.$
+(42)
+Then (41) becomes
+$\displaystyle\delta_{t+k}=D^{k}\delta_{t}+\alpha S_{k}\,g.$
+(43)
+C.2.2 Invertibility of $I-D$ and closed form for $S_{k}$
+Let $v_{i}$ be an eigenvector of $F$ , and $\lambda_{i}$ be its corresponding eigenvalue. Using $D=\eta I-\alpha\beta F$ ,
+$\displaystyle Dv_{i}=(\eta I-\alpha\beta F)v_{i}=(\eta-\alpha\beta\lambda_{i})v_{i}.$
+(44)
+Define
+$\displaystyle\chi_{i}\coloneqq\eta-\alpha\beta\lambda_{i}.$
+(45)
+Then $Dv_{i}=\chi_{i}v_{i}$ . Since $\lambda_{i}\geq 0$ ( $F\succeq 0$ ), $\eta<1$ , and $\beta,\alpha\geq 0$ , we have
+$\displaystyle\chi_{i}\leq\eta<1,$
+(46)
+Hence $1-\chi_{i}>0$ for all $i$ , so $I-D$ is invertible. Consequently,
+$\displaystyle S_{k}=\sum_{j=0}^{k-1}D^{j}=(I-D^{k})(I-D)^{-1}.$
+(47)
+C.2.3 Closed form for $\theta_{t+k}$ and the $M_{k}$ matrix
+From (32) with frozen $F,g$ ,
+$\displaystyle\theta_{t+1}$
+$\displaystyle=\theta_{t}+\alpha g-\alpha\beta F\delta_{t},$
+(48)
+$\displaystyle\theta_{t+k}$
+$\displaystyle=\theta_{t}+\sum_{j=0}^{k-1}\big(\alpha g-\alpha\beta F\delta_{t+j}\big)=\theta_{t}+\alpha k\,g-\alpha\beta F\sum_{j=0}^{k-1}\delta_{t+j}.$
+(49)
+Using (43) at times $t+j$ ,
+$\displaystyle\delta_{t+j}=D^{j}\delta_{t}+\alpha S_{j}g,$
+(50)
+so
+$\displaystyle\sum_{j=0}^{k-1}\delta_{t+j}$
+$\displaystyle=\sum_{j=0}^{k-1}D^{j}\delta_{t}+\alpha\sum_{j=0}^{k-1}S_{j}g=S_{k}\delta_{t}+\alpha\Big(\sum_{j=0}^{k-1}S_{j}\Big)g.$
+(51)
+Define
+$\displaystyle M_{k}\coloneqq\sum_{j=0}^{k-1}S_{j}.$
+(52)
+Then
+$\displaystyle\theta_{t+k}=\theta_{t}+\alpha k\,g-\alpha\beta FS_{k}\delta_{t}-\alpha^{2}\beta FM_{k}\,g.$
+(53)
+Closed form for $M_{k}$ .
+Using $S_{j}=(I-D^{j})(I-D)^{-1}$ from (47),
+$\displaystyle M_{k}=\sum_{j=0}^{k-1}(I-D^{j})(I-D)^{-1}=\Big(kI-\sum_{j=0}^{k-1}D^{j}\Big)(I-D)^{-1}=(kI-S_{k})(I-D)^{-1}.$
+(54)
+Collecting (53) and (43), one may the dynamics as a homogeneous linear map in $(\theta,\delta,g)$ :
+$\begin{bmatrix}\theta_{t+k}\\
+\delta_{t+k}\\
+g\end{bmatrix}=\begin{bmatrix}I&-\alpha\beta FS_{k}&\alpha kI-\alpha^{2}\beta FM_{k}\\
+0&D^{k}&\alpha S_{k}\\
+0&0&I\end{bmatrix}\begin{bmatrix}\theta_{t}\\
+\delta_{t}\\
+g\end{bmatrix}$
+C.3 Eigen-decomposition of Fisher and mode-wise dynamics (Proof of Lemma 4.2)
+Since $F$ is a Fisher information matrix (or symmetric empirical approximation), we assume $F$ is symmetric PSD:
+$\displaystyle F\succeq 0.$
+Therefore, there exists an orthonormal eigenbasis $\{v_{i}\}_{i=0}^{d-1}$ and eigenvalues $\lambda_{i}\geq 0$ such that
+$\displaystyle Fv_{i}=\lambda_{i}v_{i},\qquad\lambda_{i}\geq 0.$
+We refer to $v_{i}$ as the $i$ -th Fisher eigenvector (eigen-direction). “High curvature” corresponds to large $\lambda_{i}$ . Previously we have already shown that
+$\displaystyle\chi_{i}\coloneqq\eta-\alpha\beta\lambda_{i}\qquad\chi_{i}\leq\eta<1,$
+and $\chi_{i}$ may be negative if $\alpha\beta\lambda_{i}>\eta$ .
+Now we define the scalar projections
+$\displaystyle\delta_{t}^{(i)}\coloneqq v_{i}^{\top}\delta_{t},\qquad g^{(i)}\coloneqq v_{i}^{\top}g.$
+(55)
+Projecting (43) onto $v_{i}$ yields
+$\displaystyle\delta_{t+k}^{(i)}$
+$\displaystyle=v_{i}^{\top}D^{k}\delta_{t}+\alpha\,v_{i}^{\top}S_{k}g=\chi_{i}^{k}\delta_{t}^{(i)}+\alpha\sum_{j=0}^{k-1}\chi_{i}^{j}\,g^{(i)}$
+(56)
+$\displaystyle=\chi_{i}^{k}\delta_{t}^{(i)}+\alpha\,\frac{1-\chi_{i}^{k}}{1-\chi_{i}}\,g^{(i)},$
+(57)
+This yields the decomposition into a transient term and a particular solution.
+C.4 Stability and oscillations
+C.4.1 Stability condition
+The transient part of the lag dynamics is $\delta_{t+1}=D\delta_{t}$ .
+Stability (transient $\to 0$ ) requires $\rho(D)<1$ , equivalently
+$\displaystyle\max_{i}|\chi_{i}|<1.$
+(58)
+Since $\chi_{i}\leq\eta<1$ , the upper inequality $|\chi_{i}|<1$ is only violated if $\chi_{i}\leq-1$ for some $i$ .
+The most negative eigenvalue occurs at $\lambda_{\max}\coloneqq\max_{i}\lambda_{i}$ , so stability is equivalent to
+$\displaystyle\eta-\alpha\beta\lambda_{\max}>-1\quad\Longleftrightarrow\quad\alpha\beta\lambda_{\max}<1+\eta.$
+(59)
+This proves (9).
+C.4.2 Non-oscillatory vs. oscillatory transients
+From (57), the sign of the transient in mode $i$ is governed by $\chi_{i}^{k}$ .
+If $\chi_{i}\in(0,1)$ , the transient decays monotonically.
+If $\chi_{i}\in(-1,0)$ , the transient alternates sign each step (damped overshoot/undershoot), which we call “oscillatory”.
+Thus:
+•
+Non-oscillatory in all modes iff $\chi_{i}\geq 0$ for all $i$ , i.e.
+$\displaystyle\eta-\alpha\beta\lambda_{\max}\geq 0\quad\Longleftrightarrow\quad\alpha\beta\lambda_{\max}\leq\eta.$
+(60)
+•
+Oscillatory in some high-curvature directions if there exists $i$ with $\chi_{i}<0$ , which can occur when $\alpha\beta\lambda_{\max}>\eta$ .
+Combined with stability (59) yields the three regimes summarized in the main text:
+•
+If $0\leq\alpha\beta\lambda_{\max}\leq\eta$ , then $\chi_{i}\in[0,\eta]\subset[0,1)$ for all $i$ , so the dynamics is stable and all transients decay monotonically (non-oscillatory).
+•
+If $\eta<\alpha\beta\lambda_{\max}<1+\eta$ , then stability holds ( $|\chi_{i}|<1$ for all $i$ ) but there exist high-curvature directions with $\chi_{i}<0$ , producing damped sign-flipping transients (oscillations).
+•
+If $\alpha\beta\lambda_{\max}\geq 1+\eta$ , then $\chi_{\max}\leq-1$ for the top-curvature direction, so $\max_{i}|\chi_{i}|\geq 1$ and the lag dynamics is unstable.
+C.5 Steady-state lag and bounds
+Assume stability (59), $D^{k}\to 0$ as $k\to\infty$ .
+Taking $k\to\infty$ in (43) gives the steady lag
+$\displaystyle\delta_{*}=\lim_{k\to\infty}\delta_{t+k}=\alpha\Big(\sum_{j=0}^{\infty}D^{j}\Big)g=\alpha(I-D)^{-1}g.$
+(61)
+Using $I-D=I-(\eta I-\alpha\beta F)=(1-\eta)I+\alpha\beta F$ , we obtain
+$\displaystyle\delta_{*}=\alpha\big((1-\eta)I+\alpha\beta F\big)^{-1}g,$
+(62)
+In each eigen-direction,
+$\displaystyle\delta_{*}^{(i)}=\frac{\alpha}{(1-\eta)+\alpha\beta\lambda_{i}}\,g^{(i)}.$
+(63)
+C.5.1 Euclidean norm upper bound
+Since $F\succeq 0$ , we have the PSD ordering
+$\displaystyle(1-\eta)I+\alpha\beta F\;\succeq\;(1-\eta)I.$
+For positive definite matrices, PSD ordering reverses under inversion, hence
+$\displaystyle\big((1-\eta)I+\alpha\beta F\big)^{-1}\;\preceq\;\frac{1}{1-\eta}I.$
+Therefore,
+$\displaystyle\|\delta_{*}\|_{2}=\alpha\Big\|\big((1-\eta)I+\alpha\beta F\big)^{-1}g\Big\|_{2}\leq\alpha\Big\|\big((1-\eta)I+\alpha\beta F\big)^{-1}\Big\|_{2}\,\|g\|_{2}\;\leq\;\alpha\cdot\frac{1}{1-\eta}\,\|g\|_{2},$
+(64)
+C.5.2 Quasi-steady KL magnitude
+Under the quadratic KL approximation (30), the quasi-steady KL is
+$\displaystyle\widehat{\mathrm{KL}}_{*}\;\approx\;\frac{1}{2}\delta_{*}^{\top}F\delta_{*}.$
+(65)
+Expanding in the eigenbasis, $F=\sum_{i}\lambda_{i}v_{i}v_{i}^{\top}$ and $\delta_{*}=\sum_{i}\delta_{*}^{(i)}v_{i}$ , gives
+$\displaystyle\delta_{*}^{\top}F\delta_{*}=\sum_{i=0}^{d-1}\lambda_{i}\big(\delta_{*}^{(i)}\big)^{2}.$
+(66)
+Substituting (63) yields
+$\displaystyle\widehat{\mathrm{KL}}_{*}\;\approx\;\frac{\alpha^{2}}{2}\sum_{i=0}^{d-1}\frac{\lambda_{i}\big(g^{(i)}\big)^{2}}{\big((1-\eta)+\alpha\beta\lambda_{i}\big)^{2}},$
+(67)
+Thus, within the quasi-steady model, increasing $\eta$ increases $\widehat{\mathrm{KL}}_{*}$ unless $\beta$ is increased or $\alpha$ is decreased.
+Appendix D Sequence-level KL vs. Token-level KL
+Notation and setup
+For prompt $x$ , consider the conditional distribution over output sequence $y=(y_{0},\dots,y_{L-1})$ .
+$\displaystyle\pi_{\theta}(y\mid x)=\prod_{n=0}^{L-1}\pi_{\theta}(y_{n}\mid x,y_{0:n-1}).$
+For each position $l$ , define the prefix (history)
+$\displaystyle h_{n}\triangleq(x,y_{0:n-1}),$
+and the per-token log-ratio and score term
+$\displaystyle\rho_{n}\triangleq\log\frac{\pi_{\theta}(y_{n}\mid h_{n})}{\pi_{\mathrm{ref}}(y_{n}\mid h_{n})},\qquad\omega_{n}\triangleq\nabla_{\theta}\log\pi_{\theta}(y_{n}\mid h_{n}).$
+Note that $\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}=\sum_{n=0}^{L-1}\rho_{n}$
+and $\nabla_{\theta}\log\pi_{\theta}(y\mid x)=\sum_{n=0}^{L-1}\omega_{n}$ .
+D.1 Sequence-level KL gradients
+Define the (sequence-level) conditional KL:
+$\displaystyle\mathrm{KL}\big(\pi_{\theta}(\cdot\mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid x)\big)\triangleq\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\left[\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}\right].$
+Differentiate it:
+$\displaystyle\nabla_{\theta}\mathrm{KL}$
+$\displaystyle=\nabla_{\theta}\int\pi_{\theta}(y\mid x)\,\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}\,dy$
+$\displaystyle=\int\nabla_{\theta}\pi_{\theta}(y\mid x)\,\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}\,dy+\int\pi_{\theta}(y\mid x)\,\nabla_{\theta}\log\pi_{\theta}(y\mid x)\,dy.$
+Using $\nabla_{\theta}\pi_{\theta}=\pi_{\theta}\nabla_{\theta}\log\pi_{\theta}$ and
+$\int\pi_{\theta}\nabla_{\theta}\log\pi_{\theta}\,dy=\mathbb{E}_{\pi_{\theta}}[\nabla_{\theta}\log\pi_{\theta}]=0$ ,
+we obtain the standard score-function form:
+$\displaystyle\nabla_{\theta}\mathrm{KL}\big(\pi_{\theta}(\cdot\mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid x)\big)=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\left[\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\mathrm{ref}}(y\mid x)}\;\nabla_{\theta}\log\pi_{\theta}(y\mid x)\right].$
+(68)
+D.2 Analysis of sequence-level KL gradients
+Substitute the autoregressive decompositions:
+$\displaystyle\nabla_{\theta}\mathrm{KL}\big(\pi_{\theta}(\cdot\mid x)\,\|\,\pi_{\mathrm{ref}}(\cdot\mid x)\big)$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\left[\left(\sum_{m=0}^{L-1}\rho_{m}\right)\left(\sum_{n=0}^{L-1}\omega_{n}\right)\right]=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\left[\sum_{n=0}^{L-1}\sum_{m=0}^{L-1}\rho_{m}\omega_{n}\right].$
+(69)
+Split the inner sum into “future” and “past” relative to $n$ :
+$\displaystyle\sum_{m=0}^{L-1}\rho_{m}\omega_{n}=\left(\sum_{m\geq n}\rho_{m}\right)\omega_{n}+\left(\sum_{m<n}\rho_{m}\right)\omega_{n}.$
+(70)
+Why the “past” terms vanish
+Recall the conditional expectation notation
+$\displaystyle\mathbb{E}_{n}[\cdot]\triangleq\mathbb{E}_{y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})}[\cdot],\qquad h_{n}\triangleq(x,y_{0:n-1}).$
+We will use the standard Law of total expectation in the following explicit form: for any random variable
+$Z=Z(x,y_{0:n})$ ,
+$\displaystyle\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}[Z]=\mathbb{E}_{y_{0:n-1}\sim\pi_{\theta}(\cdot\mid x)}\Big[\mathbb{E}_{y_{n}\sim\pi_{\theta}(\cdot\mid x,y_{0:n-1})}[Z]\Big]=\mathbb{E}_{y_{0:n-1}\sim\pi_{\theta}(\cdot\mid x)}\big[\mathbb{E}_{n}[Z]\big].$
+(71)
+Step 1: the score has zero mean.
+Conditioning on a fixed prefix $h_{n}$ , we have
+$\displaystyle\mathbb{E}_{n}[\omega_{n}]$
+$\displaystyle=\sum_{a}\pi_{\theta}(a\mid h_{n})\,\nabla_{\theta}\log\pi_{\theta}(a\mid h_{n})=\sum_{a}\nabla_{\theta}\pi_{\theta}(a\mid h_{n})=\nabla_{\theta}\sum_{a}\pi_{\theta}(a\mid h_{n})=\nabla_{\theta}1=0.$
+Step 2: past log-ratios are constant under $\mathbb{E}_{n}[\cdot]$ .
+Since $\sum_{m<n}\rho_{m}$ depends only on the prefix $h_{n}=(x,y_{0:n-1})$ , it does not depend on $y_{n}$ and can be
+pulled out of $\mathbb{E}_{n}[\cdot]$ :
+$\displaystyle\mathbb{E}_{n}\!\left[\left(\sum_{m<n}\rho_{m}\right)\omega_{n}\right]=\left(\sum_{m<n}\rho_{m}\right)\mathbb{E}_{n}[\omega_{n}]=0.$
+Step 3: unconditional past terms also vanish.
+Apply (71) with
+$Z=\left(\sum_{m<n}\rho_{m}\right)\omega_{n}$ :
+$\displaystyle\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\left[\left(\sum_{m<n}\rho_{m}\right)\omega_{n}\right]$
+$\displaystyle=\mathbb{E}_{y_{0:n-1}\sim\pi_{\theta}(\cdot\mid x)}\Big[\mathbb{E}_{n}\!\left[\left(\sum_{m<n}\rho_{m}\right)\omega_{n}\right]\Big]=0,$
+(72)
+which justifies dropping the “past tokens” contribution in the main derivation.
+D.3 Token-level KL gradients
+Define the token-level conditional KL at position $n$ :
+$\displaystyle\widehat{\mathrm{KL}}_{n}\triangleq\mathrm{KL}\big(\pi_{\theta}(\cdot\mid h_{n})\,\|\,\pi_{\mathrm{ref}}(\cdot\mid h_{n})\big)=\mathbb{E}_{y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})}\left[\log\frac{\pi_{\theta}(y_{n}\mid h_{n})}{\pi_{\mathrm{ref}}(y_{n}\mid h_{n})}\right].$
+By the same argument as (68), its gradient can be written as
+$\displaystyle\nabla_{\theta}\widehat{\mathrm{KL}}_{n}=\mathbb{E}_{y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})}\left[\log\frac{\pi_{\theta}(y_{n}\mid h_{n})}{\pi_{\mathrm{ref}}(y_{n}\mid h_{n})}\;\nabla_{\theta}\log\pi_{\theta}(y_{n}\mid h_{n})\right]=\mathbb{E}_{y_{n}\sim\pi_{\theta}(\cdot\mid h_{n})}[\rho_{n}\,\omega_{n}].$
+(73)
+Hence the token-level KL objective yields the per-token weighting:
+$\displaystyle\nabla_{\theta}L_{\mathrm{kl}}^{\mathrm{token}}=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\bigg[\sum_{n=0}^{L-1}\nabla_{\theta}\widehat{\mathrm{KL}}_{n}\bigg]=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}\left[\sum_{n=0}^{L-1}\rho_{n}\omega_{n}\right].$
+(74)
+Comparison
+Sequence-level KL weights token $n$ by the cumulative future log-ratio $\sum_{m\geq n}\rho_{m}$ ,
+while token-level KL weights token $n$ only by the local log-ratio $\rho_{n}$ .
+$\displaystyle\nabla_{\theta}L_{\mathrm{KL}}^{\text{seq}}=\mathbb{E}_{\pi_{\theta}(y|x)}\Big[\sum_{n}\Big(\sum_{{\color[rgb]{1,0,0}m\geq n}}{\color[rgb]{1,0,0}\rho_{m}}\Big)\,\omega_{n}\Big]\qquad\nabla_{\theta}L_{\mathrm{KL}}^{\text{token}}=\mathbb{E}_{\pi_{\theta}(y|x)}\Big[\sum_{n}\big({\color[rgb]{1,0,0}\rho_{n}}\big)\,\omega_{n}\Big]$
+In other words, sequence-level KL punishes each current token for the divergence of all its future tokens; token-level KL is only concerned with the current token.
+Appendix E Derivation of Sampled Reverse KL Estimator
+We focus on a fixed token position $n$ with prefix $h_{n}=(x,y_{0:n-1})$ .
+Let $p\sim\pi_{\theta}(\cdot\mid h_{n})$ be the sampled token, and define
+$\displaystyle w(p)\triangleq\frac{\pi_{\mathrm{ref}}(p\mid h_{n})}{\pi_{\theta}(p\mid h_{n})},\qquad\ell(p)\triangleq-\log w(p)=\log\frac{\pi_{\theta}(p\mid h_{n})}{\pi_{\mathrm{ref}}(p\mid h_{n})}.$
+To avoid ambiguity, throughout this subsection we use the shorthand
+$\displaystyle\mathbb{E}_{p}\big[\cdot\big]\;\triangleq\;\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}\big[\cdot\big]$
+Reverse KL at a fixed prefix.
+The token-level reverse KL at history $h_{n}$ is (with $\mathcal{V}$ being the vocabulary):
+$\displaystyle\mathrm{KL}_{n}(\theta)\;\triangleq\;\mathrm{KL}\big(\pi_{\theta}(\cdot\mid h_{n})\,\|\,\pi_{\mathrm{ref}}(\cdot\mid h_{n})\big)=\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\log\frac{\pi_{\theta}(j\mid h_{n})}{\pi_{\mathrm{ref}}(j\mid h_{n})}=\mathbb{E}_{p}\big[\ell(p)\big].$
+Exact reverse-KL gradient.
+$\displaystyle\nabla_{\theta}\mathrm{KL}_{n}(\theta)=\sum_{j\in\mathcal{V}}\pi_{\theta}(j)\log\frac{\pi_{\theta}(j)}{\pi_{\mathrm{ref}}(j)}\,\nabla_{\theta}\log\pi_{\theta}(j)=\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}\Big[\ell(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big].$
+$\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ versus $\nabla_{\theta}\mathbb{E}_{p}[\cdot]$
+Since $\pi_{\theta}(\cdot\mid h_{n})$ depends on $\theta$ , $\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}[\cdot]$ is itself a function of $\theta$ ; we write it as $\mathbb{E}_{p}[\cdot]$ .
+For any scalar function $f(p,\theta)$ , the gradient $\nabla_{\theta}\mathbb{E}_{p}[\cdot]$ is:
+$\displaystyle\mathbb{E}_{p}\big[f(p,\theta)\big]=\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\,f(j,\theta)\qquad\nabla_{\theta}\mathbb{E}_{p}\big[f(p,\theta)\big]=\mathbb{E}_{p}\Big[f(p,\theta)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})+\nabla_{\theta}f(p,\theta)\Big].$
+(75)
+In contrast, $\mathbb{E}_{p}[\nabla_{\theta}f(p,\theta)]$ alone is in general is not equal to
+$\nabla_{\theta}\mathbb{E}_{p}[f]$ , as it has only one of the two terms in the full gradient.
+E.1 Sampled KL estimators (K1 / K2 / K3) and their expected values
+Define the single-sample estimators
+$\displaystyle(\mathrm{K1})_{n}\triangleq\ell(p),\qquad(\mathrm{K2})_{n}\triangleq\frac{1}{2}\,\ell(p)^{2},\qquad(\mathrm{K3})_{n}\triangleq\ell(p)+w(p)-1.$
+(76)
+Then
+$\displaystyle\mathbb{E}_{p}\big[(\mathrm{K1})_{n}\big]$
+$\displaystyle=\mathbb{E}_{p}\big[\ell(p)\big]=\mathrm{KL}_{n}(\theta),$
+(77)
+$\displaystyle\mathbb{E}_{p}\big[w(p)\big]$
+$\displaystyle=\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\frac{\pi_{\mathrm{ref}}(j\mid h_{n})}{\pi_{\theta}(j\mid h_{n})}=\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j\mid h_{n})=1,$
+(78)
+$\displaystyle\mathbb{E}_{p}\big[(\mathrm{K3})_{n}\big]$
+$\displaystyle=\mathbb{E}_{p}\big[\ell(p)\big]+\mathbb{E}_{p}\big[w(p)\big]-1=\mathrm{KL}_{n}(\theta),$
+(79)
+while in general $\mathbb{E}_{p}\big[(\mathrm{K2})_{n}\big]=\frac{1}{2}\mathbb{E}_{p}[\ell(p)^{2}]\neq\mathbb{E}_{p}[\ell(p)]$ ,
+so K2 has incorrect expected values.
+E.2 Gradients of K1 / K2 / K3 under autodiff $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$
+Here $\nabla_{\theta}(\cdot)$ denotes the autodiff gradient of the sampled scalar while treating the sampled token $p$ as fixed.
+K1: correct value but wrong gradient.
+Since $(\mathrm{K1})_{n}=\ell(p)=\log\pi_{\theta}(p\mid h_{n})-\log\pi_{\mathrm{ref}}(p\mid h_{n})$ and $\pi_{\mathrm{ref}}$ is fixed,
+$\displaystyle\nabla_{\theta}(\mathrm{K1})_{n}=\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}).$
+Averaging over $p\sim\pi_{\theta}(\cdot\mid h_{n})$ gives
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathrm{K1})_{n}\big]=\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\nabla_{\theta}\log\pi_{\theta}(j\mid h_{n})=\sum_{j\in\mathcal{V}}\nabla_{\theta}\pi_{\theta}(j\mid h_{n})=\nabla_{\theta}1=0,$
+which is zero.
+K2: correct reverse-KL gradient but wrong value.
+We have $(\mathrm{K2})_{n}=\frac{1}{2}\ell(p)^{2}$ , so
+$\displaystyle\nabla_{\theta}(\mathrm{K2})_{n}=\ell(p)\,\nabla_{\theta}\ell(p)=\ell(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}).$
+Therefore,
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathrm{K2})_{n}\big]=\mathbb{E}_{p}\Big[\ell(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big].$
+(80)
+K3: yields the forward-KL gradient under $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ .
+Since $(\mathrm{K3})_{n}=\ell(p)+w(p)-1$ and,
+$\displaystyle w(p)=\pi_{\mathrm{ref}}(p\mid h_{n})/\pi_{\theta}(p\mid h_{n})\quad\nabla_{\theta}w(p)=-w(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}),$
+$\displaystyle\nabla_{\theta}(\mathrm{K3})_{n}=\nabla_{\theta}\ell(p)+\nabla_{\theta}w(p)=\big(1-w(p)\big)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}).$
+Averaging over $p\sim\pi_{\theta}(\cdot\mid h_{n})$ gives
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathrm{K3})_{n}\big]$
+$\displaystyle=\mathbb{E}_{p}\big[\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\big]-\mathbb{E}_{p}\big[w(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\big]$
+$\displaystyle=0-\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\frac{\pi_{\mathrm{ref}}(j\mid h_{n})}{\pi_{\theta}(j\mid h_{n})}\nabla_{\theta}\log\pi_{\theta}(j\mid h_{n})$
+$\displaystyle=-\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j\mid h_{n})\,\nabla_{\theta}\log\pi_{\theta}(j\mid h_{n})=\nabla_{\theta}\mathrm{KL}\big(\pi_{\mathrm{ref}}(\cdot\mid h_{n})\,\|\,\pi_{\theta}(\cdot\mid h_{n})\big),$
+(81)
+which is the forward-KL gradient, not the reverse-KL gradient.
+E.3 The $\boldsymbol{r}$ -trick restores $\nabla_{\theta}\mathbb{E}_{p}[\cdot]$ from $\mathbb{E}_{p}[\nabla_{\theta}(\cdot)]$ .
+Define $r(\cdot)$ as:
+$\displaystyle r(p,\theta)\triangleq\frac{\pi_{\theta}(p\mid h_{n})}{\mathrm{sg}\big(\pi_{\theta}(p\mid h_{n})\big)}.$
+(82)
+In the forward pass $r(p,\theta)=1$ , but in backpropagation the denominator is treated as constant, hence
+$\displaystyle\nabla_{\theta}r(p,\theta)=r(p,\theta)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})=\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}).$
+For any scalar $f(p,\theta)$ , differentiating $r(p,\theta)f(p,\theta)$ gives
+$\displaystyle\nabla_{\theta}\big(rf\big)=f\,\nabla_{\theta}r+r\,\nabla_{\theta}f=f(p,\theta)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})+\nabla_{\theta}f(p,\theta),$
+where we used $r=1$ in the forward pass so $r\,\nabla_{\theta}f=\nabla_{\theta}f$ .
+Taking $\mathbb{E}_{p}[\cdot]$ on both sides and comparing with (75) yields
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}\big(r(p,\theta)f(p,\theta)\big)\big]=\nabla_{\theta}\mathbb{E}_{p}\big[f(p,\theta)\big].$
+(83)
+This identity holds even when $f$ depends on $\theta$ (via the $\nabla_{\theta}f$ term).
+E.4 ${\color[rgb]{0,0.5,1}\textbf{K3}^{\boldsymbol{++}}}$ yields unbiased reverse-KL values and gradients
+Define
+$\displaystyle(\mathrm{K3}^{++})_{n}\triangleq r(p,\theta)\,(\mathrm{K3})_{n}=r(p,\theta)\big(\ell(p)+w(p)-1\big).$
+(84)
+Value: since $r=1$ in the forward pass,
+$\displaystyle\mathbb{E}_{p}\big[(\mathrm{K3}^{++})_{n}\big]=\mathbb{E}_{p}\big[(\mathrm{K3})_{n}\big]=\mathrm{KL}_{n}(\theta)\quad\text{by \eqref{eq:K3-value}.}$
+(85)
+Gradient: by (83) with $f=(\mathrm{K3})_{n}$ ,
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathrm{K3}^{++})_{n}\big]=\nabla_{\theta}\mathbb{E}_{p}\big[(\mathrm{K3})_{n}\big]=\nabla_{\theta}\mathrm{KL}_{n}(\theta),$
+(86)
+because $\mathbb{E}_{p}[(\mathrm{K3})_{n}]=\mathrm{KL}_{n}(\theta)$ .
+E.4.1 Alternative Proof
+Alternatively, we compute the $\mathrm{K3}^{++}$ gradients in a brute force manner by directly differentiating using the product rule:
+$\displaystyle\nabla_{\theta}(\mathrm{K3}^{++})_{n}$
+$\displaystyle=\big(\ell+w-1\big)\,\nabla_{\theta}r+r\big(\nabla_{\theta}\ell+\nabla_{\theta}w\big).$
+(87)
+Now compute each piece (all conditioned on the sampled $p$ and fixed $h_{n}$ ):
+$\displaystyle\nabla_{\theta}r$
+$\displaystyle=\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}),$
+(88)
+$\displaystyle\nabla_{\theta}\ell$
+$\displaystyle=\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}),$
+(89)
+$\displaystyle\nabla_{\theta}w$
+$\displaystyle=\nabla_{\theta}\!\left(\frac{\pi_{\mathrm{ref}}(p\mid h_{n})}{\pi_{\theta}(p\mid h_{n})}\right)=-w\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}).$
+(90)
+Substitute (88)–(90) into (87). Using that $r=1$ in the forward pass,
+$\displaystyle\nabla_{\theta}(\mathrm{K3}^{++})_{n}=\big(\ell+w-1\big)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})+\big(1-w\big)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})=\ell(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})$
+(91)
+Taking expectation over the sampled token $p\sim\pi_{\theta}(\cdot\mid h_{n})$ on both sides of (91) yields
+$\displaystyle\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}\big[\nabla_{\theta}(\mathrm{K3}^{++})_{n}\big]$
+$\displaystyle=\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}\Big[\ell(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big]=\nabla_{\theta}\mathrm{KL}_{n}(\theta),$
+E.5 K4 yields unbiased reverse-KL values and gradients
+Define
+$\displaystyle(\mathrm{K4})_{n}\triangleq r(p,\theta)\cdot\mathrm{sg}\big((\mathrm{K1})_{n}\big)=r(p,\theta)\cdot\mathrm{sg}\big(\ell(p)\big).$
+(92)
+Value: since $r=1$ in the forward pass,
+$\displaystyle\mathbb{E}_{p}\big[(\mathrm{K4})_{n}\big]=\mathbb{E}_{p}\big[\ell(p)\big]=\mathrm{KL}_{n}(\theta).$
+(93)
+Gradient: $\mathrm{sg}(\ell(p))$ is treated as constant in backprop, so differentiating yields
+$\displaystyle\nabla_{\theta}(\mathrm{K4})_{n}=\mathrm{sg}\big(\ell(p)\big)\,\nabla_{\theta}r(p,\theta)=\mathrm{sg}\big(\ell(p)\big)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n}).$
+(94)
+Taking expectation over $p\sim\pi_{\theta}(\cdot\mid h_{n})$ gives
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathrm{K4})_{n}\big]=\mathbb{E}_{p}\Big[\ell(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big]=\nabla_{\theta}\mathrm{KL}_{n}(\theta),$
+(95)
+Appendix F Derivation of Sampled Forward KL Estimator
+Similar to before, we focus on a fixed token position $n$ with prefix $h_{n}=(x,y_{0:n-1})$ .
+For brevity, write
+$\displaystyle\pi_{\theta}(j)\triangleq\pi_{\theta}(j\mid h_{n}),\qquad\pi_{\mathrm{ref}}(j)\triangleq\pi_{\mathrm{ref}}(j\mid h_{n}).$
+At this position we sample a token
+$\displaystyle p\sim\pi_{\theta}(\cdot\mid h_{n}),$
+and define the importance ratio and stop-gradient ratio
+$\displaystyle w(p)\triangleq\frac{\pi_{\mathrm{ref}}(p)}{\pi_{\theta}(p)},\qquad r(p,\theta)\triangleq\frac{\pi_{\theta}(p)}{\mathrm{sg}(\pi_{\theta}(p))}.$
+The expectation over $p$ is also same as before:
+$\displaystyle\mathbb{E}_{p}\big[\cdot\big]\triangleq\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}\big[\cdot\big]$
+F.1 Forward KL and its gradient
+The token-wise forward KL is
+$\displaystyle\mathrm{FKL}_{n}(\theta)\triangleq\mathrm{KL}\big(\pi_{\mathrm{ref}}(\cdot\mid h_{n})\,\|\,\pi_{\theta}(\cdot\mid h_{n})\big)=\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j)\log\frac{\pi_{\mathrm{ref}}(j)}{\pi_{\theta}(j)}.$
+Differentiating w.r.t. $\theta$ (note $\pi_{\mathrm{ref}}$ does not depend on $\theta$ ),
+$\displaystyle\nabla_{\theta}\mathrm{FKL}_{n}(\theta)$
+$\displaystyle=\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j)\,\nabla_{\theta}\!\left(\log\pi_{\mathrm{ref}}(j)-\log\pi_{\theta}(j)\right)=-\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j)\,\nabla_{\theta}\log\pi_{\theta}(j).$
+(96)
+We can rewrite (96) as an expectation over $p\sim\pi_{\theta}(\cdot\mid h_{n})$ using $w(p)$ :
+$\displaystyle-\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j)\,\nabla_{\theta}\log\pi_{\theta}(j)$
+$\displaystyle=-\sum_{j\in\mathcal{V}}\pi_{\theta}(j)\frac{\pi_{\mathrm{ref}}(j)}{\pi_{\theta}(j)}\,\nabla_{\theta}\log\pi_{\theta}(j)=-\mathbb{E}_{p}\!\Big[w(p)\,\nabla_{\theta}\log\pi_{\theta}(p)\Big].$
+(97)
+Finally, we use the score-mean identity $\mathbb{E}_{p}[\nabla_{\theta}\log\pi_{\theta}(p)]=0$ to obtain an equivalent form:
+$\displaystyle\nabla_{\theta}\mathrm{FKL}_{n}(\theta)=-\mathbb{E}_{p}\!\Big[w(p)\,\nabla_{\theta}\log\pi_{\theta}(p)\Big]=\mathbb{E}_{p}\!\Big[(1-w(p))\,\nabla_{\theta}\log\pi_{\theta}(p)\Big].$
+(98)
+F.2 The K5 estimator has unbiased value
+We propose the forward-KL estimator
+$\displaystyle(\mathbf{K5})_{n}\triangleq\mathrm{sg}(w(p))\log w(p)+\log r(p,\theta).$
+(99)
+For the KL value estimation, note that $r(p,\theta)=1$ in the forward pass, so $\log r(p,\theta)=0$ in value. Therefore
+$\displaystyle\mathbb{E}_{p}\big[(\mathbf{K5})_{n}\big]$
+$\displaystyle=\mathbb{E}_{p}\big[w(p)\log w(p)\big]=\sum_{j\in\mathcal{V}}\pi_{\theta}(j)\frac{\pi_{\mathrm{ref}}(j)}{\pi_{\theta}(j)}\log\frac{\pi_{\mathrm{ref}}(j)}{\pi_{\theta}(j)}$
+$\displaystyle=\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j)\log\frac{\pi_{\mathrm{ref}}(j)}{\pi_{\theta}(j)}=\mathrm{FKL}_{n}(\theta),$
+(100)
+which is the token-wise forward KL.
+F.3 The K5 estimator has unbiased gradient
+We next show that $\mathbb{E}_{p}[\nabla_{\theta}(\mathbf{K5})_{n}]=\nabla_{\theta}\mathrm{FKL}_{n}(\theta)$ .
+First, compute the gradient of each term in (99). Since $\mathrm{sg}(w(p))$ is treated as a constant in backprop,
+$\displaystyle\nabla_{\theta}\big(\mathrm{sg}(w(p))\log w(p)\big)=\mathrm{sg}(w(p))\,\nabla_{\theta}\log w(p).$
+Because $\log w(p)=\log\pi_{\mathrm{ref}}(p)-\log\pi_{\theta}(p)$ and $\pi_{\mathrm{ref}}$ is fixed,
+$\displaystyle\nabla_{\theta}\log w(p)=-\nabla_{\theta}\log\pi_{\theta}(p)\qquad\nabla_{\theta}\log r(p,\theta)=\nabla_{\theta}\log\pi_{\theta}(p).$
+Combining them yields the per-sample gradient
+$\displaystyle\nabla_{\theta}(\mathbf{K5})_{n}=-\mathrm{sg}(w(p))\,\nabla_{\theta}\log\pi_{\theta}(p)+\nabla_{\theta}\log\pi_{\theta}(p)=(1-w(p))\,\nabla_{\theta}\log\pi_{\theta}(p).$
+(101)
+Taking expectation over $p\sim\pi_{\theta}(\cdot\mid h_{n})$ gives
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathbf{K5})_{n}\big]=\mathbb{E}_{p}\!\Big[(1-w(p))\,\nabla_{\theta}\log\pi_{\theta}(p)\Big]=\nabla_{\theta}\mathrm{FKL}_{n}(\theta),$
+(102)
+where the last equality follows from (98).
+F.4 Variance reduction in K5 gradients
+We start from the exact forward-KL gradient written in the importance-weighted form (Eq. (97)):
+$\displaystyle\nabla_{\theta}\mathrm{FKL}_{n}(\theta)=-\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}\Big[w(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big],\qquad w(p)=\frac{\pi_{\mathrm{ref}}(p\mid h_{n})}{\pi_{\theta}(p\mid h_{n})}.$
+A key observation is that under the same sampling distribution $p\sim\pi_{\theta}(\cdot\mid h_{n})$ ,
+the weight $w(p)$ has mean $1$ :
+$\displaystyle\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}[w(p)]$
+$\displaystyle=\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\frac{\pi_{\mathrm{ref}}(j\mid h_{n})}{\pi_{\theta}(j\mid h_{n})}=\sum_{j\in\mathcal{V}}\pi_{\mathrm{ref}}(j\mid h_{n})=1.$
+Therefore, we can subtract this constant baseline from $w(p)$ without changing the expectation of the gradient estimator.
+Indeed, using the score-mean identity $\mathbb{E}_{p\sim\pi_{\theta}(\cdot\mid h_{n})}[\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})]=0$ , we have
+$\displaystyle-\mathbb{E}_{p}\!\Big[w(p)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big]$
+$\displaystyle=-\mathbb{E}_{p}\!\Big[(w(p)-1)\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big]-\underbrace{\mathbb{E}_{p}\!\Big[1\cdot\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big]}_{=\,0}$
+$\displaystyle=\mathbb{E}_{p}\!\Big[(1-w(p))\,\nabla_{\theta}\log\pi_{\theta}(p\mid h_{n})\Big].$
+Thus, replacing $-w(p)$ with $(1-w(p))$ centered around $0$ preserves an unbiased gradient while typically reducing variance, known as the use of a baseline in policy gradient methods.
+Appendix G Bias-Variance Tradeoff in Top-k KL: An Illustrative Synthetic Setup
+This appendix specifies the synthetic setting used to produce Fig. 4. The goal is to isolate the bias–variance behavior of the Top-k Reverse KL estimator in a controlled regime that reflects how KL penalties are applied to LLM policies, while removing confounders such as long-horizon autoregressive dependencies.
+G.1 Token-wise i.i.d. simplification
+Let $\pi_{\theta}(\cdot\mid h_{n})$ be an LLM policy over the vocabulary $\mathcal{V}$ at token position $n$ given history $h_{n}=(x,y_{<n})$ , and let $\pi_{\text{ref}}(\cdot\mid h_{n})$ be the reference policy.
+The token-level reverse KL is:
+$\displaystyle\mathrm{KL}\big(\pi_{\theta}(\cdot\mid h_{n})\,\|\,\pi_{\text{ref}}(\cdot\mid h_{n})\big)=\sum_{j\in\mathcal{V}}\pi_{\theta}(j\mid h_{n})\log\frac{\pi_{\theta}(j\mid h_{n})}{\pi_{\text{ref}}(j\mid h_{n})}.$
+(103)
+To focus purely on the estimator (rather than the dynamics that produce $h_{n}$ ), we adopt the following simplification:
+(i.i.d. token-position assumption) Each token position contributes an i.i.d. draw from a common distribution over $(\pi,\pi_{\text{ref}})$ , and we analyze a representative position whose ground-truth objective is the reverse KL in (103). In other words, we ignore autoregressive coupling across positions when constructing synthetic tasks.
+G.2 Synthetic task and metric
+Under this assumption, each token position is treated as a draw of a single-step categorical policy pair $(\pi,\pi_{\text{ref}})$ over a fixed vocabulary $\mathcal{V}$ .
+We fix $|\mathcal{V}|=32000$ and sample
+$\displaystyle\pi_{\text{ref}}$
+$\displaystyle=\mathrm{softmax}(\tilde{z}_{\text{ref}}),\qquad\tilde{z}_{\text{ref}}\sim\mathcal{N}(0,I_{V}),$
+(104)
+$\displaystyle\pi$
+$\displaystyle=\mathrm{softmax}(s\cdot\tilde{z}),\qquad\tilde{z}\sim\mathcal{N}(0,I_{V}),\;s>0.$
+(105)
+Controlling concentration via top-32 mass.
+Define the top-32 probability mass
+$\displaystyle M_{32}(\pi)\;\triangleq\;\sum_{j\in\mathrm{TopK}(\pi,32)}\pi(j).$
+(106)
+We tune the logit scale $s$ so that $M_{32}(\pi)$ matches one of the target values
+$\displaystyle M_{32}(\pi)\approx m,\qquad m\in\{0.2,\,0.5,\,0.8,\,0.9\},$
+(107)
+thereby probing a range of entropy regimes from diffuse to highly concentrated policies.
+Estimators and error metric.
+We compare three per-token gradient estimators for the reverse-KL penalty:
+(i) sampled-only reverse KL (fully Monte Carlo),
+(ii) truncated-only (exact top-k head without tail correction; biased), and
+(iii) Top-k reverse KL (exact head plus masked sampled tail; unbiased).
+We sweep
+$\displaystyle K\in\{4,8,16,32,64,128,256\},\qquad B\in\{1,2,4,8,16,32,64,128,256,512,1024,2048,4096,8192,16384,32768\},$
+where $B$ denotes the number of i.i.d. samples drawn from $\pi$ (“batch tokens”) used by the sampled components of the estimators. For each estimator, we measure the relative root-mean-squared error (RMSE) of the per-token gradient:
+$\displaystyle\mathrm{RelRMSE}\;\triangleq\;\frac{\sqrt{\mathbb{E}\big[\|\hat{g}-g_{\text{true}}\|_{2}^{2}\big]}}{\|g_{\text{true}}\|_{2}},$
+(108)
+where $g_{\text{true}}$ is the exact gradient of (103) with respect to the token logits at that position, and $\hat{g}$ is the corresponding estimator. The expectation in (108) is approximated by Monte Carlo sampling and averaging over many independently generated synthetic tasks.
+Critical sample size.
+For each $K$ , the truncated-only estimator induces a bias floor (its error does not vanish with more samples since it omits the tail).
+The Top-k estimator is unbiased but has sampling variance from the tail correction.
+We define the critical sample size as the smallest $B$ beyond which Top-k KL achieves lower gradient error than Truncated KL, i.e., the intersection point between the Top-k RMSE curve and the truncated-only bias floor.
+Appendix H Top-k $\boldsymbol{f}$ -Divergence Estimator
+We generalize the Top- $k$ “truncated exact term + masked sampled tail” construction from KL to a broad class of
+$f$ -divergences, while retaining (i) unbiased value estimates and (ii) unbiased gradients under the convention
+$\mathbb{E}[\nabla_{\theta}(\cdot)]$ (i.e., the expectation of autodiff gradients of sampled scalars).
+Setup and notation.
+Fix a token position $n$ and prefix $h_{n}=(x,y_{0:n-1})$ .
+Let the current policy at this position be
+$\displaystyle P_{\theta}(j)\triangleq\pi_{\theta}(j\mid h_{n}),\qquad j\in\mathcal{V},$
+and let the reference policy be
+$\displaystyle Q(j)\triangleq\pi_{\mathrm{ref}}(j\mid h_{n}),$
+which is treated as independent of $\theta$ .
+We use an explicit expectation shorthand:
+$\displaystyle\mathbb{E}_{p}\big[\cdot\big]\triangleq\mathbb{E}_{p\sim P_{\theta}(\cdot)}\big[\cdot\big]$
+H.1 $f$ -divergence and its gradients
+Let $f:\mathbb{R}_{+}\to\mathbb{R}$ be convex with $f(1)=0$ . The (discrete) $f$ -divergence is
+$\displaystyle D_{f}(P_{\theta}\|Q)\triangleq\sum_{j\in\mathcal{V}}Q(j)\,f\!\left(\frac{P_{\theta}(j)}{Q(j)}\right).$
+(109)
+Define the likelihood ratio and its inverse
+$\displaystyle t(j)\triangleq\frac{P_{\theta}(j)}{Q(j)},\qquad w(j)\triangleq\frac{Q(j)}{P_{\theta}(j)}=\frac{1}{t(j)}.$
+(110)
+Eq. (109) can be written as an expectation under $Q$ :
+$\displaystyle D_{f}(P_{\theta}\|Q)=\mathbb{E}_{j\sim Q}\big[f(t(j))\big].$
+(111)
+It also admits an equivalent importance-weighted expectation under $P_{\theta}$ .
+Define
+$\displaystyle g_{f}(w)\triangleq w\,f(1/w).$
+(112)
+Then
+$\displaystyle D_{f}(P_{\theta}\|Q)$
+$\displaystyle=\sum_{j\in\mathcal{V}}Q(j)\,f\!\left(\frac{P_{\theta}(j)}{Q(j)}\right)=\sum_{j\in\mathcal{V}}P_{\theta}(j)\,\frac{Q(j)}{P_{\theta}(j)}\,f\!\left(\frac{P_{\theta}(j)}{Q(j)}\right)$
+$\displaystyle=\sum_{j\in\mathcal{V}}P_{\theta}(j)\,g_{f}\!\left(w(j)\right)=\mathbb{E}_{p}\big[g_{f}(w(p))\big],$
+(113)
+where $p\sim P_{\theta}(\cdot)$ and $w(p)=Q(p)/P_{\theta}(p)$ .
+H.1.1 Exact gradient w.r.t. $\theta$ (reference policy fixed)
+Since $Q$ is fixed, differentiating (109) yields
+$\displaystyle\nabla_{\theta}D_{f}(P_{\theta}\|Q)$
+$\displaystyle=\sum_{j\in\mathcal{V}}Q(j)\,f^{\prime}(t(j))\,\nabla_{\theta}\!\left(\frac{P_{\theta}(j)}{Q(j)}\right)=\sum_{j\in\mathcal{V}}f^{\prime}(t(j))\,\nabla_{\theta}P_{\theta}(j)$
+$\displaystyle=\sum_{j\in\mathcal{V}}P_{\theta}(j)\,f^{\prime}(t(j))\,\nabla_{\theta}\log P_{\theta}(j)=\mathbb{E}_{p}\Big[f^{\prime}(t(p))\,\nabla_{\theta}\log P_{\theta}(p)\Big].$
+(114)
+Eq. (114) is the policy-gradient-shaped form used throughout this appendix.
+H.2 A generic, unbiased, sampled $f$ -divergence estimator
+We define the following quantities as before:
+$\displaystyle r(p)\triangleq\frac{P_{\theta}(p)}{\mathrm{sg}\big(P_{\theta}(p)\big)}\qquad g_{f}(w(p))\triangleq w(p)\,f(1/w(p))\qquad w(p)=\frac{Q(p)}{P_{\theta}(p)}$
+Then we have our sampled $f$ -divergence estimator, $\mathbf{K}f^{++}$ :
+$\displaystyle(\mathbf{K}f^{++})_{n}\triangleq r(p)\,g_{f}(w(p)),\qquad p\sim P_{\theta}(\cdot).$
+(115)
+Which in effect becomes:
+$\displaystyle\boxed{(\mathbf{K}f^{++})_{n}=\mathrm{sg}\bigg(\frac{Q(p)}{P_{\theta}(p)}\bigg)f\bigg(\frac{P_{\theta}(p)}{Q(p)}\bigg)=\mathrm{sg}(w)\,f(1/w)}$
+(116)
+Another way to write this expression is $(\mathbf{K}f^{++})_{n}=\mathrm{sg}\left(\frac{\pi_{\text{ref}}(p\mid h_{n})}{\pi_{\theta}(p\mid h_{n})}\right)f\left(\frac{\pi_{\theta}(p\mid h_{n})}{\pi_{\text{ref}}(p\mid h_{n})}\right)$ .
+Unbiased value.
+Since $r=1$ in the forward pass, from (113) we have
+$\displaystyle\mathbb{E}_{p}\big[(\mathbf{K}f^{++})_{n}\big]=\mathbb{E}_{p}\big[g_{f}(w(p))\big]=D_{f}(P_{\theta}\|Q).$
+(117)
+Unbiased gradient under $\mathbb{E}[\nabla_{\theta}(\cdot)]$ .
+Differentiate (115) using product rule:
+$\displaystyle\nabla_{\theta}(\mathbf{K}f^{++})_{n}=g_{f}(w(p))\,\nabla_{\theta}r(p)+r(p)\,\nabla_{\theta}g_{f}(w(p))=g_{f}(w(p))\,\nabla_{\theta}\log P_{\theta}(p)+\nabla_{\theta}g_{f}(w(p))$
+(118)
+Taking expectation over $p\sim P_{\theta}(\cdot)$ gives
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathbf{K}f^{++})_{n}\big]=\nabla_{\theta}\mathbb{E}_{p}\big[g_{f}(w(p))\big]=\nabla_{\theta}D_{f}(P_{\theta}\|Q),$
+(119)
+where the last equality follows from (113).
+Thus $(\mathbf{K}f^{++})_{n}$ provides both unbiased values and unbiased gradients for any $f$ -divergence.
+H.3 Top-k $f$ -divergence estimator: A generalization of Top-k KL estimator
+Let $S\subseteq\mathcal{V}$ be any index set of size $K$ (e.g., $S=\mathrm{Topk}(P_{\theta})$ or $S=\mathrm{Topk}(Q)$ ).
+Being an unbiased estimator does not require $S$ to be Top- $K$ ; Top- $K$ is a variance/compute heuristic.
+Truncated exact term.
+Define the truncated $f$ -divergence (computed exactly given logits on $S$ ):
+$\displaystyle\boxed{(\widehat{D}_{f,\mathrm{trun}})_{n}\triangleq\sum_{j\in S}Q(j)\,f\!\left(\frac{P_{\theta}(j)}{Q(j)}\right)}$
+(120)
+Masked sampled tail term.
+Sample $p\sim P_{\theta}(\cdot)$ and define the masked tail estimator
+$\displaystyle\boxed{(\widehat{D}_{f,\mathrm{tail}})_{n}\triangleq\mathbf{1}\{p\notin S\}\,(\mathbf{K}f^{++})_{n}}=\mathbf{1}\{p\notin S\}\,r(p)\,g_{f}\!\left(\frac{Q(p)}{P_{\theta}(p)}\right)$
+(121)
+Top-k $f$ -divergence estimator.
+We define the Top- $K$ $f$ -divergence estimator
+$\displaystyle\boxed{(\mathrm{TopK}\text{-}D_{f})_{n}\triangleq(\widehat{D}_{f,\mathrm{trun}})_{n}+(\widehat{D}_{f,\mathrm{tail}})_{n}}$
+(122)
+Unbiased value.
+Using (113) and the definition of $g_{f}$ ,
+$\displaystyle\mathbb{E}_{p}\big[(\widehat{D}_{f,\mathrm{tail}})_{n}\big]$
+$\displaystyle=\sum_{j\in\mathcal{V}}P_{\theta}(j)\,\mathbf{1}\{j\notin S\}\,g_{f}\!\left(\frac{Q(j)}{P_{\theta}(j)}\right)=\sum_{j\notin S}Q(j)\,f\!\left(\frac{P_{\theta}(j)}{Q(j)}\right),$
+(123)
+so
+$\displaystyle\mathbb{E}_{p}\big[(\mathrm{TopK}\text{-}D_{f})_{n}\big]=(\widehat{D}_{f,\mathrm{trun}})_{n}+\mathbb{E}_{p}\big[(\widehat{D}_{f,\mathrm{tail}})_{n}\big]=D_{f}(P_{\theta}\|Q).$
+(124)
+Unbiased gradient.
+Since $(\widehat{D}_{f,\mathrm{trun}})_{n}$ is computed exactly on $S$ , it has the correct gradient contribution from indices in $S$ . For the tail term,
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\widehat{D}_{f,\mathrm{tail}})_{n}\big]=\mathbb{E}_{p}\big[\mathbf{1}\{p\notin S\}\,\nabla_{\theta}(\mathbf{K}f^{++})_{n}\big]=\nabla_{\theta}\sum_{j\notin S}Q(j)\,f\!\left(\frac{P_{\theta}(j)}{Q(j)}\right),$
+(125)
+where the last step follows by expanding the expectation as a sum over $j\notin S$ and using the property
+(119) of our sampled $f$ -divergence estimator $\mathbf{K}f^{++}$ restricted to the tail indices. Therefore,
+$\displaystyle\mathbb{E}_{p}\big[\nabla_{\theta}(\mathrm{TopK}\text{-}D_{f})_{n}\big]=\nabla_{\theta}D_{f}(P_{\theta}\|Q).$
+(126)
+A note on variance reduction in Forward and Reverse KL gradient estimators.
+•
+The Forward KL estimator derived from the standard $f$ -divergence formula in Eq (116) is $\mathrm{sg}(w)\log w$ , which differs from our K5 estimator $\mathrm{sg}(w)\log w+\log r$ . This is explained in §F.4: the additional term $\log r$ is added as a baseline to reduce gradient variance, where the baseline is $\mathbb{E}[\mathrm{sg}(w)]=1$ .
+•
+The Reverse KL estimator derived from Eq (116) is $r\cdot(-\log w)$ ; this also differs from our K4 estimator $r\cdot\mathrm{sg}(-\log w)$ . The reason is similar: for reverse KL, the baseline is $\mathbb{E}[-\log w]=0$ , and $\mathbb{E}[-\nabla_{\theta}\log w]=\mathbb{E}[\nabla_{\theta}\log\pi_{\theta}(y|x)]=0$ . As a result, doing a stop gradient operation on $(-\log w)$ keeps the gradients unbiased while reducing variance, so we do a stop gradient on the $(-\log w)$ term in K4.
+Table 5:
+Top-k $f$ -divergence estimators.
+Let $P_{\theta}(j)=\pi_{\theta}(j|h_{n}),\ Q(j)=\pi_{\mathrm{ref}}(j|h_{n}),\ t_{j}=P_{\theta}(j)/Q(j)$ .
+Sample $p\sim P_{\theta}(\cdot)$ . We compute $r=P_{\theta}(p)/\mathrm{sg}(P_{\theta}(p))$ , $w=Q(p)/P_{\theta}(p)$ . Note that $\mathrm{sg}(w)/w=r$ .
+$\boldsymbol{f(t)}$ (so $D_{f}=\sum_{j}Q(j)\,f(t_{j})$ )
+Sampled $f$ -divergence estimator $=\mathrm{sg}(w)\,f(1/w)$
+Forward KL
+$-\log t$
+$\mathrm{sg}(w)\cdot\log w$
+Reverse KL
+$t\log t$
+$r\cdot(-\log w)$
+Pearson $\chi^{2}$
+$(t-1)^{2}$
+$r\cdot\frac{(1-w)^{2}}{w}$
+Neyman $\chi^{2}$
+$\dfrac{(t-1)^{2}}{t}$
+$r\cdot(1-w)^{2}$
+Squared Hellinger
+$\tfrac{1}{2}(\sqrt{t}-1)^{2}$
+$r\cdot\tfrac{1}{2}(1-\sqrt{w})^{2}$
+Jensen–Shannon (JS)
+$\displaystyle{\textstyle\frac{1}{2}}\left(t\log t-(t+1)\log\!\Big(\frac{t+1}{2}\Big)\right)$
+$\displaystyle r\cdot{\textstyle\frac{1}{2}}\Big[-\log w-(1+w)\log\!\Big(\frac{1+w}{2w}\Big)\Big]$
+Total variation (TV)
+$\tfrac{1}{2}|t-1|$
+$r\cdot\tfrac{1}{2}|1-w(p)|$
+$\alpha$ -divergence
+$\displaystyle\frac{t^{\alpha}-1-\alpha(t-1)}{\alpha(\alpha-1)},\ \alpha\neq 0,1$
+$\displaystyle r\cdot\frac{w^{1-\alpha}+(\alpha-1)w-\alpha}{\alpha(\alpha-1)}$
+Appendix I Optimal Policies under Forward vs Reverse KL Regularization
+We now study the optimal policies under different types of regularizers and see if the optimal policies are interchangeable.
+The RL objectives under reverse and forward KL regularization are:
+$\displaystyle J$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}[R(x,y)]-\beta\,\mathrm{KL}(\pi_{\theta}(\cdot\mid x)\|\pi_{\text{ref}}(\cdot\mid x))$
+(127)
+$\displaystyle J_{f}$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}(\cdot\mid x)}[R(x,y)]-\beta\mathrm{KL}(\pi_{\text{ref}}(\cdot\mid x)\|\pi_{\theta}(\cdot\mid x))$
+(128)
+Optimal Policy under Reverse KL
+It is well known that the optimal policy for objective (127) is (Peters et al., 2010; Schulman et al., 2017a; Abdolmaleki et al., 2018):
+$\displaystyle\boxed{\pi^{*}(y|x)=\pi_{\text{ref}}(y|x)\,\dfrac{\exp(R(x,y)/\beta)}{Z(x)}}\qquad Z(x)={\sum}_{y}\pi_{\text{ref}}(y|x)\exp(R(x,y)/\beta)$
+(129)
+Optimal Policy under Forward KL
+We derive the optimal policy for objective (128). Expanding the forward KL:
+$\displaystyle J_{f}$
+$\displaystyle={\sum}_{y}\pi_{\theta}(y|x)R(x,y)+\beta\;{\sum}_{y}\pi_{\text{ref}}(y|x)\log\pi_{\theta}(y|x)+\text{const}$
+(130)
+where the constant absorbs terms independent of $\pi_{\theta}$ . This objective decomposes into an RL term (first sum) and a behavioral cloning (BC) term (second sum). Forming the Lagrangian:
+$\displaystyle\mathcal{L}$
+$\displaystyle={\sum}_{y}\pi_{\theta}(y|x)R(x,y)+\beta\;{\sum}_{y}\pi_{\text{ref}}(y|x)\log\pi_{\theta}(y|x)-\lambda\left({\sum}_{y}\pi_{\theta}(y|x)-1\right)$
+$\displaystyle\frac{\partial\mathcal{L}}{\partial\pi_{\theta}(y|x)}$
+$\displaystyle=R(x,y)+\beta\;\frac{\pi_{\text{ref}}(y|x)}{\pi_{\theta}(y|x)}-\lambda=0$
+$\displaystyle\pi_{\theta}(y\mid x)$
+$\displaystyle=\frac{\beta\;\pi_{\text{ref}}(y\mid x)}{\lambda-R(x,y)}$
+For this to be a valid probability distribution, we need $\lambda>\max_{y}R(x,y)$ . Denote $Z^{*}(x):=\lambda$ , we require $Z^{*}(x)$ to satisfy:
+$\displaystyle{\sum}_{y}\frac{\pi_{\text{ref}}(y\mid x)}{Z^{*}(x)-R(x,y)}=\frac{1}{\beta}$
+(131)
+Equation (131) implicitly defines $Z^{*}(x)$ as a function of the reward distribution as well. The optimal policy is:
+$\displaystyle\boxed{\pi_{f}^{*}(y\mid x)=\pi_{\text{ref}}(y\mid x)\,\dfrac{\beta}{Z^{*}(x)-R(x,y)}}$
+(132)
+A similar result was obtained in (Grill et al., 2020a) under a different context.
+I.1 Reward transformation for equivalent optima between forward KL and reverse KL
+We now derive the reward transformation that makes the two objectives yield the same optimal policy.
+$\displaystyle\pi^{*}(y\mid x)=\pi_{f}^{*}(y\mid x)\qquad\frac{\pi_{\text{ref}}(y|x)\exp(\tilde{R}/\beta)}{Z(x)}=\frac{\beta\;\pi_{\text{ref}}(y\mid x)}{Z^{*}(x)-R(x,y)}$
+(133)
+Therefore, the optimal policy under reward function $R$ and forward KL regularizer is equivalent to the counterpart under reward function $\tilde{R}$ and reverse KL regularizer:
+$\displaystyle\text{Forward KL (with $R$)}\rightarrow\text{Reverse KL (with $\tilde{R}$)}\qquad\boxed{\tilde{R}=-\beta\log(Z^{*}-R)+\beta\log(\beta Z)}$
+(134)
+Proposition I.1.
+The function $\tilde{R}=-\beta\log(Z^{*}-R)+\text{const}$ is strictly monotonically increasing and strictly convex in $R$ .
+Proof.
+Taking the derivative with respect to $R$ (treating $Z^{*}$ as constant):
+$\frac{\partial\tilde{R}}{\partial R}=-\beta\cdot\frac{-1}{Z^{*}-R}=\frac{\beta}{Z^{*}-R}>0$ .
+The last step was due to $Z^{*}>\max_{y}R(x,y)$ by construction. Thus $\tilde{R}$ is strictly monotonically increasing in $R$ .
+Taking the second derivative:
+$\frac{\partial^{2}\tilde{R}}{\partial R^{2}}=\frac{\partial}{\partial R}\left(\frac{\beta}{Z^{*}-R}\right)=\beta\cdot\frac{1}{(Z^{*}-R)^{2}}=\frac{\beta}{(Z^{*}-R)^{2}}>0$ .
+Thus $\tilde{R}$ is strictly convex in $R$ .
+∎
+Inverse transformation:
+Given a reward $R$ used in the reverse KL objective $J$ , what reward $R_{f}$ should be used in the forward KL objective $J_{f}$ to obtain the same optimal policy?
+Setting $\pi^{*}(y|x)=\pi_{f}^{*}(y|x)$ , we have ${\exp(R/\beta)}/{Z}={\beta}/{(Z^{*}-R_{f})}$ , which simplifies to:
+$\displaystyle\text{Reverse KL (with $R$)}\rightarrow\text{Forward KL (with $R_{f}$)}\qquad\boxed{R_{f}=Z^{*}-\beta Z\exp(-R/\beta)}$
+(135)
+Proposition I.2.
+The function $R_{f}=Z^{*}-\beta Z\exp(-R/\beta)$ is strictly monotonically increasing and strictly concave in $R$ .
+Proof.
+Taking first-order derivative
+$\frac{\partial R_{f}}{\partial R}=-\beta Z\cdot\left(-\frac{1}{\beta}\right)\exp(-R/\beta)=Z\exp(-R/\beta)>0$ ; therefore, $R_{f}$ is strictly monotonically increasing (preserving reward ordering).
+The second-order derivative is
+$\frac{\partial^{2}R_{f}}{\partial R^{2}}=Z\cdot\left(-\frac{1}{\beta}\right)\exp(-R/\beta)=-\frac{Z}{\beta}\exp(-R/\beta)<0$ , we find that $R_{f}$ is strictly concave (compressing high rewards).
+∎
+Direction
+Transformation
+Monotonic?
+Curvature
+Effect
+Forward KL $\to$ Reverse KL
+$-\beta\log(Z^{*}-R)+\text{const}$
+Yes
+Convex
+Amplify high rewards
+Reverse KL $\to$ Forward KL
+$Z^{*}-\beta Ze^{-R/\beta}$
+Yes
+Concave
+Compress high rewards
+I.2 Reward transformation for equivalent optima across $f$ -divergences
+We now generalize beyond KL divergence to arbitrary $f$ -divergence regularization. Consider the objective:
+$\displaystyle J_{f}=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}[R(x,y)]-\beta\,D_{f}(\pi_{\theta}(\cdot|x)\|\pi_{\text{ref}}(\cdot|x))$
+(136)
+where the $f$ -divergence is defined as $D_{f}(P\|Q)=\sum_{y}Q(y)\,f\left(\frac{P(y)}{Q(y)}\right)$ where $f:\mathbb{R}^{+}\to\mathbb{R}$ is a convex function with $f(1)=0$ . Standard KKT conditions yield the optimal policy:
+$\displaystyle\boxed{\pi_{f}^{*}(y\mid x)=\pi_{\text{ref}}(y\mid x)\cdot(f^{\prime})^{-1}\left(\frac{R(x,y)-\lambda(x)}{\beta}\right)}$
+(137)
+where $\lambda(x)$ is determined by the normalization constraint:
+$\displaystyle\sum_{y}\pi_{\text{ref}}(y\mid x)\cdot(f^{\prime})^{-1}\left(\frac{R(x,y)-\lambda(x)}{\beta}\right)=1$
+(138)
+which was previously derived in (Wang et al., 2023).
+Given two $f$ -divergences with $f_{1}$ and $f_{2}$ , the optimal policies $\pi_{f_{1}}^{*}$ and $\pi_{f_{2}}^{*}$ coincide when:
+$\displaystyle(f_{1}^{\prime})^{-1}\left(\frac{R_{1}-\lambda_{1}}{\beta}\right)=(f_{2}^{\prime})^{-1}\left(\frac{R_{2}-\lambda_{2}}{\beta}\right)$
+(139)
+This yields the general reward transformation:
+$\displaystyle\boxed{R_{2}=\beta\cdot f_{2}^{\prime}\left((f_{1}^{\prime})^{-1}\left(\frac{R_{1}-\lambda_{1}}{\beta}\right)\right)+\lambda_{2}}$
+(140)
+The curvature of this transformation is determined by the composition $(f_{2}^{\prime})\circ(f_{1}^{\prime})^{-1}$ .
+Table 6:
+Optimal Policy form under the each $f$ -divergence regularization.
+Divergence
+$f(t)$
+$f^{\prime}(t)$
+$(f^{\prime})^{-1}(s)$
+Optimal Policy Form
+Reverse KL
+$t\log t-t+1$
+$\log t$
+$e^{s}$
+$\pi_{\text{ref}}\cdot\exp\!\big((R-\lambda)/\beta\big)$
+Forward KL
+$-\log t+t-1$
+$1-\frac{1}{t}$
+$\frac{1}{1-s}$
+$\pi_{\text{ref}}\cdot\frac{1}{1-(R-\lambda)/\beta}$
+Jensen-Shannon
+$\frac{1}{2}\!\left[t\log t-(t+1)\log\!\Big(\frac{t+1}{2}\Big)\right]$
+$\frac{1}{2}\log\!\Big(\frac{2t}{t+1}\Big)$
+$\frac{1}{2e^{-2s}-1}$
+$\pi_{\text{ref}}\cdot\frac{\exp\!\big(2(R-\lambda)/\beta\big)}{2-\exp\!\big(2(R-\lambda)/\beta\big)}$
+Squared Hellinger
+$(\sqrt{t}-1)^{2}=t-2\sqrt{t}+1$
+$1-\frac{1}{\sqrt{t}}$
+$\frac{1}{(1-s)^{2}}$
+$\pi_{\text{ref}}\cdot\frac{1}{\big(1-(R-\lambda)/\beta\big)^{2}}$
+Pearson $\chi^{2}$
+$\frac{1}{2}(t-1)^{2}$
+$t-1$
+$s+1$
+$\pi_{\text{ref}}\cdot\Big(1+\frac{R-\lambda}{\beta}\Big)$
+Neyman $\chi^{2}$
+$\frac{(t-1)^{2}}{t}=t-2+\frac{1}{t}$
+$1-\frac{1}{t^{2}}$
+$\frac{1}{\sqrt{1-s}}$
+$\pi_{\text{ref}}\cdot\frac{1}{\sqrt{1-(R-\lambda)/\beta}}$
+$\alpha$ -divergence
+$\frac{4}{1-\alpha^{2}}\Big(1-t^{\frac{1+\alpha}{2}}\Big)$
+$-\frac{2}{1-\alpha}\,t^{\frac{\alpha-1}{2}}$
+$\left(-\frac{1-\alpha}{2}\,s\right)^{\frac{2}{\alpha-1}}$
+$\pi_{\text{ref}}\cdot\left(-\frac{1-\alpha}{2}\cdot\frac{R-\lambda}{\beta}\right)^{\frac{2}{\alpha-1}}$
+Table 7:
+Reward transformations that produce the same optimal policy as each $f$ -divergence under Reverse KL.
+Let $\lambda$ and $\widetilde{\lambda}$ be normalization constants enforcing ${\sum}_{y}\pi^{*}(y\mid x)=1$ for the $f$ -divergence and Reverse KL objectives, respectively.
+Then the equivalence is achieved by $\widetilde{R}(x,y)=\beta\log\!\big((f^{\prime})^{-1}((R-\lambda)/\beta)\big)+\widetilde{\lambda}$ , for each $f(\cdot)$ in $f$ -divergence.
+Divergence $f$ (target)
+$(f^{\prime})^{-1}(s)$
+Reverse-KL reward transform $\widetilde{R}(x,y)$
+Ranges of $\lambda(x)$
+Forward KL
+$\dfrac{1}{1-s}$
+$-\beta\log\!\Big(1-\dfrac{R-\lambda}{\beta}\Big)+\widetilde{\lambda}$
+$\lambda>R-\beta$
+Jensen–Shannon
+$\dfrac{1}{2e^{-2s}-1}$
+$-\beta\log\!\Big(2\exp\!\big(-2\dfrac{R-\lambda}{\beta}\big)-1\Big)+\widetilde{\lambda}$
+$\lambda>R-\frac{\beta}{2}\log 2$
+Squared Hellinger
+$\dfrac{1}{(1-s)^{2}}$
+$-2\beta\log\!\Big(1-\dfrac{R-\lambda}{\beta}\Big)+\widetilde{\lambda}$
+$\lambda>R-\beta$
+Pearson $\chi^{2}$
+$1+s$
+$\beta\log\!\Big(1+\dfrac{R-\lambda}{\beta}\Big)+\widetilde{\lambda}$
+$\lambda<R+\beta$
+Neyman $\chi^{2}$
+$\dfrac{1}{\sqrt{1-s}}$
+$-\dfrac{\beta}{2}\log\!\Big(1-\dfrac{R-\lambda}{\beta}\Big)+\widetilde{\lambda}$
+$\lambda>R-\beta$
+$\alpha$ -divergence
+$\left(-\dfrac{1-\alpha}{2}\,s\right)^{\frac{2}{\alpha-1}}$
+$\dfrac{2\beta}{\alpha-1}\log\!\Big(-\dfrac{1-\alpha}{2}\cdot\dfrac{R-\lambda}{\beta}\Big)+\widetilde{\lambda}$
+$-\,(1-\alpha)(R-\lambda)>0$
+Appendix J Policy Gradient Methods can be Derived from Sampled KL Estimators
+If RL optimization is simply written as closing the reverse KL between current policy $\pi_{\theta}$ and the reference policy distribution $\pi_{\text{ref}}$ transformed by the return $R$ (Peters and Schaal, 2007; Schulman et al., 2017a; Haarnoja et al., 2018), we have:
+$\displaystyle\min_{\theta}\mathrm{KL}\bigg(\pi_{\theta}(\cdot|x)\Big|\Big|\dfrac{1}{Z(x)}\pi_{\text{ref}}(\cdot|x)\exp\Big(R(x,\cdot)\Big)\bigg)$
+(141)
+to make the connection with sampled KL estimators clear, we define the ratio between the optimal policy $\pi^{*}$ and current policy $\pi_{\theta}$ as $w$ , same as before:
+$\displaystyle w=\dfrac{\pi_{\text{ref}}(y|x)\,\exp R(x,y)}{\pi_{\theta}(y|x)\,Z(x)}$
+(142)
+where the partition function $Z(x)$ is approximated via a group of $N$ trajectories per prompt $y^{(i)}\sim\pi_{\theta}(\cdot\mid x)$ for $i=1,\dots,N$ :
+$\displaystyle\log Z(x)\triangleq\log\mathbb{E}_{\pi_{\text{ref}}(y|x)}[\exp R(x,y)]$
+$\displaystyle\approx\log\dfrac{1}{N}\sum_{i=1}^{N}\mathrm{sg}\left({\frac{\pi_{\text{ref}}(y^{(i)}\mid x)}{\pi_{\theta}(y^{(i)}\mid x)}}\right)\exp\Big(R(x,y^{(i)})\Big)$
+(143)
+$\displaystyle\geq\dfrac{1}{N}\sum_{i=1}^{N}\left(R(x,y^{(i)})-\mathrm{sg}\left(\log{\frac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}}\right)\right)$
+(144)
+where the last step uses Jensen’s inequality. We split it into two terms, value function ( $V(x)$ ) and aggregate KL ( $\widehat{\mathrm{KL}}$ ):
+$\displaystyle V(x)\triangleq\mathbb{E}_{\begin{subarray}{c}y^{(i)}\sim\pi_{\theta}(\cdot\mid x)\\
+i=1,\dots,N\end{subarray}}\left[\dfrac{1}{N}\sum_{i=1}^{N}R(x,y^{(i)})\right]\qquad\widehat{\mathrm{KL}}\triangleq\mathbb{E}_{\begin{subarray}{c}y^{(i)}\sim\pi_{\theta}(\cdot\mid x)\\
+i=1,\dots,N\end{subarray}}\left[\dfrac{1}{N}\sum_{i=1}^{N}\mathrm{sg}\left(\log{\frac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}}\right)\right]$
+(145)
+As a side note, to sharpen or flatten the target distribution, we simply need to multiply all rewards by $1/\beta$ ; as a result, we omit $\beta$ in our derivation and let it be absorbed by $R(x,y)$ .
+Next, we show that every sampled KL estimator in Tab 1 can be turned into a policy gradient algorithm.
+J.1 K1 estimator leads to on-policy PPO / GRPO loss
+We start with $\mathbf{K1}=-\log w$ :
+$\displaystyle\text{K1:}\quad\min_{\theta}-\log w\qquad\nabla_{\theta}L_{1}$
+$\displaystyle=-\nabla_{\theta}\log{\pi_{\theta}(y|x)}\bigg(R(x,y)-\log Z(x)\bigg)$
+$\displaystyle=-\nabla_{\theta}\log{\pi_{\theta}(y|x)}\left(R(x,y)-V(x)+\frac{1}{N}\sum_{i=1}^{N}\mathrm{sg}\left(\log\dfrac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}\right)\right)$
+Summing over all $N$ rollouts, we get
+$\displaystyle\underbrace{-\sum_{j=1}^{N}\nabla_{\theta}\log{\pi_{\theta}(y^{(j)}\mid x)}\bigg(R(x,y^{(j)})-V(x)\bigg)}_{\text{REINFORCE}}+\underbrace{\sum_{j=1}^{N}\nabla_{\theta}\log{\pi_{\theta}(y^{(j)}\mid x)}\left(\frac{1}{N}\sum_{i=1}^{N}\mathrm{sg}\left(\log\dfrac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}\right)\right)}_{\text{The regularizer gradient $\mathbb{E}_{y^{(j)}\sim\pi_{\theta}}[\sum_{j=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(j)}\mid x)\widehat{\mathrm{KL}}]$}}$
+Lemma J.1.
+The regularizer gradient $\mathbb{E}_{y^{(j)}\sim\pi_{\theta}}[\sum_{j=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(j)}\mid x)\widehat{\mathrm{KL}}]$ is equivalent to the expected KL gradient:
+$\displaystyle\mathbb{E}_{\begin{subarray}{c}y^{(j)}\sim\pi_{\theta}(\cdot\mid x)\\
+j=1,\dots,N\end{subarray}}\left[\sum_{j=1}^{N}\nabla_{\theta}\log{\pi_{\theta}(y^{(j)}\mid x)}\,\widehat{\mathrm{KL}}\right]$
+$\displaystyle=\mathbb{E}_{\begin{subarray}{c}y^{(j)}\sim\pi_{\theta}(\cdot\mid x)\\
+j=1,\dots,N\end{subarray}}\left[\dfrac{1}{N}\sum_{j=1}^{N}\nabla_{\theta}\log{\pi_{\theta}(y^{(j)}\mid x)}\,\mathrm{sg}\left(\log{\textstyle\frac{\pi_{\theta}(y^{(j)}\mid x)}{\pi_{\text{ref}}(y^{(j)}\mid x)}}\right)\right]$
+(146)
+$\displaystyle=\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot\mid x)\parallel\pi_{\text{ref}}(\cdot\mid x))$
+Proof.
+Expanding the product of sums gives
+$\mathbb{E}_{\begin{subarray}{c}y^{(j)}\sim\pi_{\theta}(\cdot\mid x)\\
+j=1,\dots,N\end{subarray}}\left[\sum_{j=1}^{N}\nabla_{\theta}\log{\pi_{\theta}(y^{(j)}\mid x)}\,\widehat{\mathrm{KL}}\right]=\mathbb{E}_{\begin{subarray}{c}y^{(j)}\sim\pi_{\theta}(\cdot\mid x)\\
+j=1,\dots,N\end{subarray}}\left[\frac{1}{N}\sum_{i=1}^{N}\sum_{j=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(j)}\mid x)\,\mathrm{sg}\!\left(\log\frac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}\right)\right]$
+which can be written as two components:
+$\displaystyle\frac{1}{N}\sum_{i=1}^{N}\sum_{j=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(j)}\mid x)\,\mathrm{sg}\!\left(\log\frac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}\right)$
+$\displaystyle=$
+$\displaystyle\underbrace{\frac{1}{N}\sum_{j=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(j)}\mid x)\,\mathrm{sg}\Big(\log\frac{\pi_{\theta}(y^{(j)}\mid x)}{\pi_{\text{ref}}(y^{(j)}\mid x)}\Big)}_{\text{= $\mathbb{E}_{y\sim\pi_{\theta}}\!\left[\nabla_{\theta}\log\pi_{\theta}(y\mid x)\,\mathrm{sg}\!\left(\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\text{ref}}(y\mid x)}\right)\right]$}}+\underbrace{\frac{1}{N}\bigg(\sum_{j=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(j)}\mid x)\bigg)\,\bigg(\sum_{i\neq j}^{N}\mathrm{sg}\Big(\log\frac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}\Big)\bigg)}_{\text{has an expected value $=0$, since $\mathbb{E}_{y\sim\pi_{\theta}}[\nabla_{\theta}\log\pi_{\theta}(y\mid x)]=0$}}$
+For $i\neq j$ , independence of samples and the score-function identity
+$\mathbb{E}_{y\sim\pi_{\theta}}[\nabla_{\theta}\log\pi_{\theta}(y\mid x)]=0$
+imply that these off-diagonal terms have zero expectation. The only
+non-vanishing contribution comes from the diagonal $i=j$ , yielding
+$\mathbb{E}_{y\sim\pi_{\theta}}\!\left[\nabla_{\theta}\log\pi_{\theta}(y\mid x)\,\mathrm{sg}\!\left(\log\frac{\pi_{\theta}(y\mid x)}{\pi_{\text{ref}}(y\mid x)}\right)\right]=\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot\mid x)\parallel\pi_{\text{ref}}(\cdot\mid x)).$
+Thus, the regularizer gradient is equivalent to the common KL gradient.
+∎
+Therefore, $L_{1}$ is simply a typical KL-regularized policy gradient objective:
+$\displaystyle\text{K1:}\quad\min_{\theta}-\log w\quad\boxed{\nabla_{\theta}L_{1}=-\nabla_{\theta}\log{\pi_{\theta}(y\mid x)}\Big(R(x,y)-V(x)\Big)+\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot\mid x)\parallel\pi_{\text{ref}}(\cdot\mid x))}$
+(147)
+Which is what typical policy gradient algorithms like PPO (Schulman et al., 2017b) and GRPO (Shao et al., 2024) optimize in the on-policy case.
+J.2 K2 estimator leads to APA / Kimi loss
+Using the K2 estimator:
+K2:
+$\displaystyle\min_{\theta}\dfrac{1}{2}(\log w)^{2}\quad$
+$\displaystyle\nabla_{\theta}L_{2}=\nabla_{\theta}\bigg(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-R(x,y)+\log Z(x)\bigg)^{2}$
+Expanding the partition function:
+$\displaystyle\nabla_{\theta}\bigg(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-(R(x,y)-V(x))+\widehat{\mathrm{KL}}\bigg)^{2}$
+$\displaystyle=$
+$\displaystyle\underbrace{\nabla_{\theta}\bigg(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-(R(x,y)-V(x))\bigg)^{2}}_{\text{APA Loss}}+\underbrace{\nabla_{\theta}\log\pi_{\theta}(y\mid x)\,\widehat{\mathrm{KL}}}_{\begin{subarray}{c}\text{Becomes $\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot\mid x)\parallel\pi_{\text{ref}}(\cdot\mid x))$}\\
+\text{when summed over $N$ trajectories (Lemma \ref{lemma:regularizer-grad})}\end{subarray}}$
+The loss $L_{2}$ is the Advantage-induced Policy Alignment (APA) (Zhu et al., 2023), which was also used by Kimi models (Kimi et al., 2025b). The second term was often ignored, since prior works often approximate $\log Z(x)\approx V(x)$ rather than $\log Z(x)\approx V(x)-\widehat{\mathrm{KL}}$ . The APA loss already incorporates the same KL term:
+$\displaystyle\nabla_{\theta}(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-(R(x,y)-V(x)))^{2}=\nabla_{\theta}\log\pi_{\theta}(y|x)(R(x,y)-V(x))+\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot\mid x)\|\pi_{\text{ref}}(\cdot\mid x))$
+Which means that the additional $\nabla_{\theta}\log\pi_{\theta}(y\mid x)\,\widehat{\mathrm{KL}}$ term just upweights the KL. Both APA and Kimi showed that this loss is effective in the off-policy regime without necessarily adding off-policy correction:
+K2:
+$\displaystyle\min_{\theta}\dfrac{1}{2}(\log w)^{2}\qquad\boxed{\nabla_{\theta}L_{2}=\nabla_{\theta}\Big(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-(R(x,y)-V(x))\Big)^{2}}$
+(148)
+J.3 K5 estimator leads to RWR / MPO loss
+Under the K5 estimator, the divergence minimization in policy optimization becomes:
+$\displaystyle\text{K5:}\quad\min_{\theta}\mathrm{sg}(w)\log w+\log r\qquad\nabla_{\theta}L_{5}=-\nabla_{\theta}\log\pi_{\theta}(y|x)\bigg(\dfrac{\pi_{\text{ref}}(y|x)\,\exp R(x,y)}{\pi_{\theta}(y|x)\,Z(x)}\bigg)$
+Averaging over all $N$ rollouts per $x$ to simplify the partition function:
+$\displaystyle-\dfrac{1}{N}\sum_{i=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(i)}\mid x)\left(\dfrac{\pi_{\text{ref}}(y^{(i)}\mid x)\,\exp R(x,y^{(i)})}{\pi_{\theta}(y^{(i)}\mid x)\,Z(x)}\right)$
+$\displaystyle=$
+$\displaystyle-\dfrac{1}{N}\sum_{i=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(i)}\mid x)\left(\dfrac{{\mathrm{sg}\left(\frac{\pi_{\text{ref}}(y^{(i)}\mid x)}{\pi_{\theta}(y^{(i)}\mid x)}\right)\,\exp R(x,y^{(i)})}}{\dfrac{1}{N}\sum_{j=1}^{N}\mathrm{sg}\Big({\textstyle\frac{\pi_{\text{ref}}(y^{(j)}\mid x)}{\pi_{\theta}(y^{(j)}\mid x)}}\Big)\exp R(x,y^{(j)})}\right)$
+$\displaystyle=$
+$\displaystyle-\sum_{i=1}^{N}\nabla_{\theta}\log\pi_{\theta}(y^{(i)}\mid x)\cdot\mathrm{sg}\underbrace{\left(\dfrac{{\exp\left(R(x,y^{(i)})-\log\frac{\pi_{\theta}(y^{(i)}\mid x)}{\pi_{\text{ref}}(y^{(i)}\mid x)}\right)}}{\sum_{j=1}^{N}{\exp\left(R(x,y^{(j)})-\log\frac{\pi_{\theta}(y^{(j)}\mid x)}{\pi_{\text{ref}}(y^{(j)}\mid x)}\right)}}\right)}_{\text{$\mathrm{softmax}$ over $[y^{(1)},\dots,y^{(N)}]$}}$
+Which can be written in a batched manner over a group of $N$ rollouts per prompt $\boldsymbol{y}=[y^{(1)},\dots,y^{(N)}]$ , where $\mathrm{mean}$ and $\mathrm{softmax}$ are taken along the axis of the group dimension $i=1,\dots,N$ (which we denote as $\mathrm{mean}_{y}$ and $\mathrm{softmax}_{y}$ ):
+$\displaystyle\mathrm{mean}_{y}\left(\nabla_{\theta}\log\pi_{\theta}(\boldsymbol{y}\mid{x})\cdot\mathrm{softmax}_{y}\left({R}({x},\boldsymbol{y})-\log\frac{\pi_{\theta}(\boldsymbol{y}\mid{x})}{\pi_{\text{ref}}(\boldsymbol{y}\mid{x})}\right)\right)$
+This loss closely resembles Reward-Weighted Regression (RWR) (Peters and Schaal, 2007) and Maximum a Posteriori Policy Optimisation (MPO) (Abdolmaleki et al., 2018).
+$\displaystyle\text{K5:}\quad\min_{\theta}\mathrm{sg}(w)\log w+\log r\quad\boxed{\nabla_{\theta}L_{5}=-\nabla_{\theta}\log\pi_{\theta}(y|x)\cdot\mathrm{softmax}_{y}\Big(R(x,y)-\log(\pi_{\theta}(y|x)/\pi_{\text{ref}}(y|x))\Big)}$
+(149)
+J.4 K3 / K3++ / K4 estimators lead to combined losses
+The K3 estimator leads to a combined $L_{1}$ and $L_{5}$ (GRPO + MPO):
+K3:
+$\displaystyle\min_{\theta}(-\log w+w-1)$
+$\displaystyle\nabla_{\theta}L_{3}$
+$\displaystyle=\underbrace{-\nabla_{\theta}\log{\pi_{\theta}(y|x)}(R(x,y)-\log Z(x))}_{\text{Typical policy gradient, }L_{1}}-\underbrace{\Big(\nabla_{\theta}\log\pi_{\theta}(y|x)\Big)\bigg(\dfrac{\pi_{\text{ref}}(y|x)\,\exp R(x,y)}{\pi_{\theta}(y|x)\,Z(x)}\bigg)}_{\text{Same term as the one in $L_{5}$}}=\nabla_{\theta}L_{1}+\nabla_{\theta}L_{5}$
+(150)
+The $\text{K3}^{++}$ estimator leads to a combined $L_{1}$ and $L_{2}$ (GRPO + APA):
+$\displaystyle\text{K3}^{++}\text{:}\quad$
+$\displaystyle\min_{\theta}r\cdot(-\log w+w-1)\qquad r=\dfrac{\pi_{\theta}(y|x)}{\mathrm{sg}(\pi_{\theta}(y|x))}$
+$\displaystyle\nabla_{\theta}L_{3++}$
+$\displaystyle=\nabla_{\theta}L_{1}+\Big(\nabla_{\theta}\log\pi_{\theta}(y|x)\Big)\bigg(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-R(x,y)+\log Z(x)\bigg)=\nabla_{\theta}L_{1}+\nabla_{\theta}L_{2}$
+(151)
+The K4 estimator leads to $L_{2}$ (same as the APA loss):
+$\displaystyle\text{K4:}\quad\min_{\theta}r\cdot\mathrm{sg}(-\log w)$
+$\displaystyle\nabla_{\theta}L_{4}=\Big(\nabla_{\theta}\log\pi_{\theta}(y|x)\Big)\bigg(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-R(x,y)+\log Z(x)\bigg)=\nabla_{\theta}L_{2}$
+(152)
+A Note on Off-policy Correction
+Just like the off-policy correction for any sampled KL, any policy loss derived above can simply multiply a stop gradient version of the importance weight to remain unbiased when sampling is not on-policy:
+$\displaystyle y\sim\pi_{\text{sampling}}(\cdot\mid x)\qquad s=\mathrm{sg}\left(\dfrac{\pi_{\theta}(y\mid x)}{\pi_{\text{sampling}}(y\mid x)}\right)$
+With the option of using additional PPO-like binary masks on the loss
+$\displaystyle M(x,y)=\begin{cases}0&\text{ if }R(x,y)-V(x)>0\text{ and }s>1+\epsilon_{\text{high}}\\
+0&\text{ if }R(x,y)-V(x)<0\text{ and }s<1-\epsilon_{\text{low}}\\
+1&\text{ otherwise}\end{cases}$
+Leading us to conclude that the off-policy gradient under any loss function $L$ above is
+$\displaystyle\mathbb{E}_{y\sim\pi_{\text{sampling}}(\cdot\mid x)}[s(x,y)\,M(x,y)\;\nabla_{\theta}L(x,y)]$
+Though it is worth noting that many prior works find those losses to be effective in the absence of off-policy correction.
+Summary of the Equivalence between Policy Gradient and Divergence Minimization
+We have shown that many existing policy gradient methods can be derived from sampled KL estimators. In other words, better techniques in sampled KL estimation may directly lead to better policy gradient algorithms under such an equivalence.
+Estimator
+Expression
+Corresponding policy gradient
+Prior literature?
+K1
+$-\log w$
+$\nabla_{\theta}L_{1}=-\,\nabla_{\theta}\log{\pi_{\theta}(y|x)}\Big(R(x,y)-V(x)\Big)+\nabla_{\theta}\mathrm{KL}(\pi_{\theta}(\cdot|x)\|\pi_{\text{ref}}(\cdot|x))$
+PPO, GRPO, etc
+K2
+$\dfrac{1}{2}(\log w)^{2}$
+$\nabla_{\theta}L_{2}=\,\nabla_{\theta}\Big(\log\pi_{\theta}(y|x)-\log\pi_{\text{ref}}(y|x)-R(x,y)+V(x)\Big)^{2}$
+APA, Kimi
+K4
+$r\cdot\mathrm{sg}(-\log w)$
+$\nabla_{\theta}L_{4}=\nabla_{\theta}L_{2}$
+APA, Kimi
+K5
+$\mathrm{sg}(w)\log w+\log r$
+$\nabla_{\theta}L_{5}=-\,\nabla_{\theta}\log\pi_{\theta}(y|x)\;\mathrm{softmax}_{y}\Big(R(x,y)-\log\big(\pi_{\theta}(y|x)/\pi_{\text{ref}}(y|x)\big)\Big)$
+RWR, MPO
+K3
+$-\log w+w-1$
+$\nabla_{\theta}L_{3}=\nabla_{\theta}L_{1}+\nabla_{\theta}L_{5}$
+GRPO $\boldsymbol{+}$ MPO
+$\text{K3}^{++}$
+$r(-\log w+w-1)$
+$\nabla_{\theta}L_{3++}=\nabla_{\theta}L_{1}+\nabla_{\theta}L_{2}$
+GRPO $\boldsymbol{+}$ APA
+Table 8: Each KL estimator directly corresponds to a policy gradient loss under the divergence minimization view of RL.
+Appendix K Policy Gradient as $\boldsymbol{f}$ -Divergence Minimization
+Once a problem is framed as minimizing a KL, it can typically be recast into the general framework of $f$ -divergence minimization, leading to a family of loss functions. We have seen this in a variety of other optimization problems: the generalization of GAN (Goodfellow et al., 2020) to $f$ -GAN (Nowozin et al., 2016), GAIL (Ho and Ermon, 2016) to $f$ -MAX (Ghasemipour et al., 2020) and $f$ -VIM (Ke et al., 2020), DPO (Rafailov et al., 2023) to $f$ -DPO (Wang et al., 2023). In this section, we still assume that the optimal policy takes the form of a Boltzmann policy (Ziebart et al., 2008; Schulman et al., 2017a) due to its partition function having an intuitive interpretation (which says that the log partition function is equivalent to the value function), but explores using a sampled $f$ -divergence estimator for policy optimization.
+We now extend the results in §J to generic $f$ -divergence estimators. Let the optimal policy $\pi^{*}$ be:
+$\displaystyle\pi^{*}(y|x)=\dfrac{1}{Z(x)}\pi_{\text{ref}}(y|x)\exp(R(x,y))\qquad w=\dfrac{\pi^{*}(y|x)}{\pi_{\theta}(y|x)}=\dfrac{\pi_{\text{ref}}(y|x)\,\exp R(x,y)}{\pi_{\theta}(y|x)\,Z(x)}$
+Re-iterating the definition of $f$ -divergence, with $f(\cdot)$ being convex and $f(1)=0$ :
+$\displaystyle D_{f}(p||q)=\mathbb{E}_{y\sim q}\bigg[f\bigg(\dfrac{p(y)}{q(y)}\bigg)\bigg]$
+We now study two directions of $f$ -divergence minimization: $D_{f}(\pi_{\theta}(\cdot|x)||\pi^{*}(\cdot|x))$ and $D_{f}(\pi^{*}(\cdot|x)||\pi_{\theta}(\cdot|x))$ .
+K.1 Minimizing $D_{f}(\pi_{\theta},\pi^{*})$
+If we define function $g_{f}(\cdot)$ as:
+$\displaystyle g_{f}(w)\triangleq w\,f\!\left(\frac{1}{w}\right)$
+(153)
+Then, using the definition of $f$ -divergence:
+$\displaystyle D_{f}(\pi_{\theta}(\cdot|x)||\pi^{*}(\cdot|x))=\mathbb{E}_{y\sim\pi^{*}(\cdot|x)}\bigg[f\bigg(\dfrac{1}{w}\bigg)\bigg]=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\bigg[w\,f\bigg(\dfrac{1}{w}\bigg)\bigg]=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\big[g_{f}(w(x,y))\big]$
+(154)
+Note that $w(x,y)$ has the following properties:
+$\displaystyle\nabla_{\theta}\log w(x,y)=-\nabla_{\theta}\log\pi_{\theta}(y|x),\qquad\nabla_{\theta}w(x,y)=-w(x,y)\,\nabla_{\theta}\log\pi_{\theta}(y|x).$
+(155)
+Therefore, using the score-function identity, we arrive at:
+$\displaystyle\nabla_{\theta}D_{f}(\pi_{\theta}\|\pi^{*})=\nabla_{\theta}\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\big[g_{f}(w)\big]$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\Big[\nabla_{\theta}\log\pi_{\theta}(y|x)\,g_{f}(w)+\nabla_{\theta}g_{f}(w)\Big]$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\Big[\nabla_{\theta}\log\pi_{\theta}(y|x)\,\big(g_{f}(w)-w\,g_{f}^{\prime}(w)\big)\Big].$
+(156)
+Hence, minimizing $D_{f}(\pi_{\theta}\|\pi^{*})$ is equivalent to a policy gradient update with scalar weight $-\phi_{f}(w)$ where $\phi_{f}(w)$ is
+$\displaystyle\phi_{f}(w)\triangleq g_{f}(w)-w\,g_{f}^{\prime}(w)=f^{\prime}(1/w).$
+(157)
+K.2 Minimizing $D_{f}(\pi^{*},\pi_{\theta})$
+We now consider the reverse direction:
+$\displaystyle D_{f}(\pi^{*}(\cdot|x)\,\|\,\pi_{\theta}(\cdot|x))=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\bigg[f\bigg(\dfrac{\pi^{*}(y|x)}{\pi_{\theta}(y|x)}\bigg)\bigg]=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\big[f(w(x,y))\big].$
+(158)
+By the same derivation as above,
+$\displaystyle\nabla_{\theta}D_{f}(\pi^{*}\|\pi_{\theta})$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}(\cdot|x)}\Big[\nabla_{\theta}\log\pi_{\theta}(y|x)\,\big(f(w)-w\,f^{\prime}(w)\big)\Big].$
+(159)
+Thus the induced policy-gradient weight for the reverse direction is
+$\displaystyle\psi_{f}(w)\triangleq f(w)-w\,f^{\prime}(w).$
+(160)
+Summary of $f$ -divergence loss.
+The two directions of $f$ -divergence minimization are reduced to the following:
+$\displaystyle\nabla_{\theta}D_{f}(\pi_{\theta},\pi^{*})$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}}\Big[\nabla_{\theta}\log\pi_{\theta}(y|x)\,\phi_{f}(w)\Big],\qquad\phi_{f}(w)=f^{\prime}(1/w),$
+(161)
+$\displaystyle\nabla_{\theta}D_{f}(\pi^{*},\pi_{\theta})$
+$\displaystyle=\mathbb{E}_{y\sim\pi_{\theta}}\Big[\nabla_{\theta}\log\pi_{\theta}(y|x)\,\psi_{f}(w)\Big],\qquad\psi_{f}(w)=f(w)-wf^{\prime}(w).$
+(162)
+The EM Algorithm
+The expectation-maximization (EM) process can be summarized as the following. For each prompt or task $x$ , we sample $N$ rollouts $[y^{(1)},\dots,y^{(N)}]$ from $\pi_{\theta}(\cdot\mid x)$ to estimate the partition function $Z(x)$ and the ratio $w$ as:
+$\displaystyle\textbf{E-Step}\qquad Z(x)\approx\dfrac{1}{N}\sum_{i=1}^{N}\mathrm{sg}\left({\frac{\pi_{\text{ref}}(y^{(i)}\mid x)}{\pi_{\theta}(y^{(i)}\mid x)}}\right)\exp\Big(R(x,y^{(i)})\Big)\qquad w=\frac{\pi_{\text{ref}}(y\mid x)}{\pi_{\theta}(y\mid x)}\cdot\frac{\exp R(x,y)}{Z(x)}$
+where the returns $R(x,y^{(i)})$ are (pre-) scaled by $1/\beta$ to control the regularization effect of the anchor $\pi_{\text{ref}}$ . After the E-Step, M-Step performs gradient updates based on $f$ -divergence minimization; the following two tables, Table 9 and Table 10, summarize what to minimize under each $f$ -divergence (M-Step).
+Figure 10: Policy gradient based on $\nabla_{\theta}D_{f}(\pi_{\theta},\pi^{*})$ , where the REINFORCE weight for $\nabla_{\theta}\log\pi_{\theta}(y|x)$ is $-\phi_{f}(w)=-f^{\prime}(1/w)$ .
+Table 9: M-Step: Minimizing $D_{f}(\pi_{\theta},\pi^{*})$ results in the gradient update $\mathbb{E}_{y\sim\pi_{\theta}}[\nabla_{\theta}\log\pi_{\theta}(y|x)\,\phi_{f}(w)]$
+$f$ -divergence
+$f(t)$
+$\phi_{f}(w)=f^{\prime}(1/w)$
+Forward KL
+$t\log t$
+$-\log w+1$
+Reverse KL
+$-\log t$
+$-w$
+Jensen–Shannon (JS)
+$\frac{1}{2}\left(t\log t-(t+1)\log\!\Big(\frac{t+1}{2}\Big)\right)$
+$\frac{1}{2}\log\!\Big(\frac{2}{1+w}\Big)$
+Squared Hellinger
+$(\sqrt{t}-1)^{2}$
+$1-\sqrt{w}$
+Pearson $\chi^{2}$
+$(t-1)^{2}$
+$-2+2/w$
+Neyman $\chi^{2}$
+$\frac{(t-1)^{2}}{t}$
+$1-w^{2}$
+Total variation (TV)
+$\frac{1}{2}\,\lvert t-1\rvert$
+$-\frac{1}{2}\,\mathrm{sgn}(w-1)$
+$\alpha$ -divergence ( $\alpha\neq\pm 1$ )
+$\frac{4}{1-\alpha^{2}}\Big(1-t^{\frac{1+\alpha}{2}}\Big)$
+$\frac{2}{\alpha-1}w^{\frac{1-\alpha}{2}}$
+Figure 11: Policy gradient based on $\nabla_{\theta}D_{f}(\pi^{*},\pi_{\theta})$ , where the REINFORCE weight for $\nabla_{\theta}\log\pi_{\theta}(y|x)$ is $-\psi_{f}(w)=-f(w)+wf^{\prime}(w)$ .
+Table 10: M-Step: Minimizing $D_{f}(\pi^{*},\pi_{\theta})$ results in the gradient update
+$\mathbb{E}_{y\sim\pi_{\theta}}[\nabla_{\theta}\log\pi_{\theta}(y|x)\,\psi_{f}(w)]$
+$f$ -divergence
+$f(t)$
+$\psi_{f}(w)=f(w)-wf^{\prime}(w)$
+Forward KL
+$t\log t$
+$-w$
+Reverse KL
+$-\log t$
+$-\log w+1$
+Jensen–Shannon (JS)
+$\frac{1}{2}\left(t\log t-(t+1)\log\!\Big(\frac{t+1}{2}\Big)\right)$
+$\frac{1}{2}\log\!\Big(\frac{2}{1+w}\Big)$
+Squared Hellinger
+$(\sqrt{t}-1)^{2}$
+$1-\sqrt{w}$
+Pearson $\chi^{2}$
+$(t-1)^{2}$
+$1-w^{2}$
+Neyman $\chi^{2}$
+$\frac{(t-1)^{2}}{t}$
+$-2+2/w$
+Total variation (TV)
+$\frac{1}{2}\,\lvert t-1\rvert$
+$-\frac{1}{2}\,\mathrm{sgn}(w-1)$
+$\alpha$ -divergence ( $\alpha\neq\pm 1$ )
+$\frac{4}{1-\alpha^{2}}\Big(1-t^{\frac{1+\alpha}{2}}\Big)$
+$-\frac{2}{\alpha+1}w^{\frac{\alpha+1}{2}}-\frac{4}{(\alpha-1)(\alpha+1)}$
+Experimental support, please
+view the build logs
+for errors. Generated by
+L
+A
+T
+E
+xml
+.
+Instructions for reporting errors
+We are continuing to improve HTML versions of papers, and your feedback helps enhance accessibility and mobile
+support. To report errors in the HTML that will help us improve conversion and rendering, choose any of the
+methods listed below:
+Click the "Report Issue" (
+) button, located in the page header.
+Tip: You can select the relevant text first, to include it in your report.
+Our team has already identified the following issues. We appreciate your time reviewing and reporting rendering errors we
+may not have found yet. Your efforts will help us improve the HTML versions for all readers, because disability
+should not be a barrier to accessing research. Thank you for your continued support in championing open access for
+all.
+Have a free development cycle? Help support accessibility at arXiv! Our collaborators at LaTeXML maintain a list of packages that need conversion, and welcome developer contributions.
+We gratefully acknowledge support from
+our major funders,
+member institutions, ,
+and all contributors.
+About
+·
+Help
+·
+Contact
+·
+Subscribe
+·
+Copyright
+·
+Privacy
+·
+Accessibility
+·
+Operational Status (opens in new tab)
+Major funding support from

@@ -1,0 +1,29 @@
+% ============================================================================
+\section{Discussion and Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+The local analysis distinguishes the expected effect of a shared update
+from the uncertainty in that effect. When a task's progress margin is
+nonpositive, changing sample counts at fixed weights cannot make its
+expected first-order progress positive under the frozen-preconditioner
+model. For positive margins, additional samples can reduce uncertainty.
+GPAS allocates samples to reduce total update variance, which bounds
+directional variance conservatively. Directional variance determines a more specific
+bound for each task; the two allocation criteria need not agree.
+
+The proposed study tests these quantities against updates from identical
+checkpoints and against complete training runs. Separate-distillation
+references assess individual transfer, while fixed-state loss, fresh-policy
+loss, and capability evaluation measure different aspects of training.
+\missing{Report which diagnostics predicted observed failures, when GPAS
+improved capability or compute efficiency, and which failures remained.}
+
+These local conditions do not establish joint capability attainability or
+global convergence. Successful training may temporarily increase a task
+loss, and a local conflict does not prove a capacity limit. The empirical
+scope is one student size, four domains, and one hardware layout; the
+repeated core comparison estimates training variation within that scope.
+Finite-sample diagnostic error, changing optimizer states, and changing
+rollout distributions must be assessed before using the local bounds to
+make training decisions.

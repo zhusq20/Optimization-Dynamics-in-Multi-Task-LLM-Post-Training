@@ -1,0 +1,4 @@
+observation,mc_relative_change_from_uniform,calculated_relative_change_from_uniform,uniform_counts,adaptive_counts,draws,seed
+First moment,0.0021147349044643047,0.0,6-5-5,3-3-10,200000,20260903
+Standard second moment,0.5427689053895406,0.5419956324971777,6-5-5,3-3-10,200000,20260903
+Taskwise second moment,0.0009208889700392709,0.0,6-5-5,3-3-10,200000,20260903

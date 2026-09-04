@@ -1,220 +1,214 @@
-# Qwen3-1.7B 四教师 MOPD：micro-batch GPAS 实验协议
+# GPAS 四域实验：两周核心方案
 
-> 2026-09-03 修订：按四条约束修订——18 卡（10×48GB + 8×96GB A6000 级）、两周期限（9/17 前完成）、每配置单种子、基线齐全。math 和 IF 教师为 Qwen3-1.7B 学生经领域 RL 得到的同源专家，code 和 science 教师为原版 Qwen3-4B（`enable_thinking=False`，不做额外训练，2026-09-03 定）；学生与教师都用 non-thinking 模式。修订前版本在 `backup/2026-09-03_pre_compute_plan/`。
+更新：2026-09-04。本版以两周内完成实验和结果整理为目标，替代此前 13 个训练 runs 与大规模诊断方案。**本轮只做 4 个单种子完整训练 + 1 个共同 checkpoint 的小规模机制对照。**结果围绕 GPAS 的能力收益、计算效率和分配机制展开。
 
-## 0. 本次修订摘要
+沿用已确定的设置：学生 Qwen3-1.7B；代码、科学两个域的 Qwen3-4B **暂代**对应的 Qwen3-1.7B RL teacher；不设置防御性试验、教师资格筛选或 gate 实验。当前文件是执行计划，尚未填入实测结果。
 
-| 项 | 原计划 | 现计划 |
+## 1. 三个重点问题与对应实验
+
+| 重点问题 | 直接比较 | 最主要的证据 |
 |---|---|---|
-| 种子 | Uniform、GPAS 各 3，其余 1 | 全部 1；不确定性用 held-out prompt 的配对 bootstrap |
-| 教师 | 未定 | math、IF：Qwen3-1.7B 领域 RL 专家，同源；code、science：原版 Qwen3-4B，non-thinking |
-| 系统 | 单教师槽轮换加载 | 每个 run 2 卡，四教师常驻推理卡；`C` 不含教师加载 |
-| 配置 | 4 个，RawNoise 条件触发 | 6 个，一轮并发：Uniform、GPAS、Cost-GPAS、RawNoise、LossGap、StdMOPD |
-| `L_max` | 8,192 | 4,096 |
-| 排程 | 四阶段阶梯 | 训练前三项测量 + 冒烟测试 + 单轮并发 |
+| GPAS 是否带来实际收益？ | Uniform vs GPAS，训练目标与样本预算相同 | 第 500 步四域能力、平均分、最差域差值；固定参考 loss 与实测 GPU hours |
+| 预条件是否有价值？ | GPAS vs GPAS without preconditioning | 相同 AdamW 优化器下，仅分配统计是否使用 D 的差异 |
+| 梯度噪声分配是否优于已有调度信号？ | GPAS vs D³ signal, fixed weights | 相同 loss、任务权重、计数边界下，分配信号的效果差异 |
 
-方法定义量不变：`G=16`、`b=4`、`m∈[2,8]`、500 步、每任务 16,000 prompt、held-out 每任务 128 prompt、每 50 步一个 checkpoint。
+用一个共同 checkpoint 的 Uniform/GPAS 对照补充机制证据：在相同状态和相同样本预算下，GPAS 是否降低**独立实测的更新方差**，以及这种变化是否伴随实际 loss 下降改善。它使用固定 checkpoint，不按最终效果选择有利时点。
 
-## 1. 固定项
+论文的实验叙事收敛为：**方法是否有效 → 相对已有调度信号的表现 → 预条件消融 → 一个直接机制对照**。各域成绩和无效结果完整展示，结论取决于实测，不预写成功方向。
 
-所有配置使用相同的：
+## 2. 唯一的完整训练清单
 
-- 学生：Qwen3-1.7B，non-thinking 模式，固定 checkpoint revision、tokenizer、精度；
-- 教师：math 和 IF 教师是 Qwen3-1.7B，由同一学生 checkpoint 经各自领域的 RL 得到（同源、同 tokenizer、non-thinking），所用 checkpoint 步数写进论文 pipeline 表；code 和 science 教师是原版 `Qwen/Qwen3-4B`，`enable_thinking=False`，不做任何额外训练。它与学生 tokenizer.json 逐字节相同、chat template 逐字相同，打分时不需要单独格式化 prompt。选原版而不选 Instruct-2507 的理由是让四个域的教师-学生差距量级接近：按 Qwen3 技术报告的 non-thinking 分数，code 约 +10 到 +14、science 约 +13，与 IF 教师的 +12 和 math 教师的 +5 同量级，避免某个域主导目标。两个 RL 教师的 RL prompt 集、四条 16,000 prompt 训练流、held-out 集、四个 benchmark 两两不重叠；
-- 每个 micro-batch `b=4` 个 prompt，每个 prompt 采样一条回复（与 MOPD 的 `N=1` 一致）；
-- 每步 `G=16` 个 micro-batch，`m_min=2`，`m_max=8`；
-- token → response → micro-batch 的两层平均顺序；
-- 总预算 500 步 × 64 条回复 = 32,000 attempted responses，学习率以 optimizer step 为时钟；
-- 每个任务独立且固定的 prompt 顺序；每个任务 16,000 个不循环的 prompt；
-- 回复长度上限 `L_max = 4,096`；截断的回复保留并正常参与 loss。non-thinking 回复极少超过 2,000 token，上限的作用是封住重复循环回复对生成时间的拖尾。MOPD 的 token 级信号在任意前缀上成立，不需要完整回复；
-- 采样温度、目标权重、计时 EMA decay `rho = 0.9`、共同 loss threshold；
-- 种子：每个配置 1 个。种子改变 prompt 洗牌和采样；同一种子内各方法的 prompt 流保持匹配。
+| ID / run ID | 配置 | 样本分配 | 优化器与目标 | 作用 |
+|---|---|---|---|---|
+| U / `uniform-s1` | Uniform | 每域 4 个 micro-batches | AdamW；teacher top-64；固定等权 | 主基线 |
+| G / `gpas-s1` | GPAS (per step) | 按预条件梯度噪声分配 | 同 U | 主方法 |
+| R / `gpas-raw-s1` | GPAS without preconditioning | 按原始梯度噪声分配，统计使用 D=I | 同 U，优化器仍是 AdamW | 唯一机制消融 |
+| H / `d3-fixed-s1` | D³ signal, fixed weights | 按 remaining gap × descent velocity 分配 | 同 U | 已有调度信号对照 |
 
-每一步都处理四个任务。Uniform 分配是 `[4,4,4,4]`。自适应方法只改变每个任务的 micro-batch 数 `m_i`，且始终满足 `sum(m)=16`。
+**合计 4 个完整 runs，各运行同一个训练种子 s1 一次，每 run 500 步。**U/G 优先排入，R/H 接续或在有空闲设备时并行。四个配置是本轮全部训练计划，不再追加“有时间就做”的方法。
 
-每个 rollout batch 只做一次更新（`K=1`），教师 log-prob 不跨更新复用。即使一个任务始终取 `m_max=8`，也只消耗 `500*8*4=16,000` 个 prompt，因此所有任务都按不放回顺序读取且不循环；Uniform 每任务消耗 8,000 个 prompt。`m_max=8` 限制单个任务最多占每步的一半，也限制计数的单步变化。由于 Uniform 的计数为 4 且 `m_i<=8`，任意非负噪声下都有 `H<=2`。
+### 从本轮清单移出的内容
 
-## 2. 固定目标和 loss scaling
+| 移出内容 | 对应范围调整 |
+|---|---|
+| 4 个单任务 OPD 参照 | 本轮直接比较共享学生的多域能力，不报告相对单任务参照的集成达标率或归一化收益 |
+| GPAS cost-aware | 保留实测效率报告，暂不验证额外的 time×variance 调度器 |
+| 动态权重 D³ 完整配方、Open-MOPD 配方 | 保留与本方法最直接可比的固定权重 D³ 信号，避免额外目标和实现差异 |
+| TA-OPD 两个 runs | 固定一种已有 dense loss，暂不研究跨 loss 泛化 |
+| Precise 分支、4 个单任务更新分支、batch-size 扫描 | 局部实验只比较相同预算的 Uniform 与 GPAS |
+| 3 checkpoint × 多分支大诊断、方向协方差/K 矩阵交叉拟合、独立预测分类流程 | 只在第 250 步测更新方差与实际一步 loss 变化 |
+| 状态分布变化的完整分解、额外种子/模型/teacher 复验 | 保留固定参考 loss、最终 fresh-policy loss 和能力三个观测，不扩展实验轴 |
 
-训练目标为
+这些内容移出两周交付范围，不作为开跑或得出当前结果的前置条件。原完整方案保留在备份中。
 
-```text
-F(theta) = sum_i w_i * ell_i(theta)
-w_i = (1 / ell_i(0)) / sum_j (1 / ell_j(0))
-```
+## 3. 四个 runs 共用的设置
 
-`ell_i(0)` 在训练前用 held-out 集测量：初始学生对任务 `i` 的 128 个 held-out prompt 各采样一条回复，教师 `i` 打分，取平均 sampled-token reverse KL。math 和 IF 的同源 RL 教师与学生的 KL 可能很小，code 和 science 的 4B 教师 KL 会明显更大，各任务差异可能很大，因此加一条规则：若 `max_i ell_i(0) / min_i ell_i(0) > 10`，改用等权 `w_i = 1/4`，并把论文 Setting 节 "inverse initial loss" 一句改为等权。四个 `ell_i(0)` 和最终采用的 `w` 写进论文 pipeline 表。测量脚本：`experiments/measure_initial_kl.py`（vLLM 生成 + HF 打分，单卡约 10 分钟）。教师 RL 日志里没有对初始策略的 KL（KL 系数为 0），不能替代这一步。
+| 项目 | 设置 |
+|---|---|
+| 学生 | Qwen3-1.7B，non-thinking |
+| 数学教师 | 数学 Qwen3-1.7B RL teacher |
+| IF 教师 | IF Qwen3-1.7B RL teacher |
+| 代码教师 | **Qwen3-4B 暂代代码 Qwen3-1.7B RL teacher** |
+| 科学教师 | **Qwen3-4B 暂代科学 Qwen3-1.7B RL teacher**；当前和代码路由共享同一套权重 |
+| loss / 权重 | teacher top-64 corrected reverse KL；四域 w_i=1/4 |
+| prompts | 每域 16,000 条；共享同种子的域内排列，打乱后无放回消费 |
+| micro-batch / step | 每 micro-batch 4 个同域 prompts，每 prompt 1 个 response；每步 G=16，共 64 个 responses |
+| 计数 | 每域 2≤m_i≤8，sum_i m_i=16；Uniform 为 (4,4,4,4) |
+| 预算 | 每 run 500 步、32,000 条计划 responses，失败重算另计 |
+| rollout | 最大 response 长度 4,096；截断回复保留有效 token；每批新 rollout 仅更新一次，K=1 |
+| 优化器 | AdamW；学习率、schedule、clipping、精度等直接采用同一份已有训练配方 |
+| 种子 | 唯一训练种子 s1；各用途随机源由它派生 |
+| 资源 | 每 run 一张 96GB learner GPU + 一张 48GB rollout/teacher GPU；按实际可用 slots 排程 |
 
-每个 micro-batch 先独立完成内部平均。任务 `i` 的每个 micro-batch loss 在 backward 前乘 `w_i / m_i`。因此一步的一阶矩观测是
+目标教师仍是四域对应的 Qwen3-1.7B RL teacher。Qwen3-4B 是当前两个域的**暂代方案**；四个可比 runs 使用相同的实际 teacher revisions，在结果表注明暂代状态。正式 RL teacher 后续就位时使用另一个完整配置版本，本轮无需等待。
 
-```text
-A = sum_i (w_i / m_i) * sum_s g_i,s
-```
+训练、固定 loss 评估、局部诊断和能力 benchmark 的题目集合分开。每个方法共享初始权重、训练 prompt 顺序和解码设置；分配导致的域曝光差异作为方法行为记录。每步生成使用更新前的学生权重，完成一次更新后同步新权重。
 
-所有配置的条件期望均为同一个 `sum_i w_i E[g_i]`。不得把整步所有 token 直接合并平均，因为这会把有效任务权重改成接近 `m_i / G`；StdMOPD 基线正是故意这样做，见第 7 节。
+记录实际模型/tokenizer/teacher revisions、数据版本、s1 整数、解码设置、优化器参数、软件/GPU 型号。采用已有配置完成普通实现核对，不另开超参数扫描、先导训练或资格试验。
 
-## 3. 在线分配
+## 4. 只实现本轮需要的训练差异
 
-第一步使用 Uniform，并从该步初始化每个任务的噪声和时间统计。GPAS 计算
+### 4.1 默认 loss 与固定权重
 
-```text
-score_i = w_i * sqrt(e_i)
-```
+    S = teacher_top64(prefix)
+    loss_position = sum_{a in S} [p[a] * (log(p[a]) - log(q[a])) - p[a] + q[a]]
+    A = sum_i w_i * mean_s(g_i,s)
 
-先求与 score 成比例的连续计数，再限制到 `[m_min,m_max]`，最后用最大余数法取整，保证总和为 `G`。RawNoise 和 LossGap 只换 score，裁剪与取整相同。
+p/q 保留全词表归一化，top-64 内不重新归一化；对完整 loss 求导，保留 -p 项。教师及采样 prefixes 固定；先对 response 的有效位置平均，再对 response 平均。四个 runs 都按任务均值汇总，等价于每个 micro-batch loss 乘 w_i/m_i；不能按整步 response 平均而把任务权重改为 m_i/G。
 
-时间模型为
+### 4.2 GPAS 与原始噪声消融
 
-```text
-t(m) = C + sum_i m_i * tau_i
-J_C(m) = t(m) * sum_i w_i**2 * e_i / m_i
-```
+G 使用更新前的 bias-corrected Adam second moment 定义 D=(sqrt(v_pre)+epsilon)^(-1)，第一步用 D=I 和 Uniform。对未加任务权重、未 clipping 的 micro-batch 梯度做 Welford 统计：
 
-`C` 是每步固定的 rollout、权重同步、优化器和日志开销，`tau_i` 是任务 `i` 每个 micro-batch 的打分加 backward 时间。墙钟预算为 `T` 时，步数为 `T/t(m)`，平均梯度方差为 `V(m)t(m)/T`，所以 Cost-GPAS 最小化 `J_C`。当 `C=0` 时才有 `m_i ∝ w_i * sqrt(e_i/tau_i)`；实际四任务实验枚举满足边界和总数约束的整数分配。`tau_i` 与 `C` 用实测时间的 EMA。
+    h = 0; S = 0
+    for s, g in task_microbatch_gradients:  # s 从 1 开始
+        delta = g - h
+        h += delta / s
+        S += (s - 1) / s * squared_norm(D * delta)
+    e_hat_i = S / (m_i - 1)
+    A += w_i * h
 
-## 4. 噪声估计
+同一任务均值 buffer 按域复用；混合精度梯度先 unscale，归约使用 float32，最后对 A 做 clipping 和 AdamW 更新。噪声 EMA decay=0.9，首条观测直接初始化。下一步读取已完成步骤的 EMA 选择计数，当前样本不参与选择自己的计数。
 
-在本步开始时冻结 `D = 1 / (sqrt(v) + eps)`。任务 `i` 的 unweighted micro-batch 梯度为 `g_i,s`，任务均值为 `a_i = mean_s(g_i,s)`。记录
+G 枚举满足边界的 **149** 组整数计数，最小化 sum_i w_i²*e_ema_i/m_i。R 采用完全相同流程，仅噪声统计中的 D=I，优化器仍是 AdamW。并列优先选择距离 Uniform 最近的计数，再按 math/code/if/science 字典序确定；全零噪声时用 Uniform。
 
-```text
-e_hat_i = (sum_s ||D g_i,s||^2 - m_i ||D a_i||^2) / (m_i - 1)
-e_i     = e_hat_i
-tau_i   = rho * tau_i + (1-rho) * tau_hat_i
-C       = rho * C + (1-rho) * C_hat
-```
+U 使用常规固定权重梯度累积，H 只记录调度所需的 task loss。**不为 U/H 强加 GPAS 的逐 micro-batch 噪声收集开销**；G/R 的统计耗时和额外内存包含在它们自己的训练成本中。可比的实际更新方差在第 6 节的共同 checkpoint 实验中统一测量。
 
-`e_hat_i` 汇总约 `10^9` 个坐标；独立坐标近似下相对误差量级为 `sqrt(2/d_eff)`。噪声直接使用当步估计，日志报告其逐步相对变化。回复长度重尾，因此 `tau_i` 和 `C` 保留 EMA。
+### 4.3 D³ 固定权重对照
 
-同时记录未缩放的 `||g_i,s||^2` 与 `||a_i||^2`，用于离线比较 raw 与 scaled 的任务排序。
+采用论文附录 `app:baselines` 的 remaining gap × descent velocity：初始 loss 取前 5 个观测均值，EMA window=10，窗口 W=10、最多 R=3 个窗口，每 10 步更新，KL denominator floor=0.15，max-normalization，softmax temperature=0.5，probability floor=0.10，batch jitter=0.30。warmup、零信号和操作顺序沿用该来源的固定实现并记录版本。
 
-## 5. AdamW 二阶矩与分配的关系（不做训练 run）
+    gap_i(t) = Lbar_i(t) / max(L_i_initial, 0.15)
+    velocity_i(t) = max(0, mean of available window-relative loss decreases)
+    signal_i(t) = gap_i(t) * velocity_i(t)
 
-conventional AdamW 的二阶矩观测 `A**2` 含噪声项 `sum_i w_i**2 Var(g_i) / m_i`，随分配变化，这与任何改变 batch 组成的做法相同。在 `2 <= m_i <= 8`、Uniform 为 4 的边界内，每个任务的噪声项相对 Uniform 在 `[0.5, 2]` 倍之间；二阶矩经 EMA 再开方进入更新，因此噪声主导坐标上更新幅度的变化最坏不超过 `sqrt(2)`。
+所得概率 p_i 转为计数时，在 149 个可行整数向量中最小化 sum_i(m_i-16*p_i)²，并列沿用 G 的规则。最终仍以 w_i=1/4 汇总任务均值。这一行明确命名为 **D³ signal, fixed weights**，不称为完整 D³-MOPD 配方复现。
 
-可选的分配无关观测为 `U = sum_i (w_i/m_i) sum_s g_i,s**2`，`v_obs = U/G`，`E[U/G] = (1/G) sum_i w_i E[g_i**2]` 不依赖 `m`；在比例分配 `m_i = G w_i` 下与 conventional 的噪声尺度一致。受控检查：Uniform 改为 GPAS 后 conventional 二阶矩相对变化 `0.543`，`U/G` 变化 `0.0009`。
+## 5. 评估压缩为“一张主表、两条核心曲线、一张机制图”
 
-决定：所有训练 run 使用 conventional AdamW，不跑 Uniform-TW / GPAS-TW。`U/G` 只作为附录说明。
+### 5.1 能力评估
 
-## 6. 受控检查
+主表统一使用第 500 步，列出：初始学生、实际指定教师、U、G、R、H。指定教师行按域记录，代码/科学标注 Qwen3-4B 暂代。
 
-受控三任务实验固定 `G=16`、`m_min=2`、`m_max=12`。整数分配为：
-
-| 方法 | `(m_1,m_2,m_3)` | AdamW-scaled variance / Uniform | time × variance / Uniform |
-|---|---:|---:|---:|
-| Uniform | `(6,5,5)` | 1.000 | 1.000 |
-| Raw-noise | `(11,3,2)` | 2.316 | 2.084 |
-| GPAS | `(3,3,10)` | 0.679 | 0.913 |
-| Cost-GPAS | `(3,5,8)` | 0.734 | 0.857 |
-
-20,000 次 Monte Carlo 的结果与计算值一致。另一个 200,000-step 检查把 Uniform 改为 GPAS 后的 AdamW moment：conventional 二阶矩相对变化为 `0.543`，taskwise 二阶矩变化为 `0.00092`，后者的理论变化为零。
-
-## 7. 端到端配置
-
-| 配置 | 每步分配 / loss | 作用 |
+| 域 | 指标 | 口径 |
 |---|---|---|
-| Uniform | `[4,4,4,4]`，固定目标 loss | 基线；其 checkpoint 供 held-out 方差检查与离线反事实分配 |
-| GPAS | `m_i ∝ w_i * sqrt(e_i)` | 同步数下的 held-out loss |
-| Cost-GPAS | `argmin_m J_C(m)` | GPU-hour 效率 |
-| RawNoise | `m_i ∝ w_i * sqrt(Var(g_i))`（未缩放） | 优化器坐标是否重要 |
-| LossGap | `m_i ∝ w_i * Lbar_i`，`Lbar_i` 为任务 `i` 训练 batch 教师损失的 EMA（decay 0.9） | gap-following 信号在固定目标下的对照，回答"为什么不按 loss 分配" |
-| StdMOPD | 每任务每步 16 个 prompt（与 Uniform 相同），一步内所有有效 token 直接求均值；不做 per-response 平均，不乘 `w_i/m_i` | 现行常用配方；有效任务权重随 token 数变化，目标与 `F` 不同 |
+| Math | MATH-500 greedy pass@1 | 每题一个 greedy 回答，固定答案判定器 |
+| Code | 固定 LiveCodeBench 切片 pass@1 | 固定题目 IDs/日期范围、解码、执行环境和超时 |
+| IF | IFBench strict accuracy | 固定 evaluator 及 strict 聚合粒度 |
+| Science | GPQA-Diamond average@4 | 同题 4 次回答的平均正确率，再对题目平均；不使用任一答对的 pass@4 |
 
-所有配置 1 个种子、conventional AdamW、相同学习率与 schedule、相同 `L_max`、相同计数边界；四个自适应配置第一步都是 Uniform。RawNoise 无条件跑；若日志显示 raw 与 scaled 排序在多数步一致，结果节如实写"两种信号在本设定下给出相近分配"。
+主表同时给出四域百分比分数的算术均值、G 相对 U 的逐域差值和最差域差值 min_i(C_i(G)-C_i(U))。R/H 同样报告逐域与平均变化。能力主比较不使用单任务归一化或未知参照目标。
 
-LossGap 只用 gap，不用 D3-MOPD 的下降速度项，保持单参数。`w_i * Lbar_i` 在 inverse-initial-loss 权重下等于相对剩余损失 `Lbar_i / ell_i(0)`（差一个常数），即把 micro-batch 推向相对进展最小的任务。
+**完整 benchmark 只评：**初始学生一次；U/G 的第 250 和 500 步；R/H 的第 500 步。共 **7 组学生 checkpoint 评估**，另对各域指定教师做一次对应 benchmark 评估。第 0 步共享，不重复算作四次。U/G 能力曲线只标出 0/250/500 的实测点。
 
-StdMOPD 的实现：rollout 结束后已知本步有效 token 总数 `T`，每个 micro-batch 的 loss 取 token 损失之和除以 `T` 再 backward，累加后即为精确的一步 token-mean。StdMOPD 与 Uniform 每步消耗完全相同的 prompt，二者只差 loss 聚合方式。它的加权 `F` 与其他配置不可比，只比各任务 held-out `L_i` 和 benchmark。
+保存题目级输出，使用配对题目 bootstrap 给出评估误差；GPQA 同题四次回答作为一簇。所有完整训练都是单种子，不构造跨训练种子的标准差。
 
-各任务使用独立的 matched prompt stream。配置对任务 `i` 发出的第 `n` 个 prompt 必须相同；自适应配置在同一步到达不同的 per-task stream 前缀是算法本身的结果。
+### 5.2 低成本 loss 与效率曲线
 
-## 8. 系统执行和记账
+每域使用 **64 条固定 held-out prompts**。初始学生只生成一次 reference responses，缓存各位置 teacher top-64 scores，形成四域共 256 个 responses 的公共固定 bank。
 
-每个 run 固定占 2 卡，所有 run 的卡型相同：
+- 四个方法在第 **0、100、200、300、400、500** 步计算该固定 bank 的 loss；第 0 步共享一次。
+- fresh-policy loss 仅在第 **0 和 500** 步测量：第 0 步复用初始 bank；每个最终模型在同一批 held-out prompts 上各生成一次新 response。保留最终 fresh loss 与固定 loss，不做相邻状态分布完整分解。
+- 固定参考 loss 分别对 optimizer steps 和累计 GPU hours 作图；U/G 突出展示，R/H 用同图辅助线。最终能力与实测总训练成本同时报告。
 
-- 训练卡（96GB）：学生全参微调。bf16 参数 + fp32 master + AdamW 状态约 24 GB；梯度 scratch、任务累加器 `B_i`、步累加器 `A` 三个参数大小张量约 17 GB（fp32）；加激活，总计约 50 GB；
-- 推理卡（48GB）：vLLM 学生 rollout（预算约 20 GB；non-thinking 下 64 条回复的 KV 约 5 GB）+ 四个教师常驻：两个 1.7B 共 6.8 GB，两个 4B 共 16 GB，bf16 合计约 23 GB，整卡约 43 GB。若显存紧张，把两个 4B 教师移到训练卡，训练卡余量约 40 GB。教师按固定顺序依次给各自任务的回复打分：prefill-only 前向，取采样 token 的 log-prob。
+共同目标为 target=F_ref,U(500)，其中 F_ref=sum_i L_i/4。按首次向下穿越目标的相邻评估点插值估算到达成本；未到达标 `unreached`，不外推。它只表示达到同一 loss 的计算效率，能力收益由 benchmark 独立回答。
 
-一步的流程：训练卡把权重同步到推理卡（3.4 GB）→ 64 条回复一次性 rollout → 四教师顺序打分 → 训练卡按任务、按 micro-batch 前反向 → 优化器更新。rollout 时间由最长回复决定，与分配 `m` 基本无关；打分和 backward 与 token 数成正比。因此时间模型保持 `t(m) = C + sum_i m_i tau_i`：`tau_i` = 任务 `i` 每个 micro-batch 的打分 + backward 时间；`C` = rollout + 权重同步 + 优化器 + 日志。Cost-GPAS 按此模型枚举整数分配。报告 `C / sum_i m_i tau_i` 和线性模型对实测步时间的拟合残差。
+训练成本记录两张设备的实际占用，包括 rollout、teacher scoring、梯度、统计、同步、等待和保存；不同 GPU 型号分别列出后再汇总。诊断和评估单列，并给出研究总成本。主成本比较包含 G/R 的真实统计开销。
 
-预期：non-thinking 回复短、教师不超过 4B，`C` 会明显大于 `sum_i m_i tau_i`（估计比值 1.5–2），Cost-GPAS 的解会接近 GPAS，GPU-hour 节省主要来自 GPAS 本身。论文 Cost-GPAS 段和摘要按实测比值写，不预设大幅节省。
+## 6. 一个共同 checkpoint 的机制对照
 
-每步每任务记录：rollout、teacher scoring、backward、optimizer 时间；attempted responses、valid tokens、generated tokens；peak HBM。GPU-hour = 完整 wall time × 2，包括同步与等待。主系统结论只使用端到端 GPU-hour，不用成本 proxy 代替。
+固定使用 **U 第 250 步**，只比较 Uniform 与 GPAS 两个分支。两者每次都从相同模型、完整 AdamW/LR 状态恢复，使用同一学习率和相同 G=16，做一次实际更新，结果不写回主训练。整个实验仅 **20 次局部更新**。
 
-Uniform、GPAS、Cost-GPAS 三个进入 GPU-hour 对比的配置必须在同型 slot 上跑；本方案 8 个 slot 卡型一致，自动满足。
+### 样本与执行
 
-## 9. 指标、机制检查和主要结果
+| 用途 | 样本 | 操作 |
+|---|---|---|
+| Calibration | 每域 16 个独立 micro-batches，共 256 responses | 用固定 pre-step D 估计 e_i，枚举选出一个 GPAS 计数向量；Uniform 固定 (4,4,4,4) |
+| Update trials | 每分支 10 次独立抽样，每次 64 responses，共 1,280 responses | 固定所选计数，不再用 trials 重新选择分配；从相同 checkpoint 恢复后执行更新 |
+| Evaluation | 每域 64 个独立 prompts，共 256 responses | 由更新前模型生成一次，缓存 teacher scores；所有更新后模型在同一 bank 上评分 |
 
-### 9.1 主指标：held-out teacher loss
+三个用途从同一域内诊断分布独立抽样，和训练、长期 loss bank、benchmark 分开。update trials 不复用 calibration 的 responses；所有分支共享 evaluation bank。10 次抽样是一步更新的重复，不是额外训练种子。
 
-每个任务固定 128 个不在训练流中的 prompt，构成 held-out 集。每 50 步（含第 0 步和第 500 步，共 11 个点）从 checkpoint 离线生成一条回复（固定采样种子、与训练相同的温度），用对应教师打分，得到各任务的 `L_i` 与加权 `F = sum_i w_i L_i`。所有方法使用同一 held-out 集和同一采样种子，因此比较在 prompt 级别配对。
+### 只保留两个观测
 
-不确定性：每个 checkpoint 上，方法间 `F` 之差的区间用 512 个 held-out prompt 的配对 bootstrap（1,000 次重采样）给出。它反映 held-out 采样，不反映种子间差异，论文里说明一次。
+1. **更新方差。**对每个 trial 的 clipping 前组装梯度 A_r，在该 checkpoint 的固定 D 下，按分支计算：
 
-训练 batch 上的 loss 只进附录：不同方法在同一步消耗的 prompt 和每任务回复数不同，不可直接比较。
+       V_hat = sum_r ||D*(A_r - mean_r(A_r))||² / (10 - 1)
 
-共同 loss 阈值 = Uniform 的最终 held-out `F`。到达阈值的 GPU-hour 在相邻 checkpoint 间线性插值。StdMOPD 不参与阈值比较。
+   使用 Welford 累积，无需保存全部 trial 梯度。报告 V_hat_G/V_hat_U 与原始值。选择计数的 calibration 和计算 V_hat 的 trials 独立，避免把“在同一批估计上求得最小值”当作机制证据。这里两个分支使用同一个 D，测量开销均计入诊断。
 
-### 9.2 机制检查：held-out 梯度方差
+2. **实际一步进展。**在固定 evaluation bank 上记录各域 d_i=L_i(before)-L_i(after)、等权平均下降以及 d_i≤0 的频率；展示全部 10 次 trial 的点和汇总。差值以同一评估 prompt 配对，更新抽样则分支独立处理。共享 bank 的重采样索引在全部 trials 中保持一致。
 
-取 Uniform 的 early / middle / late checkpoint（第 50、250、500 步）。每个 checkpoint、每个任务用 held-out prompt 生成 32 个新 micro-batch，`D` 取该 checkpoint 的 AdamW 状态，记录每个 micro-batch 的 `||D g||^2` 与两半的 `||D a||^2`。一半估计 `e_i` 并给出各规则的分配 `m`（Uniform、RawNoise、LossGap、GPAS、Cost-GPAS；LossGap 用该 checkpoint 的 held-out `L_i`），另一半算 `sum_i w_i**2 e_i / m_i`，相对 Uniform 分配报告；交换两半取平均。同时报告 `e_i` 的两半相对误差，并用 2 个和 4 个 micro-batch 的子集模拟在线估计的误差。只存标量范数，不存梯度向量。
+机制图并列展示：两种分配的 m_i、实际更新方差比、各域一步 loss 变化；用 G 主训练日志补充分配随训练的轨迹。既不需要 evaluation 梯度，也不构造 K、方向协方差、Hessian 或一阶符号分类。
 
-### 9.3 主图与主表
+这项对照直接支持“改变分配是否降低更新方差并改善该状态的一步进展”。端到端作用看 U/G 主实验，不由一个 checkpoint 推断长期收敛或全部失效机制。若 calibration 选出的 GPAS 计数恰好等于 Uniform，也保留这个结果，不另选有利 checkpoint 或教师。
 
-- 图 2（噪声与分配动态）：(a) 各任务 scaled 与 raw 的 `e_hat_i(t)`；(b) GPAS 与 Cost-GPAS 的 `m_i(t)`；(c) `H(t)` 与上界 2；(d) `tau_i(t)` 与 `C / sum_i m_i tau_i`。伴随文字给出 `e_hat_i` 的跨任务范围与漂移、raw/scaled 排序不一致的步数比例、各任务触达计数边界的比例、`H` 的中位数与四分位。Uniform 的日志本身能产出除 (b) 实际计数外的全部面板。
-- 表（held-out 方差）：三个 checkpoint × {Uniform, RawNoise, LossGap, GPAS, Cost-GPAS} 的相对方差。
-- 图 3（效率）：(a) held-out `F` 对 optimizer step，Uniform、GPAS、RawNoise、LossGap，带配对 bootstrap 带；(b) held-out `F` 对 GPU-hour，Uniform、GPAS、Cost-GPAS。
-- 主表：初始学生、各教师、StdMOPD、Uniform、RawNoise、LossGap、GPAS、Cost-GPAS 的 MATH-500 greedy pass@1、固定 LiveCodeBench slice pass@1、IFBench strict accuracy、GPQA-Diamond average@4，归一化增益 `(s - s_init)/(s_teacher - s_init)` 及其平均，最终 held-out `F`，到阈值的 GPU-hour。每个任务相对 Uniform 的差异与平均值一起列出。StdMOPD 的 `F` 与 GPU-hour 两列留空或标注不可比。
-- 附录：各任务 held-out `L_i` 表（含 StdMOPD）、各任务 held-out 与训练 loss 曲线、prompt 消耗、回复长度与截断率、计数边界占用、step-time 分位数。
+## 7. 两周排程与费用
 
-如果 held-out 方差检查中 GPAS 相对 Uniform 的方差比接近 1，说明本设定下各任务噪声差异太小，GPAS 没有作用空间；这一结论直接写进结果。
+### 7.1 从启动日计 14 天
 
-### 9.4 训练前的两项测量
+| 时间 | 主要工作 | 当期产物 |
+|---|---|---|
+| 第 1–3 天 | 在同一训练器接入默认 loss、固定任务权重、G/R 分配与 H 信号；接入现有评估器；启动 U/G | 可执行的 4 配置、共享数据/teacher manifest、主训练日志 |
+| 第 4–6 天 | 完成 U/G，保存第 250/500 步并评估；已有空闲 slot 时启动 R/H | 主比较结果与效率曲线；U/250 完整状态 |
+| 第 7–8 天 | 完成 R/H 及最终评估 | 一张包含四种方法的最终能力/成本表 |
+| 第 9–10 天 | 执行 U/250 的两个局部分支，各 10 次；补齐公共 loss 与最终 fresh loss | 更新方差和实际一步下降图 |
+| 第 11–12 天 | 汇总题目级结果、成本和分配日志，完成论文图表 | 主表、核心曲线、机制图及图表源数据 |
+| 第 13–14 天 | 处理故障导致的缺失输出、核对表图与文字、整理产物 | 两周交付版本；不新增配置或实验轴 |
 
-- `ell_i(0)`：按第 2 节规则决定 `w`。
-- 教师与初始学生的四个 benchmark 分数：若某 benchmark 上 `s_teacher - s_init < 3` 分，归一化增益不可靠，换成或增加一个同域、差距足够的 benchmark，并在论文 Capability 段说明。这一步同时确认 benchmark 与两个 RL 教师的 prompt 集、训练流无重叠。4B 教师的差距按技术报告预期 code +10 以上、science +13，仍要在同一评测器下实测。
+实现与评估并行推进，不以 teacher gap、单任务能力或早期指标达标作为启动条件。计划按一个双卡 slot 也能顺序执行四个 runs 安排，有更多设备时只并行加速现有清单。每日按实测耗时调整顺序，最后两天保留给修复与整理。
 
-## 10. 与 D3-MOPD 的边界
+### 7.2 预算
 
-D3-MOPD 根据 loss gap 或下降速度改变任务混合比例，因此改变有效目标权重。这里的 `w_i` 固定，`m_i` 只控制每个任务梯度均值的方差。LossGap 是它的信号在固定目标框架下的对照，不是 D3-MOPD 的复现。
+| 项目 | 计算 | 工作量 |
+|---|---|---:|
+| 完整训练 | 4 × 500 × 16 × 4 | **128,000 条计划 responses** |
+| 局部 calibration | 4 域 × 16 micro-batches × 4 | 256 条 responses |
+| 局部 update trials | 2 分支 × 10 × 16 × 4 | 1,280 条 responses |
+| 局部 evaluation bank | 4 域 × 64 | 256 条 responses |
+| 局部诊断合计 | 1 个 checkpoint、20 次一步更新 | **1,792 条新生成 responses** |
+| 长期固定/fresh loss banks | 共享初始 256 + 四个最终模型各 256 | **1,280 条新生成 responses** |
+| 以上生成合计 | 128,000 + 1,792 + 1,280 | **131,072 条计划 responses** |
 
-若 `G < 2M`，本方法不适用；任务子采样需要另行设计 inclusion-probability correction。
+局部更新后评分额外为 20×256=**5,120 次 response 学生评分前向**；长期固定 bank 每个方法的五个后续评估点另有 4×5×256=5,120 次评分，初始/最终 fresh 评分和局部更新前评分单列。固定 bank 评分不重新生成 response，也不重复请求 teacher scores。
 
-## 11. 排程
+能力 benchmark 费用另算：7 组学生 checkpoint 的题目生成/评分，加各域指定 teacher 一次对应评估；GPQA 每题 4 个回答，其余采用固定单回答口径。Code/IF 题数按最终冻结切片记录，故不预填完整 benchmark token 或 GPU hours。训练与评估故障重算另列。
 
-| 日期 | 内容 |
-|---|---|
-| 9/4–9/5 | 确认 math 和 IF 教师的 checkpoint 步数，下载 `Qwen/Qwen3-4B`；搭 MOPD 训练器 |
-| 9/6–9/8 | 训练器、rollout 权重同步、教师打分、held-out 评测脚本完成；教师与初始学生 benchmark；测 `ell_i(0)` 定 `w`；冒烟测试 |
-| 9/9 | 冻结配置；8 个 slot 一轮并发启动 |
-| 9/10 | 收 run；held-out `F` 曲线；held-out 方差检查；6 个模型 benchmark |
-| 9/11–9/12 | 图 2、图 3、各表；填论文占位 |
-| 9/13–9/17 | 余量：重跑失败配置；如需多种子，每轮约半天 |
+按之前每 run 8–10 墙钟小时、两张 GPU 的**未验证排程假设**，4 个完整 runs 为 **64–80 GPU hours**（一个双卡 slot 顺序运行约 32–40 小时），实际训练、评估和实现耗时以日志为准。这不是两周完成的硬件保证，排程已为实现、评估与故障处理留出主要时间。
 
-冒烟测试：GPAS 配置跑 20 步，检查每步时间、回复长度分布与截断率、峰值显存、`e_hat_i` 逐步相对变化、resume test。步时超过 2 分钟或截断率超过 5% 时再调 `L_max`。
+相较上一版，完整训练从 **13 减到 4 runs**，局部更新从 **600 减到 20 次**，诊断生成从 **81,792 减到 1,792 条**。两周内不再添加原方案中的单任务参照或次要配方。
 
-单轮并发：8 个 slot 同时启动 6 个配置；剩余 2 个 slot 跑 Uniform 与 GPAS 的第二个种子，可选，不进主文，除非后续决定报告多种子。剩余 2 张 48GB 卡做 held-out 评测与 benchmark。
+## 8. 交付物与论文同步范围
 
-原阶段 0 的判据不再决定跑不跑，只决定结果怎么写：`H` 的中位数和 held-out 方差比决定 GPAS 作用空间的表述；raw/scaled 排序一致率决定 RawNoise 段的表述；`C / sum m_i tau_i` 和 `tau_i` 的离散度决定 Cost-GPAS 段的表述。
+交付限定为：
 
-## 12. 实现清单
+1. **主结果表：**初始学生/指定教师/U/G/R/H，四域分数、平均分、相对 U 的逐域和最差域差值、总训练 GPU hours。
+2. **核心曲线：**固定参考 loss 对 steps/GPU hours；U/G 能力在 0/250/500 的实测点。最终 fresh loss 作为补充列。
+3. **机制与消融：**U/250 的分配、实测更新方差和一步 loss 图；R/H 对照结果直接使用主表，G 的 m_i/e_i 轨迹来自训练日志。
+4. **可追溯产物：**配置与实际 teacher 暂代标记、逐步 loss/计数/曝光/时间日志、题目级评估、20 次局部更新记录、图表源表。主训练保存第 100/200/300/400/500 步模型和 U/G 第 250 步模型；U/250 额外保存完整优化器/数据/随机状态，另保留最新恢复点。
 
-- micro-batch 按任务分组；每个 micro-batch 的 loss 先做 token → response 两层平均，再乘 `w_i / m_i`。StdMOPD 改为 token 损失之和除以本步有效 token 总数。
-- micro-batch 内按回复逐条 backward 累加（4 次），避免 4 条回复的 logits 同时驻留；累加完成后再取范数。
-- 每个 micro-batch backward 后：用当前 AdamW 状态 `D` 计算并记录 `||D g_i,s||^2`（以及 `||g_i,s||^2`），把 `g_i,s` 加进任务累加器 `B_i`，清零 `.grad`。任务块结束时由 `B_i / m_i` 记录 `||D a_i||^2`，并把 `w_i B_i / m_i` 加进步累加器 `A`。单卡训练，不需要 all-reduce。
-- 若 loss 已乘 `w_i / m_i`，记录前除以 `(w_i / m_i)^2` 还原。
-- 每步结束：更新 `e_hat_i`、`Lbar_i`、`tau_i`、`C` 的 EMA，计算下一步的 `m`，日志写入 `m`、`H`、各任务 loss、tokens、attempted responses、计时；把权重同步到推理卡。
-- checkpoint：每 50 步存权重（3.4 GB）；Uniform 在第 50、250、500 步另存优化器状态（各约 20 GB）供 held-out 方差检查；每个 run 保留最新一份完整状态用于 resume。checkpoint 保存 `m`、`e_hat_i`、EMA 状态、prompt 位置；resume test 验证下一步分配与参数更新可复现。
-- 不需要额外的前向或反向；不需要修改优化器。
+论文回填按这份缩减范围呈现。正文中既有单任务可迁移参照、所有域均值/方向方差诊断、独立预测验证、cost-aware 和跨 loss 泛化的实测承诺应相应删除或留作后续工作，不用本轮四个 runs 代替未做的证据。理论中的区别仍可保留为分析，但本轮主张聚焦 GPAS 的实际效果、预条件和噪声分配。
 
-## 13. 算力与存储预算
+本次修改的是实验文档和实验目录说明；论文正文的范围同步与实测结果回填随实验交付完成。当前目录的解析 teaser 与旧合成数据仍只作解析/历史材料，不作为四域实测结果。
 
-| 项目 | 估算 |
-|---|---|
-| 单个 run | 2 卡：96GB 训练卡 + 48GB 推理卡 |
-| 每步时间 | 约 1 分钟：rollout 25–40 s（由最长回复决定，`L_max=4,096` 封顶约 40 s）；四教师打分约 15 s，两个 4B 教师各约为 1.7B 的两倍；学生前反向约 15 s（约 45k token）；同步 + 优化器 + 日志约 10 s |
-| 单 run 墙钟 | 500 步约 8–10 h，含每 50 步存档 |
-| 一轮 8 slot | 6 配置 + 2 备用种子，约 10 h，约 160 GPU-h |
-| 18 卡两周容量 | 约 6,000 GPU-h |
-| 存储 | 权重 checkpoint 3.4 GB × 11 × 8 ≈ 300 GB；优化器状态 3 × 20 GB；日志与 held-out 输出可忽略 |
-
-算力不是约束，工程时间是：训练器、权重同步、打分、日志、resume test 必须在 9/8 前跑通。步时与长度分布以冒烟测试实测为准，上表只用于排程。
+论文实现依据：[任务目标与梯度聚合](sections/004_preliminary.tex)、[GPAS 方差与分配](sections/005_theory.tex)、[比较配方](sections/009_appendix.tex)。两周限制、单种子和暂代教师决定以本文件为准。

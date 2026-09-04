@@ -1,0 +1,186 @@
+% ============================================================================
+\section{Experimental Setup}
+\label{sec:experiments}
+% ============================================================================
+
+\subsection{A four-domain distillation setting}
+
+We study mathematics, code, instruction following, and science with a
+Qwen3-1.7B student in non-thinking mode. Mathematics and instruction
+following use domain-specific Qwen3-1.7B RL teachers. Code and science
+are routed to the same frozen Qwen3-4B model through separate task
+endpoints. This setting combines specialized feedback and a larger
+generalist teacher in one student.
+
+The default loss is Equation~\ref{eq:dense_topk_loss} with teacher
+$k=64$, and each task has weight $w_i=1/4$. Each step processes
+$G=16$ micro-batches of $b=4$ responses, with $2\leq m_i\leq8$.
+Uniform uses four micro-batches per task. Runs last $500$ steps;
+each task supplies a shuffled stream of $16{,}000$ unique prompts,
+and each response is capped at $4{,}096$ tokens. There is one optimizer
+update per fresh rollout batch. Noise and time estimates use EMA decay
+$0.9$. All runs use AdamW, the same task prompt orders, and one training
+seed per method.
+
+One $96$-GB GPU trains the student, and one $48$-GB GPU serves
+student rollouts and teacher scoring. The two generalist task endpoints
+share their teacher weights in memory. Appendix~\ref{app:reference_tables}
+records the configuration.
+\missing{Complete the exact checkpoint and data revisions, optimizer
+settings, software versions, and measured resource use.}
+
+\subsection{Comparisons}
+
+The core comparison keeps the loss, response averaging, and task weights
+fixed, varying how the $16$ micro-batches are assigned:
+\begin{itemize}
+    \item \textbf{Uniform}: four micro-batches per task.
+    \item \textbf{GPAS (per step)}: counts from smoothed preconditioned
+    gradient noise.
+    \item \textbf{GPAS (cost-aware)}: counts from the time--variance
+    criterion in Equation~\ref{eq:batch_cost_objective}.
+    \item \textbf{Unpreconditioned allocation}: the same variance rule
+    with $D=I$ for count selection; AdamW still performs the update.
+    \item \textbf{D$^3$ signal, fixed weights}: counts from D$^3$-MOPD's
+    remaining-gap and descent-velocity signal, combined with our fixed
+    task-mean weights. This compares learning progress with gradient
+    variability as a scheduling signal.
+\end{itemize}
+
+We also include two recipe-level comparisons.
+\textbf{D$^3$-MOPD scheduling} uses the same gap--velocity scheduling rule but
+averages responses across the step, so a task's effective weight follows
+$m_i/G$. \textbf{Open-MOPD ($K=1$)} uses its student top-$16$ dense
+loss, token-share balancing, and gap-aware weighting with one update per
+rollout batch. Student reward refresh has no intervening update to
+correct in this $K=1$ setting. These are adaptations to our model, data,
+and training budget; their task objectives differ from the fixed-weight
+comparison. Appendix~\ref{app:baselines} specifies the adaptations.
+
+Finally, \textbf{TA-OPD + Uniform} and \textbf{TA-OPD + GPAS} use
+the tail-aware loss of \citet{huang2026tailaware} at the same $k=64$.
+This pair evaluates whether the allocation remains useful when the
+dense supervision also accounts for the omitted probability mass.
+It brings the study to nine training configurations.
+
+\subsection{Capability, efficiency, and allocation traces}
+
+\paragraph{Capability and learning curves.}
+We report MATH-500 greedy pass@1, a fixed LiveCodeBench pass@1 slice,
+IFBench strict accuracy, and GPQA-Diamond average@4. The initial student
+and assigned teachers are evaluated with the same benchmark protocols.
+The main table reports all four scores and their unweighted mean.
+Every $50$ steps, we also evaluate $128$ fixed held-out prompts per task
+using the common teacher top-$64$ loss and equal task weights.
+This provides a common distillation metric even for recipes trained
+with different losses or task weights. Shared evaluation seeds allow
+paired prompt-level bootstrap intervals; these describe evaluation
+uncertainty, not training-seed variation.
+\missing{Insert benchmark versions, the code evaluation date range,
+and complete decoding settings.}
+
+\paragraph{Measured efficiency.}
+We plot the common held-out loss against both optimizer steps and
+GPU hours. GPU hours include all time on the two reserved devices,
+including waiting, synchronization, statistics, and checkpointing.
+For the fixed-weight default-loss methods, we also report the time to
+Uniform's final held-out loss, interpolating between adjacent evaluations
+and marking unreached targets. Capability scores accompany this
+loss-based comparison because teacher agreement and task performance
+need not improve together.
+
+\paragraph{Understanding the allocation.}
+The ordinary training loop logs task loss, its recent rate of change,
+response length, preconditioned and unpreconditioned noise, assigned
+counts, and time per micro-batch. These traces show when a task receives
+more computation and whether the decision follows remaining gap,
+gradient variability, or cost. We report the time and memory used by
+the GPAS statistics as part of the implementation cost.
+
+% ============================================================================
+\section{Results}
+\label{sec:results}
+% ============================================================================
+
+\subsection{Training efficiency and per-domain capability}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{3pt}
+\caption{Capability and training efficiency in the four-domain study.
+$F_{\rm eval}$ is the common equal-weight teacher top-$64$ evaluation
+loss. Time to target is reported within the default-loss, fixed-weight
+group. Dashes denote inapplicable entries; blank cells await measurements.}
+\label{tab:main_results}
+\begin{tabular}{lccccccc}
+\toprule
+Method & Math & Code & IF & Science & Mean & $F_{\rm eval}$ & GPU h to target \\
+\midrule
+Initial student & & & & & & & --- \\
+Assigned teachers & & & & & & --- & --- \\
+\midrule
+Uniform & & & & & & & \\
+GPAS (per step) & & & & & & & \\
+GPAS (cost-aware) & & & & & & & \\
+Unpreconditioned allocation & & & & & & & \\
+D$^3$ signal, fixed weights & & & & & & & \\
+\midrule
+D$^3$-MOPD scheduling & & & & & & & --- \\
+Open-MOPD ($K=1$) & & & & & & & --- \\
+TA-OPD + Uniform & & & & & & & --- \\
+TA-OPD + GPAS & & & & & & & --- \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+    \centering
+    \missingfigure[0.17\textheight]{Plot common held-out teacher loss
+    against optimizer steps and measured GPU hours. Include Uniform,
+    the two GPAS modes, and the scheduling comparisons; give the
+    recipe-level comparisons in a companion panel.}
+    \caption{Learning progress per update and per unit of computation.}
+    \label{fig:training_efficiency}
+\end{figure}
+
+Table~\ref{tab:main_results} and Figure~\ref{fig:training_efficiency}
+evaluate whether the allocation translates into useful training progress.
+\missing{Report measured efficiency and every per-domain score change
+relative to Uniform. Describe the observed tradeoff between the two
+GPAS modes and the recipe-level comparisons.}
+
+\subsection{Where does the computation go?}
+
+\begin{figure}[t]
+    \centering
+    \missingfigure[0.18\textheight]{For each task, align smoothed gradient
+    noise, allocated micro-batches, teacher loss and its rate of change,
+    and response length over training. Show preconditioned and
+    unpreconditioned noise with clear, separate scales.}
+    \caption{Allocation dynamics from the ordinary training trace.
+    The panels connect changes in computation to changes in the
+    task-gradient estimates and learning progress.}
+    \label{fig:allocation_dynamics}
+\end{figure}
+
+Figure~\ref{fig:allocation_dynamics} follows the decisions behind the
+learning curves. The comparison with unpreconditioned allocation
+isolates the optimizer's coordinate scaling; the fixed-weight
+D$^3$ signal compares noise with remaining gap and learning velocity.
+\missing{Describe the main allocation shifts and their timing.
+Explain where the signals agree or disagree using the task traces,
+and relate those decisions to the capability and efficiency results.}
+
+\subsection{Cost-aware allocation and reuse with a second dense loss}
+
+The cost-aware run uses the observed time of each task alongside its
+gradient variability. We report the fitted step-time components,
+observed step times, and the time spent collecting GPAS statistics.
+\missing{Report the measured cost differences and the resulting
+allocation and GPU-hour differences between the two GPAS modes.}
+
+The TA-OPD pair reuses the same scheduler with tail-aware supervision.
+\missing{Report the capability and learning-curve differences between
+TA-OPD + Uniform and TA-OPD + GPAS. Compare the resulting allocation
+patterns with those under the default teacher top-$64$ loss.}

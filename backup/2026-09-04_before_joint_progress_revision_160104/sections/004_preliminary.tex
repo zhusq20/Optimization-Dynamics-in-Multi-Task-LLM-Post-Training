@@ -1,0 +1,73 @@
+% ============================================================================
+\section{Distillation and Task Allocation}
+\label{sec:setting}
+% ============================================================================
+
+\subsection{Dense supervision on student rollouts}
+
+There are $M$ tasks with prompt distributions $\mathcal D_i$ and assigned
+frozen teachers $\pi_{T_i}$. The student and teachers share a vocabulary.
+For a task-$i$ prompt $x$, the student generates a response $y$. At position
+$t$, the teacher scores the student-generated prefix $c=(x,y_{<t})$.
+Write $p_\theta(a\mid c)=\pi_\theta(a\mid c)$ and
+$q_i(a\mid c)=\pi_{T_i}(a\mid c)$.
+
+We use the teacher top-$k$ loss from MOPD
+\citep{ma2026mopdmultiteacheronpolicydistillation}. Let
+$S_i(c)=\operatorname{TopK}_k(q_i(\cdot\mid c))$. The position loss is
+\begin{equation}
+    \ell_i^{(k)}(\theta;c)=
+    \sum_{a\in S_i(c)}
+    \left[
+        p_\theta(a\mid c)\log\frac{p_\theta(a\mid c)}{q_i(a\mid c)}
+        -p_\theta(a\mid c)+q_i(a\mid c)
+    \right].
+    \label{eq:dense_topk_loss}
+\end{equation}
+The probabilities retain their full-vocabulary normalization. The
+$-p_\theta+q_i$ correction makes the loss smallest when student and teacher
+probabilities agree on the retained tokens. Both the teacher scores and the
+generated prefixes are held fixed during the update. This retained-support objective gives a dense gradient at each
+observed position using a small teacher payload.
+GPAS operates on the resulting micro-batch gradients; the allocation
+method also applies to other distillation losses.
+
+We average position losses within each response, then average responses
+within a task. Positive weights $w_i$, fixed before training and summing
+to one, specify the desired balance:
+\begin{equation}
+    F(\theta)=\sum_{i=1}^M w_iL_i(\theta).
+    \label{eq:fixed_multitask_objective}
+\end{equation}
+Here $L_i$ is the expected response-mean loss under the current rollout
+distribution. Each update differentiates the loss on those sampled prefixes;
+Appendix~\ref{app:local_objective} gives the corresponding step-local
+objective. Our main study uses equal task weights.
+
+\subsection{Averaging task gradients before combining them}
+
+A micro-batch contains $b$ prompts from one task. An optimizer step processes
+$G$ micro-batches, with task $i$ receiving $m_i$ of them. The counts sum to
+$G$ and satisfy $m_{\min}\leq m_i\leq m_{\max}$. We use
+$m_{\min}\geq2$ to estimate each task's variability from the same step.
+
+Let $g_{i,s}$ be the gradient of the response-mean loss in micro-batch $s$
+of task $i$. GPAS accumulates
+\begin{equation}
+    A=\sum_{i=1}^M w_i
+       \underbrace{\frac1{m_i}\sum_{s=1}^{m_i}g_{i,s}}_{\text{task mean}}.
+    \label{eq:batch_gradient_observation}
+\end{equation}
+Implementation only requires multiplying each micro-batch loss by $w_i/m_i$.
+For example, an equally weighted task contributes one quarter of the
+combined mean whether it receives two or six micro-batches; six
+micro-batches give a more precise estimate of that mean.
+
+Counts are chosen before drawing the step's data. If fresh task-$i$
+micro-batches have mean $\mu_i$ at the current training state, then
+$\mathbb E[A\mid m]=\sum_iw_i\mu_i$. Thus, the scheduler can change counts
+without changing the intended weighted mean. Response-level averaging also
+prevents a task from gaining extra loss weight simply because its responses
+are longer. This addresses the length imbalance highlighted by Open-MOPD
+\citep{gao2026openmopddiagnosingfixingcapability}, while making the response
+the unit of averaging within each task.

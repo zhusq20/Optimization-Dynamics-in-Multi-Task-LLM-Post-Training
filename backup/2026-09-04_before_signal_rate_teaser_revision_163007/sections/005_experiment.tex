@@ -1,0 +1,305 @@
+% ============================================================================
+\section{Experimental Protocol}
+\label{sec:experiments}
+% ============================================================================
+
+The protocol first tests individual transfer, then separates harmful mean
+updates from sampling failures at common checkpoints, and finally evaluates
+prediction, capability, and computation. End-to-end measurements are not yet
+available; the results below specify the evidence to collect.
+
+\subsection{A four-domain distillation setting}
+
+We study mathematics, code, instruction following, and science with a
+Qwen3-1.7B student in non-thinking mode. Mathematics and instruction
+following use domain-specific Qwen3-1.7B RL teachers. Code and science
+are routed to the same frozen Qwen3-4B model through separate task
+endpoints. This setting combines specialized feedback and a larger
+generalist teacher in one student.
+
+The default loss is Equation~\ref{eq:dense_topk_loss} with teacher
+$k=64$, and each task has weight $w_i=1/4$. Each step processes
+$G=16$ micro-batches of $b=4$ responses, with $2\leq m_i\leq8$.
+Uniform uses four micro-batches per task. Runs last $500$ steps;
+each task supplies a shuffled stream of $16{,}000$ unique prompts,
+and each response is capped at $4{,}096$ tokens. There is one optimizer
+update per fresh rollout batch. Noise and time estimates use EMA decay
+$0.9$. Runs use AdamW and shared task prompt orders within each paired seed.
+Uniform and GPAS (per step) use three paired training seeds; the other seven
+joint configurations use one exploratory seed each.
+
+One $96$-GB GPU trains the student, and one $48$-GB GPU serves
+student rollouts and teacher scoring. The two generalist task endpoints
+share their teacher weights in memory. Appendix~\ref{app:reference_tables}
+records the configuration.
+\missing{Complete the exact checkpoint and data revisions, optimizer
+settings, software versions, and measured resource use.}
+
+\subsection{Individual transfer and joint training}
+
+Four single-task OPD references use the same initial student, assigned teacher,
+and default loss with weight one. Each initially uses one seed, $500$ updates,
+and $16$ micro-batches per update. Its $32{,}000$ responses require two passes
+through the $16{,}000$-prompt pool, reshuffling only after exhaustion. Joint
+runs do not repeat prompts. We report unique prompts, exposure, and compute,
+and compare learning curves at matched domain exposure and total compute.
+The reference's final score is an observed separately acquired capability,
+neither an upper bound nor evidence of joint attainability.
+
+The fixed-objective comparisons change only the assignment of the $16$
+micro-batches:
+\begin{itemize}
+    \item \textbf{Uniform}: four micro-batches per task.
+    \item \textbf{GPAS (per step)}: counts from smoothed preconditioned
+    gradient noise.
+    \item \textbf{GPAS (cost-aware)}: counts from the time--variance
+    criterion in Equation~\ref{eq:batch_cost_objective}.
+    \item \textbf{Unpreconditioned allocation}: the same variance rule
+    with $D=I$ for count selection; AdamW still performs the update.
+    \item \textbf{D$^3$ signal, fixed weights}: counts from D$^3$-MOPD's
+    remaining-gap and descent-velocity signal, combined with our fixed
+    task-mean weights.
+\end{itemize}
+
+Two recipe comparisons change the objectives. \textbf{D$^3$-MOPD scheduling}
+averages responses across the step, giving effective task weights $m_i/G$.
+\textbf{Open-MOPD ($K=1$)} uses its student top-$16$ dense loss, token-share
+balancing, and gap-aware weighting. Appendix~\ref{app:baselines} specifies
+these adaptations to our models, data, and budget.
+\textbf{TA-OPD + Uniform} and \textbf{TA-OPD + GPAS} use the tail-aware loss
+of \citet{huang2026tailaware} at $k=64$ to test loss sensitivity. These nine
+joint configurations accompany the four single-task references. Only the
+repeated Uniform--GPAS comparison supports claims about training-seed stability.
+
+\subsection{Interference and precision at common checkpoints}
+
+At Uniform steps $50$, $250$, and $450$, each diagnostic branch restores the
+same complete student, AdamW, scheduler, data, and random state and makes one
+update. We compare each task alone, the Uniform joint update, GPAS, and a
+more precise equal-weight joint estimate using $32$ micro-batches per task.
+Single-task branches use $16$ micro-batches of their task with weight one;
+Uniform and GPAS retain $G=16$. The precise branch is an expensive diagnostic,
+and its cost is reported separately.
+
+At each checkpoint, calibration, update-trial, and evaluation samples are
+drawn independently from the same declared diagnostic distribution for each
+task, using the fixed checkpoint rollout policy. These distributions are
+held out from training and benchmarks. For these tests, $L_i^t$ and $\mu_i$
+refer to the diagnostic distribution; applicability to the training
+distribution is evaluated empirically. Draws and responses are not reused
+across roles; independent draws may select the same prompt. Calibration uses
+$32$ independent micro-batches per task to estimate means, trace noise,
+transfer margins $a_i$ (Equation~\ref{eq:transfer_margins}), and directional
+variances (Equation~\ref{eq:directional_variance}). We split calibration into
+two independent halves and use cross-fitted mean products for $K$ and $a_i$,
+avoiding the upward bias from squaring the same noisy mean estimate.
+Calibration estimates alone select diagnostic GPAS counts. We run $20$
+independent update trials per branch and evaluate every branch on the same independent, fixed reference
+prefixes for all four domains. Diagnostic samples are independent with replacement; joint training uses
+finite streams without replacement. Their covariance assumptions are distinct.
+
+For each trial we use independent evaluation gradients to estimate the
+first-order projection under frozen pre-step $D$, and record the fixed-prefix
+loss change after an actual AdamW update. A separate equal-allocation sweep uses
+$m_i\in\{2,4,8,16,32\}$ for every task, so $G$ ranges from $8$ to $128$.
+This local sweep is exempt from the main count cap and does not test the
+end-to-end effect of changing update frequency under a fixed compute budget.
+
+We classify a harmful mean interaction only when an independently evaluated
+margin estimate is negative beyond its sampling uncertainty. A precise AdamW
+update can increase loss because of momentum or finite-step effects even with
+a positive frozen-$D$ margin; those cases test the approximation. Positive
+margins with frequent sampled sign reversals identify a candidate sampling
+failure. Margins whose uncertainty includes zero remain inconclusive.
+Total trace noise is assessed as a proxy for directional uncertainty; a directional allocation
+is considered only as an offline diagnostic if that proxy fails.
+
+\subsection{Prediction before intervention}
+
+We specify the diagnostic rule, regression threshold, confidence procedure,
+and comparison metrics using step $50$ of the first Uniform seed, before
+examining later diagnostic outcomes. The rule uses estimated margin signs and
+$v_i/a_i^2$ for positive margins to predict domain regressions, the reduction
+in regressions from GPAS or increased precision, and cases with little expected
+benefit. Steps $250$ and $450$ and the two other training seeds evaluate these
+predictions without retuning the rule. We compare predictions from directional
+uncertainty with those from trace noise alone, and report predictive errors
+as well as successful interventions. Plug-in estimates of the probability
+bound are diagnostic quantities, not finite-sample certificates.
+\missing{Record the rule and analysis specification before evaluating the
+held-out checkpoints and seeds.}
+
+\subsection{Capability, state distribution, and computation}
+
+\paragraph{Separate measurements.}
+We report MATH-500 greedy pass@1, a fixed LiveCodeBench pass@1 slice,
+IFBench strict accuracy, and GPQA-Diamond average@4. The initial student and
+assigned teachers use the same benchmark protocols. Raw per-domain scores
+remain primary. Reference-normalized gains are reported only when the
+single-task gain exceeds a prespecified positive denominator floor; otherwise
+we report raw gains. Every $50$ steps, all methods are evaluated with the
+common teacher top-$64$ loss and equal task weights on $128$ fixed held-out
+prompts per task. We keep two distinct loss measurements: a fixed bank of
+initial-student reference prefixes, and fresh prefixes generated by the
+current student. Common-checkpoint diagnostics additionally use an independent
+bank generated at that checkpoint and held fixed across its branches.
+We retain each checkpoint's fresh reference bank and teacher scores, then
+evaluate the next checkpoint on both the previous and new banks. These paired
+measurements give the empirical counterpart of Equation~\ref{eq:policy_drift}
+on the held-out prompt distribution over $50$-step intervals, with sampling
+uncertainty reported separately. The initial bank provides a common fixed-loss target;
+its difference from fresh-policy loss alone is not that decomposition.
+Neither loss is treated as a capability score.
+
+The main capability table uses step $500$ for every run, without selecting a
+different checkpoint for each domain. For the repeated core comparison,
+we report all three seed outcomes and their mean and spread. Paired
+prompt-level bootstrap intervals describe evaluation uncertainty separately;
+they do not replace training-seed variation. Single-task references initially
+have one seed, which limits claims about their stability.
+\missing{Insert benchmark versions, code evaluation date range, complete
+decoding settings, the reference-gain denominator floor, and capability
+tolerances $\epsilon_i$ before inspecting results.}
+
+\paragraph{Measured efficiency.}
+We plot fixed-reference loss, fresh-policy loss, and capability separately
+against task exposure, optimizer steps, and GPU hours. GPU hours include all
+time on the two reserved devices, including waiting, synchronization,
+statistics, and checkpointing. Diagnostic branches and evaluation have
+separate compute totals. Within the fixed-weight default-loss group, we
+report time to Uniform's mean final fixed-reference loss, interpolating
+between adjacent evaluations and marking unreached targets. This is a
+loss-based efficiency measure; per-domain capability and the worst-domain
+change accompany it.
+
+\paragraph{Allocation traces.}
+The training loop logs task loss, its recent rate of change, response length,
+trace noise with and without preconditioning, assigned counts, task exposure,
+and time per micro-batch. Diagnostic checkpoints add progress margins and
+directional noise. We test whether these measurements explain observed
+regressions and intervention effects. The cost-aware criterion measures time
+times update variance; its relationship to learning progress is evaluated
+empirically. All statistics collection costs enter the time and memory report.
+
+% ============================================================================
+\section{Results}
+\label{sec:results}
+% ============================================================================
+
+\subsection{Separately acquired and jointly acquired capabilities}
+
+\begin{figure}[t]
+    \centering
+    \missingfigure[0.17\textheight]{Plot single-task and joint capability
+    gains per domain against domain exposure and total GPU hours. Mark prompt
+    repetition in single-task references and show raw scores. Measurements
+    are not yet available.}
+    \caption{Individual transfer and joint training under explicit exposure
+    and compute comparisons. A difference does not identify its cause.}
+    \label{fig:individual_joint}
+\end{figure}
+
+Figure~\ref{fig:individual_joint} tests whether the chosen student acquires
+each capability separately and whether joint training reaches comparable
+gains. A task that does not improve alone does not establish an integration
+failure. A joint-versus-single-task gap requires the common-checkpoint tests
+before it can be attributed to interference or sampling.
+\missing{Report raw gains, uncertainty, matched-exposure comparisons, and
+any tasks for which individual transfer is weak or inconclusive.}
+
+\subsection{Mean interactions, sampling failures, and prediction}
+
+\begin{figure}[t]
+    \centering
+    \missingfigure[0.19\textheight]{For each checkpoint and domain, show
+    cross-fitted progress margins with uncertainty, directional and trace noise,
+    independent first-order sign measurements, and actual fixed-prefix loss changes for
+    single-task, Uniform, GPAS, and precise-gradient branches. Add the local
+    batch-size sweep. All panels await measurements.}
+    \caption{Common-checkpoint interventions distinguish estimated mean
+    interactions from sensitivity to sampling and test the frozen-$D$
+    approximation against actual AdamW updates.}
+    \label{fig:checkpoint_diagnostics}
+\end{figure}
+
+\missing{Report which estimated mean margins are positive, negative, or
+inconclusive; where sampled projections disagree with them; and whether
+increasing precision reduces the observed failures. Include uncertainty in the precise
+estimate and cases where finite-step AdamW behavior differs from the local
+projection. Then report predictive performance on held-out checkpoints and
+seeds, comparing directional uncertainty with trace noise. Do not infer
+capacity limits or long-run impossibility from local regressions.}
+
+\subsection{Capability and computation after intervention}
+
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Four-domain capability at step $500$. Blank cells await measurements.
+Uniform and GPAS use three seeds; all other joint configurations and each
+single-task reference initially use one. The single-task row contains four
+separate students, each scored in its training domain, not one joint model.}
+\label{tab:main_results}
+\begin{tabular}{lccccc}
+\toprule
+Method & Math & Code & IF & Science & Mean \\
+\midrule
+Initial student & & & & & \\
+Assigned teachers & & & & & \\
+Single-task references & & & & & \\
+\midrule
+Uniform & & & & & \\
+GPAS (per step) & & & & & \\
+\midrule
+GPAS (cost-aware) & & & & & \\
+Unpreconditioned allocation & & & & & \\
+D$^3$ signal, fixed weights & & & & & \\
+D$^3$-MOPD scheduling & & & & & \\
+Open-MOPD ($K=1$) & & & & & \\
+TA-OPD + Uniform & & & & & \\
+TA-OPD + GPAS & & & & & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[t]
+    \centering
+    \missingfigure[0.17\textheight]{Plot fixed-reference loss, fresh-policy
+    loss, and per-domain capability in separate panels against steps and
+    measured GPU hours. Show three-seed variation for Uniform and GPAS;
+    label secondary comparisons as single-seed exploratory runs.
+    Measurements are not yet available.}
+    \caption{Training progress, changes in visited states, and capability
+    evaluated separately under the same compute accounting.}
+    \label{fig:training_efficiency}
+\end{figure}
+
+Table~\ref{tab:main_results} and Figure~\ref{fig:training_efficiency} test
+whether the diagnosed local effect leads to useful end-to-end changes.
+\missing{Report every per-domain change, the worst-domain change, seed
+variation, measured GPU hours, and time to the fixed-reference loss target.
+State whether capability and the two loss measurements agree. Report negative
+or null results alongside improvements.}
+
+\subsection{Allocation, cost, and dense-loss sensitivity}
+
+\begin{figure}[t]
+    \centering
+    \missingfigure[0.16\textheight]{Align task counts, trace noise, loss,
+    and response length over training; mark the diagnostic checkpoints and
+    their progress margins. Keep preconditioned and unpreconditioned noise
+    on separate scales. Measurements are not yet available.}
+    \caption{Allocation traces interpreted using the measured progress
+    margins and intervention outcomes.}
+    \label{fig:allocation_dynamics}
+\end{figure}
+
+The unpreconditioned and fixed-weight D$^3$ comparisons test the role of
+optimizer scaling and the choice of allocation signal. The cost-aware run
+tests whether minimizing time times variance improves measured efficiency.
+The TA-OPD pair tests sensitivity to the dense loss.
+\missing{Relate allocation changes to measured directional uncertainty and
+outcomes. Report statistics overhead, fitted and observed task costs, and
+capability changes under the second loss. Keep conclusions from single-seed
+comparisons exploratory.}

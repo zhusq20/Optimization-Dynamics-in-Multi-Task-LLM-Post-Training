@@ -1,0 +1,189 @@
+% ============================================================================
+\section{GPAS}
+\label{sec:theory}
+% ============================================================================
+
+\subsection{Noise in preconditioned coordinates}
+
+The variance criterion is exact for a step with a fixed diagonal
+preconditioner and provides a local allocation metric for optimizers with
+diagonal preconditioning. Let $D$ be the pre-step diagonal preconditioner read
+from the optimizer state:
+\[
+    D=
+    \begin{cases}
+        I, & \text{for SGD},\\
+        \operatorname{diag}\!\bigl((\sqrt{\widehat v_{\rm pre}}+\epsilon)^{-1}\bigr),
+        & \text{for an Adam-type optimizer},
+    \end{cases}
+\]
+where $\widehat v_{\rm pre}$ is the bias-corrected second-moment state at the
+start of the step. Noise in a coordinate affects the local update according to
+how strongly $D$ amplifies it, so we measure noise after preconditioning and
+hold $D$ fixed within a step.
+
+The quantity to allocate is the variance of a single micro-batch gradient
+around its task mean. Unless noted otherwise, $g_i$ and $e_i$ refer to the
+top-$k$ estimator used for training. Under the working model that fresh
+micro-batches are conditionally independent across draws and identically
+distributed within each task, with a common task mean and covariance, define
+task noise $e_i$ and the accumulated-gradient variance $V(m)$ by
+\begin{equation}
+    e_i=\mathbb E\bigl\|D(g_i-\mu_i)\bigr\|_2^2,
+    \qquad
+    V(m)=\mathbb E\bigl\|D(A-\mu)\bigr\|_2^2
+        =\sum_{i=1}^M\frac{w_i^2e_i}{m_i}.
+    \label{eq:batch_variance}
+\end{equation}
+Thus the allocation enters the preconditioned variance only through the
+inverse-count terms. When $\mu$ is the gradient of the step-local surrogate,
+then for a fixed student state, preconditioner, and step size, the allocation
+also enters its one-step descent bound only through $V(m)$ (proof in
+Appendix~\ref{app:descent}).
+
+Minimizing this variance gives the count rule used by GPAS. Before enforcing
+integer bounds, the solution is
+\begin{equation}
+    m_i\ \propto\ w_i\sqrt{e_i}.
+    \label{eq:batch_gpas_allocation}
+\end{equation}
+This is Neyman allocation, the classical rule that samples each stratum in
+proportion to its standard deviation. We choose the common proportionality
+scale so that the clipped counts sum to $G$, iterating after any count reaches
+a bound, and then round by largest remainder.
+
+Preconditioning matters because unpreconditioned and preconditioned noise can
+rank tasks differently. In a three-task example whose preconditioner reverses
+the noise ranking, counts from unpreconditioned noise raise the preconditioned
+variance to $2.3\times$ Uniform, whereas the preconditioned rule lowers it to
+$0.68\times$ (details in Appendix~\ref{app:controlled}).
+
+\subsection{Where the teacher--student gap enters}
+\label{sec:gap_noise}
+
+The log ratio at a prefix has two distinct roles. Its student-probability
+weighted mean is the local reverse-KL gap, while its centered variation,
+together with the norm and direction of
+$\nabla_\theta\log\pi_\theta(y_t\mid x,y_{<t})$, determines how noisy a sampled
+score-function term can be; the constant mean itself cancels against the
+mean-zero score function. Teachers at different distances from the student can
+therefore induce different within-position spreads, an empirical relation we
+test rather than assume.
+
+For a precise diagnostic, view scoring in two stages: first fix the prompts and
+on-policy prefixes in a micro-batch, and then independently draw the token used
+to estimate each fixed-prefix score. Let $g_{i,\mathrm{diag}}^a$ denote the
+resulting diagnostic gradient for estimator
+$a\in\{\mathrm{samp},\mathrm{top}k\}$, let $\bar g_i$ be their common
+conditional mean given the fixed trace, and let
+$\mu_i^{\mathrm{diag}}=\mathbb E[g_{i,\mathrm{diag}}^a]$. The law of total
+variance gives
+\[
+    e_{i,\mathrm{diag}}^a
+      =e_{i,\mathrm{diag}}^{\mathrm{resp}}
+       +e_{i,\mathrm{diag}}^{\mathrm{tok},a},\qquad
+    e_{i,\mathrm{diag}}^{\mathrm{resp}}
+      =\mathbb E\bigl\|D(\bar g_i-\mu_i^{\mathrm{diag}})\bigr\|_2^2,
+    \quad
+    e_{i,\mathrm{diag}}^{\mathrm{tok},a}
+      =\mathbb E\bigl\|D(g_{i,\mathrm{diag}}^a-\bar g_i)\bigr\|_2^2.
+\]
+Here response-level noise comes from which prompts and rollout prefixes are
+observed, whereas token-level noise is the sum of the conditional
+within-position contributions from which scoring token is drawn at each fixed
+prefix (derivation in Appendix~\ref{app:allocation_proofs}). GPAS handles
+response-level noise by averaging more examples, whereas the retained-token
+component can be integrated directly at a fixed prefix.
+
+The estimator in Section~\ref{sec:setting} replaces the random retained-set
+contribution by its exact fixed-prefix expectation. Its tail correction remains
+random, so the paired measurement in Section~\ref{sec:experiments} checks the
+diagnostic variance change rather than presuming it. Online GPAS uses $e_i$
+from the actual top-$k$ training gradients in Equation~\ref{eq:batch_variance};
+the independent scoring-token protocol isolates the fixed-prefix mechanism,
+and its diagnostic components need not equal that online $e_i$. We test whether
+more distant teachers show a larger diagnostic token component and whether
+integrating the retained contribution predicts a narrower online noise spread
+and a changed allocation.
+
+Open-MOPD uses the level of the gap as a budget signal and increases the weight
+of large-gap domains \citep{gao2026openmopddiagnosingfixingcapability}. Under a
+fixed objective, the log ratio already appears in the task gradient; its
+additional token-to-token variability is estimation noise, which we address
+with the estimator rather than by changing objective weights.
+
+\subsection{Cost-aware mode}
+
+Long-response tasks can take more time per micro-batch, so the allocation with
+the least variance per step need not have the least variance per hour. Let
+$\tau_i$ be the measured marginal time for the count-dependent rollout,
+teacher scoring, and backward work of one task-$i$ micro-batch, and let $C$ be
+the remaining fixed time for synchronization, the optimizer update, and
+logging. At a fixed student state, under the measured additive time model, the
+local time-normalized variance proxy is
+\begin{equation}
+    J_C(m)=\Bigl(C+\sum_{i=1}^M m_i\tau_i\Bigr)\,V(m).
+    \label{eq:batch_cost_objective}
+\end{equation}
+GPAS in its cost-aware mode enumerates the feasible integer count vectors and
+chooses the one with smallest $J_C$. In the unconstrained continuous relaxation
+with no fixed time, the optimal count scales as
+$w_i\sqrt{e_i/\tau_i}$; as fixed time dominates, it approaches the per-step
+rule (derivation in Appendix~\ref{app:allocation_proofs}).
+
+\subsection{Online estimates and implementation}
+
+Every statistic for the next allocation comes from the step just completed.
+Let $\bar g_i$ now denote the sample mean of task $i$'s observed micro-batch
+gradients in that step. Its preconditioned sample variance is
+\begin{equation}
+    \widehat e_i=\frac{1}{m_i-1}\sum_{s=1}^{m_i}
+    \bigl\|D(g_{i,s}-\bar g_i)\bigr\|_2^2.
+    \label{eq:noise_estimate}
+\end{equation}
+Under this working model, it is an unbiased estimate of one-micro-batch
+preconditioned noise, and the count lower bound guarantees that it exists every
+step. Timing estimates are smoothed online because response lengths make
+individual observations noisy.
+
+To expose how much a count change can help, define the plug-in prediction
+$\widehat V(m)=\sum_iw_i^2\widehat e_i/m_i$ and compare it with Uniform. The
+logged variance ratio is
+\begin{equation}
+    H=\frac{\widehat V(m^{\rm unif})}{\widehat V(m)},
+    \label{eq:allocation_variance_ratio}
+\end{equation}
+and is bounded above by the count limits. The first step uses Uniform because
+no earlier statistics are available.
+
+GPAS leaves the optimizer untouched: for SGD, $D$ is the identity and no
+optimizer state is read; for Adam-type optimizers, $D$ is read from the
+pre-step second-moment buffer. Changing the allocation changes the noise term
+in an Adam-type second-moment observation, as does any change in batch
+composition; SGD has no such state and is unaffected (details in
+Appendix~\ref{app:moment_target_proof}). Computing $\widehat e_i$ requires one
+parameter-sized mean buffer and elementwise reductions, but no additional
+forward or backward pass. The top-$k$ estimator likewise reuses logits that
+the student and teacher already compute. Algorithm~\ref{alg:batch_gpas}
+summarizes one step.
+
+\begin{algorithm}[H]
+\caption{One optimizer step with GPAS.}
+\label{alg:batch_gpas}
+\small
+\begin{minipage}{0.97\linewidth}
+\begin{enumerate}
+    \item Choose bounded integer counts $m$ from the previous step's
+    $\widehat e_i$ and, in the cost-aware mode, $\tau_i$ and $C$; use Uniform
+    when no statistics are available.
+    \item For every task, draw fresh prompts and responses, obtain teacher
+    scores for the student top-$k$ tokens and for the sampled token when it is
+    outside that set, and accumulate each micro-batch gradient with weight
+    $w_i/m_i$.
+    \item Read the pre-update $D$ from the optimizer state (the identity for
+    SGD); from the same gradients and trace, compute $\widehat e_i$, update
+    timing estimates, and log the diagnostic quantities.
+    \item Apply one optimizer update.
+\end{enumerate}
+\end{minipage}
+\end{algorithm}

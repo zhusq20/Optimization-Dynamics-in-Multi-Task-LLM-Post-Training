@@ -1,0 +1,242 @@
+% ============================================================================
+\section{Implementation and Supporting Derivations}
+% ============================================================================
+
+\subsection{Configuration}
+\label{app:reference_tables}
+
+\begin{table}[H]
+\centering
+\footnotesize
+\caption{Configuration of the four-domain study. Entries marked TODO
+require the corresponding training or evaluation artifact.}
+\label{tab:pipeline}
+\begin{tabular}{p{0.19\linewidth}p{0.73\linewidth}}
+\toprule
+Component & Configuration \\
+\midrule
+Student & Qwen3-1.7B \citep{qwen2025qwen3}, non-thinking mode;
+\missing{frozen model and tokenizer revisions} \\
+Teachers & Domain-specific Qwen3-1.7B RL checkpoints for math and
+instruction following; one shared Qwen3-4B weight set for code and science.
+All use the same vocabulary and tokenizer.
+\missing{exact checkpoint identifiers, RL training recipes, and scores} \\
+Training data & $16{,}000$ unique prompts per task, shuffled once and
+consumed without replacement.
+\missing{datasets, versions, licenses, filters, and held-out split} \\
+Default loss & Teacher top-$64$ corrected reverse KL
+(Equation~\ref{eq:dense_topk_loss}); full-vocabulary probabilities;
+position mean within response, response mean within task; $w_i=1/4$ \\
+Rollout & One response per prompt and one update per fresh batch;
+maximum response length $4{,}096$; truncated responses retained.
+\missing{temperature, EOS handling, and decoding settings} \\
+Step and budget & $b=4$, $G=16$, $2\leq m_i\leq8$, $500$ steps,
+$32{,}000$ attempted responses per run, one seed per method \\
+Optimizer & AdamW;
+\missing{learning rate and schedule, betas, epsilon, weight decay,
+clipping, precision, and memory configuration} \\
+GPAS & Pre-step bias-corrected Adam second moment for $D$;
+noise and time EMA decay $0.9$; first step Uniform;
+bounded proportional rounding for per-step counts and integer
+enumeration for cost-aware counts \\
+Evaluation & $128$ held-out prompts per task every $50$ steps;
+MATH-500, LiveCodeBench, IFBench, and GPQA-Diamond.
+\missing{versions, evaluation seeds, and decoding protocols} \\
+System & One 96\,GB learner GPU and one 48\,GB rollout/teacher GPU;
+the code and science endpoints share weights.
+\missing{GPU models, inference and training software revisions,
+peak memory, and GPU hours} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Dense loss implementation and online statistics}
+\label{app:implementation}
+
+At each student-generated prefix, the teacher returns the identifiers
+and full-vocabulary log probabilities of its top-$64$ tokens. The
+student computes its full-vocabulary log normalizer and gathers its
+probabilities at those identifiers. Autodifferentiation is applied to
+the whole expression in Equation~\ref{eq:dense_topk_loss}, including
+the $-p_\theta$ term. The retained probabilities are not renormalized
+within the top-$k$ set, and the loss does not use a sampled tail
+correction. The operation is dense over the retained set and uses
+sparse teacher output.
+
+GPAS collects statistics from unweighted micro-batch gradients. For a
+task block, initialize its running mean $h=0$ and scalar $S=0$.
+After micro-batch $s$, form $\delta=g_{i,s}-h$, then update
+\begin{equation}
+    h\leftarrow h+\delta/s,\qquad
+    S\leftarrow S+\frac{s-1}{s}\|D\delta\|_2^2.
+    \label{eq:welford}
+\end{equation}
+At the end of the block, $\widehat e_i=S/(m_i-1)$ and
+$A\leftarrow A+w_i h$. The mean buffer is reused for the next task.
+The same recurrence with $D=I$ records unpreconditioned noise.
+Reductions use float32 accumulation. Gradients are unscaled before
+measurement if mixed-precision loss scaling is active, and clipping
+is applied to the assembled gradient $A$.
+
+The optimizer state is fixed during this collection. Before an Adam
+second moment is available, the first Uniform step uses $D=I$.
+Subsequent steps use the pre-step bias-corrected second moment.
+The first observation initializes each noise EMA; later observations
+use decay $0.9$. The scheduler reads the completed step's averages
+before generating the next step's data.
+
+For per-step allocation, set $a_i=w_i\sqrt{\widetilde e_i}$ and find
+a scale $\lambda$ such that
+$\sum_i\operatorname{clip}(\lambda a_i,m_{\min},m_{\max})=G$.
+Floor these counts and assign remaining units in descending order
+of fractional remainder, respecting the bounds; ties follow the
+fixed task order. Zero-noise tasks receive the lower bound unless
+the other tasks reach their upper bounds; if all scores are zero,
+use Uniform. The cost-aware scheduler evaluates all feasible integer
+vectors using the smoothed noise and timing estimates.
+
+\subsection{Comparison recipes}
+\label{app:baselines}
+
+\paragraph{D$^3$-MOPD scheduling.}
+We use the remaining-gap and descent-velocity construction of
+\citet{sun2026d3mopd}. Let $\bar L_i(t)$ be the smoothed task loss
+and $L_i^0$ the mean of its first five observations. With $W=10$
+and up to $R=3$ available windows, the composite signal is
+\begin{equation}
+\begin{split}
+    r_i(t)&=\bar L_i(t)/L_i^0,\\
+    v_i(t)&=\max\left\{0,\frac1{R'}
+       \sum_{j=0}^{R'-1}
+       \frac{\bar L_i(t-(j+1)W)-\bar L_i(t-jW)}
+            {\bar L_i(t-(j+1)W)}\right\},\\
+    s_i(t)&=r_i(t)v_i(t).
+\end{split}
+\end{equation}
+We retain the published max-normalization, softmax temperature $0.5$,
+per-domain probability floor $0.10$, and multiplicative batch jitter
+of amplitude $0.30$. The scheduler refreshes every $10$ steps,
+using the paper's history warmup and EMA window of $10$.
+All KL denominators use the published floor of $0.15$.
+The signal is computed from the default dense task loss in our pipeline.
+The resulting mixture is converted to micro-batch counts with the
+shared bounds $[2,8]$. Thus this is a controlled adaptation to our loss
+scale, micro-batch unit, and budget.
+
+The two D$^3$ rows use the same scheduling rule. The fixed-weight
+row assembles $A=\sum_iw_i\bar g_i$; the recipe-level row assembles
+$A=\sum_i(m_i/G)\bar g_i$. This makes the effect of task weighting
+visible alongside the comparison of scheduling signals.
+
+\paragraph{Open-MOPD with one update per rollout.}
+We follow the released student top-$16$ dense candidate loss,
+token-share balancing, and gap-aware weighting
+\citep{gao2026openmopddiagnosingfixingcapability,openmopd2026code}.
+The released implementation multiplies candidate-wise detached
+advantages by candidate-wise student probability ratios and then
+sums over candidates. Each retained token therefore contributes its own gradient. In our setting, the initial task target is uniform, and each
+batch contains four micro-batches per task. The recipe's token and
+gap weights remain active. One optimizer step per rollout batch
+corresponds to $K=1$, so there is no reuse-induced reward staleness.
+\missing{Record the exact configuration for gap smoothing, floors,
+and weight normalization from the integrated implementation.}
+
+\paragraph{Tail-aware supervision.}
+TA-OPD \citep{huang2026tailaware} groups the omitted vocabulary
+into one tail event. For teacher support $S_i(c)$, write
+$p_{\rm tail}=1-\sum_{a\in S_i(c)}p_\theta(a\mid c)$ and
+$q_{\rm tail}=1-\sum_{a\in S_i(c)}q_i(a\mid c)$. Its position loss is
+\begin{equation}
+    \ell_i^{\rm TA}=
+       \sum_{a\in S_i(c)}p_\theta(a\mid c)
+                     \log\frac{p_\theta(a\mid c)}{q_i(a\mid c)}
+       +p_{\rm tail}\log\frac{p_{\rm tail}}{q_{\rm tail}}.
+\end{equation}
+Both runs use $k=64$, the same response averaging and fixed task
+weights, and the same training budget as the core comparison.
+Only the allocation differs between TA-OPD + Uniform and
+TA-OPD + GPAS.
+
+\subsection{Step-local objective}
+\label{app:local_objective}
+
+Let $\theta_t$ be the current student and $\mathcal R_i^t$ its
+distribution over task-$i$ prompts and responses at step $t$.
+The local objective differentiated by dense OPD is
+\begin{equation}
+    F_t(\theta)=
+       \sum_i w_i\,\mathbb E_{(x,y)\sim\mathcal R_i^t}
+       \left[\frac1{|y|}\sum_{u=1}^{|y|}
+            \ell_i^{(k)}(\theta;x,y_{<u})\right].
+\end{equation}
+The rollout distribution is held fixed in this derivative. Thus the
+mean micro-batch update at $\theta_t$ is $\nabla F_t(\theta_t)$.
+The distribution is refreshed at the next step. Fixing $w_i$ preserves
+the chosen task weighting through this sequence of local objectives.
+
+\subsection{Variance and the allocation rule}
+\label{app:allocation_proofs}
+
+Condition on the current state and pre-step scaling $D$. In the
+independent micro-batch model, cross-task centered terms have zero
+expectation, giving
+\begin{equation}
+    \mathbb E\|D(A-\mu)\|_2^2
+       =\sum_i w_i^2\mathbb E\|D(\bar g_i-\mu_i)\|_2^2
+       =\sum_i\frac{w_i^2e_i}{m_i}.
+\end{equation}
+Equation~\ref{eq:noise_estimate} is the ordinary sample variance
+summed over preconditioned coordinates.
+Writing $a_i=w_i\sqrt{e_i}$, Cauchy--Schwarz gives
+\begin{equation}
+    \left(\sum_i m_i\right)
+    \left(\sum_i\frac{a_i^2}{m_i}\right)
+    \geq\left(\sum_i a_i\right)^2.
+\end{equation}
+Equality holds at $m_i\propto a_i$, yielding the continuous
+per-step rule. With unequal costs and zero fixed step time,
+\begin{equation}
+    \left(\sum_i m_i\tau_i\right)
+    \left(\sum_i\frac{a_i^2}{m_i}\right)
+    \geq\left(\sum_i a_i\sqrt{\tau_i}\right)^2,
+\end{equation}
+with equality at $m_i\propto a_i/\sqrt{\tau_i}$.
+Positive fixed time and integer bounds are handled by the finite
+search used in the cost-aware implementation.
+
+\subsection{Connection to a local update}
+\label{app:descent}
+
+For an $L$-smooth $F_t$ and the frozen-preconditioner step
+$\theta'=\theta-\eta DA$, let $\mu=\nabla F_t(\theta)$.
+Smoothness and the bias--variance identity give
+\begin{equation}
+    \mathbb E F_t(\theta')
+       \leq F_t(\theta)-\eta\mu^\top D\mu
+       +\frac{\eta^2L}{2}
+         \left(\|D\mu\|_2^2+V(m)\right).
+\end{equation}
+At the fixed state, the allocation-dependent term is $V(m)$.
+This motivates measuring noise in update coordinates. GPAS uses
+this local criterion with ordinary AdamW; momentum, clipping, and
+the new second-moment update remain part of that optimizer.
+
+\subsection{Timing and released traces}
+\label{app:system_details}
+
+Task blocks record rollout, teacher-scoring, backward, and statistics
+time, together with response lengths and peak memory. The marginal
+per-micro-batch estimates form $\tau_i$; synchronization, optimizer
+work, and other count-independent step operations form $C$.
+Their EMA estimates use decay $0.9$. We compare predicted and
+observed step times and evaluate efficiency with actual elapsed
+time on both reserved GPUs. Evaluation compute is reported separately.
+If a deployment overlaps task blocks, its timing predictor should
+represent that execution schedule.
+
+Checkpoints retain optimizer state, task stream positions, counts,
+and noise and time averages. The released traces include per-task
+held-out loss, prompt consumption, response length and truncation,
+micro-batch counts, noise estimates, and measured step time.
+\missing{Add the artifact location and populate the configuration
+and empirical figures from these records.}

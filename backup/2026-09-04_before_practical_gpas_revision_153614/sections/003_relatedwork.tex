@@ -1,0 +1,57 @@
+% ============================================================================
+\section{Related Work}
+% ============================================================================
+
+\paragraph{Task weighting and data allocation.}
+Multi-task methods tune loss weights, alter gradient directions, or adapt data
+schedules
+\citep{sener2019multitasklearningmultiobjectiveoptimization,
+yu2020gradientsurgerymultitasklearning,
+liu2024conflictaversegradientdescentmultitask,chen2018gradnorm}, and
+language-model training adapts domain, rollout, or prompt distributions from
+learning progress
+\citep{albalak2023efficient,wang2025dump,zheng2025greso,gao2025promptcurriculum}.
+These methods change the objective or the data distribution. GPAS keeps both
+fixed and changes only the number of micro-batches used to estimate each task
+gradient; because every task appears in every step, it observes within-task
+gradient noise for all tasks rather than for a sampled subset.
+
+\paragraph{Multi-teacher on-policy distillation.}
+MOPD routes student rollouts to task teachers and trains a shared student with
+token-level teacher feedback \citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD studies token-share balancing and gap-following, and also handles
+stale rewards \citep{gao2026openmopddiagnosingfixingcapability}; its token-share
+balance holds here by construction through response averaging and
+$w_i/m_i$ weighting. We use one update per rollout and do not address reuse.
+D$^3$-MOPD adapts the domain mixture from the teacher-loss gap and its descent
+velocity \citep{sun2026d3mopd}, which changes the objective weights; GPAS
+changes the precision of each task-gradient estimate instead. Teacher mixtures
+can still produce transfer and task trade-offs
+\citep{li2026coinsidesdualnature}, which is why we report capability per task.
+
+\paragraph{Top-$k$ distillation estimators.}
+Three estimators are commonly described as top-$k$ distillation. The first
+restricts reverse KL to the student's top-$k$ tokens and renormalizes; it drops
+the mass outside the set and therefore optimizes a different objective, and
+MOPD reports that it diverges earlier than the sampled-token form under a large
+teacher--student gap \citep{ma2026mopdmultiteacheronpolicydistillation}. The
+second, used by Open-MOPD, sums top-$k$ log ratios into a scalar reward that
+multiplies the sampled token's score function. This reward is smoother than a
+single log ratio, but randomness from the sampled token remains. The third is
+the sampled-token log ratio itself. Our estimator computes that third form's
+top-$k$ contribution exactly and lets a sampled token cover the remaining
+mass, preserving its fixed-prefix expectation while removing the retained-set
+sampling component.
+
+\paragraph{Stratified allocation for optimization.}
+Gradient-norm sampling reduces the second moment of an SGD estimate
+\citep{alain2015variancereductionsgddistributed,
+katharopoulos2018samplescreatedequaldeep}. Neyman allocation assigns samples
+in proportion to within-stratum standard deviation, and unequal sampling costs
+give the square-root cost correction used here
+\citep{neyman1934representative,cochran1977sampling,mohri2026costawarelearning}.
+The right variance geometry depends on the optimizer: Euclidean coordinates
+suit SGD, whereas adaptive optimizers precondition coordinates
+\citep{lahire2023nonuniformadaptive}. GPAS applies Neyman allocation to
+fixed-size MOPD micro-batches under the preconditioner of whichever optimizer
+is used.

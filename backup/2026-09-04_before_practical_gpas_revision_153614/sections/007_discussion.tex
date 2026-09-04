@@ -1,0 +1,34 @@
+% ============================================================================
+\section{Limitations and Conclusion}
+\label{sec:conclusion}
+% ============================================================================
+
+The study covers one student scale, four tasks, one seed per method, and one
+system layout. GPAS is a local rule: its analysis treats micro-batches within
+a step as conditionally independent and identically distributed within task,
+holds the pre-step preconditioner fixed while
+measuring noise, and its attainable variance reduction is bounded by the count
+limits. The additive step-time model is fitted to one layout; systems with
+parallel critical paths require their own measured time model. The method needs
+at least two micro-batches per task per step, so settings with many more tasks
+than micro-batches need a task-subsampling variant.
+The variance derivation treats fresh micro-batches as conditionally i.i.d.; the
+fixed shuffled prompt stream is read without replacement and therefore has a
+finite-population covariance correction. Held-out splits and online estimates
+measure the realized setting directly.
+
+Each rollout batch is used for one update; staleness caused by reusing rollouts
+across updates is outside our scope. The top-$k$ estimator also requires the
+teacher to score the student's retained tokens and the sampled token when it
+lies outside that set. This is natural when the teacher is available as a
+prefill scoring service, but it may
+not be available through an API that exposes only the sampled-token score.
+
+GPAS fixes the objective weights and adapts only how many micro-batches each
+task contributes, so the allocation changes gradient variance and nothing
+else. Its per-step mode follows Neyman allocation in preconditioned coordinates,
+and its cost-aware mode also uses measured time; both reuse statistics produced
+by MOPD training. \missing{Conclude with the four empirical laws in one
+sentence: noise is heterogeneous, drifting, and coordinate dependent; teacher
+distance predicts a removable token component; analytic removal and allocation
+are complementary; and the overhead ratio bounds the gain per GPU hour.}

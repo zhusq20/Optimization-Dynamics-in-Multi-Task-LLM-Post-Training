@@ -2,42 +2,60 @@
 \section{Related Work}
 % ============================================================================
 
-\paragraph{Task weighting and data allocation.}
-Multi-task methods tune loss weights, alter gradient directions, or adapt data
-schedules
-\citep{sener2019multitasklearningmultiobjectiveoptimization,
-yu2020gradientsurgerymultitasklearning,
-liu2024conflictaversegradientdescentmultitask,chen2018gradnorm}, and
-language-model training adapts domain, rollout, or prompt distributions from
-learning progress
-\citep{albalak2023efficient,wang2025dump,zheng2025greso,gao2025promptcurriculum}.
-These methods change the objective or the data distribution. GPAS keeps both
-fixed and changes only the number of micro-batches used to estimate each task
-gradient; because every task appears in every step, it observes within-task
-gradient noise for all tasks rather than for a sampled subset.
+\paragraph{Capability integration in multi-teacher distillation.}
+MOPD combines domain teachers through supervision on student-generated
+responses \citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD measures integration gaps against separately distilled students
+and addresses response-token imbalance, uneven progress, and stale
+student-dependent rewards
+\citep{gao2026openmopddiagnosingfixingcapability}.
+D$^3$-MOPD adapts domain sampling using the remaining teacher gap and its
+descent velocity \citep{sun2026d3mopd}. CaMOPD studies counteracting recovery
+and preservation gradients and combines alternating training with
+gap-based selection \citep{chen2026camopd}.
+Our analysis relates the implemented teacher signal to task gradients and
+distinguishes mean progress from uncertainty in its estimate.
+Our proposed checkpoint interventions test
+whether increased precision improves joint progress under fixed weights.
 
-\paragraph{Multi-teacher on-policy distillation.}
-MOPD routes student rollouts to task teachers and trains a shared student with
-token-level teacher feedback \citep{ma2026mopdmultiteacheronpolicydistillation}.
-Open-MOPD studies unequal token budgets, reward scales, and stale rewards
-\citep{gao2026openmopddiagnosingfixingcapability}; its token-share balancing
-holds here by construction through per-response averaging and $w_i/m_i$
-scaling. D$^3$-MOPD adapts the domain mixture from the teacher-loss gap and
-its descent velocity \citep{sun2026d3mopd}, which changes the objective
-weights; GPAS changes the precision of each task-gradient estimate instead,
-and the two can be combined. Teacher mixtures can still produce transfer and
-task trade-offs \citep{li2026coinsidesdualnature}, which is why we report
-capability per task.
+\paragraph{Dense losses and token estimators.}
+MOPD includes both sampled-token policy gradients and a corrected reverse-KL
+loss on the teacher's top-$k$ tokens
+\citep{ma2026mopdmultiteacheronpolicydistillation}. Open-MOPD uses student
+top-$k$ candidates with probability-weighted log-ratio advantages; its
+released dense implementation computes candidate-wise losses before
+summing across the retained set
+\citep{gao2026openmopddiagnosingfixingcapability,openmopd2026code}.
+EMA-PG combines an exact retained-set contribution with a sampled tail
+\citep{zhang2026emapg}, TA-OPD includes the probability mass outside the
+teacher's top-$k$ set \citep{huang2026tailaware}, and vOPD uses a
+control-variate baseline for sampled-token distillation
+\citep{oh2026vopd}. We build on existing dense losses and apply GPAS to the
+micro-batch gradients they produce.
 
-\paragraph{Stratified allocation for optimization.}
-Gradient-norm sampling reduces the second moment of an SGD estimate
-\citep{alain2015variancereductionsgddistributed,
-katharopoulos2018samplescreatedequaldeep}. Neyman allocation assigns samples
-in proportion to within-stratum standard deviation, and unequal sampling costs
-give the square-root cost correction used here
-\citep{neyman1934representative,cochran1977sampling,mohri2026costawarelearning}.
-The right variance scale depends on the optimizer: Euclidean coordinates suit
-SGD, whereas adaptive optimizers rescale coordinates
-\citep{lahire2023nonuniformadaptive}. GPAS applies Neyman allocation to
-fixed-size MOPD micro-batches with noise measured under the current AdamW
-scaling.
+\paragraph{On-policy learning dynamics.}
+Teacher--student compatibility and the capabilities supplied by the teacher
+shape OPD outcomes \citep{li2026rethinkingopd}.
+Rethinking OPD~II finds slow alignment even when training states are held
+fixed in its studied settings \citep{fu2026rethinkingopd2}. This motivates
+examining optimization separately from state coverage, but does not
+identify gradient noise as the cause. We therefore distinguish
+fixed-reference loss, fresh-policy loss, and downstream capability in the
+evaluation protocol.
+
+\paragraph{Task weighting and stochastic optimization.}
+Multi-task learning adapts loss weights and gradient directions
+\citep{chen2018gradnorm,sener2019multitasklearningmultiobjectiveoptimization,
+yu2020gradientsurgerymultitasklearning}; language-model training also adapts
+data mixtures from learning progress \citep{albalak2023efficient,wang2025dump}.
+Directional sampling tests already distinguish descent reliability from
+norm accuracy \citep{bollapragada2018adaptive}, and adaptive sampling has
+been developed for stochastic multiobjective optimization
+\citep{zhao2024adaptive}. Our local analysis applies these established
+ideas to domain progress in MOPD. GPAS minimizes total update variance,
+following Neyman allocation and its unequal-cost extension
+\citep{neyman1934representative,cochran1977sampling}.
+The interaction between non-uniform sampling and adaptive optimizers
+\citep{lahire2023nonuniformadaptive} motivates measuring variance after
+the optimizer's coordinate scaling. We show why minimizing this
+trace variance need not maximize each domain's directional reliability.
