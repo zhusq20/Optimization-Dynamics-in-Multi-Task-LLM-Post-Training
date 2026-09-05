@@ -15,10 +15,10 @@ require the corresponding training or evaluation artifact.}
 \toprule
 Component & Configuration \\
 \midrule
-Student & Qwen3-1.7B \citep{qwen2025qwen3}, non-thinking mode;
+Student & Qwen3-1.7B-Base \citep{qwen2025qwen3}, non-thinking mode;
 \missing{frozen model and tokenizer revisions} \\
-Teachers & Domain-specific Qwen3-1.7B RL checkpoints for math and
-instruction following; one shared Qwen3-4B weight set for code and science.
+Teachers & Four domain-specific Qwen3-1.7B RL checkpoints for math, code,
+instruction following, and science.
 All use the same vocabulary and tokenizer.
 \missing{exact checkpoint identifiers, RL training recipes, and scores} \\
 Training data & $16{,}000$ unique prompts per task. Joint runs consume

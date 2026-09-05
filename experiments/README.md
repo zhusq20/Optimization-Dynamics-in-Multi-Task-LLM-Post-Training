@@ -16,9 +16,9 @@ training runs and one small common-checkpoint comparison**.
 
 All runs share teacher top-64 corrected reverse KL, equal task weights,
 G=16 micro-batches of four responses, counts in [2,8], 500 updates, and the
-same training seed. Code and science currently share Qwen3-4B **temporarily
-in place of their respective Qwen3-1.7B RL teachers**. Record actual teacher
-revisions and temporary-substitute status in each run and result table.
+same training seed. The student is Qwen3-1.7B-Base, and each domain uses
+its respective Qwen3-1.7B RL teacher. Record actual teacher revisions
+in each run and result table.
 
 Single-task reference runs, cost-aware GPAS, full recipe comparisons,
 TA-OPD, precise-gradient branches, batch-size sweeps, additional seeds,

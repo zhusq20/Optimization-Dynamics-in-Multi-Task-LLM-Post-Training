@@ -58,7 +58,7 @@
 
 | 实验论文常规要素 | 当前稿 |
 |---|---|
-| 学生起点（Base / SFT / Instruct）及其分数 | 只写 "same Qwen3-1.7B revision"，未说 Base 还是 post-trained，未给初始分 |
+| 学生起点（Base / SFT / Instruct）及其分数 | 起点为 Qwen3-1.7B-Base，未给初始分 |
 | 教师的名称、大小、来源、是否同源 | "Four fixed specialists"，未命名（`005_experiment.tex:75`） |
 | 每个域的训练 prompt 集来源 | "16,000 prompts per task"，未说来源 |
 | 损失形式（sampled-token reverse KL / top-k）在正文一句话说明 | 只在附录 A.5 |
@@ -116,7 +116,7 @@ noise measured in AdamW's preconditioned coordinates, which is the Neyman
 allocation for this estimator; Cost-GPAS further divides by the measured
 per-micro-batch time. Both rules use gradients and timings that the trainer
 already computes and add no forward or backward passes. In a four-teacher
-distillation of Qwen3-1.7B (math, code, instruction following, science), GPAS
+distillation of Qwen3-1.7B-Base (math, code, instruction following, science), GPAS
 reaches [X]% lower weighted teacher loss than uniform allocation at the same
 step budget, Cost-GPAS reaches the uniform run's final loss in [Y]% fewer GPU
 hours, and no task falls below its uniform counterpart on downstream
@@ -261,7 +261,7 @@ taskwise 目标：          E[U]  = Σ w_i (h_i² + Var_i)
   - RQ3 Cost-GPAS 是否降低到达同一损失的 GPU-hour？
   - RQ4 taskwise 二阶矩是否重要？
   - RQ5 下游能力是否跟随固定目标，无任务回退？
-- **评测**（`005_experiment.tex:181`）：补教师分数、初始学生分数，用 MOPD 论文的归一化分数 `(s − s_init)/(s_teacher − s_init)` 做跨域平均；选有 headroom 的 benchmark（Qwen3-1.7B 在 MATH-500 上可能接近饱和，可加 AIME24/25 avg@16；GPQA-Diamond 对 1.7B 噪声大，avg@8 或加第二个科学集）；按 Open-MOPD 报告各域平均响应长度与截断率，8,192 上限对数学/代码可能截断。
+- **评测**（`005_experiment.tex:181`）：补教师分数、初始学生分数，用 MOPD 论文的归一化分数 `(s − s_init)/(s_teacher − s_init)` 做跨域平均；选有 headroom 的 benchmark（Qwen3-1.7B-Base 在 MATH-500 上可能接近饱和，可加 AIME24/25 avg@16；GPQA-Diamond 对 1.7B 噪声大，avg@8 或加第二个科学集）；按 Open-MOPD 报告各域平均响应长度与截断率，8,192 上限对数学/代码可能截断。
 - **系统描述**：单教师槽串行是一种具体系统选择，用一张小图或一句话说明为什么（显存），并给出实测 `C/(Σ m_i τ_i)`。并发教师槽的讨论压成一句，放局限。
 
 ### 3.7 结果节：图表规划

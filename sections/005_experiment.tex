@@ -12,11 +12,10 @@ available; the results below specify the evidence to collect.
 \subsection{A four-domain distillation setting}
 
 We study mathematics, code, instruction following, and science with a
-Qwen3-1.7B student in non-thinking mode. Mathematics and instruction
-following use domain-specific Qwen3-1.7B RL teachers. Code and science
-are routed to the same frozen Qwen3-4B model through separate task
-endpoints. This setting combines specialized feedback and a larger
-generalist teacher in one student.
+Qwen3-1.7B-Base student in non-thinking mode. Mathematics, code, instruction
+following, and science each use a domain-specific Qwen3-1.7B RL teacher
+through a separate task endpoint. This setting combines feedback from
+four specialized teachers in one student.
 
 The default loss is Equation~\ref{eq:dense_topk_loss} with teacher
 $k=64$, and each task has weight $w_i=1/4$. Each step processes
@@ -30,8 +29,8 @@ Uniform and GPAS (per step) use three paired training seeds; the other seven
 joint configurations use one exploratory seed each.
 
 One $96$-GB GPU trains the student, and one $48$-GB GPU serves
-student rollouts and teacher scoring. The two generalist task endpoints
-share their teacher weights in memory. Appendix~\ref{app:reference_tables}
+student rollouts and teacher scoring. The four task endpoints serve
+their respective RL teacher weights. Appendix~\ref{app:reference_tables}
 records the configuration.
 \missing{Complete the exact checkpoint and data revisions, optimizer
 settings, software versions, and measured resource use.}
