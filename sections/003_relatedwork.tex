@@ -1,61 +1,39 @@
-% ============================================================================
 \section{Related Work}
-% ============================================================================
 
-\paragraph{Capability integration in multi-teacher distillation.}
-MOPD combines domain teachers through supervision on student-generated
-responses \citep{ma2026mopdmultiteacheronpolicydistillation}.
-Open-MOPD measures integration gaps against separately distilled students
-and addresses response-token imbalance, uneven progress, and stale
-student-dependent rewards
+\paragraph{Capability integration and task weighting.}
+MOPD consolidates routed domain teachers in policy space
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD diagnoses token-share and reward-related imbalances
 \citep{gao2026openmopddiagnosingfixingcapability}.
-D$^3$-MOPD adapts domain sampling using the remaining teacher gap and its
-descent velocity \citep{sun2026d3mopd}. CaMOPD studies counteracting recovery
-and preservation gradients and combines alternating training with
-gap-based selection \citep{chen2026camopd}.
-Our analysis relates the implemented teacher signal to task gradients and
-distinguishes mean progress from uncertainty in its estimate.
-Our proposed checkpoint interventions test
-whether increased precision improves joint progress under fixed weights.
+Our first study separates cross-domain weighting from within-domain
+response-length weighting in existing loss reductions.
+Prior work on multi-task loss weighting and gradient conflict also
+motivates distinguishing weight balance from joint capability gains
+\citep{chen2018gradnorm,yu2020gradientsurgerymultitasklearning}.
 
-\paragraph{Dense losses and token estimators.}
-MOPD includes both sampled-token policy gradients and a corrected reverse-KL
-loss on the teacher's top-$k$ tokens
-\citep{ma2026mopdmultiteacheronpolicydistillation}. Open-MOPD uses student
-top-$k$ candidates with probability-weighted log-ratio advantages; its
-released dense implementation computes candidate-wise losses before
-summing across the retained set
-\citep{gao2026openmopddiagnosingfixingcapability,openmopd2026code}.
-EMA-PG combines an exact retained-set contribution with a sampled tail
-\citep{zhang2026emapg}, TA-OPD includes the probability mass outside the
-teacher's top-$k$ set \citep{huang2026tailaware}, and vOPD uses a
-control-variate baseline for sampled-token distillation
-\citep{oh2026vopd}. We build on existing dense losses and apply GPAS to the
-micro-batch gradients they produce.
+\paragraph{Sparse parameter changes and teacher differences.}
+\citet{mukherjee2025subnetworks} report sparse cumulative parameter changes
+in RL and repeated changes in similar parameter subsets across settings.
+\citet{yu2026denseupdates} establish related OPD signatures, including
+overlap when varying teachers and experiments that restrict training
+to selected parameters. \citet{shen2026opdgeometry} examine update
+subspaces and response-position thinning. These results motivate our
+study but do not establish sparsity of instantaneous gradients.
+Teacher compatibility also affects distillation success
+\citep{li2026rethinkingopd,ma2026mopdmultiteacheronpolicydistillation}.
+We measure single-step and cumulative parameter changes separately and
+ask whether teachers with more different distributions change more
+different subsets of a shared MOPD student. Raw gradients help explain
+the role of the current loss signal.
 
-\paragraph{On-policy learning dynamics.}
-Teacher--student compatibility and the capabilities supplied by the teacher
-shape OPD outcomes \citep{li2026rethinkingopd}.
-Rethinking OPD~II finds slow alignment even when training states are held
-fixed in its studied settings \citep{fu2026rethinkingopd2}. This motivates
-examining optimization separately from state coverage, but does not
-identify gradient noise as the cause. We therefore distinguish
-fixed-reference loss, fresh-policy loss, and downstream capability in the
-evaluation protocol.
-
-\paragraph{Task weighting and stochastic optimization.}
-Multi-task learning adapts loss weights and gradient directions
-\citep{chen2018gradnorm,sener2019multitasklearningmultiobjectiveoptimization,
-yu2020gradientsurgerymultitasklearning}; language-model training also adapts
-data mixtures from learning progress \citep{albalak2023efficient,wang2025dump}.
-Directional sampling tests already distinguish descent reliability from
-norm accuracy \citep{bollapragada2018adaptive}, and adaptive sampling has
-been developed for stochastic multiobjective optimization
-\citep{zhao2024adaptive}. Our local analysis applies these established
-ideas to domain progress in MOPD. GPAS minimizes total update variance,
-following Neyman allocation and its unequal-cost extension
-\citep{neyman1934representative,cochran1977sampling}.
-The interaction between non-uniform sampling and adaptive optimizers
-\citep{lahire2023nonuniformadaptive} motivates measuring variance after
-the optimizer's coordinate scaling. We show why minimizing this
-trace variance need not maximize each domain's directional reliability.
+\paragraph{Vocabulary coverage and gradient estimation.}
+MOPD provides sampled-token and corrected teacher-top-$k$ objectives
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+Variance-reduced sampled OPD \citep{oh2026vopd}, exact-head plus
+sampled-tail estimation \citep{zhang2026emapg}, and tail-aware losses
+\citep{huang2026tailaware} motivate separating vocabulary coverage from
+the choice of objective and estimator. Our loss study compares
+update concentration under practical PG and top-$k$ training, with
+full-vocabulary local updates and their gradients in both single-teacher
+and joint settings. Established estimator controls are reserved for interpreting
+a stable difference; we do not propose a new estimator.

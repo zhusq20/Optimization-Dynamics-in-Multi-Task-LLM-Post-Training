@@ -1,0 +1,84 @@
+% ============================================================================
+\section{Sparse OPD Updates and Teacher Subnetwork Overlap}
+\label{sec:subnetworks}
+% ============================================================================
+
+We investigate three questions in sequence: whether OPD updates are sparse,
+whether different teachers update overlapping subnetworks of the same MOPD
+student, and whether larger teacher distribution differences correspond to
+larger subnetwork differences. The following experiments are planned;
+their outcomes are not yet established.
+
+\subsection{Do sparse OPD updates persist under multiple teachers?}
+
+Sparse parameter changes have been reported for RL fine-tuning
+\citep{mukherjee2025subnetworks} and OPD
+\citep{yu2026denseupdates,shen2026opdgeometry}. We first reproduce this
+measurement in our setting and extend the comparison to MOPD. From the
+same initialization $\theta_0$, we measure single-teacher deltas
+$\Delta_{i,t}^{\mathrm{single}}$ and the joint delta
+$\Delta_t^{\mathrm{joint}}=\theta_t-\theta_0$, comparing training curves
+separately against domain exposure and compute. For an $n$-coordinate delta $v$,
+\begin{equation}
+ s_\tau(v)=\frac1n\sum_{a=1}^n
+       \mathbf 1\{|v_a|\leq\tau\}.
+ \label{subnet_sparsity}
+\end{equation}
+We report threshold sweeps, update norms, and top-coordinate energy
+concentration using FP32 master-weight deltas, with bf16 checkpoint
+measurements for comparison. This distinguishes small accumulated changes
+from rounding-induced zeros; endpoint sparsity does not establish that
+instantaneous gradients are exactly sparse. This first experiment is a
+replication and extension, not a claim to discover OPD sparsity.
+
+\subsection{Which subnetworks do teachers update in the same student?}
+
+At selected checkpoints $\theta_t$ of one MOPD run, each teacher processes
+its routed student-rollout batch independently. Every diagnostic branch
+starts from the identical student and optimizer state. We record each
+teacher's gradient $g_{i,t}$ and virtual optimizer displacement $u_{i,t}$
+without advancing the shared training run. These local probes describe
+each teacher's update tendency at the actual joint-training checkpoint;
+they do not decompose AdamW's joint update additively.
+
+For either probe $v_{i,t}$, define its threshold support and pairwise
+Jaccard overlap as
+\begin{equation}
+ A_{i,t}^{\tau}=\{a:|v_{i,t,a}|>\tau\},\qquad
+ J_{ij,t}=\frac{|A_{i,t}\cap A_{j,t}|}{|A_{i,t}\cup A_{j,t}|}.
+ \label{subnet_overlap}
+\end{equation}
+We also compare masks retaining the same top fraction of coordinates,
+globally and within layers, against density-matched random masks.
+Threshold masks reflect update scale as well as location; fixed-density
+masks emphasize location. Raw-gradient masks check whether shared momentum
+or decay dominates virtual-step overlap. Independent single-teacher
+endpoint supports provide a secondary comparison, but cannot identify
+teacher contributions along the MOPD trajectory. Signed alignment is an
+auxiliary diagnostic: overlapping coordinates can support compatible or
+opposing updates, so low overlap is not assumed preferable.
+
+\subsection{Do more different teachers update more different subnetworks?}
+
+At each probe checkpoint, all teachers score the same cached student-prefix
+bank $\mathcal C_t$. With $q_i$ denoting teacher $i$'s distribution, measure
+\begin{equation}
+\begin{aligned}
+ D_{ij,t}^{\mathrm{TT}}&=\mathbb E_{c\sim\mathcal C_t}
+          \operatorname{JS}(q_i(\cdot\mid c),q_j(\cdot\mid c)),\\
+ D_{i,t}^{\mathrm{TS}}&=\mathbb E_{c\sim\mathcal C_t}
+          \operatorname{JS}(q_i(\cdot\mid c),p_{\theta_t}(\cdot\mid c)).
+\end{aligned}
+\label{subnet_distances}
+\end{equation}
+We plot teacher-pair divergence against subnetwork distance $1-J_{ij,t}$
+at the same checkpoint, recording both teacher--student gaps as auxiliary
+descriptors. A small common-context check recomputes all teachers' masks
+on identical prefixes, assessing whether routed-domain differences explain
+the observed association. Code and science currently share one Qwen3-4B
+teacher; comparisons between these routes measure context differences,
+not differences between independent teachers. We report pair trajectories
+and run-level uncertainty without treating shared teachers or repeated
+checkpoints as independent observations. A positive distance--difference
+relationship is a hypothesis to test, not a consequence of sparsity or an
+assumption about optimal MOPD behavior.

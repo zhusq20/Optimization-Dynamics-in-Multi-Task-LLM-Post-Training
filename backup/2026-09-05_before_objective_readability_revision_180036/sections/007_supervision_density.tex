@@ -1,0 +1,71 @@
+% ============================================================================
+\section{Does Loss Design Change Update Sparsity?}
+\label{sec:density}
+% ============================================================================
+
+Our third study examines vocabulary-level supervision density: how many
+vocabulary alternatives enter the loss at each student-generated prefix.
+The endpoints are sampled-token policy gradients (PG) and full-vocabulary
+KL; top-$K$ losses provide an intermediate practical choice. This concerns
+vocabulary coverage, not how many response positions receive supervision.
+We compare these choices in single-teacher and multi-teacher settings
+(Table~\ref{tab:density_controls}). Prior work already observes concentrated
+OPD parameter changes under dense feedback \citep{yu2026denseupdates}.
+We ask whether these loss choices produce materially different
+update sparsity under otherwise matched configurations, without assuming
+that sampled supervision is sparser or reduces interference.
+
+\begin{table}[t]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Setting & Sampled-token PG & Vocabulary-level KL \\
+\midrule
+Single teacher & Single-teacher setting & Full-vocabulary / top-$K$ \\
+Multiple teachers & Joint MOPD setting & Full-vocabulary / top-$K$ \\
+\bottomrule
+\end{tabular}
+\caption{Primary loss-design comparison. Both settings include full-vocabulary
+local probes; online PG/top-$K$ runs provide cumulative sparsity and
+capability comparisons.}
+\label{tab:density_controls}
+\end{table}
+
+Full-vocabulary loss is evaluated on a small common prefix bank in both
+settings, producing a reference gradient and proposed optimizer step.
+It is part of the primary density measurement, not only a follow-up
+triggered by a PG/top-$K$ difference. Cumulative training comparisons
+initially use PG and top-$K$; full-vocabulary online training is subject
+to measured feasibility and is not implied by a local probe.
+
+Within each setting, paired runs share the student initialization, teachers,
+prompt schedule, length limits, task normalization, optimizer configuration,
+and training steps. We fix and document $K$, support selection, and probability
+normalization for the chosen top-$K$ implementation
+\citep{ma2026mopdmultiteacheronpolicydistillation}. Online rollouts follow each
+run's evolving student; generated-token exposure and compute are reported
+alongside matched-step comparisons.
+
+We measure actual optimizer-step sparsity and cumulative parameter changes
+at identical checkpoints, using the same FP32 measurement procedure and
+thresholds across conditions. Update norms and scale-normalized concentration
+provide context for threshold-visible sparsity. Repeated seeds yield effect
+estimates and confidence intervals. Held-out task scores establish whether
+a sparser update accompanies comparable learning; sparsity alone does not
+demonstrate better capability integration.
+
+At a fixed prefix, fresh sampled-token PG with detached log-ratio coefficients
+has the same expected gradient as full-vocabulary reverse KL, a known identity
+\citep{yu2026denseupdates,oh2026vopd}. This does not equate practical top-$K$
+objectives, length-weighted original rollout samples, nonlinear Adam updates,
+or long-term parameter supports.
+
+If confidence intervals fall within a prespecified materiality margin, we
+will report no material sparsity difference within the tested regime and
+stop this line of analysis; intervals too wide to resolve that margin are
+inconclusive. Only a stable, meaningful gap would motivate an optional
+follow-up separating sampling noise from truncation bias, for example using
+a variance-reduced sampled estimator on the common reference bank.
+These mechanism controls are conditional extensions, not required components
+of the primary study, and no preference for sampled PG is assumed.

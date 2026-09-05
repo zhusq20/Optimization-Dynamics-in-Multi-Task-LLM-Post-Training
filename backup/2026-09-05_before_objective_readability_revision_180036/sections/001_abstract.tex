@@ -1,0 +1,24 @@
+% Results-pending abstract: investigation language is intentional.
+% Add measured findings only after completing the corresponding experiments.
+\begin{abstract}
+Multi-teacher on-policy distillation (MOPD) aims to consolidate specialized
+capabilities in a single student. We investigate three aspects of this
+process: token balancing, parameter update sparsity, and supervision
+density. First, we analyze how token-loss averaging and domain-level
+reweighting affect capability balance. A finite-batch gradient
+decomposition distinguishes cross-domain token-share weighting from
+within-domain response-length weighting, providing an explanation to
+test against multi-task training outcomes. Second, building on prior
+observations of sparse OPD updates, we characterize parameter update
+sparsity in single-teacher and multi-teacher settings. We measure the
+overlap between subnetworks updated by different teachers in the same
+MOPD student and investigate whether larger teacher--teacher distribution
+differences correspond to larger subnetwork differences, while also
+examining teacher--student compatibility. Third, we study
+\emph{vocabulary-level supervision density}: whether each student-generated
+prefix receives supervision from a full-vocabulary loss, a top-$k$
+subset, or a sampled-token policy-gradient estimator. We compare the
+resulting update sparsity in both single-teacher OPD and MOPD, with
+capability measurements providing context for the observed parameter
+changes.
+\end{abstract}

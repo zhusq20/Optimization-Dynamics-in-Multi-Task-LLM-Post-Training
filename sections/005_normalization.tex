@@ -1,0 +1,103 @@
+\section{Token Balancing and Response Length}
+\label{sec:normalization}
+
+\subsection{How does loss averaging change domain weights?}
+
+The MOPD objective in Section~\ref{sec:setting} averages token losses
+within each response. Open-MOPD analyzes a different implementation:
+averaging all response tokens together gives instruction following
+approximately $1\%$ of the token weight despite supplying $20\%$ of
+the prompts \citep{gao2026openmopddiagnosingfixingcapability}.
+Length imbalance therefore depends on the averaging rule; it is not
+intrinsic to the response-normalized MOPD objective.
+
+For response $y_i$, write its mean token loss as
+$\ell_i=|y_i|^{-1}\sum_t\ell_{i,t}$, using any of the per-position
+losses in Section~\ref{sec:setting}. Let $\mathcal B_d$ index the
+responses from domain $d$ in the batch. The intended domain weights
+are $\lambda_d\geq0$, with $\sum_d\lambda_d=1$.
+Table~\ref{tab:normalization} compares three averaging rules using
+only these quantities.
+
+\begin{table}[!htbp]
+\centering
+\small
+\renewcommand{\arraystretch}{1.15}
+\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll@{}}
+\toprule
+Averaging rule & Batch loss \\
+\midrule
+All tokens together
+  & $\bigl(\sum_i |y_i|\ell_i\bigr)\big/\bigl(\sum_i |y_i|\bigr)$ \\
+Tokens within each domain
+  & $\sum_d\lambda_d\,
+    \bigl(\sum_{i\in\mathcal B_d}|y_i|\ell_i\bigr)
+    \big/\bigl(\sum_{i\in\mathcal B_d}|y_i|\bigr)$ \\
+Responses within each domain
+  & $\sum_d\lambda_d\,|\mathcal B_d|^{-1}
+    \sum_{i\in\mathcal B_d}\ell_i$ \\
+\bottomrule
+\end{tabular*}
+\caption{Loss averaging on the same rollout batch. Each domain has at least
+one nonempty response. The last rule recovers an ordinary response mean
+when $\lambda_d$ equals the domain's share of responses.}
+\label{tab:normalization}
+\end{table}
+
+With equal numbers of prompts, a domain producing responses ten times
+as long receives ten times the weight under the first rule. The second
+rule fixes each domain's total weight to $\lambda_d$, as in Open-MOPD's
+token-share balancing, but longer responses still count more within
+that domain. The third rule also gives responses equal weight inside
+each domain. Thus domain balancing and response-length normalization
+address different effects.
+
+The same distinction holds for gradients. Writing the response gradient
+as $g_i=\nabla_\theta\ell_i$, the token-weighted gradient within a domain
+equals its mean response gradient plus the covariance between response
+length and $g_i$, divided by mean response length.
+Appendix~\ref{app:normalization} gives the exact fixed-batch identity
+and its short proof. This is a weighted-average identity, not a new
+optimizer. Equal domain weights do not imply equal gradient magnitudes
+or compatible gradient directions.
+
+\subsection{Experiment: compare averaging rules on identical batches and online}
+
+\paragraph{Shared setting.}
+All three studies use a Qwen3-1.7B student on mathematics, code,
+instruction following, and science. Math and instruction following have
+domain-specific Qwen3-1.7B RL teachers; code and science currently share
+one Qwen3-4B teacher. The reference run uses equal domain prompt quotas
+and weights, $64$ responses per update, one update per fresh rollout
+batch, and a $4{,}096$-token response cap. The initial budget is at most
+$500$ updates per run, subject to a throughput pilot.
+Appendix~\ref{app:setup} records the shared setup and evaluation protocol.
+The experiments below are planned; measured results are not yet available.
+
+\paragraph{Fixed-batch comparison.}
+At early, intermediate, and late checkpoints, apply all three rules to
+the same responses and corrected teacher top-$64$ losses. Record domain
+token shares, response lengths, gradient norms and directions before
+clipping, and the length--gradient covariance. Check the decomposition
+and evaluate each proposed step on a common held-out response bank.
+Accumulate the correct sums and denominators across micro-batches and
+workers: averaging unequal micro-batch means can change the intended
+loss. An unequal-quota check first matches $\lambda_d$ to prompt shares,
+then tests uniform weights separately, so changes in the domain prior
+are distinguishable from length weighting.
+\missing{Loss-reduction audit and gradient measurements.}
+
+\paragraph{Online comparison.}
+Train three branches differing only in the averaging rule. They share
+initialization, teachers, prompt schedule, length limits, and optimizer
+settings; each generates responses from its own evolving student.
+The response-averaged top-$64$ branch is reused in
+Sections~\ref{sec:subnetworks} and~\ref{sec:density}.
+Report per-domain capability, macro-average, and worst-domain change
+against both updates and generated tokens, with GPU time reported
+separately. A supporting $1{,}024$ versus $4{,}096$ cap comparison
+records truncation and answer-completion rates. Shortening responses
+changes the available prefixes and may remove solution endings, so it
+is a separate intervention from loss reweighting. Neither the algebra
+nor the cap comparison guarantees a capability improvement.
+\missing{Per-domain capability curves for the three averaging rules.}
