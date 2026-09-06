@@ -56,7 +56,7 @@
 
 核心分析可以使用各教师各自路由域上的更新；增加少量“所有教师使用完全相同 prefixes 计算更新”的检查，帮助区分 teacher 差异与输入域差异。无需先建设复杂的因果辨识项目。若只有少数 teacher pair，就逐对报告当前设置的观察，不把共享教师的 pair 当独立大样本。
 
-数学、代码、指令遵循和科学四个域分别使用对应的 Qwen3-1.7B RL teacher，共四组教师权重。已有教师中间 checkpoint 可提供距离变化，不要求为此重新训练大量专家。
+当前 code/science 暂时共享一个 Qwen3-4B teacher。二者 teacher 分布距离在相同 context 上为零，路由更新不同则反映 context 差异；不能当作两个独立 teacher。已有教师中间 checkpoint 可提供距离变化，不要求为此重新训练大量专家。
 
 可能得到的结果都可报告：距离越大子网越不同；没有明显关系；关系依赖任务、checkpoint 或 teacher–student gap。不能预先写第一种。
 

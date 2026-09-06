@@ -106,7 +106,9 @@ whether an association persists when the response contexts also match.
 For PG, pair the same freshly sampled next tokens and fixed prefix weights
 across teachers, repeating the paired draws across batches.
 Available intermediate teacher checkpoints can add variation without
-training new teachers.
+training new teachers. Code and science share one Qwen3-4B teacher, so
+their routed comparison reflects context differences rather than two
+independent teacher models.
 
 Show individual pair trajectories and run-level uncertainty. Pairs that
 share a teacher or training lineage, and repeated checkpoints, are

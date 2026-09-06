@@ -65,9 +65,9 @@ or compatible gradient directions.
 
 \paragraph{Shared setting.}
 All three studies use a Qwen3-1.7B student on mathematics, code,
-instruction following, and science. Each domain uses its own
-Qwen3-1.7B teacher trained with reinforcement learning (RL).
-The reference run uses equal domain prompt quotas
+instruction following, and science. Math and instruction following have
+domain-specific Qwen3-1.7B RL teachers; code and science currently share
+one Qwen3-4B teacher. The reference run uses equal domain prompt quotas
 and weights, $64$ responses per update, one update per fresh rollout
 batch, and a $4{,}096$-token response cap. The initial budget is at most
 $500$ updates per run, subject to a throughput pilot.
