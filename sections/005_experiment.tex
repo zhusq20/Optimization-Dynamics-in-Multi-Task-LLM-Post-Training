@@ -22,8 +22,8 @@ normalization study, which adds two averaging rules. Thus six training
 configurations cover the core comparisons, with checkpoints reused for
 the update, teacher-overlap, and full-vocabulary measurements.
 Additional teacher settings, the response-cap comparison, and repeated
-seeds require separate resource accounting. The manuscript does not yet
-report measured outcomes for these studies.
+seeds require separate resource accounting. Final training outcomes remain
+pending; Section~\ref{sec:density} records preliminary observations.
 
 \paragraph{Capability evaluation.}
 Use MATH-500 greedy pass@1, a frozen LiveCodeBench pass@1 slice,
@@ -37,6 +37,56 @@ transfer is not itself evidence of multi-teacher interference.
 Loss on a common held-out response bank and loss on fresh student
 responses are reported separately; a lower mean KL alone does not
 establish balanced capability integration.
+
+\paragraph{Teacher reference results.}
+Table~\ref{tab:teacher_reference} reports the completed reference evaluations
+from September 6, 2026. Each RL-trained teacher is evaluated only on its
+own domain; the initial Qwen3-1.7B-Base student is evaluated on the same
+questions and labels. Scores include truncated responses.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrr}
+\toprule
+Benchmark & Responses & Teacher & Initial & $\Delta$ (pp) & Trunc. \\
+\midrule
+MATH-500 & 500 & 75.60 & 55.60 & +20.00 & 6.80 \\
+LiveCodeBench postcutoff & 128 & 23.44 & 0.78 & +22.66 & 24.22 \\
+IFBench strict & 300 & 29.00 & 17.33 & +11.67 & 7.33 \\
+GPQA-Diamond avg@4 & $198\times4$ & 34.60 & 18.81 & +15.78 & 0.51 \\
+\bottomrule
+\end{tabular}
+\caption{Domain-specific teacher references and the initial student.
+Scores and teacher truncation rates (Trunc.) are percentages;
+$\Delta$ is the teacher-minus-initial difference in percentage points,
+computed before rounding. MATH-500 and LiveCodeBench use pass@1;
+IFBench uses strict accuracy. GPQA averages correctness over four
+responses per question, rather than counting any correct response as
+success. Each row uses a different teacher and benchmark.}
+\label{tab:teacher_reference}
+\end{table}
+
+The teachers produce respectively $378/500$, $30/128$, $87/300$, and
+$274/792$ correct responses. Mathematics, code, and instruction following
+use greedy decoding; GPQA uses temperature $1$ and top-$p=1$.
+The requested response limit is $32{,}768$ tokens, reduced as needed to
+fit each prompt within the $32{,}768$-token context.
+Teacher prompts retain the empty \texttt{<think>}\ldots\texttt{</think>}
+suffix from the chat template, whereas initial-student prompts remove
+it. Thus the observed differences compare the deployed evaluation
+configurations and do not isolate the effect of model weights.
+
+Code generation warrants particular attention: $31/128$ teacher responses
+are truncated and none passes; $27/128$ have execution errors, with zero
+sandbox infrastructure errors. These categories can overlap.
+The initial student's code and IF truncation rates are $75.78\%$ and
+$69.67\%$, respectively, so generation behavior also matters when
+interpreting their score differences. These reference scores do not
+establish transfer to an OPD student or jointly attainable performance.
+% Auditable counts, source paths, completion records, and artifact hashes:
+% experiments/teacher_reference_results_20260906.json
 
 \paragraph{Compute and uncertainty.}
 Record generated tokens, domain response counts, optimizer updates, and
