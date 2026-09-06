@@ -1,0 +1,71 @@
+\section{MOPD Learning Objective}
+\label{sec:setting}
+
+We follow the notation and loss definitions of
+\citet{ma2026mopdmultiteacheronpolicydistillation}, Section~3.2.
+The student policy is $\pi_\theta$ and the frozen teacher for domain $d$
+is $\pi_{\phi_d}$. A prompt $x$ is drawn from the training mixture and
+the student generates a response $y\sim\pi_\theta(\cdot\mid x)$.
+At position $t$, both models condition on the same prefix $(x,y_{<t})$.
+Following MOPD, we abbreviate these conditional probabilities as
+$\pi_\theta(v)$ and $\pi_{\phi_d}(v)$, where $v$ is a vocabulary token.
+Teachers and student share the vocabulary and tokenizer.
+
+\paragraph{Reverse-KL objective.}
+MOPD minimizes the student--teacher reverse KL at each response position
+and averages over the response length $|y|$:
+\begin{equation}
+\mathcal L_{\mathrm{rev\text{-}KL}}
+=\mathbb E_{x,\,y\sim\pi_\theta}
+\left[\frac{1}{|y|}\sum_{t=1}^{|y|}\sum_v
+\pi_\theta(v)\log\frac{\pi_\theta(v)}{\pi_{\phi_d}(v)}\right].
+\label{eq:reference_reverse_kl}
+\end{equation}
+Each prompt is scored by its assigned teacher. The factor $1/|y|$ gives
+each response a mean token loss; it does not give every token in the
+entire training batch equal weight. This distinction motivates
+Section~\ref{sec:normalization}.
+
+\paragraph{Sampled-token policy gradient.}
+MOPD assigns each generated token a detached log-probability advantage,
+$\hat A_{\mathrm{MOPD},t}=\sg[\log\pi_{\phi_d}(y_t)-\log\pi_\theta(y_t)]$,
+where $\sg$ stops gradients. The clipped value is
+$\hat A^{\mathrm{clip}}_{\mathrm{MOPD},t}
+=\operatorname{clip}(\hat A_{\mathrm{MOPD},t},-A_{\max},A_{\max})$,
+and the policy-gradient (PG) loss is
+\begin{equation}
+\mathcal L^{\mathrm{PG}}_{\mathrm{MOPD}}(\theta)
+=-\mathbb E_{x,\,y\sim\pi_\theta}
+\left[\frac{1}{|y|}\sum_{t=1}^{|y|}
+\hat A^{\mathrm{clip}}_{\mathrm{MOPD},t}\log\pi_\theta(y_t)\right].
+\label{eq:mopd_pg}
+\end{equation}
+This loss uses the sampled token $y_t$ at each position. Clipping is part
+of the practical recipe and must be recorded when comparing losses.
+
+\paragraph{Teacher top-$k$ distillation.}
+Let $\mathcal T_t^d=\operatorname{TopK}_k(\pi_{\phi_d}(\cdot\mid x,y_{<t}))$
+be the teacher's $k$ most probable tokens. MOPD instead evaluates
+\begin{equation}
+\mathcal L^{\mathrm{TopK}}_{\mathrm{MOPD}}(\theta)
+=\mathbb E_{x,\,y\sim\pi_\theta}
+\left[\frac{1}{|y|}\sum_{t=1}^{|y|}\sum_{v\in\mathcal T_t^d}
+\left(\pi_\theta(v)\log\frac{\pi_\theta(v)}{\pi_{\phi_d}(v)}
+-\pi_\theta(v)+\pi_{\phi_d}(v)\right)\right].
+\label{eq:mopd_topk}
+\end{equation}
+These are full-vocabulary probabilities, without renormalization over
+the selected tokens. The correction $-\pi_\theta(v)+\pi_{\phi_d}(v)$
+makes each selected-token term minimal when the two probabilities match;
+it does not recover the omitted vocabulary terms. With the entire
+vocabulary included, the correction sums to zero and the loss reduces
+to Equation~\ref{eq:reference_reverse_kl}.
+
+\paragraph{Gradients measured in this paper.}
+We differentiate the chosen loss on fixed student-generated responses,
+holding prefixes, masks, teachers, and detached advantages fixed.
+These local training gradients do not include derivatives through the
+generation of the responses or their lengths. The unclipped sampled-token
+gradient matches the full reverse-KL gradient in expectation at a fixed
+prefix; clipping, top-$k$ truncation, and trajectory-dependent weighting
+need separate treatment (Section~\ref{sec:density}).

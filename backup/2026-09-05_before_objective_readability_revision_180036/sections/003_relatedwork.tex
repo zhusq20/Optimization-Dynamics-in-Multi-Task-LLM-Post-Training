@@ -1,0 +1,38 @@
+\section{Related Work}
+
+\paragraph{Capability integration and task weighting.}
+MOPD consolidates routed domain teachers in policy space
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD diagnoses token-share and reward-related imbalances
+\citep{gao2026openmopddiagnosingfixingcapability}.
+Our first study audits the reduction used by each implementation and
+separates cross-domain weights from within-domain length weighting.
+The algebra explains existing objectives; it is not introduced as a
+new allocation algorithm. Prior work on multi-task loss weighting and
+gradient conflict further motivates distinguishing weight balance from
+joint capability gains \citep{chen2018gradnorm,yu2020gradientsurgerymultitasklearning}.
+
+\paragraph{Sparse updates and teacher compatibility.}
+\citet{mukherjee2025subnetworks} find sparse cumulative parameter changes
+in RL and substantial support reuse across settings.
+\citet{yu2026denseupdates} directly establish related OPD signatures,
+including teacher-varied overlap and functional masked-training tests.
+\citet{shen2026opdgeometry} examine update subspaces and report rank
+robustness to response-position thinning. These observations are
+starting points for our study, not discoveries claimed here.
+Teacher compatibility also affects distillation success
+\citep{li2026rethinkingopd,ma2026mopdmultiteacheronpolicydistillation}.
+We first verify sparse updates in our setting, then study overlap
+between teachers acting on the same MOPD student and its relationship
+to their distribution differences.
+
+\paragraph{Loss support and gradient estimation.}
+MOPD provides sampled-token and corrected teacher-top-$k$ objectives
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+Variance-reduced sampled OPD \citep{oh2026vopd}, exact-head plus
+sampled-tail estimation \citep{zhang2026emapg}, and tail-aware losses
+\citep{huang2026tailaware} show why token count alone does not identify
+the estimation or optimization problem. Our primary loss study compares parameter sparsity under practical PG
+and top-$k$ objectives in single-teacher and multi-teacher OPD. These
+established controls are reserved for interpreting a stable difference;
+we do not propose a new estimator.

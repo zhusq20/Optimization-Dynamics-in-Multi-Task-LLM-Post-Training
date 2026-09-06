@@ -1,0 +1,61 @@
+\section{Introduction}
+\label{sec:intro}
+
+Multi-teacher on-policy distillation (MOPD) transfers domain specialists
+into one student by scoring student-generated responses with their
+assigned teachers \citep{ma2026mopdmultiteacheronpolicydistillation}.
+Its intended outcome is balanced capability integration. Open-MOPD
+identifies capability imbalance in a controlled routed setting and
+studies token-share weighting, changing distillation gaps, and stale
+student-dependent rewards \citep{gao2026openmopddiagnosingfixingcapability}.
+These findings motivate examining both the loss weights given to each
+domain and the parameter updates induced by its teacher.
+
+We organize the paper around three studies. The first examines loss
+reduction as an explanation for imbalance. A global token mean gives
+long-response domains greater weight. Averaging tokens separately within
+each domain changes those domain weights, but still weights longer
+responses more heavily inside the domain. We derive these effects and
+test their relationship to multi-task capability. This analysis does
+not require a new sampling or weighting algorithm.
+
+The second study is the empirical center of the paper. Prior work
+already reports sparse parameter changes in RL
+\citep{mukherjee2025subnetworks} and in OPD
+\citep{yu2026denseupdates,shen2026opdgeometry}, including support reuse
+when varying the teacher. We first verify update sparsity in our
+single-teacher and multi-teacher settings. We then ask whether different
+teachers acting on the \emph{same MOPD student} update overlapping
+parameter subsets. Finally, we test whether teacher pairs with larger
+distribution differences induce more different update supports.
+Teacher--student distance is measured as a related factor that may help
+explain transfer and update differences. Reproducing existing sparsity
+results is a foundation for this study, not a claim of first discovery.
+
+The third study is a focused comparison of loss choices. We compare
+sampled-token policy-gradient, top-$k$, and full-vocabulary losses in
+both single-teacher and multi-teacher OPD, keeping the compared
+update measurements consistent. If these choices
+show no material sparsity difference in the tested regime, that is a
+reportable observation and the study stops at that comparison. If a
+stable difference appears, additional controls can examine its source.
+We do not make estimator-noise analysis the main contribution or assume
+that sampled-token supervision must produce sparser parameter updates.
+
+The intended contributions are therefore:
+\begin{enumerate}
+\item An empirical and algebraic explanation of how loss reduction
+and length weighting affect capability balance across tasks.
+\item A study of sparse OPD updates, the overlap of teacher-conditioned
+supports within MOPD, and their relationship to teacher--teacher and
+teacher--student distribution differences.
+\item A comparison of parameter-update sparsity across sampled-token, top-$k$, and full-vocabulary supervision in
+single-teacher and multi-teacher distillation.
+\end{enumerate}
+
+The core questions permit positive, negative, and null relationships.
+Support overlap does not by itself imply harmful interference, and a
+sparsity difference does not by itself justify choosing a loss. Capability
+and signed cross-task effects provide context for these measurements.
+\missing{Replace the prospective empirical contributions with observed
+findings and their measured scope once the experiments are complete.}
