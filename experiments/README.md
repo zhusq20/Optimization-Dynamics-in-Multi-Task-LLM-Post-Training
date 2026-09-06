@@ -66,14 +66,12 @@ The end-to-end trainer and measured MOPD results are not present in this
 directory yet. Manuscript commitments to the earlier broad study must be
 narrowed when results are written up; this turn changes the plan and README.
 
-## Existing analytical and historical artifacts
+## Current supporting files
 
-- `generate_joint_progress_teaser.py` generates the analytic first figure.
-- `generate_gpas_main_figure.py` generates the GPAS schematic.
-- `generate_controlled_figure.py`, `controlled_optimizer_*_results.csv`,
-  and `random_geometry_stress_*` retain earlier synthetic calculations.
+- `generate_gpas_main_figure.py` generates the GPAS schematic used in the
+  current manuscript appendix (`figures/gpas_main_figure.pdf`). The PNG and
+  SVG exports are retained with the figure.
 - `measure_initial_kl.py` is an existing sampled-log-ratio utility and is
   not scheduled as an experiment or gate in this plan.
 
-These existing artifacts are not empirical four-domain results. Earlier
-versions of the full experiment plan are preserved under backup/.
+These supporting files are not empirical four-domain results.

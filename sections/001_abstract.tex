@@ -1,24 +1,25 @@
+% Results-pending abstract: investigation language is intentional.
+% Add measured findings only after completing the corresponding experiments.
 \begin{abstract}
-Multi-teacher on-policy distillation (MOPD) aims to combine capabilities
-from several teachers in one student. Successful transfer from each teacher
-separately does not establish that their combined updates improve every
-task. We derive how teacher log-ratio signals on retained tokens produce
-the student's task gradients, then separate the mean update's direction
-and rate from uncertainty due to finite sampling. An exact quadratic
-example has no task conflict or sampling noise but unequal convergence
-rates. For losses on
-fixed student-generated states and a frozen optimizer scaling, we bound the
-probability of any non-descent first-order direction when the mean update
-improves every task to first order. The analysis distinguishes harmful mean
-interactions, which allocation at fixed weights cannot correct in this local
-model, from sampling errors in otherwise useful directions.
-Gradient-Preconditioned Adaptive Sampling (GPAS) minimizes an estimated
-total-variance criterion; an
-analytical example shows why this need not minimize uncertainty in task
-progress. We specify a four-domain study with separate-distillation
-references, controlled updates from common checkpoints, and repeated
-training comparisons. The evaluation distinguishes fixed-state loss,
-fresh-policy loss, downstream capability, and computation.
-\missing{Add the observed integration gap, diagnostic prediction accuracy,
-and measured capability and compute effects after completing the study.}
+Multi-teacher on-policy distillation (MOPD) aims to consolidate specialized
+capabilities in a single student. We examine three aspects of its
+optimization: token balancing, update sparsity, and supervision
+density. Starting from the MOPD learning objective, we first show how
+loss averaging determines both domain weights and the relative weight
+of long and short responses. A finite-batch gradient decomposition
+separates these effects and motivates matched experiments on capability
+balance. Second, we investigate whether parameter changes concentrate
+on small, overlapping subsets when different teachers act on the same
+MOPD student, and whether more different teacher distributions correspond
+to more different subsets. We measure optimizer steps and cumulative
+parameter changes separately, using raw gradients to help explain the
+observed updates. Third, we compare sampled-token policy gradients with
+teacher top-$k$ supervision in single-teacher and joint training,
+using full-vocabulary reverse-KL updates at shared prefixes as a
+local reference. The planned experiments pair update concentration
+with per-domain capability and account for sampling variability,
+training exposure, and compute. Each question is developed together
+with its experimental design, without presuming that sparse updates,
+low teacher overlap, or sampled supervision improve capability
+integration. Empirical outcomes remain to be measured.
 \end{abstract}
