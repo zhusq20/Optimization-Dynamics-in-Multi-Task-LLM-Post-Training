@@ -10,7 +10,7 @@ select weights, change teachers, or determine whether training proceeds.
 
 Example (one GPU; vLLM for generation, HF for scoring):
   python experiments/measure_initial_kl.py \
-    --student /ckpt/Qwen3-1.7B \
+    --student /ckpt/Qwen3-1.7B-Base \
     --teacher math=/ckpt/math_teacher --teacher code=/ckpt/code_teacher \
     --teacher if=/ckpt/if_teacher --teacher science=/ckpt/science_teacher \
     --prompts math=heldout/math.parquet --prompts code=heldout/code.parquet \

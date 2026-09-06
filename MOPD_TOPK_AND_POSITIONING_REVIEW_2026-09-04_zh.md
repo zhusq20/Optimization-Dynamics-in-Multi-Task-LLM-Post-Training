@@ -169,10 +169,10 @@ m_i\propto w_i\sqrt{e_i}.
 
 **8. 当前实验方案中需要同步改的细节**
 
-- code/science 使用同一个通用 Qwen3-4B，不能称“四个独立 specialist teachers”。可以称四域、混合同源与较大通用教师的实验；更干净的主设定是若干同源 domain-RL teachers，把异源配置放压力测试。
+- math/code/IF/science 分别使用对应的 Qwen3-1.7B RL teacher，可称“四个独立 specialist teachers”；主设定为 Qwen3-1.7B-Base student 与四域 domain-RL teachers。
 - 教师来源与 domain/size 当前混杂。不能凭 math/IF 对 code/science 的差异归因于 teacher origin；需要至少一个域内的教师替换对照。
 - $w_i\propto1/L_i(0)$ 不是无害默认值。接近零的初始 KL 会放大任务权重，有限样本 log-ratio 均值还可能为负。建议均匀 $w_i$ 为主；若保留 inverse-initial-loss，则设稳定化并作敏感性分析。Instella 的初始化 anchor 便是初始 gap 近零的实际场景。
-- 4,096 token 上限与 1.7B non-thinking 可以作为预算选择，但必须先证明任务可学、截断不主导结果。Open-MOPD 的 1.7B 长链失败来自另一配置，不能直接推断我们的 non-thinking 配置必然失败。
+- 4,096 token 上限与 1.7B-Base non-thinking 可以作为预算选择，但必须先证明任务可学、截断不主导结果。Open-MOPD 的 1.7B 长链失败来自另一配置，不能直接推断我们的 non-thinking 配置必然失败。
 - “不增加 forward/backward 次数”不等于没有开销。需要逐 micro-batch 暴露梯度、保存均值 buffer、进行参数规模 reduction、处理 sharding。$m_{\min}=2$ 只保证方差可定义，不保证估计可靠。可采用 warmup、跨步平滑/收缩和低频调整，并检验稳定性。
 - 响应均值可消除跨任务长度导致的隐式权重漂移，但与 Open-MOPD 每域 token mean 并非完全等价：二者在域内对长短 response 的相对权重不同。
 - $T(m)=C+\sum_i m_i\tau_i$ 只在测量支持时适用。异步 teacher 服务、流水重叠和排队会使实际耗时非加性；用实测 $T(m)$ 或系统拟合并留出验证，最终比较完整 GPU-hours。
