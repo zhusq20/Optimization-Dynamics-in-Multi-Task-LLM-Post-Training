@@ -1,0 +1,51 @@
+\section{Shared Experimental Details}
+\label{app:setup}
+
+Sections~\ref{sec:normalization}--\ref{sec:density} contain the experiments;
+this appendix records shared resource and evaluation details.
+
+\paragraph{Training setup and run reuse.}
+Section~\ref{sec:normalization} specifies the student, domains, and three
+teacher weight sets. The $64$-response update comprises $16$ micro-batches
+of four responses, with equal domain quotas, one optimizer update per
+fresh rollout batch, and a $4{,}096$-token cap.
+The initial budget is at most $500$ updates per run, subject to a
+throughput pilot on a $96$-GB learner GPU and $48$-GB rollout/teacher GPUs.
+Exact model revisions, optimizer and decoding settings, data splits,
+and evaluation versions remain to be frozen before execution.
+
+A representative single-teacher setting is chosen before inspecting
+results. PG and corrected teacher top-$64$ in the single-teacher and
+joint settings give four configurations. The joint top-$64$ configuration
+with domain-response averaging is also the reference for the three-way
+normalization study, which adds two averaging rules. Thus six training
+configurations cover the core comparisons, with checkpoints reused for
+the gradient, teacher-overlap, and full-vocabulary measurements.
+Additional teacher settings, the response-cap comparison, and repeated
+seeds require separate resource accounting. The manuscript does not yet
+report measured outcomes for these studies.
+
+\paragraph{Capability evaluation.}
+Use MATH-500 greedy pass@1, a frozen LiveCodeBench pass@1 slice,
+IFBench strict accuracy, and GPQA-Diamond average@4. Record evaluator,
+model, and data revisions and fix decoding within each comparison.
+Report raw per-domain scores, their macro-average, and the worst-domain
+change from initialization. Independently trained OPD students, where
+available, are references at matched domain exposure, not upper bounds
+or guarantees of jointly attainable capability. A lack of single-teacher
+transfer is not itself evidence of multi-teacher interference.
+Loss on a common held-out response bank and loss on fresh student
+responses are reported separately; a lower mean KL alone does not
+establish balanced capability integration.
+
+\paragraph{Compute and uncertainty.}
+Record generated tokens, domain response counts, optimizer updates, and
+GPU hours separately, including teacher-scoring and diagnostic overhead.
+Key online comparisons use repeated paired training seeds when feasible;
+initial one-seed runs are exploratory. Prompt bootstrap estimates
+conditional evaluation uncertainty, not training-seed variation.
+Report effect sizes, confidence intervals, and the range of differences
+the experiment can resolve. Teacher pairs sharing weights or training
+lineage, and repeated checkpoints, are not independent observations.
+No sparsity advantage or capability improvement is claimed before
+measurement.

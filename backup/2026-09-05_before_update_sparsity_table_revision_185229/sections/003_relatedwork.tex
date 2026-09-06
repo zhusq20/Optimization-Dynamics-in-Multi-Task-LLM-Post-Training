@@ -1,0 +1,38 @@
+\section{Related Work}
+
+\paragraph{Capability integration and task weighting.}
+MOPD consolidates routed domain teachers in policy space
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+Open-MOPD diagnoses token-share and reward-related imbalances
+\citep{gao2026openmopddiagnosingfixingcapability}.
+Our first study separates cross-domain weighting from within-domain
+response-length weighting in existing loss reductions.
+Prior work on multi-task loss weighting and gradient conflict also
+motivates distinguishing weight balance from joint capability gains
+\citep{chen2018gradnorm,yu2020gradientsurgerymultitasklearning}.
+
+\paragraph{Sparse parameter changes and teacher differences.}
+\citet{mukherjee2025subnetworks} report sparse cumulative parameter changes
+in RL and repeated changes in similar parameter subsets across settings.
+\citet{yu2026denseupdates} establish related OPD signatures, including
+overlap when varying teachers and experiments that restrict training
+to selected parameters. \citet{shen2026opdgeometry} examine update
+subspaces and response-position thinning. These results motivate our
+study but do not establish sparsity of instantaneous gradients.
+Teacher compatibility also affects distillation success
+\citep{li2026rethinkingopd,ma2026mopdmultiteacheronpolicydistillation}.
+We measure raw gradients separately from parameter changes and ask
+whether teachers with more different distributions produce their
+strongest gradients on more different subsets of a shared MOPD student.
+
+\paragraph{Vocabulary coverage and gradient estimation.}
+MOPD provides sampled-token and corrected teacher-top-$k$ objectives
+\citep{ma2026mopdmultiteacheronpolicydistillation}.
+Variance-reduced sampled OPD \citep{oh2026vopd}, exact-head plus
+sampled-tail estimation \citep{zhang2026emapg}, and tail-aware losses
+\citep{huang2026tailaware} motivate separating vocabulary coverage from
+the choice of objective and estimator. Our loss study compares raw
+gradient concentration under practical PG and top-$k$ training, with
+full-vocabulary local measurements in both single-teacher and joint
+settings. Established estimator controls are reserved for interpreting
+a stable difference; we do not propose a new estimator.

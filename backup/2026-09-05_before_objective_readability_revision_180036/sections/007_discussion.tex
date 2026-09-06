@@ -1,0 +1,23 @@
+\section{Discussion}
+\label{sec:conclusion}
+
+The paper first explains loss weighting, then examines sparse updates
+inside MOPD, and finally compares vocabulary-level supervision choices. Its empirical
+center is the progression from observing sparsity to measuring
+teacher-conditioned support overlap and relating support differences
+to teacher distribution differences. Teacher--student distance and
+signed cross-task effects aid interpretation without replacing those
+questions.
+
+The PG/top-$k$ comparison is deliberately bounded. Similar sparsity
+in both single-teacher and multi-teacher settings is a useful observation
+within the tested regime; it does not require an additional mechanism
+program. A stable difference can motivate further analysis, but a
+smaller support alone does not establish better capability integration.
+Likewise, teacher divergence may or may not predict support difference,
+and overlap may contain either shared or opposing corrections.
+
+\missing{State the supported observations, including null relationships,
+and their model, task, teacher, loss, and measurement scope. Do not
+convert existing sparsity findings or local algebra into new universal
+claims.}

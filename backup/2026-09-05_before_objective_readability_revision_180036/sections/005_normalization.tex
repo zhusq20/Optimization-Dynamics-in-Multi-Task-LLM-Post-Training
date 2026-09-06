@@ -1,0 +1,100 @@
+% ============================================================================
+\section{Length Normalization Changes the Training Mixture}
+\label{sec:normalization}
+% ============================================================================
+
+Length imbalance depends on how token losses are reduced. MOPD writes a
+response-normalized objective
+\citep{ma2026mopdmultiteacheronpolicydistillation}, whereas Open-MOPD
+analyzes a token-mean implementation in which instruction following supplies
+approximately $20\%$ of prompts but only $1\%$ of response tokens
+\citep{gao2026openmopddiagnosingfixingcapability}. This observation motivates
+separating the training objective from the sampling mixture. It does not
+establish a length pathology intrinsic to multi-teacher distillation.
+The formal objective and each implementation's complete reduction path,
+including gradient accumulation, require separate verification.
+\missing{Reduction audit.}
+
+\paragraph{Three reduction orders.}
+Fix a rollout batch containing $n_d\geq1$ responses from domain $d$.
+Response $i$ has $T_{di}>0$ valid positions, position losses $\ell_{dit}$,
+and mean loss $\bar\ell_{di}=T_{di}^{-1}\sum_t\ell_{dit}$.
+Write $N_d=\sum_iT_{di}$, $N=\sum_dN_d$, and $s_d=N_d/N$.
+The target domain weights $a_d\geq0$, with $\sum_da_d=1$, are distinct
+from the prompt proportions $p_d=n_d/\sum_jn_j$. Consider
+\begin{align}
+ L_{\mathrm{tok}}
+   &=\frac1N\sum_{d,i,t}\ell_{dit}
+     =\sum_ds_d\frac{\sum_iT_{di}\bar\ell_{di}}{N_d},
+     \label{eq:norm_global}\\
+ L_{\mathrm{DT}}
+   &=\sum_da_d\frac{\sum_iT_{di}\bar\ell_{di}}{N_d},
+     \label{eq:norm_domain_token}\\
+ L_{\mathrm{DR}}
+   &=\sum_da_d\frac1{n_d}\sum_i\bar\ell_{di}.
+     \label{eq:norm_domain_response}
+\end{align}
+These respectively average tokens globally, tokens within domains, and
+positions within responses before averaging responses within domains.
+Multiplying each domain's token loss by $a_d/s_d$ converts
+Equation~\ref{eq:norm_global} into Equation~\ref{eq:norm_domain_token};
+this is Open-MOPD's token-share balancing. It preserves length weighting
+within each domain. An ordinary mean over response means instead equals
+Equation~\ref{eq:norm_domain_response} with $a_d=p_d$.
+
+\begin{proposition}[Fixed-batch length--gradient decomposition]
+\label{prop:norm_covariance}
+Hold the rollouts, masks, and domain weights fixed when differentiating;
+any surrogate advantages are detached. Define
+$h_{di}=T_{di}^{-1}\sum_t\nabla_\theta\ell_{dit}$,
+$\bar h_d=n_d^{-1}\sum_ih_{di}$, and
+$\bar T_d=n_d^{-1}\sum_iT_{di}$. Let
+\begin{equation}
+ C_d=\frac1{n_d}\sum_i(T_{di}-\bar T_d)(h_{di}-\bar h_d).
+ \label{eq:norm_covariance}
+\end{equation}
+Then
+\begin{align}
+ \nabla L_{\mathrm{tok}}
+   &=\sum_ds_d\left(\bar h_d+\frac{C_d}{\bar T_d}\right),
+     \label{eq:norm_global_gradient}\\
+ \nabla L_{\mathrm{DT}}
+   &=\sum_da_d\left(\bar h_d+\frac{C_d}{\bar T_d}\right),
+ &\nabla L_{\mathrm{DR}}&=\sum_da_d\bar h_d.
+     \label{eq:norm_domain_gradients}
+\end{align}
+\end{proposition}
+\begin{proof}
+Expanding the empirical covariance gives
+$n_d^{-1}\sum_iT_{di}h_{di}=\bar T_d\bar h_d+C_d$.
+Divide by $\bar T_d$ and substitute into each reduction.
+\end{proof}
+
+Domain token normalization therefore removes the coefficient mismatch
+$s_d-a_d$ while retaining the within-domain length--gradient covariance.
+These are standard weighted-mean identities, used here to explain existing
+training recipes rather than introduce a new algorithm. Equal token
+counts do not imply equal gradient norms or compatible update directions;
+neither token shares nor scalar reward magnitudes capture vector
+cancellation or optimizer preconditioning. The identities are exact for
+a fixed batch. In expectation, a sample ratio generally differs from
+$\mathbb E[Th]/\mathbb E[T]$; the latter describes an appropriate
+large-batch limit, not an exact finite-batch expectation.
+
+\paragraph{Controlled observations.}
+To test this explanation, compare all three reductions on identical
+rollouts, teacher scores, and surrogate signals at early, middle, and late
+checkpoints. Measure $s_d$, $\bar h_d$, $C_d/\bar T_d$, and gradient
+directions before clipping. First set $a_d=p_d$, or use equal prompt
+quotas, to isolate length weighting; evaluate uniform target weights
+separately. Otherwise, correcting length also changes the domain prior.
+\missing{Gradient decomposition.}
+Follow these measurements with matched training branches that retain the
+same prompt schedule, response limits, teachers, and update settings,
+while generating their own on-policy responses. Report capability curves
+against both updates and cumulative generated tokens.
+\missing{Training curves.}
+Reducing the response limit is a separate intervention: it changes the
+available prefixes and may remove solution endings. Its effect cannot be
+identified with loss reweighting, nor do the identities imply that
+response normalization always improves capability integration.
