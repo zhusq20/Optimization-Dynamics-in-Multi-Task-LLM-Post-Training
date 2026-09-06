@@ -10,4 +10,4 @@ The initial design reuses six training configurations: representative single-tea
 
 Teacher-conditioned gradients and proposed optimizer steps start from identical copies of an actual MOPD checkpoint. Independent single-teacher endpoint deltas are reference measurements, not historical attribution inside the joint run. Code and science currently share one Qwen3-4B teacher and count as one teacher weight set.
 
-The end-to-end trainer and measured results for these studies are not yet present. Existing GPAS scripts, synthetic calculations, and the old plan remain historical artifacts; none constitute empirical evidence for the revised questions.
+The end-to-end trainer and measured results for these studies are not yet present. Older analytical figures and synthetic calculations have been moved to an external recovery archive. The retained GPAS schematic generator (`generate_gpas_main_figure.py`), sampled-log-ratio utility (`measure_initial_kl.py`), and superseded GPAS plan are historical supporting materials; none constitute empirical evidence for the revised questions or required experiments in the current plan.

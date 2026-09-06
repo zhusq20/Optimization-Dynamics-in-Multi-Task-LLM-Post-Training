@@ -104,7 +104,7 @@
 
 正文顺序：问题与三贡献 → setting → normalization → sparse OPD / MOPD overlap / teacher distance → PG vs top-k → 实验设计 → related work / discussion。
 
-旧 GPAS 理论文件、脚本与旧计划保留为历史材料，不再从主稿调用或列作当前必做。此前稿件已备份到 backup/2026-09-05_before_three_contribution_restructure_170838。
+未被当前主稿使用的旧 GPAS 理论、脚本、旧计划及历史稿件已移入项目外恢复归档，不再列作当前必做。项目内保留最新稿件、当前使用的图与脚本，以及最新研究说明和实验计划。
 
 直接相关来源：
 
