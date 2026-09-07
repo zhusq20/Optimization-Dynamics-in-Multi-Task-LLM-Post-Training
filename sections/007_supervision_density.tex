@@ -65,9 +65,11 @@ vocabulary coverage as the only causal difference.
 Our primary measurements are actual online steps and cumulative parameter
 changes from initialization, reported separately. Following
 Section~\ref{sec:subnetworks}, we report threshold curves, norms, and the
-fraction of squared change carried by the largest coordinates. We use FP32
-master-weight differences when available, with exported BF16 checkpoint
-differences reported separately. Local comparisons use proposed steps from
+fraction of squared change carried by the largest coordinates. To measure
+effective cumulative changes, we compare stored BF16 checkpoints with
+initialization at absolute tolerance $10^{-5}$, following
+\citet{mukherjee2025subnetworks}. FP32 master-weight differences separately
+characterize accumulated optimizer motion. Local comparisons use proposed steps from
 copies of the same optimizer state; repeated batches on the common prefix
 bank quantify sampling variability. Raw gradients before clipping provide
 secondary concentration measurements. Their sparsity need not equal update
@@ -82,25 +84,28 @@ and worst-domain change accompany the sparsity results. Curves show
 generated-token exposure and GPU hours separately, with response counts,
 updates, and teacher-scoring and diagnostic overhead recorded.
 
-\paragraph{Preliminary observation: distribution drift and update sparsity.}
-In the exploratory seed-$42$ runs, teacher top-$64$ training exhibits
-student probability drift outside the supervised token set. Comparing
-rollout batches $1$--$50$ with $200$--$249$, retained student mass falls
-from $86.2\%$ to $37.0\%$ for the single teacher and from $81.4\%$ to
-$51.7\%$ for joint training under domain-response (DR) averaging.
-With domain-token and global-token averaging, joint retained mass instead
-rises from $88.2\%$ to $93.7\%$ and from $88.6\%$ to $94.9\%$,
-respectively. These logged means use each run's on-policy prefixes and
-configured averaging. The stronger drift under DR is consistent with
-response averaging amplifying truncation effects. Actual FP32 updates
-show no exceptional concentration at the measured checkpoints: at update
-$250$, the largest $1\%$ of coordinates carries $8.17\%$ of update energy
-for joint top-$64$ DR, versus $9.03\%$, $9.03\%$, and $8.32\%$ for PG,
-domain-token, and global-token. The corresponding cumulative-change
-shares are $8.59\%$, $11.38\%$, $8.24\%$, and $8.24\%$.
-The association remains to be tested with controlled interventions.
-% Audited rollout windows, FP32/BF16 measurements, source hashes, and
-% W&B/local checks: experiments/topk_drift_sparsity_20260906.json
+\paragraph{Preliminary observation: drift and effective BF16 changes.}
+In seed-$42$ top-$64$ runs with domain-response (DR) averaging, logged
+student mass inside the teacher's top-$64$ falls from $86.2\%$ to $37.0\%$
+for the single teacher and from $81.4\%$ to $51.7\%$ for joint training
+(rollout batches $1$--$50$ versus $200$--$249$). Joint domain-token and
+global-token means instead rise to $93.7\%$ and $94.9\%$, respectively;
+each run uses its own on-policy prefixes and configured averaging.
+Under the BF16 criterion above, single-teacher top-$64$ changes
+$5.33\%$ of parameters at update $100$, versus $2.55\%$ for PG.
+Their BF16 cumulative-change $L_2$ norms are $0.201$ and $0.125$,
+respectively.
+At update $250$, joint top-$64$ DR changes $9.92\%$, versus
+$5.90\%$, $11.72\%$, and $12.01\%$ for PG, domain-token, and global-token;
+BF16 cumulative-change $L_2$ norms are $0.425$, $0.269$, $0.537$, and
+$0.555$, respectively. Thus top-$64$ changes more effective BF16 weights
+than PG. The stronger distribution drift under DR is consistent with an
+interaction between truncation and response averaging, but does not
+coincide with the largest BF16 parameter changes among the averaging
+rules. The mechanism remains to be established.
+% Probability windows and FP32 diagnostics: experiments/topk_drift_sparsity_20260906.json
+% Full BF16 weight scan using the cited paper's criterion:
+% experiments/bf16_effective_changes_20260906.json
 
 \subsection{Interpretation and decision rule}
 

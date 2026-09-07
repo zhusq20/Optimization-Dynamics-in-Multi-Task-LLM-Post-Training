@@ -1,5 +1,9 @@
 # MOPD: three empirical studies
 
+> Current experiment inventory: [student Top16 / BF16 audit (2026-09-06)](STUDENT_TOP16_EXPERIMENT_AUDIT_20260906_zh.md). The current online top-k loss uses student-selected 16 tokens, and parameter-change statistics use BF16 only. This inventory updates the execution status and loss/measurement choices in the historical plan below.
+
+> Coverage and time budget: [student Top16 evidence checklist and runtime estimates](STUDENT_TOP16_COVERAGE_AND_RUNTIME_20260906_zh.md), including separate Qwen3 / SmolLM3 and seed budgets. Measured timings and planning assumptions are distinguished.
+
 The active specification is [the three-contribution plan](../MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md). It supersedes the GPAS-centered plan.
 
 1. Explain and measure the effect of global token averaging, domain token averaging, and response averaging on capability balance.
