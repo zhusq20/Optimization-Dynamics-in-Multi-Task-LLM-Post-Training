@@ -1,6 +1,6 @@
 # 2026-09-10 论文证据版本
 
-本版本对应根目录的 `iclr2027_conference.tex` / `iclr2027_conference.pdf`。正文按「损失平均 → 梯度 → Adam → BF16 写回」组织，使用 aligned v8 数据。旧曲线目录保留作历史记录，正文不再引用其中的 Base、Student64→I64、旧 teacher-Top64 或 GPAS 数值。
+本版本对应根目录的 `iclr2027_conference.tex` / `iclr2027_conference.pdf`。正文严格按用户指定 7417292 版本的三个问题组织：平均方式与能力平衡；更新稀疏性、教师重叠及教师分布距离；监督密度与稀疏性/能力。使用已有 aligned v8 数据。旧曲线目录保留作历史记录，正文不再引用其中的 Base、Student64→I64、旧 teacher-Top64 或 GPAS 数值。
 
 ## 证据覆盖
 
@@ -12,29 +12,28 @@
 | 兼容教师基准 | 4 个 RL 教师，各自领域 | 教师质量参考表；science 的 792 条 GPQA 重新评分一致 |
 | 在线几何 | M-PG、DR、GT 至 100；DT 至 50 | 实际 FP32 / BF16 累积变化、更新与能量集中 |
 | 对齐局部机制 | M-PG/100，433 条主测量，2 个 bank，8 条回答、32 个 prefix | 教师×输入、Adam 状态、监督密度 |
-| PG 采样控制 | 1 / 16 / 64 actions，2 bank × 2 repeats | 固定 prefix 上的实现采样误差 |
-| 直接 Adam 向量比较 | PG / I64 / full，FP32 与 BF16 | 相同密度下的方向差异 |
+| PG 采样控制 | 1 / 16 / 64 actions，2 bank × 2 repeats | 历史数据保留，不进入当前编译稿 |
+| 直接 Adam 向量比较 | PG / I64 / full，FP32 与 BF16 | 历史数据保留，不替代参数稀疏性比较 |
 | 原始训练行为 | M-PG 128、DR 100、DT 100、GT 115 个 rollout clock | token 分配、长度、截断、终止位置监督 |
 
 单教师训练到 500 与单教师 **500 能力评测完成**是不同状态。2026-09-11 增补了已完成的 aligned S-PG/500；S-I64 当前能力曲线止于 250；DT/100 的不完整检查点不进入能力或几何比较。一个 `train/step` 是四响应梯度分片，16 个分片才合成一个 optimizer update；图中的 checkpoint 横轴使用后者。
 
-## 图表与论证的对应
+## 图表与三个问题的对应
 
-| 图 | 文件 | 回答的问题 |
+| 位置 | 文件 | 回答的问题 |
 |---|---|---|
-| 1 | `capability.pdf` | 各配置在真实完成的 checkpoint 上怎样分配能力收益？ |
-| 2 | `cumulative_geometry.pdf` | 同一累积变化在 FP32 与 BF16 中有多大支持集？ |
-| 3 | `adam_precision.pdf` | 保存的 Adam 状态怎样影响下一步可见变化？ |
-| 4 | `teacher_input.pdf` | 教师差异与输入差异分别怎样影响方向和位置？ |
-| 5 | `supervision_density.pdf` | 词表监督如何影响梯度和拟议更新方向？ |
-| 6 | `normalization50.pdf` | 同步 50 点三种归一化的全部配对差值是什么？ |
-| 7 | `thresholds.pdf` | 绝对阈值怎样影响局部活动比例？ |
-| 8 | `teacher_js.pdf` | 同 bank / 同教师对的分布距离与支持集距离怎样对应？ |
-| 9 | `training_dynamics.pdf` | M-PG 的长度、token 分配和响应行为怎样变化？ |
-| 10 | `all_token_shares.pdf` | 三种 I64 平均方式对应的原始 token 分配怎样变化？ |
-| 11 | `if_generation.pdf` | IF 分数伴随什么完成、截断和重复行为？ |
+| 正文 Section 3 | `normalization_capability.pdf` | 三种平均方式的域能力怎样变化？ |
+| 正文 Section 4.1 | `cumulative_geometry.pdf` | 联合 PG/I64 的累计更新是否集中？ |
+| 正文 Section 4.2 | `teacher_overlap.pdf` | 同一学生的教师梯度选择有哪些重叠？ |
+| 正文 Section 4.3 | `teacher_js.pdf` | 教师 JS 与选择差异如何对应？ |
+| 正文 Section 5 | `supervision_density.pdf` | 不同词表监督下，局部更新的活动比例和能量集中如何比较？ |
+| 附录 | `capability.pdf` / `normalization50.pdf` | 完整能力轨迹 / 归一化配对区间 |
+| 附录 | `adam_precision.pdf` / `thresholds.pdf` | 更新稀疏性的优化器与阈值解释 |
+| 附录 | `teacher_input.pdf` / `all_token_shares.pdf` | 教师重叠的输入背景 / 域权重的 token 来源 |
 
-所有图片在 `../../figures/aligned_evidence_20260910/`，同时提供 PDF、PNG、SVG。四个数据表进入论文（归一化、全能力、教师、局部 coverage）；第五个配对结果表供直接查看。实验覆盖表和平均方式定义表在 LaTeX 中直接给出。
+图片位于 `../../figures/aligned_evidence_20260910/`，脚本生成 PDF、PNG、SVG。生成六个数据表：归一化、PG/I64 配对能力、完整能力、教师、局部 coverage，以及未单独排版的配对区间表。实验覆盖表和平均方式定义表在 LaTeX 中直接给出。
+
+单教师在线参数几何、逐教师 optimizer-step overlap，以及逐教师 step 距离与 JS 的关系仍缺少对应记录。当前梯度矩阵和散点明确保留这一测量边界。新增图形只重排和汇总已冻结的数值，没有增加实验。更完整的范围见[三问说明](../../MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md)。
 
 ## 复现
 

@@ -1,23 +1,17 @@
-# 当前实验图路线图
+# 按三个原问题组织的论文图表
 
-更新：2026-09-09。本版根据用户指定的两篇MOPD论文，调整为“领域能力轨迹 → 原始训练诊断 → 局部机制控制”。旧15图和27图槽登记保留在原数据包中作历史记录，当前交付以新版manifest为准。
+2026-09-11 修订，恢复 [7417292 正文](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/7417292c57aa0cbe8486cad4986aa5617cd0f681) 的探究顺序。正文各节同时陈述问题、对应实验和实测范围，不再按“梯度—Adam—写回”组织研究贡献。
 
-[当前图集](../figures/paper_curves_20260908/index.html) · [正文9张PDF](../figures/paper_curves_20260908/main_figures.pdf) · [W&B raw曲线](../figures/paper_curves_20260908/raw_curves.html) · [逐图配置与依据](paper_curves_20260908/DESIGN_zh.md)
-
-| 证据层 | 当前图 | 形式与范围 |
+| 正文位置 | 主图 / 表 | 对应问题 |
 |---|---|---|
-| 结果 | 四领域独立评估曲线 | 初始学生、Joint PG、Math-only PG、各域teacher；真实完整评估点 |
-| 训练过程 | 原始log-ratio、token share、length、truncation、reward、loss、gradient | 未平滑；使用各日志自己的clock；不把microbatch当optimizer更新 |
-| 归一化机制 | 同bank DT/GT相对DR的gradient cosine | 点图，每行保留实验条件；替代条件热图 |
-| 教师输入控制 | Task-specific / identical-input teacher gradient cosine | 成对点与观测范围；共享teacher pair不作独立种子 |
-| 监督目标 | 五个学生状态的BF16阈值曲线与PG相对范数 | 有序阈值用线图，无序损失类别用点图 |
-| 关系矩阵 | PG500 shared-input教师两两support overlap | 全套唯一热力图；明确checkpoint、loss和阈值 |
-| 既有续训 | Student64→I64归一化分支的评估 | 100步是父目标；部分250步评估缺失，保留缺口 |
+| Section 3 | `normalization_capability.pdf`；平均方式定义表；共同 50 步结果表 | 三种平均方式如何改变域权重和能力平衡？ |
+| Section 4.1 | `cumulative_geometry.pdf` | 联合 PG/I64 是否仍有集中参数变化？单教师对应记录明确列为缺口。 |
+| Section 4.2 | `teacher_overlap.pdf` | 同一联合学生中的教师参数选择是否重叠？现有矩阵明确标为梯度。 |
+| Section 4.3 | `teacher_js.pdf` | 教师分布距离是否对应参数选择距离？现有散点使用梯度 overlap。 |
+| Section 5 | `supervision_density.pdf`；`density_capability_table.tex` | PG/top-k/full 局部更新稀疏性如何比较？PG/top-k 在线能力怎样变化？ |
 
-正文9张含7张折线图、2张点图；全套30张含25折线/4点图/1热图。单张PDF/PNG/SVG独立导出，图内保留坐标与图例，中文问题和英文caption置于图外。
+附录保留六张有直接解释作用的图：`capability.pdf`（完整 13 套能力）、`normalization50.pdf`（配对区间）、`adam_precision.pdf`（优化器控制）、`thresholds.pdf`（稀疏性阈值）、`teacher_input.pdf`（输入与方向背景）、`all_token_shares.pdf`（域权重来源）。
 
-已冻结10条训练记录、52组逐题核验评估attempt、31组原局部探针。原始浏览器可逐run/metric查看，并下载raw CSV；所有数值保留来源文件与行号。详见[数据指南](paper_curves_20260908/README_zh.md)和[验证](paper_curves_20260908/validation_report.json)。
+动作数/MC 方向图、独立响应行为图与 RL regularization 理论不进入本版编译稿。历史文件与原始数据保留，不自动成为后续必做实验。
 
-当前缺口：policy entropy未记录；部分续训250步Math/IF评估本地未见完整产物；实际在线BF16逐步测量和跨续训统一GPU成本未在本次补齐。没有把旧FP32 update字段、局部BF16模拟或teacher loss当成这些证据。
-
-没有启动新训练、评测或探针。此前已取消的从Base重训I64、新训练seed、cap训练仍不恢复。本次只整理已有数据和改图。
+当前图源均在 `aligned_evidence_20260910`。用 `python experiments/plot_aligned_evidence.py` 从冻结数据重画，用 `latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex` 编译，再运行 `python experiments/verify_aligned_evidence.py`。旧 September 8 图集仅作历史记录。

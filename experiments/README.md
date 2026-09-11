@@ -9,13 +9,13 @@
 > Building the current paper only requires `latexmk`; see the
 > [root guide](../README.md).
 
-The [September 11 experiment inventory (中文)](EXPERIMENT_INVENTORY_20260911_zh.md) records the completed experiments, manuscript placement, and the newly incorporated aligned S-PG/500 evaluation.
+The current manuscript is organized by the author's [three original questions](../MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md): loss averaging and capability balance; update sparsity, teacher overlap, and teacher-distribution distance; supervision density and its sparsity/capability comparison.
 
-The current manuscript uses the [September 10 aligned evidence bundle](aligned_evidence_20260910/README_zh.md) and its **5 main figures + 6 appendix figures**. Compile `iclr2027_conference.tex` to produce the paper PDF locally; open the [figure files](../figures/aligned_evidence_20260910/), or [editorial review (中文)](aligned_evidence_20260910/EDITORIAL_REVIEW_zh.md).
+The [aligned evidence guide (中文)](aligned_evidence_20260910/README_zh.md) maps the **5 main figures + 6 appendix figures** to those questions. Thirteen completed capability suites are retained. Main figures now show the three normalization branches, joint PG/I64 cumulative sparsity, teacher-pair gradient overlap, teacher JS versus selection distance, and local update sparsity across supervision choices.
 
-The bundle includes thirteen complete capability suites, compatible teacher references, actual online parameter geometry, and the aligned M-PG/100 local mechanisms. The [verification report](aligned_evidence_20260910/verification_report.json) records source hashes, score checks, figure coverage, and manuscript validation.
+Single-teacher online parameter geometry and teacher-specific optimizer-step overlaps are missing from this aligned snapshot. The paper states those gaps directly. Available teacher gradient comparisons remain supporting evidence and are not labeled as optimizer-step subnetworks. Adam-state and input controls are in the appendix; action resampling and RL-regularization theory are outside the compiled paper.
 
-Teacher-conditioned gradients and proposed optimizer steps start from identical copies of an actual MOPD checkpoint. Mathematics, code, instruction following, and science each use their own frozen RL-trained Qwen3-1.7B teacher. The aligned student is initialized from Qwen3-1.7B, as recorded in the frozen protocol. The [RL-teacher appendix](../sections/010_rl_teacher_connection.tex) distinguishes each teacher's RL KL reference from the student initialization and derives how teacher reward scale, KL strength, and the reference policy enter the distillation gradient under an optimal-teacher model.
+The [September 11 inventory](EXPERIMENT_INVENTORY_20260911_zh.md) retains the earlier experiment accounting. Its historical figure priorities are superseded by the [current roadmap](EXPERIMENT_FIGURE_ROADMAP_20260908_zh.md). The [remaining comparisons](NEXT_EXPERIMENTS_20260908_zh.md) are restricted to the three questions.
 
 Regenerate the current paper figures on CPU:
 

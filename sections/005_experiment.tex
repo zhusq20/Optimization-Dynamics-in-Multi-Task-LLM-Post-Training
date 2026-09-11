@@ -1,6 +1,8 @@
 \section{Experimental Setup and Complete Capability Results}
 \label{app:setup}
 
+The six configurations are shared across the three questions. The three I64 reductions address token balancing (Section~\ref{sec:normalization}); single-teacher and joint PG/I64 branches define the update-sparsity comparison (Section~\ref{sec:subnetworks}) and the supervision-density comparison (Section~\ref{sec:density}). Table~\ref{tab:coverage} distinguishes completed capability evaluations from available parameter measurements.
+
 \subsection{Model, data, and training protocol}
 
 The student is Qwen3-1.7B \citep{qwen2025qwen3}, revision \texttt{70d244cc86cc} (the full revision and weight hashes are in the frozen protocol). The four frozen teachers are mathematics, code, instruction-following, and science RL descendants of the same initial model. Student and teacher use the native chat template with thinking disabled, the same assistant prefix, and no suffix removal. Generation stops at token 151643 or 151645; the model EOS token is 151645. The vocabulary contains 151,936 entries.
@@ -40,6 +42,13 @@ Table~\ref{tab:all_capability} gives all thirteen complete suites. Nine suites h
 \centering\small
 \input{experiments/aligned_evidence_20260910/capability_table.tex}
 \end{table}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/capability.pdf}
+\caption{All completed capability trajectories from the shared initial student. M denotes four routed teachers and S the mathematics teacher. Lines connect measured checkpoints. The normalization comparison uses the three I64 reductions; the supervision comparison pairs PG and I64 within each setting. Single-teacher updates contain four times as many mathematics responses as joint updates.}
+\label{fig:capability}
+\end{figure}
 
 The four RL teachers were evaluated separately on their respective domain benchmarks with the compatible native prompt and decoding protocol (Table~\ref{tab:teachers}). The science teacher's 792 saved responses also agree exactly with the current GPQA scorer. These teacher scores describe the available supervision on each target domain.
 

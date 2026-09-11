@@ -1,7 +1,7 @@
 {
   "status": "passed",
-  "checked_at_utc": "2026-09-11T01:50:22.277234+00:00",
-  "checks_passed": 766,
+  "checked_at_utc": "2026-09-11T04:03:38.811243+00:00",
+  "checks_passed": 765,
   "frozen_sources": 78,
   "capability_suites": 13,
   "capability_responses": 22360,
@@ -24,6 +24,12 @@
       "text_characters": 307
     },
     {
+      "figure": "normalization_capability",
+      "width_pt": 490.7995300292969,
+      "height_pt": 269.94976806640625,
+      "text_characters": 260
+    },
+    {
       "figure": "normalization50",
       "width_pt": 490.7995300292969,
       "height_pt": 141.59951782226562,
@@ -33,7 +39,7 @@
       "figure": "cumulative_geometry",
       "width_pt": 490.7995300292969,
       "height_pt": 152.39952087402344,
-      "text_characters": 233
+      "text_characters": 206
     },
     {
       "figure": "adam_precision",
@@ -48,16 +54,16 @@
       "text_characters": 329
     },
     {
-      "figure": "supervision_density",
-      "width_pt": 491.9627380371094,
-      "height_pt": 152.39952087402344,
-      "text_characters": 206
+      "figure": "teacher_overlap",
+      "width_pt": 467.79376220703125,
+      "height_pt": 184.7995147705078,
+      "text_characters": 335
     },
     {
-      "figure": "training_dynamics",
-      "width_pt": 490.7995300292969,
-      "height_pt": 263.99951171875,
-      "text_characters": 434
+      "figure": "supervision_density",
+      "width_pt": 494.8582458496094,
+      "height_pt": 159.59951782226562,
+      "text_characters": 227
     },
     {
       "figure": "all_token_shares",
@@ -76,16 +82,10 @@
       "width_pt": 490.62518310546875,
       "height_pt": 159.59951782226562,
       "text_characters": 221
-    },
-    {
-      "figure": "if_generation",
-      "width_pt": 490.7995300292969,
-      "height_pt": 159.59951782226562,
-      "text_characters": 279
     }
   ],
-  "compiled_pdf_pages": 16,
-  "pdf_sha256": "0d4ad2632b6846c0be23118e2cff0633f51fce579b9ea23225330035ccda722a",
+  "compiled_pdf_pages": 17,
+  "pdf_sha256": "7f09154b57c77cb6dc633135c19c9daf3d822310ffb7ca3b1dbb483ce5696647",
   "environment": {
     "python": "3.12.3",
     "numpy": "1.26.4",
@@ -3779,6 +3779,40 @@
     {
       "check": "figure_source_exists",
       "passed": true,
+      "details": "capability.json"
+    },
+    {
+      "check": "figure_format_exists",
+      "passed": true,
+      "details": [
+        "normalization_capability",
+        "pdf"
+      ]
+    },
+    {
+      "check": "figure_format_exists",
+      "passed": true,
+      "details": [
+        "normalization_capability",
+        "png"
+      ]
+    },
+    {
+      "check": "figure_format_exists",
+      "passed": true,
+      "details": [
+        "normalization_capability",
+        "svg"
+      ]
+    },
+    {
+      "check": "figure_has_content",
+      "passed": true,
+      "details": "normalization_capability"
+    },
+    {
+      "check": "figure_source_exists",
+      "passed": true,
       "details": "paired_comparisons.json"
     },
     {
@@ -3936,14 +3970,38 @@
       "details": "raw/measurements.jsonl"
     },
     {
-      "check": "figure_source_exists",
+      "check": "figure_format_exists",
       "passed": true,
-      "details": "raw/direct_updates_results.json"
+      "details": [
+        "teacher_overlap",
+        "pdf"
+      ]
+    },
+    {
+      "check": "figure_format_exists",
+      "passed": true,
+      "details": [
+        "teacher_overlap",
+        "png"
+      ]
+    },
+    {
+      "check": "figure_format_exists",
+      "passed": true,
+      "details": [
+        "teacher_overlap",
+        "svg"
+      ]
+    },
+    {
+      "check": "figure_has_content",
+      "passed": true,
+      "details": "teacher_overlap"
     },
     {
       "check": "figure_source_exists",
       "passed": true,
-      "details": "raw/pg_variance_results.json"
+      "details": "raw/measurements.jsonl"
     },
     {
       "check": "figure_format_exists",
@@ -3979,43 +4037,9 @@
       "passed": true,
       "details": [
         "supervision_density",
-        "Cosine with full",
-        3
+        "Nonzero (%)",
+        2
       ]
-    },
-    {
-      "check": "figure_source_exists",
-      "passed": true,
-      "details": "raw/M-PG_rollout.jsonl"
-    },
-    {
-      "check": "figure_format_exists",
-      "passed": true,
-      "details": [
-        "training_dynamics",
-        "pdf"
-      ]
-    },
-    {
-      "check": "figure_format_exists",
-      "passed": true,
-      "details": [
-        "training_dynamics",
-        "png"
-      ]
-    },
-    {
-      "check": "figure_format_exists",
-      "passed": true,
-      "details": [
-        "training_dynamics",
-        "svg"
-      ]
-    },
-    {
-      "check": "figure_has_content",
-      "passed": true,
-      "details": "training_dynamics"
     },
     {
       "check": "figure_source_exists",
@@ -4130,40 +4154,6 @@
       "details": "thresholds"
     },
     {
-      "check": "figure_source_exists",
-      "passed": true,
-      "details": "capability.json"
-    },
-    {
-      "check": "figure_format_exists",
-      "passed": true,
-      "details": [
-        "if_generation",
-        "pdf"
-      ]
-    },
-    {
-      "check": "figure_format_exists",
-      "passed": true,
-      "details": [
-        "if_generation",
-        "png"
-      ]
-    },
-    {
-      "check": "figure_format_exists",
-      "passed": true,
-      "details": [
-        "if_generation",
-        "svg"
-      ]
-    },
-    {
-      "check": "figure_has_content",
-      "passed": true,
-      "details": "if_generation"
-    },
-    {
       "check": "all_tex_references_defined",
       "passed": true,
       "details": []
@@ -4175,6 +4165,11 @@
     },
     {
       "check": "only_aligned_figures_in_manuscript",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "figure_manifest_matches_manuscript",
       "passed": true,
       "details": null
     },

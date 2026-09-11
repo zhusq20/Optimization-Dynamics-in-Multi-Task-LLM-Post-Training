@@ -102,7 +102,7 @@ def main():
     check('eleven_figures',len(fig_manifest['figures'])==11)
     figure_details=[]
     required_labels={'normalization50':('Difference (pp)',4),'cumulative_geometry':('Nonzero (%)',2),
-                     'supervision_density':('Cosine with full',3)}
+                     'supervision_density':('Nonzero (%)',2)}
     for r in fig_manifest['figures']:
         for src in r['sources']:check('figure_source_exists',(DATA/src).is_file(),src)
         for ext in ['pdf','png','svg']:check('figure_format_exists',(FIG/(r['id']+'.'+ext)).is_file(),[r['id'],ext])
@@ -111,19 +111,23 @@ def main():
         if r['id'] in required_labels:
             label,n=required_labels[r['id']];check('figure_axis_labels_fit',text.count(label)==n,[r['id'],label,text.count(label)])
         figure_details.append({'figure':r['id'],'width_pt':page.rect.width,'height_pt':page.rect.height,'text_characters':len(text)})
-    tex='\n'.join(p.read_text() for p in (ROOT/'sections').glob('*.tex'))
+    root_tex=(ROOT/'iclr2027_conference.tex').read_text()
+    section_names=re.findall(r'\\input\{(sections/[^}]+)\}',root_tex)
+    tex='\n'.join((ROOT/(name+'.tex')).read_text() for name in section_names)
     labels=re.findall(r'\\label\{([^}]+)\}',tex);refs=re.findall(r'\\ref\{([^}]+)\}',tex)
     check('all_tex_references_defined',set(refs)<=set(labels),sorted(set(refs)-set(labels)))
     check('unique_tex_labels',len(labels)==len(set(labels)))
     figure_paths=re.findall(r'\\includegraphics\[[^]]+\]\{([^}]+)\}',tex)
     check('only_aligned_figures_in_manuscript',len(figure_paths)==11 and all(p.startswith('figures/aligned_evidence_20260910/') for p in figure_paths))
+    check('figure_manifest_matches_manuscript',
+          {Path(p).stem for p in figure_paths}=={r['id'] for r in fig_manifest['figures']})
     check('no_todo_placeholders',not re.search(r'\\missing|TODO|to be measured|remain to be measured',tex))
     check('obsolete_numeric_claims_removed',not any(x in tex for x in ['5.90','9.92','55.6','97.87','GPAS']))
     log=(ROOT/'iclr2027_conference.log').read_text()
     check('latex_references_and_layout',not re.search(r'undefined|multiply defined|Overfull|LaTeX Error',log))
     pdf=pymupdf.open(ROOT/'iclr2027_conference.pdf');body='\n'.join(p.get_text() for p in pdf)
     check('compiled_figures_present',all(f'Figure {i}:' in body for i in range(1,12)))
-    check('compiled_tables_present',all(t in body for t in [f'Table {i}:' for i in range(1,7)]))
+    check('compiled_tables_present',all(t in body for t in [f'Table {i}:' for i in range(1,8)]))
     environment={'python':platform.python_version(),'numpy':np.__version__,'matplotlib':matplotlib.__version__,'pymupdf':pymupdf.__version__}
     (DATA/'plotting_environment.json').write_text(json.dumps(environment,indent=2)+'\n')
     report={'status':'passed','checked_at_utc':datetime.now(timezone.utc).isoformat(),'checks_passed':len(checks),

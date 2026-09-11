@@ -1,119 +1,73 @@
-> 当前对齐实验设置：实验使用 **Qwen3-1.7B RL teacher → Qwen3-1.7B student**（以 2026-09-10 frozen protocol 为准）。RL Teacher Regularization and Domain Weights 附录 在 teacher 达到 KL-RL 最优策略的设定下，分析其 RL 目标如何进入完整序列的蒸馏梯度：reward 项的域系数为 λ/β，KL 项将 student 拉向 teacher 的 RL reference。Student 从该 reference 出发时，初始 KL 梯度为零；从不同策略出发时，初始梯度保留这一项。
+# MOPD 论文三个探究问题与实验主线
 
-> 最新决定：主稿标题改为 **Token Balancing, Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation**。Update Sparsity 指参数更新稀疏性：分别报告单步优化器更新和累计参数变化，原始梯度用于辅助解释。Table 1 改为正文全宽的紧凑表格。下方记录保留前一轮修改过程，研究重心以此条为准。
+2026-09-11 修订。写作布局严格以用户指定的 [7417292 版本正文](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/7417292c57aa0cbe8486cad4986aa5617cd0f681) 为依据。本文围绕以下三个问题观察与解释已有训练选择；每组实验放在它所回答的问题旁边，共用设置与评估细节放在附录。
 
-> 2026-09-05 本轮行文修订：以下保留早先讨论记录，主稿以本轮修改为准。标题现为 **Token Balancing, Gradient Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation**。Section 2 按 Ma et al. (2026) MOPD §3.2 的学生/教师策略符号和原始损失编写；Section 3–5 各自纳入相应实验，原独立 Experimental Design 仅保留共用配置与评估细节至附录。Section 3 用三行表对比平均方式，协方差推导移至附录；Section 4 用直观的参数选取与重叠比例替代 probe/support/Jaccard 堆叠。**gradient sparsity 不等同于参数更新稀疏性**：现以直接记录的原始梯度为主，单步更新与累计参数变化分别报告。实验尚无测量结果，保留待补标记。
+标题沿用 **Token Balancing, Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation**。实际对齐数据使用 Qwen3-1.7B student 与四个对应域的 Qwen3-1.7B RL teachers；具体初始化和损失以冻结协议为准。
 
-# MOPD 论文三点贡献与实验主线
+## 1. Token balancing：平均方式如何改变权重与能力平衡？
 
-更新：2026-09-05，已纳入本轮关于“第三点仅做简洁对照、第二点按原顺序展开”的修正。
+正文顺序：三种平均方式 → 域权重和域内 response 长度权重的区别 → 对应实验与能力结果。
 
-本文是观察与解释为主的论文。GPAS 不再作为主线，不要求提出新采样算法。当前已有推导与实验设计，但没有这些新实验的实测结果；不把预期写成发现。
-
-## 1. 长度、域内平均与能力平衡：解释已有训练选择
-
-研究问题：不同 token loss 平均方式如何改变各域及域内 response 的权重？这些变化能否解释多任务能力不平衡？
-
-必须区分三种实现：
-
-| 实现 | 域之间权重 | 同一域内 response 权重 |
+| 平均方式 | 域之间的权重 | 同一域内的 response 权重 |
 |---|---|---|
-| 全 batch token mean | 该域有效 token 占比 | 正比于 response 长度 |
-| 每域 token mean，再按目标域权重平均 | 指定域权重 | 仍正比于 response 长度 |
-| 每条 response token mean，再域内与域间平均 | 指定域权重 | 同域内每条 response 等权 |
+| 全 batch token mean（GT） | 有效 token 占比 | 正比于有效长度 |
+| 每域 token mean，再按目标域权重平均（DT） | 指定域权重 | 正比于有效长度 |
+| response mean，再域内、域间平均（DR） | 指定域权重 | 同域内等权 |
 
-第二行就是 Open-MOPD TSB 的代数等价形式，不重复包装成新算法。原始 MOPD 的形式目标已有 response 长度平均，不能从 Open-MOPD 的 token-mean 实例推广到所有 MOPD。
+保留固定 batch 的长度—梯度协方差恒等式，推导放附录。它解释现有 loss reduction，不包装成新算法，也不预设 DR 一定最好。
 
-解释性推导：在同一固定 batch 内，域 token-mean 梯度 = response-mean 梯度 + 长度与 response-mean 梯度的经验协方差 / 平均长度。它区分跨域 token 份额偏权与域内长度偏权。它不是新的加权平均数学定理，也不保证 response 等权一定最优。
+直接比较复用 M-I64-GT / DT / DR：相同初始化、教师、prompt 配额与顺序、优化器、长度上限，在线 responses 随各自学生产生。展示 token 份额与四域能力，并给出宏平均和相对初始模型的最差域变化。
 
-最小证据：同 batch 三种梯度的精确分解，随后配对训练的各域能力曲线。先采用相等 prompt 配额，使目标域先验不偷偷改变。长度 cap 的 1024/4096 对照是辅助观察，记录截断与答案完成率；不让长度 sweep 扩展为主算法。既看训练步数，也看 token 暴露和实际计算成本。
+现有证据：三分支共同 50 步评测，DR/GT 的 100 步评测，以及三分支 token 份额日志。正文图仅比较这三种平均方式；全配置能力轨迹放附录。固定 batch 的公式不冒充已完成的梯度分解实验。
 
-## 2. 稀疏性 → MOPD 子网重叠 → 教师差异与子网差异：论文中心
+## 2. Update sparsity：稀疏性 → 教师参数重叠 → 教师分布差异
 
-### 2.1 首先确认 OPD 参数更新的稀疏性
+这是第二部分的固定展开顺序，不能改成“精度 → Adam 状态 → 输入与方向”。
 
-同一个初始 student，分别观察单教师 OPD 和多教师 MOPD。记录初始、早期、中期、最终 checkpoint 相对初始化的参数位移。
+### 2.1 单教师 OPD 的更新稀疏性在多教师下是否延续？
 
-报告多个阈值的稀疏度、参数更新范数、承载 90% 更新能量所需的坐标比例。优先用真实 FP32 master weights；同时保留 BF16 checkpoint 指标以便对照已有论文。把 checkpoint delta 的稀疏与单步梯度/更新稀疏分开。
+比较单教师 OPD 与共同学生 MOPD 的真实优化器单步变化和相对初始化的累计参数变化。报告阈值曲线、变化范数、能量集中；FP32 master 与 BF16 checkpoint 分开。原始梯度只作辅助解释。
 
-这一步是复现与多教师场景扩展，不能声称首次发现 OPD 稀疏，因为 Dense Supervision, Sparse Updates 已直接研究。
+现有对齐在线几何来自 M-PG、M-I64-DR/DT/GT，主图使用共享 DR 的 PG/I64 两条轨迹。单教师当前有能力结果，但证据包没有对应在线参数几何。因此可报告“实测 MOPD 中仍存在集中 BF16 变化”，不能声称已完成单教师/多教师稀疏性的直接比较。
 
-### 2.2 再看不同教师是否更新同一个 MOPD 学生的重叠子网
+### 2.2 各教师是否改变同一 MOPD 学生中的相同参数？
 
-在某个 MOPD checkpoint θ_t 上固定 student 和优化器状态。各教师分别处理其路由域的诊断 batch，从同一个 θ_t 独立计算梯度与拟执行的 optimizer step。诊断结束恢复状态，不让前一个教师改变后一个教师的起点。
+比较必须以同一个 MOPD checkpoint 和相同优化器状态为起点；各教师在自己的路由域上计算更新。按相同坐标比例选择最大变化，报告 Jaccard 与教师对矩阵。独立训练的单教师终点不能代替共同学生中的教师贡献。
 
-由每位教师的梯度/拟执行更新定义 support。比较各教师 support 的 Jaccard、固定 top 1%/5%/10% 等坐标比例下的重叠，以及同层随机基线。重复若干诊断 batch，避免把某一次采样当稳定子网。
+现有证据是 M-PG/100 上两组 bank 的逐教师**原始梯度**重叠；其矩阵已回到正文。当前局部 Adam 数据是联合损失的拟议更新，不含逐教师更新重叠。因此这些梯度矩阵不能写成已测得的 optimizer-step 子网。
 
-主要输出：几个 MOPD checkpoint 的 teacher/domain overlap 矩阵和对应稀疏度曲线。
+共同输入与有符号方向仅帮助解释 overlap，放在附录。重叠的大小本身没有好坏方向，不扩展成冲突最小化或限制参数训练的新任务。
 
-关键边界：单教师模型独立训练后的终点 support 只能作为参照，不能替代“各教师对联合学生的更新”。联合 delta 也不能在 Adam/在线轨迹下唯一分解为各教师历史贡献。报告的是同一实际联合 checkpoint 上的 teacher-conditioned update tendency。
+### 2.3 教师分布差异越大，参数选择差异是否越大？
 
-重叠本身无好坏方向；更新符号/梯度 alignment 与能力结果只作辅助解释，不把“冲突最小化”或强制不重叠子网变成新主任务。
+对同一批 student prefixes 计算 teacher-pair JS，将它与同 checkpoint、同教师对的 1−Jaccard 配对。散点和逐对观察保留在正文。当前可配对的是梯度选择差异；逐教师 optimizer-step 的对应关系仍缺测。
 
-### 2.3 最后检验：教师分布差异越大，子网差异是否越大？
+只有四个教师、两个 bank、一个共同学生 checkpoint 时，如实描述观测。共享教师的 pair 不是独立样本；不预设单调关系。
 
-对同一批 student prefixes，让每个 teacher 都打分，计算 teacher-pair 的 JS 等分布距离。将它与同一 checkpoint 下的子网距离 1−Jaccard 配对，绘制散点及训练中的变化。
+## 3. Supervision density：PG 与 top-k 是否改变更新稀疏性和能力？
 
-同时记录每位 teacher 到当前 student 的分布差异与更新大小。这些是辅助描述，帮助判断观察到的关系是否只是整体更新变大/变小。
+正文顺序保持为“单教师/多教师的匹配比较 → 更新集中度与能力”。每个位置的词表监督范围是比较对象，主要指标是参数单步变化和累计变化，能力作为对应结果。
 
-核心分析可以使用各教师各自路由域上的更新；增加少量“所有教师使用完全相同 prefixes 计算更新”的检查，帮助区分 teacher 差异与输入域差异。无需先建设复杂的因果辨识项目。若只有少数 teacher pair，就逐对报告当前设置的观察，不把共享教师的 pair 当独立大样本。
-
-数学、代码、指令遵循和科学四个域分别使用对应的 Qwen3-1.7B RL teacher，共四组教师权重。已有教师中间 checkpoint 可提供距离变化，不要求为此重新训练大量专家。
-
-可能得到的结果都可报告：距离越大子网越不同；没有明显关系；关系依赖任务、checkpoint 或 teacher–student gap。不能预先写第一种。
-
-## 3. Supervision density：词表监督范围的简洁对照
-
-这里的 supervision density 明确指每个位置的词表监督范围：full-vocabulary loss、top-k 子集与 sampled-token policy gradient；不指监督覆盖多少生成位置。
-
-在单教师和多教师 checkpoint 上都加入小批公共 prefixes 的 full-vocabulary 梯度/拟执行更新对照，直接测量全词表与 sampled 的更新稀疏度。累积训练轨迹先沿用下表 PG/top-k 比较；局部全词表对照不被写成已经完成全词表在线训练。
-
-不把噪声、MC 次数或 tail correction 的机制研究列为必做：
-
-| 设置 | sampled-token PG | teacher top-64 loss |
+| 设置 | 已有在线分支 | 局部参照 |
 |---|---|---|
-| 单教师 OPD | 稀疏度曲线与能力背景 | 同样测量 |
-| 多教师 MOPD | 稀疏度曲线；各教师 support overlap | 同样测量 |
+| 代表性单教师（数学） | S-PG / S-I64 | 对齐的 full-vocabulary 局部数据尚缺 |
+| 联合 MOPD，DR 平均 | M-PG / M-I64-DR | M-PG/100 的 PG / I64 / T64 / full-vocabulary |
 
-保持初始化、教师、归一化、长度 cap、优化器、训练预算、参数测量口径一致；在线 rollout 随各自模型生成，不声称全程轨迹相同。明确 top-k 候选来源、概率是否在集合内重新归一化以及裁剪配置。
+原布局中的 top-k 问题不变，但已完成在线实验用的是 student/teacher top-64 **intersection（I64）**，不是 teacher-top64-only（T64）。论文明确实际目标；T64 和 full-vocabulary 只作为已有局部参照，不把它们写成完成了在线训练。
 
-如果二者在已测范围内没有实质差异，这就是该项结果，不强行追究原因。报告效应大小与不确定性，避免把低精度下没看见差异写成所有条件下严格等价。
+正文先报告 PG/I64 累计稀疏度与能量集中，再展示同状态的局部稀疏度及两种设置下的能力对照。局部差异很小时就报告差异很小；不同在线轨迹有差异时给出实测范围，不强行推断某种监督普遍更好。
 
-只有稳定、有意义的差异出现时，再决定是否用固定前缀 MC、full-vocabulary 或方差控制解释。该解释不是论文重心，也不是完成前两项贡献的前置条件。
+动作采样次数、MC 方差、tail correction、更新方向的额外机制研究不列为必做，也不替代这项简洁比较。已有相关原始数据保留供追溯。
 
-若 PG 更稀疏，也不能直接写“因此 MOPD 应使用 PG”；需要能力和代价结果支持。若 PG 与 top-k 稀疏度类似，则可以写“在这些单教师和多教师配置下，增加每位置的词表监督没有明显改变所测参数更新稀疏性”。
+## 4. 六种配置复用与当前缺口
 
-## 4. 最小运行复用，不扩大为全面网格搜索
+| 配置 | 问题 1 | 问题 2 | 问题 3 |
+|---|---|---|---|
+| S-PG / S-I64 | — | 单教师稀疏性参照 | 单教师 PG/top-k |
+| M-PG | — | 共同学生的稀疏性、教师重叠与距离 | 多教师 PG |
+| M-I64-DR | 归一化参照 | 共同学生的稀疏性 | 多教师 top-k |
+| M-I64-DT / M-I64-GT | 平均方式对照 | 已有几何可作补充 | — |
 
-建议初始六种训练配置，先对一个代表性单教师配置完成测量：
+当前有 13 套完整能力评测。继续补证据时，只围绕三问的直接缺口：共同 checkpoint 的归一化比较；单教师与多教师参数变化；共同学生中的逐教师更新重叠及 JS 对应；同设置 PG/I64 的稀疏性和能力配对。优先复用现有分支和 checkpoint，不新增无关实验轴。
 
-| ID | 设置 | 用途 |
-|---|---|---|
-| S-PG | 代表性单教师，sampled PG | 贡献2.1与贡献3 |
-| S-TK | 同教师，top-64 | 贡献2.1与贡献3 |
-| M-PG | 多教师，sampled PG，domain-response mean | 贡献2与贡献3 |
-| M-TK-DR | 多教师，top-64，domain-response mean | 三项共享主参照 |
-| M-TK-DT | 多教师，top-64，domain-token mean | 贡献1 |
-| M-TK-GT | 多教师，top-64，global token mean | 贡献1 |
-
-各教师独立训练参考、更多教师/种子和长度辅助实验根据现有 checkpoint 与预算扩展，不默认为六种配置各自又开完整网格。核心论文需据实际覆盖范围限制结论；真实耗时先测，不沿用旧 GPAS 的未经验证估计。
-
-最终主图/表控制为：归一化与各域能力图；single/MOPD稀疏曲线；MOPD教师support重叠矩阵；teacher分布距离与1−J散点；PG/top-k对照表。
-
-## 5. 文稿改动与文献边界
-
-主稿标题已改为 Token Balancing, Parameter Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation。
-
-正文顺序：问题与三贡献 → setting → normalization → sparse OPD / MOPD overlap / teacher distance → PG vs top-k → 实验设计 → related work / discussion。
-
-未被当前主稿使用的旧 GPAS 理论、脚本、旧计划及历史稿件已移入项目外恢复归档，不再列作当前必做。项目内保留最新稿件、当前使用的图与脚本，以及最新研究说明和实验计划。
-
-直接相关来源：
-
-- [MOPD（2026）](https://arxiv.org/abs/2606.30406)
-- [Open-MOPD（2026）](https://arxiv.org/abs/2608.19098)
-- [Reinforcement Learning Finetunes Small Subnetworks（2025 v2）](https://arxiv.org/abs/2505.11711v2)
-- [Dense Supervision, Sparse Updates（2026 v3）](https://arxiv.org/abs/2606.13657v3)
-- [On the Geometry of OPD（2026 v3）](https://arxiv.org/abs/2606.07082v3)
-
-已有工作已覆盖 OPD 稀疏与换教师后的部分 overlap。我们的增量应落在多教师共同学生上的观测、教师距离与support差异的系统对应，以及与归一化和loss对照构成的完整实证叙事。
+本轮只修改文稿、图表和实验范围说明，没有启动训练、推理评测或新的局部探针。更高熵 prefix、更多动作数、优化器状态扫描、掩码训练、RL 奖励/KL 系数分析不作为本论文完成条件；RL teacher regularization 推导已退出编译稿，历史源文件保留。

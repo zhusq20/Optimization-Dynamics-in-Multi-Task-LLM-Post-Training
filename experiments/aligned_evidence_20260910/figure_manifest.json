@@ -8,6 +8,13 @@
       "axes": 4
     },
     {
+      "id": "normalization_capability",
+      "sources": [
+        "capability.json"
+      ],
+      "axes": 4
+    },
+    {
       "id": "normalization50",
       "sources": [
         "paired_comparisons.json"
@@ -36,20 +43,18 @@
       "axes": 3
     },
     {
-      "id": "supervision_density",
+      "id": "teacher_overlap",
       "sources": [
-        "raw/measurements.jsonl",
-        "raw/direct_updates_results.json",
-        "raw/pg_variance_results.json"
+        "raw/measurements.jsonl"
       ],
       "axes": 3
     },
     {
-      "id": "training_dynamics",
+      "id": "supervision_density",
       "sources": [
-        "raw/M-PG_rollout.jsonl"
+        "raw/measurements.jsonl"
       ],
-      "axes": 4
+      "axes": 3
     },
     {
       "id": "all_token_shares",
@@ -73,14 +78,7 @@
         "raw/measurements.jsonl"
       ],
       "axes": 2
-    },
-    {
-      "id": "if_generation",
-      "sources": [
-        "capability.json"
-      ],
-      "axes": 3
     }
   ],
-  "script_sha256": "26effdc42af557e202607130d9de5ec9ebc3529f1ffbecadfaa23c96fd26eb7e"
+  "script_sha256": "f5357c4c68fb088a352e331140ad7eba1fe19b9e5f8b378a612050ae6b561c1f"
 }

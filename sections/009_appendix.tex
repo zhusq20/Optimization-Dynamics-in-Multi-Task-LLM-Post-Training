@@ -20,6 +20,15 @@ For local calculations, the exported checkpoint contains FP32 master values, BF1
 
 We evaluate three local states. \emph{Saved} retains both moments and the step clock. \emph{Reset m} zeros the first moment while retaining the second moment and clock. \emph{Fresh} zeros both moments and resets the clock. Global norm clipping at 1 is applied before the Adam calculation, and weight decay is zero. For the zero-gradient branch, the saved first moment continues to decay and move the master weights. A no-step master-to-BF16 cast gives an exact match to the saved model. Thirteen numerical checks cover the Adam formulas against PyTorch, loss gradients, parameter-coordinate inner products, support ties, and zero-vector handling. Figure~\ref{fig:thresholds} shows how absolute thresholds change the measured local activity.
 
+The zero-current-gradient branch changes 0.1403\% of BF16 coordinates, compared with 0.1486\% for PG. Resetting the first moment gives 0.0504\% for PG; resetting both moments and the clock gives 0.5140\%. These controls explain why a sparse gradient selection cannot by itself identify the parameters changed by an optimizer step. They supplement the update-sparsity measurements in Sections~\ref{sec:subnetworks} and~\ref{sec:density}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/adam_precision.pdf}
+\caption{Supporting optimizer-state controls at M-PG update 100. Points show two response banks; the zero-gradient control is evaluated once. (a,b) Nonzero fractions for FP32 steps and BF16 changes. (c) Saved moments, reset first moment, and fresh moments and clock. Weight decay is zero.}
+\label{fig:adam}
+\end{figure}
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/thresholds.pdf}
@@ -33,7 +42,16 @@ Banks use seeds 42 and 43, one response per domain per bank, a 2,048-token promp
 
 Top-$k$ coordinate sets rank absolute gradient values, using a stable coordinate index to break cutoff ties. The diagnostic records the cutoff and whether a tie crosses the selection boundary. These tie flags accompany the source metrics, including overlaps from nearly degenerate gradients. Table~\ref{tab:coverage_mass} supplies the routed PG norms; the first bank's instruction-following gradient has norm $1.53\times10^{-9}$. Cosine normalizes magnitude, so opposite directions for such a row carry very little absolute gradient mass. Jaccard overlap measures selected locations and cosine measures signed direction. For reference, independent uniform sets of fraction $\rho$ have expected-intersection to expected-union ratio $\rho/(2-\rho)$, or approximately 0.00503 at $\rho=1\%$. This reference uses uniform coordinates; layer and weight-magnitude structure remain in the measured gradients.
 
-\section{Vocabulary Coverage and Sampling}
+Holding the teacher fixed while changing the input domain yields mean gradient cosines of 0.0059 for PG and 0.0072 for I64. Holding the input domain fixed while changing teachers produces both aligned and opposed gradients. For routed gradients the mean cosines are $-0.0020$ and $0.0081$, respectively, despite partial coordinate overlap. Figure~\ref{fig:teacher} supplies this input and direction context for the teacher-overlap results in Section~\ref{sec:subnetworks}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_input.pdf}
+\caption{Supporting input controls for teacher overlap at M-PG update 100. Left and center: crossed comparisons keep four prefixes per gradient. Right: top-1\% gradient Jaccard versus signed cosine for routed and common-bank gradients. Dots share teachers and banks and are dependent comparisons.}
+\label{fig:teacher}
+\end{figure}
+
+\section{Vocabulary Supervision and Coverage}
 \label{app:losses}
 
 The corrected teacher-top-64 diagnostic uses the fixed teacher set $T$ and full-vocabulary probabilities:
@@ -49,7 +67,7 @@ For a fixed prefix, differentiating Equation~\ref{eq:full} gives
 &=\sum_{v\in\cV}p_\theta(v)\left(\log\frac{p_\theta(v)}{q_d(v)}+1\right)\nabla_\theta\log p_\theta(v)\\
 &=\mathbb E_{a\sim p_\theta}\!\left[\log\frac{p_\theta(a)}{q_d(a)}\nabla_\theta\log p_\theta(a)\right],
 \end{align}
-using $\sum_v\nabla_\theta p_\theta(v)=0$. The sampling experiment draws fresh actions from this fixed-prefix distribution with fixed prefix weights. At each sample count, two independent draws are evaluated for each bank; counts use separate, non-nested draws. Relative error is $\|\widehat g-g_{\mathrm{full}}\|_2/\|g_{\mathrm{full}}\|_2$. This identity conditions on prefixes and weights. Original rollout losses additionally use the realized response and its eventual length-dependent weight.
+using $\sum_v\nabla_\theta p_\theta(v)=0$. The identity conditions on prefixes and fixed weights. Original rollout losses additionally use the realized response and its eventual length-dependent weight. The coverage in Table~\ref{tab:coverage_mass} describes how much probability the local top-64 objectives retain; it limits the scope of the supervision-density result in Section~\ref{sec:density}.
 
 \begin{table}[t]
 \caption{Fixed-prefix coverage and routed gradient scale. Probability mass and full-vocabulary student entropy (nats) are averaged over each row's four prefixes. A displayed mass of 100\% may reflect rounding at the reported precision.}
@@ -69,41 +87,16 @@ Teacher distance is computed on the full next-token vocabulary at matched prefix
 \end{equation}
 We average over the same equally weighted domains and prefixes for every pair. The twelve bank-pair measurements are paired with the corresponding gradient overlaps in Figure~\ref{fig:teacher_js}. Common-bank gradients exhibit a wider overlap range than routed gradients. The two banks and six pairs describe the relationship for these four teachers; comparisons sharing a teacher also share its distribution and gradients.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_js.pdf}
-\caption{Full-vocabulary teacher JS versus gradient-support distance. Colors identify teacher pairs; circles and triangles identify banks. Each panel pairs the same twelve JS measurements with its PG or I64, routed or common-bank gradient overlap.}
-\label{fig:teacher_js}
-\end{figure}
 
-\section{Response Behavior During Training and Evaluation}
+
+\section{Token Shares Under the Three Averaging Rules}
 \label{app:behavior}
-\setcounter{topnumber}{3}
-\setcounter{totalnumber}{4}
 
-Figure~\ref{fig:training_behavior} shows all 128 M-PG rollout records, without smoothing. Equal prompt quotas coexist with larger mathematics token shares because mathematics responses are longer. Instruction-following truncation varies over the trajectory. The terminal-token panel records mean teacher-minus-student log probability only at observed completed terminal positions. It measures teacher supervision on those positions, with the corresponding observed-response counts retained in the source records.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/training_dynamics.pdf}
-\caption{M-PG training response behavior in the available 128-update record. The dotted token-share reference is 25\%, matching the prompt quota. Truncation uses the 4,096-token training cap. Terminal signals average completed responses with valid teacher scores. Rollout index $r$ precedes optimizer update $r+1$.}
-\label{fig:training_behavior}
-\end{figure}
-
-Figure~\ref{fig:all_token_shares} shows token shares for the three I64 reductions in the frozen scalar record. Records at the same rollout clock are merged across metric writes before plotting. The frozen histories end at rollout indices 127 for M-PG, 99 for DR and DT, and 114 for GT. These histories record available rollout behavior; capability availability follows the completed suites in Table~\ref{tab:coverage}.
+Figure~\ref{fig:all_token_shares} supports the loss-weighting comparison in Section~\ref{sec:normalization}. Each branch allocates 25\% of prompts to every domain. Under GT, the plotted token shares also give the domain loss weights. DT and DR fix those weights to 25\% even when generated token shares differ. Records at the same rollout clock are merged across metric writes before plotting; all available values are shown without smoothing. The frozen DR and DT histories end at rollout index 99, and GT at 114. These rollout histories have different coverage from the completed capability suites in Table~\ref{tab:coverage}.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/all_token_shares.pdf}
-\caption{Valid-token allocation under the three I64 reductions. Colors match Figure~\ref{fig:training_behavior}: mathematics, code, instruction following, and science. All points are raw recorded values. The dotted reference is the common 25\% prompt share.}
+\caption{Valid-token shares for mathematics, code, instruction following, and science under the three I64 reductions. The dotted reference is the common 25\% prompt share. Rollout index $r$ precedes optimizer update $r+1$. GT uses these shares as domain loss weights; DT and DR use fixed domain weights.}
 \label{fig:all_token_shares}
-\end{figure}
-
-Evaluation diagnostics complement the standard scores in Figure~\ref{fig:if_generation}. The repetition flag applies to responses longer than 10,000 characters whose final 10,000 characters have a UTF-8 byte-length to level-9 zlib compressed-length ratio above 10. Completed, nonrepetitive reward is averaged over all responses, assigning zero to responses outside that category. The standard benchmark score retains its original definition and denominator. The figure uses the shared initial student and update-100 evaluations; the single-teacher summaries contain truncation and repetition but omit the combined reward diagnostic.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/if_generation.pdf}
-\caption{IFBench generation diagnostics alongside the standard capability results. The first two panels show truncation and repetition flags; the third shows reward from completed, nonrepetitive responses divided by the total response count. Missing single-teacher values in the third panel reflect summary availability. Evaluation uses the context-limited 32,768-token cap.}
-\label{fig:if_generation}
 \end{figure}

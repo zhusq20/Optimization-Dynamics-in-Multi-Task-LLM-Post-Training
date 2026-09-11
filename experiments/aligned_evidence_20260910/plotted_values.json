@@ -3650,5 +3650,1413 @@
         }
       }
     }
-  }
+  },
+  "teacher_pairs": [
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "math",
+      "right": "code",
+      "cosine": 0.14585733351427582,
+      "left_l2": 52.52288794028243,
+      "right_l2": 53.48555054590995,
+      "difference_l2": 69.28108318951593,
+      "support": {
+        "0.001": {
+          "jaccard": 0.3063001846430437,
+          "intersection": 806878,
+          "union": 2634272,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.2589955168395841,
+          "intersection": 7078996,
+          "union": 27332504,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "math",
+      "right": "if",
+      "cosine": -0.17727910065791125,
+      "left_l2": 52.52288794028243,
+      "right_l2": 151.42865668403863,
+      "difference_l2": 168.84685359785217,
+      "support": {
+        "0.001": {
+          "jaccard": 0.3134807019124224,
+          "intersection": 821279,
+          "union": 2619871,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.2683354668526074,
+          "intersection": 7280271,
+          "union": 27131229,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "math",
+      "right": "science",
+      "cosine": -0.06649229113145581,
+      "left_l2": 52.52288794028243,
+      "right_l2": 107.36385271425543,
+      "difference_l2": 122.61956863875947,
+      "support": {
+        "0.001": {
+          "jaccard": 0.296258417684398,
+          "intersection": 786471,
+          "union": 2654679,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.25653714990433607,
+          "intersection": 7025521,
+          "union": 27385979,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "code",
+      "right": "if",
+      "cosine": -0.974453191972214,
+      "left_l2": 53.48555054590995,
+      "right_l2": 151.42865668403863,
+      "difference_l2": 203.9019681284901,
+      "support": {
+        "0.001": {
+          "jaccard": 0.7409255492074606,
+          "intersection": 1464529,
+          "union": 1976621,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.7339081467808937,
+          "intersection": 14565293,
+          "union": 19846207,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.9352082214137946,
+      "left_l2": 53.48555054590995,
+      "right_l2": 107.36385271425543,
+      "difference_l2": 60.39034672320408,
+      "support": {
+        "0.001": {
+          "jaccard": 0.6404661180569261,
+          "intersection": 1343484,
+          "union": 2097666,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.6236601848598802,
+          "intersection": 13217718,
+          "union": 21193782,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.9571016726725272,
+      "left_l2": 151.42865668403863,
+      "right_l2": 107.36385271425543,
+      "difference_l2": 256.08335361473826,
+      "support": {
+        "0.001": {
+          "jaccard": 0.640599858402523,
+          "intersection": 1343655,
+          "union": 2097495,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.6347710964166011,
+          "intersection": 13361764,
+          "union": 21049736,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "math",
+      "right": "code",
+      "cosine": 0.006875330247072687,
+      "left_l2": 132.5684945162114,
+      "right_l2": 163.8277012979894,
+      "difference_l2": 210.03637594436336,
+      "support": {
+        "0.001": {
+          "jaccard": 0.12341704999167513,
+          "intersection": 378040,
+          "union": 3063110,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.09571017121468459,
+          "intersection": 3005841,
+          "union": 31405659,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "math",
+      "right": "if",
+      "cosine": 0.0021291026221163297,
+      "left_l2": 132.5684945162114,
+      "right_l2": 6.130342181633264e-09,
+      "difference_l2": 132.56849451619834,
+      "support": {
+        "0.001": {
+          "jaccard": 0.08364553833673802,
+          "intersection": 265619,
+          "union": 3175531,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.07435555759947916,
+          "intersection": 2381601,
+          "union": 32029899,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "math",
+      "right": "science",
+      "cosine": 0.005797471793847964,
+      "left_l2": 132.5684945162114,
+      "right_l2": 54.821542262407974,
+      "difference_l2": 143.16263379173165,
+      "support": {
+        "0.001": {
+          "jaccard": 0.09611464840334497,
+          "intersection": 301743,
+          "union": 3139407,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.08747087800296843,
+          "intersection": 2767894,
+          "union": 31643606,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "code",
+      "right": "if",
+      "cosine": -0.02141810835949133,
+      "left_l2": 163.8277012979894,
+      "right_l2": 6.130342181633264e-09,
+      "difference_l2": 163.8277012981207,
+      "support": {
+        "0.001": {
+          "jaccard": 0.10388196003165542,
+          "intersection": 323833,
+          "union": 3117317,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.08455118352595385,
+          "intersection": 2682707,
+          "union": 31728793,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.012609081149763479,
+      "left_l2": 163.8277012979894,
+      "right_l2": 54.821542262407974,
+      "difference_l2": 172.10004546504751,
+      "support": {
+        "0.001": {
+          "jaccard": 0.11829927126853351,
+          "intersection": 364022,
+          "union": 3077128,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.09825462043121577,
+          "intersection": 3078602,
+          "union": 31332898,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.010256911349988924,
+      "left_l2": 6.130342181633264e-09,
+      "right_l2": 54.821542262407974,
+      "difference_l2": 54.82154226247085,
+      "support": {
+        "0.001": {
+          "jaccard": 0.10083229018478525,
+          "intersection": 315197,
+          "union": 3125953,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.08623372874810532,
+          "intersection": 2731854,
+          "union": 31679646,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "math",
+      "right": "code",
+      "cosine": 0.9264515909687376,
+      "left_l2": 29.198117353800875,
+      "right_l2": 37.61592792016568,
+      "difference_l2": 15.24526386213216,
+      "support": {
+        "0.001": {
+          "jaccard": 0.6859043764973324,
+          "intersection": 1400020,
+          "union": 2041130,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.6651794744243259,
+          "intersection": 13746160,
+          "union": 20665340,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "math",
+      "right": "if",
+      "cosine": -0.9257518162916674,
+      "left_l2": 29.198117353800875,
+      "right_l2": 58.55337398376925,
+      "difference_l2": 86.2928019714229,
+      "support": {
+        "0.001": {
+          "jaccard": 0.6843241338296513,
+          "intersection": 1398105,
+          "union": 2043045,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.6652853611392088,
+          "intersection": 13747474,
+          "union": 20664026,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "math",
+      "right": "science",
+      "cosine": 0.9506826148440531,
+      "left_l2": 29.198117353800875,
+      "right_l2": 55.39975768869306,
+      "difference_l2": 29.087359216065714,
+      "support": {
+        "0.001": {
+          "jaccard": 0.736560911470542,
+          "intersection": 1459561,
+          "union": 1981589,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.7221505093935187,
+          "intersection": 14429797,
+          "union": 19981703,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "code",
+      "right": "if",
+      "cosine": -0.8988682951618636,
+      "left_l2": 37.61592792016568,
+      "right_l2": 58.55337398376925,
+      "difference_l2": 93.82452494115307,
+      "support": {
+        "0.001": {
+          "jaccard": 0.6442411066249373,
+          "intersection": 1348300,
+          "union": 2092850,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.6207900095486323,
+          "intersection": 13180187,
+          "union": 21231313,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.9503623175880287,
+      "left_l2": 37.61592792016568,
+      "right_l2": 55.39975768869306,
+      "difference_l2": 22.872381895245788,
+      "support": {
+        "0.001": {
+          "jaccard": 0.7166995507641499,
+          "intersection": 1436635,
+          "union": 2004515,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.7059875271522033,
+          "intersection": 14240485,
+          "union": 20171015,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.935294121313575,
+      "left_l2": 58.55337398376925,
+      "right_l2": 55.39975768869306,
+      "difference_l2": 112.09605180183246,
+      "support": {
+        "0.001": {
+          "jaccard": 0.7296087464828801,
+          "intersection": 1451596,
+          "union": 1989554,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.7075282038762327,
+          "intersection": 14258685,
+          "union": 20152815,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "math",
+      "right": "code",
+      "cosine": 0.033481549198312095,
+      "left_l2": 114.74963897582676,
+      "right_l2": 49.44453555697832,
+      "difference_l2": 123.41924629986298,
+      "support": {
+        "0.001": {
+          "jaccard": 0.12502942407281478,
+          "intersection": 382430,
+          "union": 3058720,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.09586516981173054,
+          "intersection": 3010283,
+          "union": 31401217,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "math",
+      "right": "if",
+      "cosine": 0.0009903669388144872,
+      "left_l2": 114.74963897582676,
+      "right_l2": 0.002836525953146416,
+      "difference_l2": 114.7496362016836,
+      "support": {
+        "0.001": {
+          "jaccard": 0.08298937357098685,
+          "intersection": 263695,
+          "union": 3177455,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.07375314096547261,
+          "intersection": 2363631,
+          "union": 32047869,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "math",
+      "right": "science",
+      "cosine": 0.01794684540722171,
+      "left_l2": 114.74963897582676,
+      "right_l2": 44.07030172658114,
+      "difference_l2": 122.18082871994977,
+      "support": {
+        "0.001": {
+          "jaccard": 0.09913188017461413,
+          "intersection": 310361,
+          "union": 3130789,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.09083283881864244,
+          "intersection": 2865420,
+          "union": 31546080,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "code",
+      "right": "if",
+      "cosine": 0.017922343486371388,
+      "left_l2": 49.44453555697832,
+      "right_l2": 0.002836525953146416,
+      "difference_l2": 49.44448480112251,
+      "support": {
+        "0.001": {
+          "jaccard": 0.09806705862643894,
+          "intersection": 307325,
+          "union": 3133825,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.07998603517468837,
+          "intersection": 2548588,
+          "union": 31862912,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.028454287229002118,
+      "left_l2": 49.44453555697832,
+      "right_l2": 44.07030172658114,
+      "difference_l2": 65.29125347997692,
+      "support": {
+        "0.001": {
+          "jaccard": 0.12454669606504244,
+          "intersection": 381117,
+          "union": 3060033,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10174792485170835,
+          "intersection": 3177949,
+          "union": 31233551,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 0,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "if",
+      "right": "science",
+      "cosine": 0.027845279524501387,
+      "left_l2": 0.002836525953146416,
+      "right_l2": 44.07030172658114,
+      "difference_l2": 44.07022283393709,
+      "support": {
+        "0.001": {
+          "jaccard": 0.10516214440284342,
+          "intersection": 327444,
+          "union": 3113706,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.09097577267503493,
+          "intersection": 2869553,
+          "union": 31541947,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "math",
+      "right": "code",
+      "cosine": 0.23166620931485063,
+      "left_l2": 1.6847258159835203,
+      "right_l2": 6.835095082627691,
+      "difference_l2": 6.649919703896144,
+      "support": {
+        "0.001": {
+          "jaccard": 0.22374190519880938,
+          "intersection": 629160,
+          "union": 2811990,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.19195904356470625,
+          "intersection": 5541800,
+          "union": 28869700,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "math",
+      "right": "if",
+      "cosine": -0.287353024038639,
+      "left_l2": 1.6847258159835203,
+      "right_l2": 17.9729246872986,
+      "difference_l2": 18.527441972872484,
+      "support": {
+        "0.001": {
+          "jaccard": 0.2439472728160025,
+          "intersection": 674835,
+          "union": 2766315,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.20915000986673998,
+          "intersection": 5952252,
+          "union": 28459248,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "math",
+      "right": "science",
+      "cosine": 0.27199142392220355,
+      "left_l2": 1.6847258159835203,
+      "right_l2": 14.11401369487367,
+      "difference_l2": 13.751680885633208,
+      "support": {
+        "0.001": {
+          "jaccard": 0.22004704120466329,
+          "intersection": 620644,
+          "union": 2820506,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.18962826273134556,
+          "intersection": 5485237,
+          "union": 28926263,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "code",
+      "right": "if",
+      "cosine": -0.6411672302279021,
+      "left_l2": 6.835095082627691,
+      "right_l2": 17.9729246872986,
+      "difference_l2": 22.9624702103497,
+      "support": {
+        "0.001": {
+          "jaccard": 0.44356559001755613,
+          "intersection": 1057365,
+          "union": 2383785,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.4067994879325904,
+          "intersection": 9950658,
+          "union": 24460842,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.845319470512375,
+      "left_l2": 6.835095082627691,
+      "right_l2": 14.11401369487367,
+      "difference_l2": 9.100929131683836,
+      "support": {
+        "0.001": {
+          "jaccard": 0.496990488586652,
+          "intersection": 1142438,
+          "union": 2298712,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.4729471720411628,
+          "intersection": 11049155,
+          "union": 23362345,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "common",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.687975598254765,
+      "left_l2": 17.9729246872986,
+      "right_l2": 14.11401369487367,
+      "difference_l2": 29.517267643305285,
+      "support": {
+        "0.001": {
+          "jaccard": 0.3514622726355154,
+          "intersection": 894908,
+          "union": 2546242,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.3226760248034186,
+          "intersection": 8394925,
+          "union": 26016575,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "math",
+      "right": "code",
+      "cosine": -0.0343398000070627,
+      "left_l2": 2.604682029055492,
+      "right_l2": 3.1669816844790755,
+      "difference_l2": 4.169014047524813,
+      "support": {
+        "0.001": {
+          "jaccard": 0.11702438454347149,
+          "intersection": 360510,
+          "union": 3080640,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10180034525414826,
+          "intersection": 3179435,
+          "union": 31232065,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "math",
+      "right": "if",
+      "cosine": -0.00832765868538465,
+      "left_l2": 2.604682029055492,
+      "right_l2": 55.51545530829531,
+      "difference_l2": 55.59818798543111,
+      "support": {
+        "0.001": {
+          "jaccard": 0.10873757315947437,
+          "intersection": 337485,
+          "union": 3103665,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.0973567833241184,
+          "intersection": 3052966,
+          "union": 31358534,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "math",
+      "right": "science",
+      "cosine": 0.021942614121892027,
+      "left_l2": 2.604682029055492,
+      "right_l2": 0.8504941604126466,
+      "difference_l2": 2.722221757647349,
+      "support": {
+        "0.001": {
+          "jaccard": 0.11663038289893946,
+          "intersection": 359423,
+          "union": 3081727,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10089952143190936,
+          "intersection": 3153879,
+          "union": 31257621,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "code",
+      "right": "if",
+      "cosine": 0.014360850798929148,
+      "left_l2": 3.1669816844790755,
+      "right_l2": 55.51545530829531,
+      "difference_l2": 55.560289812364246,
+      "support": {
+        "0.001": {
+          "jaccard": 0.12475767774629436,
+          "intersection": 381691,
+          "union": 3059459,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10602900633105705,
+          "intersection": 3298844,
+          "union": 31112656,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "code",
+      "right": "science",
+      "cosine": -0.006157690557704609,
+      "left_l2": 3.1669816844790755,
+      "right_l2": 0.8504941604126466,
+      "difference_l2": 3.284247977653566,
+      "support": {
+        "0.001": {
+          "jaccard": 0.11934181276677135,
+          "intersection": 366888,
+          "union": 3074262,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10020889949312027,
+          "intersection": 3134258,
+          "union": 31277242,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "sampled_pg",
+      "condition": "routed",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.0070526770170373995,
+      "left_l2": 55.51545530829531,
+      "right_l2": 0.8504941604126466,
+      "difference_l2": 55.52796692426972,
+      "support": {
+        "0.001": {
+          "jaccard": 0.12970192073784279,
+          "intersection": 395081,
+          "union": 3046069,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.1077392153685308,
+          "intersection": 3346878,
+          "union": 31064622,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "math",
+      "right": "code",
+      "cosine": 0.3617974182586487,
+      "left_l2": 9.020252871320642,
+      "right_l2": 6.38914224481865,
+      "difference_l2": 8.971293963251497,
+      "support": {
+        "0.001": {
+          "jaccard": 0.2868364723145892,
+          "intersection": 767034,
+          "union": 2674116,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.24239885243598666,
+          "intersection": 6713873,
+          "union": 27697627,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "math",
+      "right": "if",
+      "cosine": -0.30518249883275733,
+      "left_l2": 9.020252871320642,
+      "right_l2": 16.845841620917657,
+      "difference_l2": 21.398471739989493,
+      "support": {
+        "0.001": {
+          "jaccard": 0.23543818985498505,
+          "intersection": 655782,
+          "union": 2785368,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.19408206660952487,
+          "intersection": 5593129,
+          "union": 28818371,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "math",
+      "right": "science",
+      "cosine": -0.18281474116638785,
+      "left_l2": 9.020252871320642,
+      "right_l2": 10.285427732736084,
+      "difference_l2": 14.868659998117865,
+      "support": {
+        "0.001": {
+          "jaccard": 0.22862628003103386,
+          "intersection": 640339,
+          "union": 2800811,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.1892950690782349,
+          "intersection": 5477133,
+          "union": 28934367,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "code",
+      "right": "if",
+      "cosine": -0.10209992592395166,
+      "left_l2": 6.38914224481865,
+      "right_l2": 16.845841620917657,
+      "difference_l2": 18.61670342125323,
+      "support": {
+        "0.001": {
+          "jaccard": 0.2808663803050719,
+          "intersection": 754570,
+          "union": 2686580,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.2299597412157413,
+          "intersection": 6433755,
+          "union": 27977745,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.18288517444539562,
+      "left_l2": 6.38914224481865,
+      "right_l2": 10.285427732736084,
+      "difference_l2": 11.071338742062956,
+      "support": {
+        "0.001": {
+          "jaccard": 0.28556538501770795,
+          "intersection": 764390,
+          "union": 2676760,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.23525290422544332,
+          "intersection": 6553642,
+          "union": 27857858,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "common",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.6319494562210051,
+      "left_l2": 16.845841620917657,
+      "right_l2": 10.285427732736084,
+      "difference_l2": 24.669089571865634,
+      "support": {
+        "0.001": {
+          "jaccard": 0.3432563157814612,
+          "intersection": 879353,
+          "union": 2561797,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.3146654645063438,
+          "intersection": 8236400,
+          "union": 26175100,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "math",
+      "right": "code",
+      "cosine": -0.04040481400110113,
+      "left_l2": 6.788680326134776,
+      "right_l2": 15.626691487214494,
+      "difference_l2": 17.287345820724344,
+      "support": {
+        "0.001": {
+          "jaccard": 0.14966856176083726,
+          "intersection": 447983,
+          "union": 2993167,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.11775313154562343,
+          "intersection": 3625185,
+          "union": 30786315,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "math",
+      "right": "if",
+      "cosine": 0.0036421370820348496,
+      "left_l2": 6.788680326134776,
+      "right_l2": 41.75831723495062,
+      "difference_l2": 42.282127012005226,
+      "support": {
+        "0.001": {
+          "jaccard": 0.12112035472904181,
+          "intersection": 371765,
+          "union": 3069385,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10247703713481239,
+          "intersection": 3198605,
+          "union": 31212895,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "math",
+      "right": "science",
+      "cosine": 0.011777837825521978,
+      "left_l2": 6.788680326134776,
+      "right_l2": 14.087618684100963,
+      "difference_l2": 15.56580875374714,
+      "support": {
+        "0.001": {
+          "jaccard": 0.1331022665008851,
+          "intersection": 404222,
+          "union": 3036928,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.10998712296879357,
+          "intersection": 3409789,
+          "union": 31001711,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "code",
+      "right": "if",
+      "cosine": -0.007891900216579534,
+      "left_l2": 15.626691487214494,
+      "right_l2": 41.75831723495062,
+      "difference_l2": 44.70179162824346,
+      "support": {
+        "0.001": {
+          "jaccard": 0.13818919710057204,
+          "intersection": 417795,
+          "union": 3023355,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.11045219766529939,
+          "intersection": 3422773,
+          "union": 30988727,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "code",
+      "right": "science",
+      "cosine": 0.015400214500085002,
+      "left_l2": 15.626691487214494,
+      "right_l2": 14.087618684100963,
+      "difference_l2": 20.87759545920295,
+      "support": {
+        "0.001": {
+          "jaccard": 0.13748000158665097,
+          "intersection": 415910,
+          "union": 3025240,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.11132300288282254,
+          "intersection": 3447055,
+          "union": 30964445,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    },
+    {
+      "kind": "teacher_pair",
+      "bank": 1,
+      "loss": "topk_intersection",
+      "condition": "routed",
+      "left": "if",
+      "right": "science",
+      "cosine": -0.011843871700999103,
+      "left_l2": 41.75831723495062,
+      "right_l2": 14.087618684100963,
+      "difference_l2": 44.22841814554776,
+      "support": {
+        "0.001": {
+          "jaccard": 0.138323234642155,
+          "intersection": 418151,
+          "union": 3022999,
+          "random_jaccard": 0.0005002501320439237
+        },
+        "0.01": {
+          "jaccard": 0.11317468433443628,
+          "intersection": 3498562,
+          "union": 30912938,
+          "random_jaccard": 0.005025125698587539
+        }
+      }
+    }
+  ],
+  "teacher_js": [
+    {
+      "kind": "teacher_js",
+      "bank": 0,
+      "left": "math",
+      "right": "code",
+      "per_domain": {
+        "math": 0.0008165558435567762,
+        "code": 0.009822032747562333,
+        "if": 4.373018583548006e-08,
+        "science": 0.0007965425563839711
+      },
+      "mean": 0.002858793719422229
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 0,
+      "left": "math",
+      "right": "if",
+      "per_domain": {
+        "math": 0.037302498922075655,
+        "code": 0.018539725162944165,
+        "if": 4.257273480334225e-07,
+        "science": 0.003331345165090798
+      },
+      "mean": 0.014793498744364662
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 0,
+      "left": "math",
+      "right": "science",
+      "per_domain": {
+        "math": 0.004437188798566129,
+        "code": 0.007691586512383299,
+        "if": 1.4170044873847863e-08,
+        "science": 0.012942101992844112
+      },
+      "mean": 0.006267722868459604
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 0,
+      "left": "code",
+      "right": "if",
+      "per_domain": {
+        "math": 0.03902009072548222,
+        "code": 0.02962857728219335,
+        "if": 2.1892479638555938e-07,
+        "science": 0.0022395559752048434
+      },
+      "mean": 0.0177221107269192
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 0,
+      "left": "code",
+      "right": "science",
+      "per_domain": {
+        "math": 0.0049052758177817405,
+        "code": 0.009950491140875522,
+        "if": 1.0079031358280614e-08,
+        "science": 0.012734182522982949
+      },
+      "mean": 0.006897489890167892
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 0,
+      "left": "if",
+      "right": "science",
+      "per_domain": {
+        "math": 0.06030253902792077,
+        "code": 0.029123258731101595,
+        "if": 3.107899203827446e-07,
+        "science": 0.019143127041348778
+      },
+      "mean": 0.02714230889757288
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 1,
+      "left": "math",
+      "right": "code",
+      "per_domain": {
+        "math": 0.001472240694322547,
+        "code": 0.0026524774369539703,
+        "if": 0.001401928592231315,
+        "science": 0.0005048663420919914
+      },
+      "mean": 0.001507878266399956
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 1,
+      "left": "math",
+      "right": "if",
+      "per_domain": {
+        "math": 0.02203904587165013,
+        "code": 0.00786778166658764,
+        "if": 0.009419422712884384,
+        "science": 0.013633249677550379
+      },
+      "mean": 0.013239874982168134
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 1,
+      "left": "math",
+      "right": "science",
+      "per_domain": {
+        "math": 0.0005970781980189865,
+        "code": 0.008525257692707086,
+        "if": 0.007600144071245434,
+        "science": 0.006122210319944414
+      },
+      "mean": 0.00571117257047898
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 1,
+      "left": "code",
+      "right": "if",
+      "per_domain": {
+        "math": 0.01293979569320911,
+        "code": 0.0035851252729559658,
+        "if": 0.007965782247066925,
+        "science": 0.01729731197146117
+      },
+      "mean": 0.010447003796173294
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 1,
+      "left": "code",
+      "right": "science",
+      "per_domain": {
+        "math": 0.003325612025742346,
+        "code": 0.004583143069811767,
+        "if": 0.0035265700360274494,
+        "science": 0.005938991599796467
+      },
+      "mean": 0.004343579182844507
+    },
+    {
+      "kind": "teacher_js",
+      "bank": 1,
+      "left": "if",
+      "right": "science",
+      "per_domain": {
+        "math": 0.02673058014599379,
+        "code": 0.006086283592538315,
+        "if": 0.013580797033561675,
+        "science": 0.021355873577652493
+      },
+      "mean": 0.01693838358743657
+    }
+  ]
 }

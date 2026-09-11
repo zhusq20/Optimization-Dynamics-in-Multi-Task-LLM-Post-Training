@@ -47,19 +47,21 @@ def finish(fig):
     for ax in fig.axes:style(ax)
 
 
-def capability():
+def capability(models=None, name='capability'):
+    models=list(COL) if models is None else models
     fig,axs=plt.subplots(2,2,figsize=(6.7,3.65),layout='constrained')
     initial=next(r for r in CAP if r['model']=='Initial')
     for ax,d,title in zip(axs.flat,DOM,['MATH-500','LiveCodeBench','IFBench strict','GPQA avg@4']):
         ax.axhline(100*initial['scores'][d],color='#777777',ls=':',lw=1)
         ax.plot(0,100*initial['scores'][d],'o',color='#777777',ms=3)
-        for m,c in COL.items():
+        for m in models:
+            c=COL[m]
             rr=sorted([r for r in CAP if r['model']==m],key=lambda r:r['step'])
             ax.plot([0]+[r['step'] for r in rr],[100*initial['scores'][d]]+[100*r['scores'][d] for r in rr],
                     marker=MARK[m],color=c,ms=3.3,ls='--' if m.startswith('S') else '-',label=m)
-        ax.set(title=title,xlabel='Optimizer updates',ylabel='Score (%)',xticks=[0,100,250,500])
-    fig.legend(*axs[0,0].get_legend_handles_labels(),ncol=6,loc='outside lower center',frameon=False)
-    finish(fig);save(fig,'capability',['capability.json'])
+        ax.set(title=title,xlabel='Optimizer updates',ylabel='Score (%)',xticks=[0,50,100] if name=='normalization_capability' else [0,100,250,500])
+    fig.legend(*axs[0,0].get_legend_handles_labels(),ncol=len(models),loc='outside lower center',frameon=False)
+    finish(fig);save(fig,name,['capability.json'])
 
 
 def normalization():
@@ -77,10 +79,10 @@ def normalization():
 def geometry():
     fig,axs=plt.subplots(1,3,figsize=(6.7,2.0),layout='constrained')
     for m,c in COL.items():
-        if m.startswith('S'):continue
+        if m not in ['M-PG','M-I64-DR']:continue
         for ax,q,title in zip(axs[:2],['delta_fp32','delta_bf16'],['(a) FP32 cumulative','(b) BF16 cumulative']):
             rr=sorted([r for r in GEO if r['model']==m and r['quantity']==q],key=lambda r:r['step'])
-            ax.plot([0]+[r['step'] for r in rr],[0]+[100*(1-r['metrics']['sparsity_at_0']) for r in rr],
+            ax.plot([r['step'] for r in rr],[100*(1-r['metrics']['sparsity_at_0']) for r in rr],
                     color=c,marker=MARK[m],ms=3,label=m)
             ax.set(title=title,xlabel='Optimizer updates',ylabel='Nonzero (%)',xticks=[0,50,100])
         if m=='M-I64-DT':continue
@@ -139,26 +141,54 @@ def teacher():
     save(fig,'teacher_input',['raw/measurements.jsonl'])
 
 
+def teacher_overlap():
+    fig,axs=plt.subplots(1,2,figsize=(6.7,2.45),layout='constrained')
+    for ax,loss,label in zip(axs,LOSSES[:2],LL[:2]):
+        matrix=np.full((4,4),np.nan)
+        for i,left in enumerate(TASK):
+            for j,right in enumerate(TASK):
+                if i==j:continue
+                rr=[r for r in ROWS if r['kind']=='teacher_pair' and r['loss']==loss
+                    and r['condition']=='routed' and {r['left'],r['right']}=={left,right}]
+                assert len(rr)==2
+                matrix[i,j]=np.mean([r['support']['0.01']['jaccard'] for r in rr])
+        im=ax.pcolormesh(np.arange(5)-.5,np.arange(5)-.5,np.ma.masked_invalid(matrix),
+                         vmin=0,vmax=1,cmap='Blues',edgecolors='white',linewidth=.8)
+        ax.set_aspect('equal');ax.set_ylim(3.5,-.5)
+        for i in range(4):
+            for j in range(4):
+                ax.text(j,i,'—' if i==j else f'{matrix[i,j]:.3f}',ha='center',va='center',fontsize=9)
+        ax.set(title=f'{label}: routed gradients',xticks=range(4),yticks=range(4),
+               xticklabels=['Math','Code','IF','Science'],yticklabels=['Math','Code','IF','Science'])
+        ax.tick_params(length=0)
+        for spine in ax.spines.values():spine.set_visible(False)
+    fig.colorbar(im,ax=axs,shrink=.9,label='Top-1% gradient Jaccard')
+    save(fig,'teacher_overlap',['raw/measurements.jsonl'])
+
+
 def density():
-    fig,axs=plt.subplots(1,3,figsize=(6.7,2.0),layout='constrained')
-    for i,(loss,c) in enumerate(zip(LOSSES[:3],LC[:3])):
-        rr=[r for r in ROWS if r['kind']=='joint_gradient_pair' and r['left']==loss and r['right']=='full_vocab']
-        axs[0].scatter([i-.035,i+.035],[r['cosine'] for r in rr],color=c,s=20)
-    axs[0].set(title='(a) Gradient',xticks=[0,1,2],xticklabels=['PG','I64','T64'],ylabel='Cosine with full',ylim=(.35,1.04),xlim=(-.5,2.5))
-    direct=json.loads((DATA/'raw/direct_updates_results.json').read_text())
-    for j,(q,c) in enumerate([('master','#0072B2'),('bf16','#D55E00')]):
-        for i,loss in enumerate(LOSSES[:2]):
-            vals=[r['cosine'] for bank in direct for r in bank['pairs'] if r['quantity']==q and r['left']==loss and r['right']=='full_vocab']
-            axs[1].scatter([i+(j-.5)*.16]*len(vals),vals,c=c,marker='o' if j==0 else 's',s=20,label='FP32' if j==0 and i==0 else ('BF16' if i==0 else None))
-    axs[1].set(title='(b) Adam step',xticks=[0,1],xticklabels=['PG','I64'],ylabel='Cosine with full',ylim=(.35,1.04),xlim=(-.5,1.5))
-    axs[1].legend(frameon=False,loc='lower right')
-    mc=json.loads((DATA/'raw/pg_variance_results.json').read_text())
-    for bank,c in zip(mc,['#0072B2','#D55E00']):
-        for repeat,marker in [(0,'o'),(1,'^')]:
-            rr=sorted([r for r in bank['comparisons'] if r['repeat']==repeat],key=lambda r:r['draws'])
-            axs[2].plot([r['draws'] for r in rr],[r['cosine'] for r in rr],color=c,marker=marker,alpha=.75,lw=.8,ms=3)
-    axs[2].set(title='(c) PG action resampling',xscale='log',xticks=[1,16,64],xticklabels=['1','16','64'],xlabel='Actions per prefix',ylabel='Cosine with full',ylim=(.35,1.04))
-    finish(fig);save(fig,'supervision_density',['raw/measurements.jsonl','raw/direct_updates_results.json','raw/pg_variance_results.json'])
+    fig,axs=plt.subplots(1,3,figsize=(6.7,2.1),layout='constrained')
+    for i,(loss,c) in enumerate(zip(LOSSES,LC)):
+        for ax,q in zip(axs[:2],['master','bf16']):
+            rr=sorted([r for r in ROWS if r['kind']=='optimizer' and r['loss']==loss
+                       and r['mode']=='history' and r['quantity']==q],key=lambda r:r['bank'])
+            assert len(rr)==2
+            vals=[100*r['metrics']['fraction_above']['0.0'] for r in rr]
+            for bank,marker in [(0,'o'),(1,'^')]:
+                ax.scatter(i+(bank-.5)*.16,vals[bank],color=c,marker=marker,s=23)
+            ax.plot(i,np.mean(vals),'_',color=c,ms=9)
+        for q,offset,marker in [('master',-.12,'o'),('bf16',.12,'s')]:
+            rr=[r for r in ROWS if r['kind']=='optimizer' and r['loss']==loss
+                and r['mode']=='history' and r['quantity']==q]
+            vals=[100*r['metrics']['top_energy']['0.01'] for r in rr]
+            axs[2].scatter([i+offset]*len(vals),vals,color='#0072B2' if q=='master' else '#D55E00',
+                           marker=marker,s=23,label=('FP32' if q=='master' else 'BF16') if i==0 else None)
+    for ax in axs:ax.set(xticks=range(4),xticklabels=['PG','I64','T64','Full'],xlim=(-.5,3.5))
+    axs[0].set(title='(a) FP32 local step',ylabel='Nonzero (%)',ylim=(0,100))
+    axs[1].set(title='(b) BF16 local change',ylabel='Nonzero (%)',ylim=(0,.18))
+    axs[2].set(title='(c) Top-1% concentration',ylabel='Squared step norm (%)',ylim=(0,106))
+    axs[2].legend(frameon=False,loc='center',fontsize=8)
+    finish(fig);save(fig,'supervision_density',['raw/measurements.jsonl'])
 
 
 def rollout_records(rows):
@@ -170,22 +200,6 @@ def rollout_records(rows):
 
 
 def dynamics():
-    rows=[json.loads(l) for l in (DATA/'raw/M-PG_rollout.jsonl').read_text().splitlines()]
-    records=rollout_records(rows)
-    fig,axs=plt.subplots(2,2,figsize=(6.7,3.55),layout='constrained')
-    for ax,key,title,scale in zip(axs.flat,['token_share','mean_response_length','truncation_rate','terminal_advantage_mean'],
-                                ['Token allocation','Response length','Truncated responses','Signal at completed terminal token'],[100,1,100,1]):
-        for task,d,c in zip(TASK,['Math','Code','IF','Science'],DC):
-            pairs=[(k,v[f'mopd/task/{task}/{key}']*scale) for k,v in sorted(records.items()) if f'mopd/task/{task}/{key}' in v]
-            ax.plot([p[0] for p in pairs],[p[1] for p in pairs],color=c,label=d,lw=.7)
-        ax.set(title=title,xlabel='Rollout index (before update)')
-        if key=='token_share':ax.axhline(25,color='#777777',ls=':',lw=.8);ax.set_ylabel('Valid token share (%)')
-        elif key=='mean_response_length':ax.set_ylabel('Tokens per response')
-        elif key=='truncation_rate':ax.set_ylabel('Responses (%)')
-        else:ax.set_ylabel('Mean log q − log p (nats)')
-    axs[0,0].legend(frameon=False,ncol=2,loc='upper right');finish(fig)
-    save(fig,'training_dynamics',['raw/M-PG_rollout.jsonl'])
-    # Paired per-run token histories provide denominator context without imputing missing reward.
     fig,axs=plt.subplots(1,3,figsize=(6.7,2.05),layout='constrained')
     for ax,m in zip(axs.flat,['M-I64-DR','M-I64-DT','M-I64-GT']):
         rr=[json.loads(l) for l in (DATA/f'raw/{m}_rollout.jsonl').read_text().splitlines()]
@@ -226,22 +240,14 @@ def supplemental():
                xticklabels=['0',r'$10^{-8}$',r'$10^{-7}$',r'$10^{-6}$',r'$10^{-5}$'],
                xlabel='Absolute-change threshold',ylabel='Coordinates (%)')
     axs[0].legend(frameon=False,ncol=3,fontsize=7.5);finish(fig);save(fig,'thresholds',['raw/measurements.jsonl'])
-    # Scores are accompanied by generation diagnostics rather than redefined by them.
-    fig,axs=plt.subplots(1,3,figsize=(6.7,2.1),layout='constrained')
-    rr=sorted([r for r in CAP if r['step']==100 or r['model']=='Initial'],key=lambda r:r['model'])
-    for ax,key,title in zip(axs,['truncation','repetition','healthy_reward'],['IF truncation','IF repetition flag','IF completed and\nnonrepetitive reward']):
-        vals=[100*r[key]['IF'] if r[key].get('IF') is not None else np.nan for r in rr]
-        ax.scatter(range(len(rr)),vals,color=[COL.get(r['model'],'#777777') for r in rr],s=22)
-        ax.set(xticks=range(len(rr)),xticklabels=[r['model'].replace('M-I64-','I64-') for r in rr],title=title,ylabel='All responses (%)')
-        ax.tick_params(axis='x',rotation=50)
-    finish(fig);save(fig,'if_generation',['capability.json'])
 
 
 def tables():
     def write(name,lines):
         spec,header={
             'capability_rows.tex':('lrrrrr',r'Configuration & Updates & Math & Code & IF & GPQA'),
-            'normalization_rows.tex':('lrrrr',r'I64 reduction, update 50 & Math & Code & IF & GPQA'),
+            'normalization_rows.tex':('lrrrrrr',r'Reduction & Math & Code & IF & GPQA & Mean & Worst $\Delta$'),
+            'density_capability_rows.tex':('lrrrrrr',r'Configuration & Updates & Math & Code & IF & GPQA & Mean'),
             'teacher_rows.tex':('lrrr',r'Teacher / target domain & Responses & Score (\%) & Truncation (\%)'),
             'paired_rows.tex':('llrl',r'Reduction & Domain & Difference (pp) & 95\% interval'),
             'coverage_rows.tex':('rlrrrr',r'Bank & Domain & Mass in $T$ (\%) & Mass in $I$ (\%) & Entropy & $\|g_{\mathrm{PG}}\|_2$'),
@@ -252,7 +258,23 @@ def tables():
     order={'Initial':0,'S-PG':1,'S-I64':2,'M-PG':3,'M-I64-DR':4,'M-I64-DT':5,'M-I64-GT':6}
     rows=sorted(CAP,key=lambda r:(order[r['model']],r['step']))
     write('capability_rows.tex',[r['model']+' & '+str(r['step'])+' & '+' & '.join(f"{100*r['scores'][d]:.2f}" for d in DOM)+r' \\' for r in rows])
-    write('normalization_rows.tex',[m.replace('M-I64-','')+' & '+' & '.join(f"{100*next(r for r in CAP if r['model']==m and r['step']==50)['scores'][d]:.2f}" for d in DOM)+r' \\' for m in ['M-I64-DR','M-I64-DT','M-I64-GT']])
+    initial=next(r for r in CAP if r['model']=='Initial')['scores']
+    normalization_rows=[]
+    for m in ['M-I64-DR','M-I64-DT','M-I64-GT']:
+        scores=next(r for r in CAP if r['model']==m and r['step']==50)['scores']
+        mean=100*np.mean([scores[d] for d in DOM])
+        worst=100*min(scores[d]-initial[d] for d in DOM)
+        normalization_rows.append(m.replace('M-I64-','')+' & '+' & '.join(f"{100*scores[d]:.2f}" for d in DOM)
+                                  +f' & {mean:.2f} & {worst:+.2f}'+r' \\')
+    write('normalization_rows.tex',normalization_rows)
+    density_rows=[]
+    for models,steps in [(['S-PG','S-I64'],[100,250]),(['M-PG','M-I64-DR'],[50,100])]:
+        for step in steps:
+            for m in models:
+                scores=next(r for r in CAP if r['model']==m and r['step']==step)['scores']
+                density_rows.append(m+' & '+str(step)+' & '+' & '.join(f"{100*scores[d]:.2f}" for d in DOM)
+                                    +f" & {100*np.mean([scores[d] for d in DOM]):.2f}"+r' \\')
+    write('density_capability_rows.tex',density_rows)
     write('teacher_rows.tex',[r['teacher'].replace('teacher_','').capitalize()+' & '+str(r['responses'])+' & '+f"{100*r.get('current_scorer_score',r['score']):.2f}"+' & '+f"{100*r['truncation_rate']:.2f}"+r' \\' for r in json.loads((DATA/'teacher_references.json').read_text())])
     write('paired_rows.tex',[r['right'].replace('M-I64-','')+' & '+r['domain']+' & '+f"{r['delta_pp']:+.2f}"+' & '+f"[{r['lo_pp']:+.2f}, {r['hi_pp']:+.2f}]"+r' \\' for r in COMPS if r['left']=='M-I64-DR'])
     coverage=[]
@@ -270,11 +292,14 @@ def tables():
                         +' & '+number(r['full_vocabulary_student_entropy'])
                         +' & '+number(g['metrics']['l2'])+r' \\')
     write('coverage_rows.tex',coverage)
-    values={'capability':CAP,'paired_comparisons':COMPS,'geometry':GEO,'mechanism':SUM}
+    values={'capability':CAP,'paired_comparisons':COMPS,'geometry':GEO,'mechanism':SUM,
+            'teacher_pairs':[r for r in ROWS if r['kind']=='teacher_pair'],
+            'teacher_js':[r for r in ROWS if r['kind']=='teacher_js']}
     (DATA/'plotted_values.json').write_text(json.dumps(values,indent=2,allow_nan=False)+'\n')
 
 
 if __name__=='__main__':
-    capability();normalization();geometry();adam();teacher();density();dynamics();supplemental();tables()
+    capability();capability(['M-I64-DR','M-I64-DT','M-I64-GT'],'normalization_capability')
+    normalization();geometry();adam();teacher();teacher_overlap();density();dynamics();supplemental();tables()
     (DATA/'figure_manifest.json').write_text(json.dumps({'figures':plots,'script_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()},indent=2)+'\n')
-    print(f'Generated {len(plots)} figures as PDF, PNG and SVG, plus five data tables.')
+    print(f'Generated {len(plots)} figures as PDF, PNG and SVG, plus six data tables.')

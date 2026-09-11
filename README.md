@@ -1,17 +1,31 @@
 # Optimization Dynamics in Multi-Task LLM Post-Training
 
-The current manuscript includes thirteen capability evaluations and eleven
-figures. Compile the root **`iclr2027_conference.tex`**:
+The manuscript follows the three research questions in the author's
+[7417292 reference version](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/7417292c57aa0cbe8486cad4986aa5617cd0f681):
+
+1. Token balancing and response length: averaging rules and capability balance.
+2. Update sparsity and teacher overlap: sparsity, overlap in a shared student,
+   then its relationship to teacher-distribution distance.
+3. Supervision density: PG/top-k update sparsity and capability in single-teacher
+   and joint settings.
+
+Experiments are explained alongside their question. The manuscript preserves
+thirteen completed capability evaluations and uses five main figures and six
+supporting appendix figures. Adam-state and input controls support the sparsity
+and overlap measurements; action-count studies and the RL-regularization
+supplement are outside the compiled paper.
+
+Compile the root **`iclr2027_conference.tex`**:
 
 ```bash
 latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex
 ```
 
-All current sections, bibliography/style files, generated table sources, and
-PDF figures are present. The validated manuscript has 16 pages. Its abstract
-contains “Thirteen capability evaluations”; Figure 1 shows capability
-trajectories. The source marker is
-`Overleaf source revision: completed-results-20260911`.
+The source marker is
+`Overleaf source revision: three-questions-restored-7417292-20260911`.
+See the [three-question scope (中文)](MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md)
+and [experiment guide](experiments/README.md) for evidence coverage and remaining
+comparisons. This revision changes local manuscript sources and figures.
 
 ## September 11 Overleaf synchronization repair
 

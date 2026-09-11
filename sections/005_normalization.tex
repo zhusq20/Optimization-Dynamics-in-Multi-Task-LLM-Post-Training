@@ -1,12 +1,14 @@
-\section{Token Balancing and Capability Allocation}
+\section{Token Balancing and Response Length}
 \label{sec:normalization}
 
-\subsection{Domain weights and response weights}
+\subsection{How does loss averaging change domain weights?}
 
-For response $i$, let $T_i$ be its valid-token count and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss. Let $\mathcal B_d$ contain the responses from domain $d$, with target weights $\sum_d\lambda_d=1$. The three reductions in Table~\ref{tab:normalization} expose two distinct choices: the weight assigned to a domain, and the weight assigned to responses within that domain.
+The response-normalized objective in Equation~\ref{eq:mopd} gives each response equal weight within its domain. Averaging all valid tokens together instead makes response length part of the weighting rule. This is the distinction underlying token-share balancing in Open-MOPD \citep{gao2026openmopddiagnosingfixingcapability}; length-induced domain imbalance depends on the implemented reduction.
+
+For response $i$, let $T_i$ be its valid-token count and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss. Let $\mathcal B_d$ contain the responses from domain $d$, with target weights $\sum_d\lambda_d=1$. Table~\ref{tab:normalization} compares the three reductions on the same batch.
 
 \begin{table}[t]
-\caption{Averaging rules on a fixed batch of nonempty responses. We use $\lambda_d=1/4$. GT assigns domains their observed token shares; DT fixes domain weights; DR also gives each response equal weight within its domain.}
+\caption{Averaging rules on a fixed batch of nonempty responses. GT assigns domains their observed token shares; DT fixes domain weights; DR also gives responses equal weight within each domain. Experiments use $\lambda_d=1/4$.}
 \label{tab:normalization}
 \centering\small
 \renewcommand{\arraystretch}{1.2}
@@ -27,23 +29,28 @@ With equal prompt quotas, longer responses increase a domain's weight under GT. 
 =\bar g_d+\frac{\operatorname{Cov}_d(T,g)}{\bar T_d}.
 \label{eq:weighting}
 \end{equation}
-Thus the effect of DT relative to DR depends on the covariance between response length and gradient, even after domain weights are fixed. Appendix~\ref{app:normalization} derives the identity. In the first 50 rollouts of M-I64-GT, mathematics receives 44.05\% of valid tokens and instruction following 14.98\%, averaged over rollout batches, despite both receiving 25\% of prompts. Under GT these are also their mean loss weights; DT and DR assign each domain 25\%. The token-share and response-length traces in Appendix~\ref{app:behavior} show how these weights evolve.
+Thus domain balancing and response-length normalization address different effects. Equal domain weights need not produce equal gradient magnitudes or compatible directions. Appendix~\ref{app:normalization} derives this weighted-average identity.
 
-\subsection{Early capability tradeoffs}
+\subsection{Experiment: averaging rules and capability balance}
 
-Figure~\ref{fig:capability} shows every completed evaluation in the aligned campaign. M-PG reaches 72.0\% on mathematics at update 100, up from 68.8\% initially; instruction following rises from 18.33\% to 19.33\%, while GPQA moves from 32.20\% to 31.19\%. The trajectories therefore reflect domain-specific changes rather than a common gain across capabilities. The single-teacher curves provide a mathematics-specialization reference, with four times as many mathematics prompts per update.
+\paragraph{Comparison.}
+M-I64-GT, M-I64-DT, and M-I64-DR differ only in the averaging rule. They share initialization, teachers, prompt quotas and schedule, optimizer settings, and the 4,096-token response cap. Each branch generates responses from its evolving student. The common update-50 evaluations provide the complete three-way comparison; DR and GT also have complete update-100 evaluations. Shared settings and coverage appear in Appendix~\ref{app:setup}.
+
+\paragraph{Observed weights.}
+In the first 50 rollouts of M-I64-GT, mathematics receives 44.05\% of valid tokens and instruction following 14.98\%, averaged over rollout batches, despite both receiving 25\% of prompts. Under GT these are also their mean loss weights; DT and DR assign each domain 25\%. Appendix~\ref{app:behavior} gives the recorded token-share trajectories. These observations establish the between-domain weighting difference; the covariance identity describes the additional within-domain effect without assuming its sign.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/capability.pdf}
-\caption{Capability trajectories from the shared initial student. Markers are completed evaluations; lines connect measured checkpoints. M denotes four routed teachers and S the mathematics teacher. GPQA reports average accuracy over four responses per question. All curves use one training seed; checkpoint availability is recorded in Table~\ref{tab:coverage}.}
-\label{fig:capability}
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/normalization_capability.pdf}
+\caption{Capability under the three I64 averaging rules. Markers are completed evaluations from one training seed; lines connect measured checkpoints. All branches start from the same student. DT has no complete update-100 suite. GPQA reports average accuracy over four responses per question.}
+\label{fig:normalization_capability}
 \end{figure}
 
-The three I64 reductions can be compared at their shared update-50 checkpoint (Table~\ref{tab:normalization50}). GT leads mathematics, while DR leads instruction following. Relative to DR, GT gains 4.6 percentage points on mathematics, with a paired prompt-bootstrap interval of $[1.2,8.2]$ points. DT changes instruction following by $-2.0$ points, with interval $[-4.0,-0.33]$. Figure~\ref{fig:normalization_ci} gives all eight paired contrasts and the uncertainty procedure. These results make the choice of averaging rule a capability-allocation decision: enforcing equal domain mass changes which responses drive learning, and its value depends on the target capability.
+\paragraph{Capability balance.}
+Figure~\ref{fig:normalization_capability} and Table~\ref{tab:normalization50} show the corresponding capability tradeoffs. At update 50, GT exceeds DR by 4.6 percentage points on mathematics, with a paired prompt-bootstrap interval of $[1.2,8.2]$ points, while DR exceeds both GT and DT by 2.0 points on instruction following. The DT-minus-DR instruction-following interval is $[-4.0,-0.33]$ points. All eight contrasts appear in Figure~\ref{fig:normalization_ci}. The macro-average and worst-domain change summarize the four scores without assuming that equal domain loss weights must be best. The results show that the averaging rule changes capability allocation; the fixed-batch identity alone does not predict which rule will improve every domain.
 
 \begin{table}[t]
-\caption{Capability scores (\%) at the common comparison checkpoint. Initialization, teachers, prompt quotas, and optimizer settings are shared. Each branch generates responses from its evolving student.}
+\caption{Capability scores (\%) at update 50. Mean is the arithmetic mean of the four domain scores. Worst $\Delta$ is the smallest domain change from initialization, in percentage points.}
 \label{tab:normalization50}
 \centering\small
 \input{experiments/aligned_evidence_20260910/normalization_table.tex}
