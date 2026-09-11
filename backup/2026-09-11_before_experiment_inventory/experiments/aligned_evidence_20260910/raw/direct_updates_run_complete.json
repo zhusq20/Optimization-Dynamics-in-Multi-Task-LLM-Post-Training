@@ -1,0 +1,9 @@
+{
+  "status": "complete",
+  "elapsed_seconds": 445.7422785758972,
+  "banks": 2,
+  "results_sha256": "0cb9e3e239d211691098aaf42c5618962bc86058ca0887ebb13ceca5157824eb",
+  "source_sha256": "7491a11558f0347db15ee4980c3bcdf21ef5df5bdd2248a32a61105439860195",
+  "scope": "Direct non-fused virtual Adam comparisons; same saved state, weights, prefixes, and original paired PG actions",
+  "peak_gpu_memory_bytes": 16288018432
+}

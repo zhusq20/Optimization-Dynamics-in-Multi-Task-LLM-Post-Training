@@ -1,0 +1,16 @@
+{
+  "at_utc": "2026-09-11T00:43:50.587134+00:00",
+  "counts": {
+    "gpqa_diamond_avg4": 792,
+    "ifbench_strict": 300,
+    "livecodebench_postcutoff_pass1": 128,
+    "math500_pass1": 500
+  },
+  "raw_hashes_verified": true,
+  "metrics": {
+    "math500_pass1": 0.738,
+    "livecodebench_postcutoff_pass1": 0.1953125,
+    "ifbench_strict": 0.18,
+    "gpqa_diamond_avg4": 0.3181818181818182
+  }
+}

@@ -1,8 +1,10 @@
 # MOPD experiment figures
 
+The [September 11 experiment inventory (中文)](EXPERIMENT_INVENTORY_20260911_zh.md) records the completed experiments, manuscript placement, and the newly incorporated aligned S-PG/500 evaluation.
+
 The current manuscript uses the [September 10 aligned evidence bundle](aligned_evidence_20260910/README_zh.md) and its **5 main figures + 6 appendix figures**. Open the [compiled paper](../iclr2027_conference.pdf), [figure files](../figures/aligned_evidence_20260910/), or [editorial review (中文)](aligned_evidence_20260910/EDITORIAL_REVIEW_zh.md).
 
-The bundle includes twelve complete capability suites, compatible teacher references, actual online parameter geometry, and the aligned M-PG/100 local mechanisms. The [verification report](aligned_evidence_20260910/verification_report.json) records source hashes, score checks, figure coverage, and manuscript validation.
+The bundle includes thirteen complete capability suites, compatible teacher references, actual online parameter geometry, and the aligned M-PG/100 local mechanisms. The [verification report](aligned_evidence_20260910/verification_report.json) records source hashes, score checks, figure coverage, and manuscript validation.
 
 Teacher-conditioned gradients and proposed optimizer steps start from identical copies of an actual MOPD checkpoint. Mathematics, code, instruction following, and science each use their own frozen RL-trained Qwen3-1.7B teacher. The aligned student is initialized from Qwen3-1.7B, as recorded in the frozen protocol. The [RL-teacher appendix](../sections/010_rl_teacher_connection.tex) distinguishes each teacher's RL KL reference from the student initialization and derives how teacher reward scale, KL strength, and the reference policy enter the distillation gradient under an optimal-teacher model.
 

@@ -27,7 +27,7 @@ With equal prompt quotas, longer responses increase a domain's weight under GT. 
 =\bar g_d+\frac{\operatorname{Cov}_d(T,g)}{\bar T_d}.
 \label{eq:weighting}
 \end{equation}
-Thus the effect of DT relative to DR depends on the covariance between response length and gradient, even after domain weights are fixed. Appendix~\ref{app:normalization} derives the identity. The online token-share and response-length traces in Appendix~\ref{app:behavior} show the changing denominators to which these rules apply.
+Thus the effect of DT relative to DR depends on the covariance between response length and gradient, even after domain weights are fixed. Appendix~\ref{app:normalization} derives the identity. In the first 50 rollouts of M-I64-GT, mathematics receives 44.05\% of valid tokens and instruction following 14.98\%, averaged over rollout batches, despite both receiving 25\% of prompts. Under GT these are also their mean loss weights; DT and DR assign each domain 25\%. The token-share and response-length traces in Appendix~\ref{app:behavior} show how these weights evolve.
 
 \subsection{Early capability tradeoffs}
 

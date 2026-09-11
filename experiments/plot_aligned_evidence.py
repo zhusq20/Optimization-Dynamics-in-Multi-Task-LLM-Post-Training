@@ -57,7 +57,7 @@ def capability():
             rr=sorted([r for r in CAP if r['model']==m],key=lambda r:r['step'])
             ax.plot([0]+[r['step'] for r in rr],[100*initial['scores'][d]]+[100*r['scores'][d] for r in rr],
                     marker=MARK[m],color=c,ms=3.3,ls='--' if m.startswith('S') else '-',label=m)
-        ax.set(title=title,xlabel='Optimizer updates',ylabel='Score (%)',xticks=[0,50,100,250])
+        ax.set(title=title,xlabel='Optimizer updates',ylabel='Score (%)',xticks=[0,100,250,500])
     fig.legend(*axs[0,0].get_legend_handles_labels(),ncol=6,loc='outside lower center',frameon=False)
     finish(fig);save(fig,'capability',['capability.json'])
 

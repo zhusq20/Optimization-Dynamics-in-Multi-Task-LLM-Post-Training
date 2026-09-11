@@ -442,5 +442,42 @@
       "IF": null,
       "GPQA": null
     }
+  },
+  {
+    "model": "S-PG",
+    "step": 500,
+    "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-11T00:43:40.412570+00:00",
+    "scores": {
+      "Math": 0.738,
+      "Code": 0.1953125,
+      "IF": 0.18,
+      "GPQA": 0.3181818181818182
+    },
+    "truncation": {
+      "Math": 0.058,
+      "Code": 0.15625,
+      "IF": 0.056666666666666664,
+      "GPQA": 0.0012626262626262627
+    },
+    "repetition": {
+      "Math": 0.064,
+      "Code": 0.15625,
+      "IF": 0.056666666666666664,
+      "GPQA": 0.0012626262626262627
+    },
+    "healthy_reward": {
+      "Math": 0.738,
+      "Code": 0.1953125,
+      "IF": 0.17,
+      "GPQA": 0.3181818181818182
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
   }
 ]

@@ -1,14 +1,14 @@
 {
   "status": "passed",
-  "checked_at_utc": "2026-09-11T01:32:51.144974+00:00",
-  "checks_passed": 738,
-  "frozen_sources": 70,
-  "capability_suites": 12,
-  "capability_responses": 20640,
-  "local_response_records": 13760,
-  "gpqa_rescored": 6336,
+  "checked_at_utc": "2026-09-11T01:50:22.277234+00:00",
+  "checks_passed": 766,
+  "frozen_sources": 78,
+  "capability_suites": 13,
+  "capability_responses": 22360,
+  "local_response_records": 15480,
+  "gpqa_rescored": 7128,
   "teacher_gpqa_rescored": 792,
-  "paired_contrasts": 36,
+  "paired_contrasts": 40,
   "mechanism_records": 433,
   "rollout_clocks": {
     "M-PG": 128,
@@ -21,7 +21,7 @@
       "figure": "capability",
       "width_pt": 490.7995300292969,
       "height_pt": 269.94976806640625,
-      "text_characters": 303
+      "text_characters": 307
     },
     {
       "figure": "normalization50",
@@ -85,7 +85,7 @@
     }
   ],
   "compiled_pdf_pages": 16,
-  "pdf_sha256": "331c6c5c8d0db345de4fabc2f1319c96b7a64879390ba81582614bce008b6b56",
+  "pdf_sha256": "0d4ad2632b6846c0be23118e2cff0633f51fce579b9ea23225330035ccda722a",
   "environment": {
     "python": "3.12.3",
     "numpy": "1.26.4",
@@ -93,11 +93,6 @@
     "pymupdf": "1.28.2"
   },
   "checks": [
-    {
-      "check": "frozen_source_hash",
-      "passed": true,
-      "details": "raw/gpqa_scorer.py"
-    },
     {
       "check": "frozen_source_hash",
       "passed": true,
@@ -217,11 +212,6 @@
       "check": "frozen_source_hash",
       "passed": true,
       "details": "raw/Initial_0_index.jsonl"
-    },
-    {
-      "check": "frozen_source_hash",
-      "passed": true,
-      "details": "raw/single_capability.json"
     },
     {
       "check": "frozen_source_hash",
@@ -442,6 +432,56 @@
       "check": "frozen_source_hash",
       "passed": true,
       "details": "raw/capability_eval.yaml"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/gpqa_scorer.py"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/S-PG_500_complete.json"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/S-PG_500_eval.jsonl"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/S-PG_500_index.jsonl"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/single_capability.json"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/single_protocol.json"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/single_capability_eval.yaml"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/S-PG_500_job.json"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/S-PG_500_verified_summary.json"
+    },
+    {
+      "check": "frozen_source_hash",
+      "passed": true,
+      "details": "raw/S-PG_500_export_verified.json"
     },
     {
       "check": "complete_capability_grid",
@@ -907,6 +947,62 @@
       "details": null
     },
     {
+      "check": "response_mean_matches_score",
+      "passed": true,
+      "details": [
+        "S-PG",
+        500,
+        "Math"
+      ]
+    },
+    {
+      "check": "unique_prompt_sample",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "response_mean_matches_score",
+      "passed": true,
+      "details": [
+        "S-PG",
+        500,
+        "Code"
+      ]
+    },
+    {
+      "check": "unique_prompt_sample",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "response_mean_matches_score",
+      "passed": true,
+      "details": [
+        "S-PG",
+        500,
+        "IF"
+      ]
+    },
+    {
+      "check": "unique_prompt_sample",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "response_mean_matches_score",
+      "passed": true,
+      "details": [
+        "S-PG",
+        500,
+        "GPQA"
+      ]
+    },
+    {
+      "check": "unique_prompt_sample",
+      "passed": true,
+      "details": null
+    },
+    {
       "check": "gpqa_rescore",
       "passed": true,
       "details": null
@@ -922,7 +1018,62 @@
       "details": null
     },
     {
+      "check": "endpoint_raw_evidence",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "endpoint_model_conversion",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "single_protocol_alignment",
+      "passed": true,
+      "details": null
+    },
+    {
       "check": "paired_comparison_count",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_question_identity",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_effect_equals_score_difference",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_question_identity",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_effect_equals_score_difference",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_question_identity",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_effect_equals_score_difference",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_question_identity",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "paired_effect_equals_score_difference",
       "passed": true,
       "details": null
     },
@@ -3573,6 +3724,11 @@
     },
     {
       "check": "token_share_denominator",
+      "passed": true,
+      "details": null
+    },
+    {
+      "check": "body_first50_token_shares",
       "passed": true,
       "details": null
     },

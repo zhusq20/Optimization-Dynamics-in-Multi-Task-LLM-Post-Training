@@ -6,8 +6,8 @@
 
 | 证据 | 数量 / 范围 | 论文用途 |
 |---|---|---|
-| 对齐能力评测 | 12 套，共 20,640 条回答；共享初始点只计一次 | 能力轨迹、归一化比较、完整结果表 |
-| 本机可核验评测 | 8 套，13,760 条回答；其中 GPQA 6,336 条重新评分全部一致 | 配对题目比较、评分审计 |
+| 对齐能力评测 | 13 套，共 22,360 条回答；共享初始点只计一次 | 能力轨迹、归一化比较、完整结果表 |
+| 本机可核验评测 | 9 套，15,480 条回答；其中 GPQA 7,128 条重新评分全部一致 | 配对题目比较、评分审计 |
 | 单教师远端评测摘要 | S-PG / S-I64，各 100、250 两个点，共 4 套 | 能力轨迹；原始回答留在评测节点 |
 | 兼容教师基准 | 4 个 RL 教师，各自领域 | 教师质量参考表；science 的 792 条 GPQA 重新评分一致 |
 | 在线几何 | M-PG、DR、GT 至 100；DT 至 50 | 实际 FP32 / BF16 累积变化、更新与能量集中 |
@@ -16,7 +16,7 @@
 | 直接 Adam 向量比较 | PG / I64 / full，FP32 与 BF16 | 相同密度下的方向差异 |
 | 原始训练行为 | M-PG 128、DR 100、DT 100、GT 115 个 rollout clock | token 分配、长度、截断、终止位置监督 |
 
-单教师训练到 500 与单教师 **500 能力评测完成**是不同状态。当前能力曲线止于真实完成的 100 / 250 点；DT/100 的不完整检查点不进入能力或几何比较。一个 `train/step` 是四响应梯度分片，16 个分片才合成一个 optimizer update；图中的 checkpoint 横轴使用后者。
+单教师训练到 500 与单教师 **500 能力评测完成**是不同状态。2026-09-11 增补了已完成的 aligned S-PG/500；S-I64 当前能力曲线止于 250；DT/100 的不完整检查点不进入能力或几何比较。一个 `train/step` 是四响应梯度分片，16 个分片才合成一个 optimizer update；图中的 checkpoint 横轴使用后者。
 
 ## 图表与论证的对应
 
@@ -51,17 +51,17 @@ python experiments/verify_aligned_evidence.py
 如需重新从当前实验目录冻结来源，显式运行：
 
 ```bash
-python experiments/export_aligned_evidence.py --source ../slime_opd_geometry
+python experiments/export_aligned_evidence.py --source ../slime_opd_geometry --capability-only
 ```
 
-这会核验源回答并重新计算汇总和配对区间。导出针对本次明确列出的运行目录，不自动把未来的新方法或其他初始化加入比较。
+此增量命令核验新增完整评测的源回答并重新计算汇总和配对区间，保留已经冻结的训练与局部机制记录。导出针对本次明确列出的运行目录，不自动把未来的新方法或其他初始化加入比较。
 
 ## 统计与来源
 
 - `manifest.json`：原文件路径、SHA-256、选入/排除范围。
-- `capability.json`：12 套评分和生成诊断，标明逐条核验或远端摘要。
-- `prompt_scores.jsonl`：8 套本机评测的紧凑逐回答记录，含 question identity hash、分数、状态、长度，不复制回答正文。
-- `paired_comparisons.json`：36 个领域级比较，10,000 次配对 prompt bootstrap，seed 1042。GPQA 的 4 条回答作为题目簇一起重采样。95% 区间未做多重比较校正，条件于训练 checkpoint。
+- `capability.json`：13 套评分和生成诊断，标明逐条核验或远端摘要。
+- `prompt_scores.jsonl`：9 套本机评测的紧凑逐回答记录，含 question identity hash、分数、状态、长度，不复制回答正文。
+- `paired_comparisons.json`：40 个领域级比较，10,000 次配对 prompt bootstrap，seed 1042。GPQA 的 4 条回答作为题目簇一起重采样。95% 区间未做多重比较校正，条件于训练 checkpoint。
 - `gpqa_score_audit.json`：`final-answer-v2` 评分审计。
 - `teacher_references.json`：兼容教师基准与 science 复评分。
 - `training_configuration.json`：实际运行参数及来源 hash；不复制节点环境变量。
@@ -72,3 +72,5 @@ python experiments/export_aligned_evidence.py --source ../slime_opd_geometry
 - `EDITORIAL_REVIEW_zh.md`：作者/审稿人视角下的论证取舍与完成检查。
 
 局部诊断的独立单位是 bank；教师对、输入对和采样重复共享模型与数据。它们不等同于独立训练种子。八条局部生成都达到 256-token cap，coverage 表给出其概率质量与梯度尺度。正文直接陈述这些测量支持的结论，范围集中在讨论和实验设置中。
+
+2026-09-11 的更新与各实验族盘点见 [实验盘点](../EXPERIMENT_INVENTORY_20260911_zh.md)。S-PG/500 的模型转换验证、实际评估命令、单教师协议与四域配置也冻结在 `raw/S-PG_500_*`、`raw/single_protocol.json` 和 `raw/single_capability_eval.yaml`。

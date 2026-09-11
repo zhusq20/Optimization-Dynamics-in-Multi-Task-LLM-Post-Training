@@ -1,0 +1,67 @@
+{
+  "status": "passed",
+  "checks": [
+    {
+      "check": "torch_adamw_reference",
+      "mode": "history",
+      "zero_gradient": false,
+      "max_error": 7.450580596923828e-09
+    },
+    {
+      "check": "torch_adamw_reference",
+      "mode": "history",
+      "zero_gradient": true,
+      "max_error": 0.0
+    },
+    {
+      "check": "torch_adamw_reference",
+      "mode": "fresh",
+      "zero_gradient": false,
+      "max_error": 0.0
+    },
+    {
+      "check": "torch_adamw_reference",
+      "mode": "fresh",
+      "zero_gradient": true,
+      "max_error": 0.0
+    },
+    {
+      "check": "torch_adamw_reference",
+      "mode": "reset_m",
+      "zero_gradient": false,
+      "max_error": 0.0
+    },
+    {
+      "check": "torch_adamw_reference",
+      "mode": "reset_m",
+      "zero_gradient": true,
+      "max_error": 0.0
+    },
+    {
+      "check": "reset_branch",
+      "mode": "fresh"
+    },
+    {
+      "check": "reset_branch",
+      "mode": "reset_m"
+    },
+    {
+      "check": "exact_enumeration_pg_expectation",
+      "max_error": 2.2351741790771484e-08
+    },
+    {
+      "check": "independent_loss_formula",
+      "loss": "teacher_topk"
+    },
+    {
+      "check": "independent_loss_formula",
+      "loss": "topk_intersection"
+    },
+    {
+      "check": "full_coordinate_gram"
+    },
+    {
+      "check": "support_ties_zero_vectors_energy_and_overlap"
+    }
+  ]
+}

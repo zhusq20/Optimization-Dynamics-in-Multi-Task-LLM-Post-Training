@@ -4,12 +4,6 @@
   "excluded": "Base student trajectories, Student64-to-I64 continuations, GPAS and superseded teacher-Top64 results; incomplete DT/100 geometry.",
   "sources": [
     {
-      "source": "slime/rollout/rm_hub/gpqa.py",
-      "frozen": "raw/gpqa_scorer.py",
-      "sha256": "9a3014b359e901271fcff9f60a7351097fb72e9bce62a3b229ea1cc71c43bd12",
-      "bytes": 7025
-    },
-    {
       "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_100/run_complete.json",
       "frozen": "raw/M-PG_100_complete.json",
       "sha256": "959dfd36c3243d5158279a5005bcfb9514f5fd43e34023fc696682c0cb683ee4",
@@ -378,12 +372,6 @@
       "note": "compact audit rows; response text remains in source workspace"
     },
     {
-      "source": "local/aligned_capability_20260909_a6000/results_summary.json",
-      "frozen": "raw/single_capability.json",
-      "sha256": "ffac36982ecc93f979fbbbebbcc897c50ff6f4bf12b2ff3aa4a502d8c7c050c7",
-      "bytes": 3454
-    },
-    {
       "source": "local/aligned_mechanism_20260910_exx/measurements.jsonl",
       "frozen": "raw/measurements.jsonl",
       "sha256": "20f5eb6264b84a01f977cd5bdef4a766c9cc7f55e59cc06003c6228ab35d55a0",
@@ -646,6 +634,94 @@
       "frozen": "raw/capability_eval.yaml",
       "sha256": "8e89fbaba99ebf301ecd23626c0ed7e400fcba9dec7c1503f4ece5bdcab468ab",
       "bytes": 1442
+    },
+    {
+      "source": "slime/rollout/rm_hub/gpqa.py",
+      "frozen": "raw/gpqa_scorer.py",
+      "sha256": "9a3014b359e901271fcff9f60a7351097fb72e9bce62a3b229ea1cc71c43bd12",
+      "bytes": 7025
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/run_complete.json",
+      "frozen": "raw/S-PG_500_complete.json",
+      "sha256": "8a865bee72eeae9ea52bdceabe0ffa9213d93e2e9d4e9b7e7cb3e761280900f0",
+      "bytes": 255
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/metrics/eval.jsonl",
+      "frozen": "raw/S-PG_500_eval.jsonl",
+      "sha256": "9101184d3e998fcb7d80e0d9f659cef3ce36b5f4606ff0aca8629e0e11e45546",
+      "bytes": 13844
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/artifacts/index.jsonl",
+      "frozen": "raw/S-PG_500_index.jsonl",
+      "sha256": "a91dcc390a1623fe415013c11be40bcaaffdd95d70074ddd7d887e3ab7df6d4a",
+      "bytes": 15719
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/artifacts/math500_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "c56708241ef56bc81223a0963dae2f3ce8b2899f7a506ea74ae21e262ed6a5e3",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/artifacts/livecodebench_postcutoff_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "22c022e1b9308b9cecc5a547b7b0828804ff80aed4a22032fe988d905ceb3401",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/artifacts/ifbench_strict/updates_00000500_eval_only.jsonl",
+      "sha256": "3973731a334b846c7eecb7f23ff4aadfba937511a77158ed837a876834099fd5",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/artifacts/gpqa_diamond_avg4/updates_00000500_eval_only.jsonl",
+      "sha256": "1fe924409dd443e6651993c56d9d7fa709c860e815fa4f7eb0c63f6b0141af78",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "local/aligned_capability_20260909_a6000/results_summary.json",
+      "frozen": "raw/single_capability.json",
+      "sha256": "ffac36982ecc93f979fbbbebbcc897c50ff6f4bf12b2ff3aa4a502d8c7c050c7",
+      "bytes": 3454
+    },
+    {
+      "source": "local/single_aligned_20260909_a6000/generated/protocol.json",
+      "frozen": "raw/single_protocol.json",
+      "sha256": "80a88ead6c81871339e2f1ae4e571000f98886b0b048426601276b5e641e3a32",
+      "bytes": 11552
+    },
+    {
+      "source": "local/single_aligned_20260909_a6000/generated/capability_eval.yaml",
+      "frozen": "raw/single_capability_eval.yaml",
+      "sha256": "8e89fbaba99ebf301ecd23626c0ed7e400fcba9dec7c1503f4ece5bdcab468ab",
+      "bytes": 1442
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/job.json",
+      "frozen": "raw/S-PG_500_job.json",
+      "sha256": "a7280f6245d54f6a385acb252204be1a3e5b65b0a2871b05cfbb0a54f1f98ad8",
+      "bytes": 4647
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/verified_summary.json",
+      "frozen": "raw/S-PG_500_verified_summary.json",
+      "sha256": "0e3f40e5ac8aa5b9ac422cb587b6a18641864fb6cc6bbd877e73792d580bdc0b",
+      "bytes": 395
+    },
+    {
+      "source": "local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-pg-s42/step_500/export_verified.json",
+      "frozen": "raw/S-PG_500_export_verified.json",
+      "sha256": "c916831f2391334760b34eccf9ecb4a60cb6232a6b7fce92ea7aded3663e787b",
+      "bytes": 2009
     }
   ],
   "bootstrap": {
@@ -653,5 +729,7 @@
     "seed": 1042,
     "unit": "prompt cluster",
     "training_seeds": 1
-  }
+  },
+  "updated_at_utc": "2026-09-11T01:45:27.283111+00:00",
+  "refresh_scope": "New complete capability suites only; existing online and local records retained."
 }

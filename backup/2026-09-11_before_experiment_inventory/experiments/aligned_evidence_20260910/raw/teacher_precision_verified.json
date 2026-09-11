@@ -1,0 +1,101 @@
+{
+  "status": "passed",
+  "shards": [
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/math/model-00001-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 85
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/math/model-00002-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 57
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/math/model-00003-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 112
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/math/model-00004-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 56
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/code/model-00001-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 85
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/code/model-00002-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 57
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/code/model-00003-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 112
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/code/model-00004-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 56
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/if/model-00001-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 85
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/if/model-00002-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 57
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/if/model-00003-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 112
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/if/model-00004-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 56
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/science/model-00001-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 85
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/science/model-00002-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 57
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/science/model-00003-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 112
+      }
+    },
+    {
+      "path": "/workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_models/teachers_hf/science/model-00004-of-00004.safetensors",
+      "tensor_dtype_counts": {
+        "BF16": 56
+      }
+    }
+  ]
+}

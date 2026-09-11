@@ -1,0 +1,44 @@
+eval:
+  defaults:
+    apply_chat_template: true
+    apply_chat_template_kwargs:
+      enable_thinking: false
+    chat_template_suffix_to_remove: null
+    custom_rm_path: slime_plugins.m2rl.rewards.reward
+    top_k: -1
+    input_key: prompt
+    label_key: label
+    metadata_key: metadata
+    max_response_len: 32768
+    stop_token_ids:
+    - 151643
+    - 151645
+  datasets:
+  - name: math500_pass1
+    path: /workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_data/m2rl/eval/m2rl_online/math500.parquet
+    rm_type: deepscaler
+    n_samples_per_eval_prompt: 1
+    temperature: 0.0
+    top_p: 1.0
+    max_response_len: 32768
+  - name: livecodebench_postcutoff_pass1
+    path: /workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_data/m2rl/single_task/code/livecodebench_v6_online128.parquet
+    rm_type: livecodebench
+    n_samples_per_eval_prompt: 1
+    temperature: 0.0
+    top_p: 1.0
+    max_response_len: 32768
+  - name: ifbench_strict
+    path: /workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_data/m2rl/eval/m2rl_online/ifbench.parquet
+    rm_type: ifbench
+    n_samples_per_eval_prompt: 1
+    temperature: 0.0
+    top_p: 1.0
+    max_response_len: 32768
+  - name: gpqa_diamond_avg4
+    path: /workspace/dev/iclr2027/slime_opd_geometry/local/hf_upload_data/m2rl/eval/m2rl_online/gpqa_diamond.parquet
+    rm_type: gpqa
+    n_samples_per_eval_prompt: 4
+    temperature: 1.0
+    top_p: 1.0
+    max_response_len: 32768

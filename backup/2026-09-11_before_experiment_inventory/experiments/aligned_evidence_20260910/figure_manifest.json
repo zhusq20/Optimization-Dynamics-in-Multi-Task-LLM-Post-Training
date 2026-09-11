@@ -1,0 +1,86 @@
+{
+  "figures": [
+    {
+      "id": "capability",
+      "sources": [
+        "capability.json"
+      ],
+      "axes": 4
+    },
+    {
+      "id": "normalization50",
+      "sources": [
+        "paired_comparisons.json"
+      ],
+      "axes": 4
+    },
+    {
+      "id": "cumulative_geometry",
+      "sources": [
+        "raw/online_context.json"
+      ],
+      "axes": 3
+    },
+    {
+      "id": "adam_precision",
+      "sources": [
+        "raw/measurements.jsonl"
+      ],
+      "axes": 3
+    },
+    {
+      "id": "teacher_input",
+      "sources": [
+        "raw/measurements.jsonl"
+      ],
+      "axes": 3
+    },
+    {
+      "id": "supervision_density",
+      "sources": [
+        "raw/measurements.jsonl",
+        "raw/direct_updates_results.json",
+        "raw/pg_variance_results.json"
+      ],
+      "axes": 3
+    },
+    {
+      "id": "training_dynamics",
+      "sources": [
+        "raw/M-PG_rollout.jsonl"
+      ],
+      "axes": 4
+    },
+    {
+      "id": "all_token_shares",
+      "sources": [
+        "raw/M-I64-DR_rollout.jsonl",
+        "raw/M-I64-DT_rollout.jsonl",
+        "raw/M-I64-GT_rollout.jsonl"
+      ],
+      "axes": 3
+    },
+    {
+      "id": "teacher_js",
+      "sources": [
+        "raw/measurements.jsonl"
+      ],
+      "axes": 4
+    },
+    {
+      "id": "thresholds",
+      "sources": [
+        "raw/measurements.jsonl"
+      ],
+      "axes": 2
+    },
+    {
+      "id": "if_generation",
+      "sources": [
+        "capability.json"
+      ],
+      "axes": 3
+    }
+  ],
+  "script_sha256": "b4caeea233aca1f3f7c3f659d2c33e1758640a429e4342983a176e772c51f154"
+}

@@ -1,0 +1,17 @@
+\section{Supervision Density Changes Direction More Than Writeback Density}
+\label{sec:density}
+
+The fixed-prefix banks also compare sampled PG, I64, corrected teacher-top-64 (T64), and full-vocabulary reverse KL. Averaged across banks, the PG gradient has cosine 0.6766 with the full-vocabulary gradient. I64 and T64 reach 0.99999990 and 0.99999981 (Figure~\ref{fig:density}a). This agreement occurs on prefixes with concentrated student probability: averaged within each bank-domain group, the student places 99.9184--100\% of its probability on the teacher's top-64 tokens. Appendix~\ref{app:losses} reports the coverage and local entropy measurements.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/supervision_density.pdf}
+\caption{Supervision comparisons on fixed prefixes at update 100. (a) Original-bank gradient cosine with full-vocabulary reverse KL. (b) Cosine of local Adam steps computed with the same saved state. (c) Fresh PG actions at each fixed prefix, with two banks and two independent draws per sample count. Colors distinguish banks and marker shapes distinguish repeats in (c); counts use separate draws. All panels compare direction.}
+\label{fig:density}
+\end{figure}
+
+Adam and writeback retain part of the directional difference while making coordinate counts nearly identical. The BF16 active fractions are 0.148599\% for PG and 0.148587\% for both I64 and full vocabulary. Yet PG/full step cosine is 0.9451 in FP32 and 0.9149 in BF16; I64/full reaches 0.999998 and 0.999956. Thus a single density statistic can hide a measurable change in which direction the optimizer moves.
+
+To test the role of action sampling, we resample fresh actions at each fixed prefix and average 1, 16, or 64 PG contributions. Mean gradient cosine with the exact reference rises from 0.5589 to 0.8962 and 0.9787, while relative norm error falls from 1.4836 to 0.5148 and 0.2221 (Figure~\ref{fig:density}c). Holding prefixes and weights fixed makes this a direct comparison of realized sampling error. The original-bank and resampled one-action results use different actions, accounting for their different starting cosines.
+
+The capability trajectories provide the corresponding online comparison. At update 100, S-PG and S-I64 score 77.4\% and 74.6\% on mathematics; at update 250 they score 73.8\% and 74.4\%. The local measurements explain how supervision changes a gradient and its proposed step, while the online results show how the evolving response distribution accumulates those changes over training.

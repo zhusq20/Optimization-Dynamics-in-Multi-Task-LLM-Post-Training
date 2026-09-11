@@ -10,7 +10,7 @@ All six configurations use AdamW with learning rate $2.5\times10^{-7}$, $(\beta_
 The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. The frozen protocol records the exact train, diagnostic, and held-out split hashes and teacher conversion manifests. I64 starts from initialization with the intersection objective in Equation~\ref{eq:i64}.
 
 \begin{table}[!htbp]
-\caption{Coverage of the aligned evidence snapshot. The single-teacher training runs reached update 500; their complete capability suites available here end at 250. Multi-teacher runs have unequal coverage after interruptions and restarts. The DT update-100 checkpoint is incomplete. Reported curves use the completed measurements listed here.}
+\caption{Coverage of the aligned evidence snapshot. The single-teacher training runs reached update 500; complete capability evaluations reach 500 for S-PG and 250 for S-I64. Multi-teacher runs have unequal coverage after interruptions and restarts. The DT update-100 checkpoint is incomplete. Reported curves use the completed measurements listed here.}
 \label{tab:coverage}
 \centering\small
 \begin{tabular}{lrl}
@@ -18,7 +18,7 @@ The multi-teacher configurations allocate 16 prompts to each domain per update a
 Configuration & Complete capability checkpoints & Online geometry in this paper \\
 \midrule
 Initial & 0 & Initial reference \\
-S-PG & 100, 250 & --- \\
+S-PG & 100, 250, 500 & --- \\
 S-I64 & 100, 250 & --- \\
 M-PG & 50, 100 & 0, 1, 50, 100; local probes at 100 \\
 M-I64-DR & 50, 100 & 0, 1, 50, 100 \\
@@ -32,10 +32,10 @@ M-I64-GT & 50, 100 & 0, 1, 50, 100 \\
 
 Each capability suite contains MATH-500 (500 questions) \citep{hendrycks2021math}, a fixed 128-question LiveCodeBench v6 subset \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 1,720 responses.
 
-Table~\ref{tab:all_capability} gives all twelve complete suites. Eight suites have local response-level artifacts: the shared initial student and seven multi-teacher checkpoints. Their 13,760 response records were checked against artifact hashes, expected sample counts, unique prompt/sample indices, and logged aggregate scores. The code artifacts report zero sandbox infrastructure errors. Recomputing all 6,336 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero score changes. Four single-teacher suites contribute 6,880 responses through previously verified completion summaries from a second node. Their per-question records remain on that node.
+Table~\ref{tab:all_capability} gives all thirteen complete suites. Nine suites have local response-level artifacts: the shared initial student, seven multi-teacher checkpoints, and S-PG at update 500. Their 15,480 response records were checked against artifact hashes, expected sample counts, unique prompt/sample indices, and logged aggregate scores. The code artifacts report zero sandbox infrastructure errors. Recomputing all 7,128 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero score changes. Four single-teacher suites contribute 6,880 responses through previously verified completion summaries from a second node. Their per-question records remain on that node.
 
 \begin{table}[t]
-\caption{All completed aligned capability scores (\%). Scores use the standard dataset metrics and all evaluated responses. The shared initial student is counted once in the twelve-suite total.}
+\caption{All completed aligned capability scores (\%). Scores use the standard dataset metrics and all evaluated responses. The shared initial student is counted once in the thirteen-suite total.}
 \label{tab:all_capability}
 \centering\small
 \input{experiments/aligned_evidence_20260910/capability_table.tex}

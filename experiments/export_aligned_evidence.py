@@ -36,15 +36,19 @@ def sha(data):
 
 def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--source', type=Path, required=True)
-    src = ap.parse_args().source.resolve()
+    ap.add_argument('--capability-only', action='store_true',
+                    help='Add newly completed suites while preserving frozen training/mechanism records.')
+    args = ap.parse_args(); src = args.source.resolve()
     OUT.mkdir(exist_ok=True); (OUT / 'raw').mkdir(exist_ok=True)
-    manifest = []
+    previous = json.loads((OUT/'manifest.json').read_text()) if args.capability_only else None
+    manifest = list(previous['sources']) if previous else []
 
     def freeze(rel, name=None):
         path = src / rel; data = path.read_bytes()
         name = name or path.name
         target = OUT / 'raw' / name
         target.write_bytes(data)
+        manifest[:] = [r for r in manifest if r['source'] != rel]
         manifest.append({'source': rel, 'frozen': str(target.relative_to(OUT)),
                          'sha256': sha(data), 'bytes': len(data)})
         return data
@@ -52,10 +56,16 @@ def main():
     gpqa_spec = importlib.util.spec_from_file_location('paper_gpqa', src / 'slime/rollout/rm_hub/gpqa.py')
     gpqa = importlib.util.module_from_spec(gpqa_spec); gpqa_spec.loader.exec_module(gpqa)
     freeze('slime/rollout/rm_hub/gpqa.py', 'gpqa_scorer.py')
-    suites, prompt_rows, gpqa_audit = [], [], []
-    for model, rel in RUNS.items():
+    suites = json.loads((OUT/'capability.json').read_text()) if previous else []
+    prompt_rows = [json.loads(l) for l in (OUT/'prompt_scores.jsonl').read_text().splitlines()] if previous else []
+    old_audit = json.loads((OUT/'gpqa_score_audit.json').read_text()) if previous else {'responses':0,'disagreements':[]}
+    assert not old_audit['disagreements']
+    gpqa_audit = []
+    eval_runs = {**RUNS, 'S-PG': 'outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42'}
+    for model, rel in eval_runs.items():
         for marker in sorted((src / rel / 'capability_eval').glob('step_*/run_complete.json')):
             base = marker.parent; step = int(base.name.split('_')[1]); tag = f'{model}_{step}'
+            if any(r['model']==model and r['step']==step for r in suites): continue
             complete = json.loads(freeze(str(marker.relative_to(src)), tag + '_complete.json'))
             assert complete['status'] == 'complete' and complete['final_num_updates'] == step
             metrics = {}
@@ -110,6 +120,7 @@ def main():
     # Remote verified summary is retained with its evidence level, not assigned synthetic prompt CIs.
     remote = json.loads(freeze('local/aligned_capability_20260909_a6000/results_summary.json', 'single_capability.json'))
     for r in remote['runs']:
+        if any(x['model']==r['model'] and x['step']==r['step'] for x in suites): continue
         rename = {'MATH':'Math','Code':'Code','IFBench':'IF','GPQA':'GPQA'}
         suites.append({'model':r['model'], 'step':r['step'], 'source':r['output'],
                        'verification':'remote_verified_summary', 'completed_at':r['completed_at_utc'],
@@ -120,7 +131,7 @@ def main():
         for r in prompt_rows: f.write(json.dumps(r,sort_keys=True)+'\n')
     dump(OUT/'capability.json', sorted(suites,key=lambda r:(r['model'],r['step'])))
     # Re-score only for audit: any discrepancy must be resolved before manuscript use.
-    dump(OUT/'gpqa_score_audit.json', {'scorer':gpqa.GPQA_SCORER_VERSION,'responses':len(gpqa_audit),
+    dump(OUT/'gpqa_score_audit.json', {'scorer':gpqa.GPQA_SCORER_VERSION,'responses':old_audit['responses']+len(gpqa_audit),
          'disagreements':[r for r in gpqa_audit if r['original'] != r['rescored']]})
     assert all(r['original']==r['rescored'] for r in gpqa_audit), 'GPQA scorer mismatch'
     # Conditional paired prompt-cluster bootstrap: all four GPQA samples stay together.
@@ -146,6 +157,28 @@ def main():
                                  'delta_pp':100*float(delta.mean()),'lo_pp':100*float(np.quantile(draws,.025)),
                                  'hi_pp':100*float(np.quantile(draws,.975)),'prompts':len(delta)})
     dump(OUT/'paired_comparisons.json',comparisons)
+    # Preserve model conversion and evaluation identities for the newly available endpoint.
+    single_protocol = json.loads(freeze('local/single_aligned_20260909_a6000/generated/protocol.json', 'single_protocol.json'))
+    shared_protocol = json.loads((OUT/'raw/protocol.json').read_text()) if previous else json.loads((src/'local/m_pg_aligned_20260909/generated/protocol.json').read_text())
+    for key in ['initialization','student','teachers','prompt_format','response_semantics','evaluation','datasets']:
+        assert single_protocol[key] == shared_protocol[key], key
+    for domain, splits in single_protocol['splits'].items():
+        for split, record in splits.items():
+            assert record['sha256'] == shared_protocol['splits'][domain][split]['sha256']
+    freeze('local/single_aligned_20260909_a6000/generated/capability_eval.yaml', 'single_capability_eval.yaml')
+    endpoint = eval_runs['S-PG']+'/capability_eval/step_500/'
+    freeze(endpoint+'job.json', 'S-PG_500_job.json')
+    freeze(endpoint+'verified_summary.json', 'S-PG_500_verified_summary.json')
+    freeze('local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-pg-s42/step_500/export_verified.json',
+           'S-PG_500_export_verified.json')
+    if args.capability_only:
+        previous['updated_at_utc'] = datetime.now(timezone.utc).isoformat()
+        previous['sources'] = manifest
+        previous['refresh_scope'] = 'New complete capability suites only; existing online and local records retained.'
+        dump(OUT/'manifest.json', previous)
+        print(json.dumps({'suites':len(suites),'raw_prompt_rows':len(prompt_rows),
+                          'paired_comparisons':len(comparisons),'new_gpqa_rescored':len(gpqa_audit)}))
+        return
     mechanism='local/aligned_mechanism_20260910_exx/'
     for name in ['measurements.jsonl','results_summary.json','coverage.json','online_context.json',
                  'input_manifest.json','verification.json','measure_complete.json','numerical_validation.json',

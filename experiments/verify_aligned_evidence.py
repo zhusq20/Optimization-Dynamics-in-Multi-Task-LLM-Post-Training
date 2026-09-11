@@ -34,11 +34,11 @@ def main():
     cap=read('capability.json')
     expected={('Initial',0),('M-PG',50),('M-PG',100),('M-I64-DR',50),('M-I64-DR',100),
               ('M-I64-DT',50),('M-I64-GT',50),('M-I64-GT',100),
-              ('S-PG',100),('S-PG',250),('S-I64',100),('S-I64',250)}
-    check('complete_capability_grid',len(cap)==12 and {(r['model'],r['step']) for r in cap}==expected)
-    check('total_evaluated_responses',sum(sum(r['response_counts'].values()) for r in cap)==20640)
+              ('S-PG',100),('S-PG',250),('S-PG',500),('S-I64',100),('S-I64',250)}
+    check('complete_capability_grid',len(cap)==13 and {(r['model'],r['step']) for r in cap}==expected)
+    check('total_evaluated_responses',sum(sum(r['response_counts'].values()) for r in cap)==22360)
     rows=[json.loads(l) for l in (DATA/'prompt_scores.jsonl').read_text().splitlines()]
-    check('local_response_count',len(rows)==13760)
+    check('local_response_count',len(rows)==15480)
     groups=defaultdict(list)
     for r in rows:groups[(r['model'],r['step'],r['domain'])].append(r)
     for r in cap:
@@ -48,12 +48,21 @@ def main():
             check('response_mean_matches_score',abs(np.mean([x['reward'] for x in rr])-score)<1e-12,[r['model'],r['step'],d])
             check('unique_prompt_sample',len({(x['prompt_index'],x['sample']) for x in rr})==len(rr))
     audit=read('gpqa_score_audit.json')
-    check('gpqa_rescore',audit=={'scorer':'final-answer-v2','responses':6336,'disagreements':[]})
+    check('gpqa_rescore',audit=={'scorer':'final-answer-v2','responses':7128,'disagreements':[]})
     teachers=read('teacher_references.json')
     check('teacher_reference_domains',len(teachers)==4 and all('base' not in r['teacher'].lower() for r in teachers))
     check('science_teacher_rescore',next(r for r in teachers if r['teacher']=='teacher_science')['current_scorer_disagreements']==0)
+    endpoint=next(r for r in cap if r['model']=='S-PG' and r['step']==500)
+    check('endpoint_raw_evidence',endpoint['verification']=='raw_artifacts')
+    conversion=read('raw/S-PG_500_export_verified.json')
+    check('endpoint_model_conversion',conversion['step']==500 and conversion['tensor_keys']==310
+          and conversion['exact_original_key_set'] and conversion['all_finite']
+          and conversion['serialized_tensors_equal_converted_native'])
+    single=read('raw/single_protocol.json');shared=read('raw/protocol.json')
+    check('single_protocol_alignment',all(single[k]==shared[k] for k in
+          ['initialization','student','teachers','prompt_format','response_semantics','evaluation','datasets']))
     comp=read('paired_comparisons.json')
-    check('paired_comparison_count',len(comp)==36)
+    check('paired_comparison_count',len(comp)==40)
     for r in comp:
         left=groups[(r['left'],r['left_step'],r['domain'])];right=groups[(r['right'],r['right_step'],r['domain'])]
         identity=lambda rr:{(x['prompt_index'],x['identity']) for x in rr}
@@ -81,6 +90,13 @@ def main():
             shares=[r[f'mopd/task/{d}/token_share'] for d in ['math','code','if','science']]
             check('token_share_denominator',abs(sum(shares)-1)<1e-10 and all(0<=x<=.8 for x in shares))
         clocks[m]=len(rec)
+    gt=defaultdict(dict)
+    for line in (DATA/'raw/M-I64-GT_rollout.jsonl').read_text().splitlines():
+        r=json.loads(line)['metrics']
+        if 'rollout/step' in r:gt[int(r['rollout/step'])].update(r)
+    check('body_first50_token_shares',
+          [round(100*np.mean([gt[i][f'mopd/task/{d}/token_share'] for i in range(50)]),2)
+           for d in ['math','if']]==[44.05,14.98])
     fig_manifest=read('figure_manifest.json')
     check('plot_script_hash',hashlib.sha256((ROOT/'experiments/plot_aligned_evidence.py').read_bytes()).hexdigest()==fig_manifest['script_sha256'])
     check('eleven_figures',len(fig_manifest['figures'])==11)
@@ -111,8 +127,8 @@ def main():
     environment={'python':platform.python_version(),'numpy':np.__version__,'matplotlib':matplotlib.__version__,'pymupdf':pymupdf.__version__}
     (DATA/'plotting_environment.json').write_text(json.dumps(environment,indent=2)+'\n')
     report={'status':'passed','checked_at_utc':datetime.now(timezone.utc).isoformat(),'checks_passed':len(checks),
-            'frozen_sources':frozen,'capability_suites':len(cap),'capability_responses':20640,'local_response_records':len(rows),
-            'gpqa_rescored':6336,'teacher_gpqa_rescored':792,'paired_contrasts':len(comp),'mechanism_records':len(measured),
+            'frozen_sources':frozen,'capability_suites':len(cap),'capability_responses':22360,'local_response_records':len(rows),
+            'gpqa_rescored':7128,'teacher_gpqa_rescored':792,'paired_contrasts':len(comp),'mechanism_records':len(measured),
             'rollout_clocks':clocks,'figures':figure_details,'compiled_pdf_pages':len(pdf),
             'pdf_sha256':hashlib.sha256((ROOT/'iclr2027_conference.pdf').read_bytes()).hexdigest(),
             'environment':environment,'checks':checks}

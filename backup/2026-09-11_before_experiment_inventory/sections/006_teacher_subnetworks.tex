@@ -1,0 +1,41 @@
+\section{From Gradients to Stored Parameter Changes}
+\label{sec:subnetworks}
+
+\subsection{Precision changes the measured support}
+
+For a parameter change $\Delta\in\mathbb R^P$, define its active fraction at threshold $\tau$ as $f_\tau(\Delta)=P^{-1}\sum_j\mathbf 1\{|\Delta_j|>\tau\}$. We measure both the cumulative change from initialization and individual optimizer steps, using the FP32 master weights and the BF16 model weights. The coordinate system contains 1,720,574,976 parameters after removing vocabulary padding and shared duplicates.
+
+At update 100, the M-PG cumulative FP32 change has 94.0\% nonzero coordinates; the BF16 change has 3.41\% (Figure~\ref{fig:geometry}). The smallest sets containing 90\% of squared change contain 34.46\% and 1.82\% of coordinates, respectively. The actual FP32 optimizer step at that checkpoint is also dense, with 88.13\% nonzero coordinates. These measurements locate the strongest sparsity in the stored BF16 change. The reductions produce different trajectories: DR and GT reach 4.84\% and 7.79\% BF16 cumulative activity at update 100, alongside different total change norms.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/cumulative_geometry.pdf}
+\caption{Actual online parameter changes from initialization. (a,b) Exact nonzero fractions in FP32 master and BF16 model coordinates. (c) The coordinate fraction containing 90\% of squared cumulative change at update 100. Precision changes both measured support and energy concentration. DT is available through update 50.}
+\label{fig:geometry}
+\end{figure}
+
+\subsection{Saved Adam state explains movement beyond the current gradient}
+
+We examine the M-PG checkpoint at update 100 using two response banks. Each bank contains one student response per domain and four selected prefixes per response, giving 32 prefixes in total. Student and teacher forward/backward computations use FP32 at the saved BF16 weight values, with TF32 disabled. A local non-fused Adam calculation then uses the checkpoint's FP32 master weights and moments. This isolates the transformation from a fixed-bank gradient to a proposed parameter step.
+
+Figure~\ref{fig:adam} compares the saved-state calculation with two state interventions. With zero current gradient, Adam changes 0.1403\% of BF16 coordinates. With the sampled PG gradient, it changes 0.1486\%. Resetting the first moment reduces the PG fraction to 0.0504\%; resetting both moments and the step clock gives 0.5140\%. Stored momentum and the adaptive denominator therefore affect both the size and location of visible writeback. The zero-gradient branch also has cosine 0.901 with the PG BF16 step. A no-step cast exactly reproduces the saved model, establishing that this movement arises during the proposed Adam step.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/adam_precision.pdf}
+\caption{Local Adam calculations at the same saved state. Points show the two response banks; the zero-gradient control is evaluated once. (a,b) Nonzero fractions for FP32 steps and BF16 writeback. (c) PG and I64 with saved moments, reset first moment, or fresh moments and clock. Weight decay is zero. These state interventions reveal how optimizer history and rounding shape visible support.}
+\label{fig:adam}
+\end{figure}
+
+\subsection{Input composition separates parameter overlap from direction}
+
+The same checkpoint supports a crossed comparison of four input domains and four teachers. For each bank, every teacher scores the same four prefixes from each domain response. Holding the teacher fixed while changing the input domain yields mean gradient cosines of 0.0059 for PG and 0.0072 for I64. Holding the input domain fixed while changing the teacher produces both strongly aligned and strongly opposed gradients (Figure~\ref{fig:teacher}). Input composition is therefore a substantial part of the geometry attributed to a routed teacher.
+
+For the routed comparison, each teacher uses its own domain response. Mean teacher-pair cosines are $-0.0020$ for PG and $0.0081$ for I64, while the mean Jaccard overlaps of their largest-magnitude 1\% gradient coordinates are 0.0951 and 0.0999. Averaging each teacher across the common four-response bank raises these overlaps to 0.3808 and 0.4577. The associated cosines still span negative and positive values. The common-bank comparison changes both input composition and response count; the crossed comparison fixes response count and exposes the dependence on domain and teacher separately. Parameter locations and signed directions carry different information about teacher interaction.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_input.pdf}
+\caption{Teacher-conditioned gradient geometry at M-PG update 100. Left and center: crossed comparisons with four prefixes per gradient, grouped by which factor is held fixed. Each dot is a dependent pair comparison within one of two banks. Right: largest-magnitude 1\% coordinate overlap versus cosine for routed and common-bank gradients. Appendix~\ref{app:records} records norms and tie handling; Appendix~\ref{app:teacher_distance} relates overlap to teacher-distribution distance.}
+\label{fig:teacher}
+\end{figure}
