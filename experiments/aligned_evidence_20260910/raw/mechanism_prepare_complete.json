@@ -1,9 +1,0 @@
-{
-  "status": "complete",
-  "elapsed_seconds": 231.05424070358276,
-  "responses": 8,
-  "prefixes": 32,
-  "gpu": "NVIDIA RTX A6000",
-  "max_memory_bytes": 7190822912,
-  "torch": "2.11.0+cu129"
-}
