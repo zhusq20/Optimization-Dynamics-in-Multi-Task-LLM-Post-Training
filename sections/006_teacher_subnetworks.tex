@@ -1,41 +1,117 @@
-\section{From Gradients to Stored Parameter Changes}
+% ============================================================================
+\section{Update Sparsity and Teacher Overlap}
 \label{sec:subnetworks}
+% ============================================================================
 
-\subsection{Precision changes the measured support}
+We ask whether OPD parameter updates concentrate on a small fraction of parameters,
+whether different teachers affect the same parameters within one MOPD
+student, and whether teacher distribution differences predict this overlap.
+Each question includes its planned experiment; no outcome is assumed.
 
-For a parameter change $\Delta\in\mathbb R^P$, define its active fraction at threshold $\tau$ as $f_\tau(\Delta)=P^{-1}\sum_j\mathbf 1\{|\Delta_j|>\tau\}$. We measure both the cumulative change from initialization and individual optimizer steps, using the FP32 master weights and the BF16 model weights. The coordinate system contains 1,720,574,976 parameters after removing vocabulary padding and shared duplicates.
+\subsection{Does update sparsity persist under multiple teachers?}
 
-At update 100, the M-PG cumulative FP32 change has 94.0\% nonzero coordinates; the BF16 change has 3.41\% (Figure~\ref{fig:geometry}). The smallest sets containing 90\% of squared change contain 34.46\% and 1.82\% of coordinates, respectively. The actual FP32 optimizer step at that checkpoint is also dense, with 88.13\% nonzero coordinates. These measurements locate the strongest sparsity in the stored BF16 change. The reductions produce different trajectories: DR and GT reach 4.84\% and 7.79\% BF16 cumulative activity at update 100, alongside different total change norms.
+Prior work reports concentrated parameter changes in RL fine-tuning
+\citep{mukherjee2025subnetworks} and OPD
+\citep{yu2026denseupdates,shen2026opdgeometry}. We measure cumulative
+parameter changes $\Delta=\theta-\theta_0$ and actual optimizer steps
+$u=\theta_{\mathrm{after}}-\theta_{\mathrm{before}}$ separately.
+For each, we report the fraction of parameters with absolute change at
+most a threshold $\tau$, together with the fraction of squared norm carried
+by the largest-magnitude $\rho$ fraction of parameters. We sweep $\tau$
+and $\rho$: ``update sparsity'' here means near-zero parameter changes or
+concentrated changes, not necessarily exact zeros. Per-step and cumulative
+sparsity can differ because successive updates can cancel.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/cumulative_geometry.pdf}
-\caption{Actual online parameter changes from initialization. (a,b) Exact nonzero fractions in FP32 master and BF16 model coordinates. (c) The coordinate fraction containing 90\% of squared cumulative change at update 100. Precision changes both measured support and energy concentration. DT is available through update 50.}
-\label{fig:geometry}
-\end{figure}
+\paragraph{Experiment.}
+Using the representative single-teacher and joint runs from
+Section~\ref{sec:density}, record cumulative changes at early, intermediate,
+and final checkpoints and actual optimizer steps around those checkpoints
+and initialization. Report curves against both domain exposure and compute.
+Measure differences using FP32 master weights when available and report
+exported BF16 checkpoint differences separately to identify rounding-induced
+zeros; converting BF16 values to FP32 cannot recover lost changes.
+Threshold curves, norms, and energy concentration jointly show whether
+apparent sparsity reflects small overall scale or concentration on particular
+parameters.
 
-\subsection{Saved Adam state explains movement beyond the current gradient}
+As a secondary diagnostic, compare each domain's raw gradient
+$g_d=\nabla_\theta\mathcal L_d$ and the combined MOPD gradient under the
+same loss reduction, where $\mathcal L_d$ is that domain's mean loss.
+Match diagnostic response counts per domain across single-teacher and joint
+students, report valid-token
+counts, and check sensitivity to batch size; record the combined gradient's
+full batch size separately. Repeat over fresh student-rollout batches,
+record accumulation denominators, and
+accumulate gradients in FP32 before clipping or optimizer processing.
+Apply the same threshold, norm, and concentration summaries to gradients,
+keeping their scales separate from steps and cumulative changes. AdamW
+momentum and weight decay can move parameters with a zero current gradient,
+so gradient sparsity alone cannot establish update sparsity.
 
-We examine the M-PG checkpoint at update 100 using two response banks. Each bank contains one student response per domain and four selected prefixes per response, giving 32 prefixes in total. Student and teacher forward/backward computations use FP32 at the saved BF16 weight values, with TF32 disabled. A local non-fused Adam calculation then uses the checkpoint's FP32 master weights and moments. This isolates the transformation from a fixed-bank gradient to a proposed parameter step.
+\subsection{Do teachers affect the same parameters in one student?}
 
-Figure~\ref{fig:adam} compares the saved-state calculation with two state interventions. With zero current gradient, Adam changes 0.1403\% of BF16 coordinates. With the sampled PG gradient, it changes 0.1486\%. Resetting the first moment reduces the PG fraction to 0.0504\%; resetting both moments and the step clock gives 0.5140\%. Stored momentum and the adaptive denominator therefore affect both the size and location of visible writeback. The zero-gradient branch also has cosine 0.901 with the PG BF16 step. A no-step cast exactly reproduces the saved model, establishing that this movement arises during the proposed Adam step.
+At a fixed MOPD checkpoint $\theta$, compute a proposed optimizer step for
+each routed domain using its teacher $\pi_{\phi_d}$ and student-generated
+responses. Each calculation starts from an identical copy of the student
+and optimizer state, without advancing training. These steps measure the
+local effect of applying each teacher's loss; they do not identify fixed,
+isolated subnetworks.
+To compare locations fairly, first select the same fraction of parameters
+for every teacher, ranked by absolute proposed change. For domains $d$ and $e$,
+\begin{equation}
+\text{overlap}(d,e)=
+\frac{\text{number of parameters selected by both teachers}}
+     {\text{number of parameters selected by either teacher}}.
+\label{subnet_overlap}
+\end{equation}
+Zero means no shared selected parameters; one means identical selections.
+The corresponding difference is one minus this overlap. We also report
+absolute-threshold selections, which retain information about update
+scale as well as location.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/adam_precision.pdf}
-\caption{Local Adam calculations at the same saved state. Points show the two response banks; the zero-gradient control is evaluated once. (a,b) Nonzero fractions for FP32 steps and BF16 writeback. (c) PG and I64 with saved moments, reset first moment, or fresh moments and clock. Weight decay is zero. These state interventions reveal how optimizer history and rounding shape visible support.}
-\label{fig:adam}
-\end{figure}
+\paragraph{Experiment.}
+Use the matched diagnostic response counts and loss reduction above.
+Repeat over diagnostic batches and report overlap matrices across
+checkpoints, with concentration curves alongside them. Compare global
+selections and selections made separately within each layer against
+random selections with matching counts, including per-layer results.
+Signed step alignment provides additional context: shared parameters
+can receive compatible or opposing updates, so lower overlap is not
+assumed better.
 
-\subsection{Input composition separates parameter overlap from direction}
+Separately compare raw-gradient overlap and alignment and use the
+zero-gradient optimizer control in Appendix~\ref{app:records} to check
+whether shared momentum or decay dominates proposed-step overlap. These
+steps do not decompose the joint AdamW step or past changes by teacher.
+Independently trained single-teacher endpoint changes provide a reference only: those students
+follow different trajectories and cannot identify teacher contributions
+inside the joint student. Appendix~\ref{app:records} specifies recording
+and threshold conventions.
 
-The same checkpoint supports a crossed comparison of four input domains and four teachers. For each bank, every teacher scores the same four prefixes from each domain response. Holding the teacher fixed while changing the input domain yields mean gradient cosines of 0.0059 for PG and 0.0072 for I64. Holding the input domain fixed while changing the teacher produces both strongly aligned and strongly opposed gradients (Figure~\ref{fig:teacher}). Input composition is therefore a substantial part of the geometry attributed to a routed teacher.
+\subsection{Do more different teachers affect more different parameters?}
 
-For the routed comparison, each teacher uses its own domain response. Mean teacher-pair cosines are $-0.0020$ for PG and $0.0081$ for I64, while the mean Jaccard overlaps of their largest-magnitude 1\% gradient coordinates are 0.0951 and 0.0999. Averaging each teacher across the common four-response bank raises these overlaps to 0.3808 and 0.4577. The associated cosines still span negative and positive values. The common-bank comparison changes both input composition and response count; the crossed comparison fixes response count and exposes the dependence on domain and teacher separately. Parameter locations and signed directions carry different information about teacher interaction.
+We measure the difference between teachers $\pi_{\phi_d}$ and
+$\pi_{\phi_e}$ by their Jensen--Shannon divergence, a symmetric, bounded
+measure of how differently they distribute probability over next tokens.
+Every teacher scores the same cached, held-out student prefixes, with
+common domain weights. We also record each teacher's difference from the
+current student $\pi_\theta$ and its gradient and step norms.
+Appendix~\ref{app:teacher_distance} gives the distribution-distance formula.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_input.pdf}
-\caption{Teacher-conditioned gradient geometry at M-PG update 100. Left and center: crossed comparisons with four prefixes per gradient, grouped by which factor is held fixed. Each dot is a dependent pair comparison within one of two banks. Right: largest-magnitude 1\% coordinate overlap versus cosine for routed and common-bank gradients. Appendix~\ref{app:records} records norms and tie handling; Appendix~\ref{app:teacher_distance} relates overlap to teacher-distribution distance.}
-\label{fig:teacher}
-\end{figure}
+\paragraph{Experiment.}
+At each checkpoint, plot teacher distribution difference against the
+parameter-selection difference from the routed proposed steps above. A smaller
+control recomputes teacher steps and gradients on identical prefixes, testing
+whether an association persists when the response contexts also match.
+For PG, pair the same freshly sampled next tokens and fixed prefix weights
+across teachers, repeating the paired draws across batches.
+Available intermediate teacher checkpoints can add variation without
+training new teachers.
+
+Show individual pair trajectories and run-level uncertainty. Pairs that
+share a teacher or training lineage, and repeated checkpoints, are
+dependent observations. Relate teacher--student differences to update
+concentration and observed transfer as additional analyses. A small
+teacher pool supports a setting-specific association, not a universal
+monotone relationship; larger, smaller, or unchanged parameter overlap
+are all valid outcomes.
