@@ -1,5 +1,3 @@
-> 当前设置：实验使用 **Qwen3-1.7B RL teacher → Qwen3-1.7B-Base student**。附录 D 在 teacher 达到 KL-RL 最优策略的设定下，分析其 RL 目标如何进入完整序列的蒸馏梯度：reward 项的域系数为 λ/β，KL 项将 student 拉向 teacher 的 RL reference。Student 从该 reference 出发时，初始 KL 梯度为零；从不同策略出发时，初始梯度保留这一项。
-
 > 最新决定：主稿标题改为 **Token Balancing, Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation**。Update Sparsity 指参数更新稀疏性：分别报告单步优化器更新和累计参数变化，原始梯度用于辅助解释。Table 1 改为正文全宽的紧凑表格。下方记录保留前一轮修改过程，研究重心以此条为准。
 
 > 2026-09-05 本轮行文修订：以下保留早先讨论记录，主稿以本轮修改为准。标题现为 **Token Balancing, Gradient Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation**。Section 2 按 Ma et al. (2026) MOPD §3.2 的学生/教师策略符号和原始损失编写；Section 3–5 各自纳入相应实验，原独立 Experimental Design 仅保留共用配置与评估细节至附录。Section 3 用三行表对比平均方式，协方差推导移至附录；Section 4 用直观的参数选取与重叠比例替代 probe/support/Jaccard 堆叠。**gradient sparsity 不等同于参数更新稀疏性**：现以直接记录的原始梯度为主，单步更新与累计参数变化分别报告。实验尚无测量结果，保留待补标记。

@@ -20,11 +20,8 @@ Table~\ref{tab:normalization} compares three averaging rules using
 only these quantities.
 
 \begin{table}[!htbp]
-\caption{Loss averaging on the same rollout batch. Each domain has at least
-one nonempty response. The last rule recovers an ordinary response mean
-when $\lambda_d$ equals the domain's share of responses.}
-\label{tab:normalization}
-\begin{center}
+\centering
+\small
 \renewcommand{\arraystretch}{1.15}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll@{}}
 \toprule
@@ -41,8 +38,10 @@ Responses within each domain
     \sum_{i\in\mathcal B_d}\ell_i$ \\
 \bottomrule
 \end{tabular*}
-
-\end{center}
+\caption{Loss averaging on the same rollout batch. Each domain has at least
+one nonempty response. The last rule recovers an ordinary response mean
+when $\lambda_d$ equals the domain's share of responses.}
+\label{tab:normalization}
 \end{table}
 
 With equal numbers of prompts, a domain producing responses ten times

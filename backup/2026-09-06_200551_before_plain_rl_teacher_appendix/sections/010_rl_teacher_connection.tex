@@ -1,0 +1,110 @@
+\section{A Conditional Connection to KL-Regularized RL Teachers}
+\label{app:rl_teacher_connection}
+
+Our experiments distill RL-trained Qwen3-1.7B teachers into a
+Qwen3-1.7B-Base student. A teacher's RL KL reference must be distinguished
+from this student initialization. This appendix derives a conditional
+connection for ideal KL-regularized RL teachers and a complete-sequence
+distillation objective. These assumptions are not established by the
+experiments, so the result is a theoretical supplement to the analysis
+of domain balance.
+
+\paragraph{Assumptions and sequence objective.}
+Let $\mu_d$ denote the fixed KL reference used for teacher $d$, and
+let $\pi_{\theta_0}$ denote the student initialization. They need not coincide.
+For each domain $d$, fix a prompt distribution $\mathcal D_d$, a
+sequence reward $R_d(x,y)$, and a KL penalty coefficient $\beta_d>0$.
+Define
+\begin{equation}
+\begin{aligned}
+\mathcal R_d(\theta)
+&=\mathbb E_{x\sim\mathcal D_d,\,y\sim\pi_\theta(\cdot\mid x)}
+  [R_d(x,y)],\\
+K_d(\theta)
+&=\mathbb E_{x\sim\mathcal D_d}
+  D_{\mathrm{KL}}\!\left(\pi_\theta(\cdot\mid x)
+  \|\mu_d(\cdot\mid x)\right),
+\qquad J_d(\theta)=\mathcal R_d(\theta)-\beta_d K_d(\theta).
+\end{aligned}
+\label{eq:rl_teacher_objective}
+\end{equation}
+Assume compatible support, finite normalizers and expectations, and
+regularity sufficient to differentiate these expectations.
+Suppose the frozen teacher equals the unrestricted optimum of this
+objective over response distributions. The standard KL-RL solution
+\citep[Appendix A.1]{rafailov2023dpo} is
+\begin{equation}
+q_d^*(y\mid x)
+=\frac{\mu_d(y\mid x)\exp(R_d(x,y)/\beta_d)}{Z_d(x)},
+\qquad
+Z_d(x)=\sum_y\mu_d(y\mid x)\exp(R_d(x,y)/\beta_d).
+\label{eq:rl_teacher_optimum}
+\end{equation}
+An RL-trained checkpoint need not attain this optimum. Here $\beta_d$
+is the KL penalty coefficient, not a decoding temperature.
+
+\paragraph{Gradient equivalence.}
+Consider the complete-sequence reverse KL, without response-length
+normalization,
+$L_d^{\mathrm{seq}}(\theta)=\mathbb E_{x\sim\mathcal D_d}
+D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\|q_d^*(\cdot\mid x))$.
+Substituting Equation~\ref{eq:rl_teacher_optimum} gives
+\begin{equation}
+\begin{aligned}
+L_d^{\mathrm{seq}}(\theta)
+&=K_d(\theta)-\frac{\mathcal R_d(\theta)}{\beta_d}+C_d
+=-\frac{J_d(\theta)}{\beta_d}+C_d,\\
+-\nabla_\theta L_d^{\mathrm{seq}}(\theta)
+&=\frac{1}{\beta_d}\nabla_\theta J_d(\theta),
+\qquad C_d=\mathbb E_{x\sim\mathcal D_d}\log Z_d(x).
+\end{aligned}
+\label{eq:rl_teacher_gradient}
+\end{equation}
+The constant $C_d$ is independent of the student parameters. Thus the
+OPD descent direction equals a scaled RL ascent direction for every
+student policy satisfying the assumptions. These are full derivatives,
+including the dependence of the response distribution on $\theta$.
+This identity does not require the student to be initialized at $\mu_d$.
+
+\paragraph{Implication for domain coefficients.}
+For fixed domain weights $\lambda_d$, the first line below gives the
+general mixed descent direction. The second line additionally assumes
+$\pi_{\theta_0}=\mu_d$ for every domain:
+\begin{equation}
+\begin{aligned}
+-\nabla_\theta\sum_d\lambda_d L_d^{\mathrm{seq}}(\theta)
+&=\sum_d\frac{\lambda_d}{\beta_d}\nabla_\theta\mathcal R_d(\theta)
+  -\sum_d\lambda_d\nabla_\theta K_d(\theta),\\
+\left.-\nabla_\theta\sum_d\lambda_d L_d^{\mathrm{seq}}(\theta)
+\right|_{\theta_0}
+&=\left.\sum_d\frac{\lambda_d}{\beta_d}
+  \nabla_\theta\mathcal R_d(\theta)\right|_{\theta_0}.
+\end{aligned}
+\label{eq:rl_teacher_mixture}
+\end{equation}
+The second line uses $\nabla_\theta K_d(\theta_0)=0$ under that additional
+assumption. A Base student and a teacher's RL reference cannot be
+identified solely by architecture or parameter count; when their
+policies differ, the KL-gradient term must be retained even at
+initialization. With equal domain weights and comparable reward units,
+hypothetical mathematics and coding teachers with $\beta_d=0.05$ and
+$0.10$ have reward-gradient coefficients in a $2{:}1$ ratio. This is
+neither a gradient-norm ratio nor a capability-gain prediction.
+If $R_d=s_d\widetilde R_d$ for $s_d>0$, the coefficient of
+$\nabla_\theta\mathbb E[\widetilde R_d]$ is instead
+$\lambda_d s_d/\beta_d$. Jointly rescaling reward and $\beta_d$ by the
+same positive constant leaves the optimal teacher unchanged.
+
+\paragraph{Relation to the measured token gradients.}
+Section~\ref{sec:normalization} analyzes averaging on fixed rollout
+batches, independently of how teachers were trained. The present
+result shows how teacher construction can introduce an additional
+scale in the ideal sequence objective; it does not supply a universal
+product of token share, response length, and inverse temperature for
+the implemented gradients. Section~\ref{sec:setting} holds sampled
+prefixes and lengths fixed when differentiating token losses.
+Those local gradients need not equal the complete-sequence derivative
+in Equation~\ref{eq:rl_teacher_gradient}; response-dependent length
+weights, top-$k$ truncation, and advantage clipping require separate
+analysis. No inverse-$\beta_d$ scaling law or $\beta_d$ calibration
+benefit is claimed for the teachers or training runs studied here.

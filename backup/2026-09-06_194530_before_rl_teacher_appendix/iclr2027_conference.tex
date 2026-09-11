@@ -6,6 +6,7 @@
 % ------------------------------ Preamble ------------------------------------
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{subcaption}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{xcolor}
@@ -42,8 +43,7 @@
 \input{math_commands.tex}
 
 \usepackage{hyperref}
-% Keep the template default hyperlink borders (citations green, internal links red).
-\hypersetup{
+\hypersetup{hidelinks,
     pdftitle={Token Balancing, Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation},
     pdfauthor={Anonymous Authors}}
 \usepackage{url}
@@ -77,9 +77,11 @@
 
 \appendix
 
+\setcounter{table}{0}
+\renewcommand{\thetable}{A\arabic{table}}
+
 \input{sections/005_experiment}
 \input{sections/009_appendix}
-\input{sections/010_rl_teacher_connection}
 
 
 \end{document}

@@ -33,10 +33,8 @@ The shared model and training setup appears in
 Section~\ref{sec:normalization} and Appendix~\ref{app:setup}.
 
 \begin{table}[!htbp]
-\caption{Supervision-density experiments. Four online configurations
-share full-vocabulary local measurements at matched checkpoints.}
-\label{tab:density_controls}
-\begin{center}
+\centering
+\small
 \begin{tabular}{lll}
 \toprule
 Setting & Online losses & Common-prefix reference \\
@@ -45,8 +43,9 @@ Single teacher & PG, teacher top-$64$ & Full-vocabulary reverse KL \\
 Joint MOPD & PG, teacher top-$64$ & Full-vocabulary reverse KL \\
 \bottomrule
 \end{tabular}
-
-\end{center}
+\caption{Supervision-density experiments. Four online configurations
+share full-vocabulary local measurements at matched checkpoints.}
+\label{tab:density_controls}
 \end{table}
 
 At the initial, early, intermediate, and final checkpoints, we evaluate

@@ -40,11 +40,24 @@ establish balanced capability integration.
 
 \paragraph{Teacher reference results.}
 Table~\ref{tab:teacher_reference} reports the completed reference evaluations
-from September 6, 2026. Each RL-trained Qwen3-1.7B teacher is evaluated only on its
+from September 6, 2026. Each RL-trained teacher is evaluated only on its
 own domain; the initial Qwen3-1.7B-Base student is evaluated on the same
 questions and labels. Scores include truncated responses.
 
 \begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrr}
+\toprule
+Benchmark & Responses & Teacher & Initial & $\Delta$ (pp) & Trunc. \\
+\midrule
+MATH-500 & 500 & 75.60 & 55.60 & +20.00 & 6.80 \\
+LiveCodeBench postcutoff & 128 & 23.44 & 0.78 & +22.66 & 24.22 \\
+IFBench strict & 300 & 29.00 & 17.33 & +11.67 & 7.33 \\
+GPQA-Diamond avg@4 & $198\times4$ & 34.60 & 18.81 & +15.78 & 0.51 \\
+\bottomrule
+\end{tabular}
 \caption{Domain-specific teacher references and the initial student.
 Scores and teacher truncation rates (Trunc.) are percentages;
 $\Delta$ is the teacher-minus-initial difference in percentage points,
@@ -53,20 +66,6 @@ IFBench uses strict accuracy. GPQA averages correctness over four
 responses per question, rather than counting any correct response as
 success. Each row uses a different teacher and benchmark.}
 \label{tab:teacher_reference}
-\begin{center}
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{>{\raggedright\arraybackslash}p{1.4in}rrrrr}
-\toprule
-Benchmark & Responses & Teacher & Initial & $\Delta$ (pp) & Trunc. \\
-\midrule
-MATH-500 & 500 & 75.60 & 55.60 & +20.00 & 6.80 \\
-LiveCodeBench\newline postcutoff & 128 & 23.44 & 0.78 & +22.66 & 24.22 \\
-IFBench strict & 300 & 29.00 & 17.33 & +11.67 & 7.33 \\
-GPQA-Diamond avg@4 & $198\times4$ & 34.60 & 18.81 & +15.78 & 0.51 \\
-\bottomrule
-\end{tabular}
-
-\end{center}
 \end{table}
 
 The teachers produce respectively $378/500$, $30/128$, $87/300$, and
