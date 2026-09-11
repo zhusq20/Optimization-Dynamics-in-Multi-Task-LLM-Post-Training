@@ -6,6 +6,8 @@
 For response $i$, let $T_i$ be its valid-token count and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss. Let $\mathcal B_d$ contain the responses from domain $d$, with target weights $\sum_d\lambda_d=1$. The three reductions in Table~\ref{tab:normalization} expose two distinct choices: the weight assigned to a domain, and the weight assigned to responses within that domain.
 
 \begin{table}[t]
+\caption{Averaging rules on a fixed batch of nonempty responses. We use $\lambda_d=1/4$. GT assigns domains their observed token shares; DT fixes domain weights; DR also gives each response equal weight within its domain.}
+\label{tab:normalization}
 \centering\small
 \renewcommand{\arraystretch}{1.2}
 \begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll@{}}
@@ -17,8 +19,6 @@ Domain token (DT) & $\sum_d\lambda_d\,\sum_{i\in\mathcal B_d}T_i\ell_i/\sum_{i\i
 Domain response (DR) & $\sum_d\lambda_d\,|\mathcal B_d|^{-1}\sum_{i\in\mathcal B_d}\ell_i$ \\
 \bottomrule
 \end{tabular*}
-\caption{Averaging rules on a fixed batch of nonempty responses. We use $\lambda_d=1/4$. GT assigns domains their observed token shares; DT fixes domain weights; DR also gives each response equal weight within its domain.}
-\label{tab:normalization}
 \end{table}
 
 With equal prompt quotas, longer responses increase a domain's weight under GT. DT removes this between-domain length effect, while retaining length weighting within each domain. Writing $g_i=\nabla_\theta\ell_i$, the exact fixed-batch relation is
@@ -43,8 +43,8 @@ Figure~\ref{fig:capability} shows every completed evaluation in the aligned camp
 The three I64 reductions can be compared at their shared update-50 checkpoint (Table~\ref{tab:normalization50}). GT leads mathematics, while DR leads instruction following. Relative to DR, GT gains 4.6 percentage points on mathematics, with a paired prompt-bootstrap interval of $[1.2,8.2]$ points. DT changes instruction following by $-2.0$ points, with interval $[-4.0,-0.33]$. Figure~\ref{fig:normalization_ci} gives all eight paired contrasts and the uncertainty procedure. These results make the choice of averaging rule a capability-allocation decision: enforcing equal domain mass changes which responses drive learning, and its value depends on the target capability.
 
 \begin{table}[t]
-\centering\small
-\input{experiments/aligned_evidence_20260910/normalization_table.tex}
 \caption{Capability scores (\%) at the common comparison checkpoint. Initialization, teachers, prompt quotas, and optimizer settings are shared. Each branch generates responses from its evolving student.}
 \label{tab:normalization50}
+\centering\small
+\input{experiments/aligned_evidence_20260910/normalization_table.tex}
 \end{table}

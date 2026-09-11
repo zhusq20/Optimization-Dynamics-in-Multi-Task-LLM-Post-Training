@@ -3,13 +3,15 @@
 
 \subsection{Model, data, and training protocol}
 
-The student is Qwen3-1.7B \citep{qwen2025qwen3}, revision \texttt{70d244cc86cc} (the full revision and weight hashes are in the frozen protocol). The four teachers are mathematics, code, instruction-following, and science RL descendants of the same initial model. Student and teacher use the native chat template with thinking disabled, the same assistant prefix, and no suffix removal. Generation stops at token 151643 or 151645; the model EOS token is 151645. The vocabulary contains 151,936 entries.
+The student is Qwen3-1.7B \citep{qwen2025qwen3}, revision \texttt{70d244cc86cc} (the full revision and weight hashes are in the frozen protocol). The four frozen teachers are mathematics, code, instruction-following, and science RL descendants of the same initial model. Student and teacher use the native chat template with thinking disabled, the same assistant prefix, and no suffix removal. Generation stops at token 151643 or 151645; the model EOS token is 151645. The vocabulary contains 151,936 entries.
 
 All six configurations use AdamW with learning rate $2.5\times10^{-7}$, $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, zero weight decay, constant learning rate, and global gradient clipping at norm 1. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. An optimizer update aggregates 64 responses in sixteen four-response slices, with one response per execution microbatch. The optimizer is applied once after all domain blocks are accumulated. Consequently, the scalar logger's \texttt{train/step} counts gradient slices; all checkpoint axes in this paper count actual optimizer updates.
 
 The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. The frozen protocol records the exact train, diagnostic, and held-out split hashes and teacher conversion manifests. I64 starts from initialization with the intersection objective in Equation~\ref{eq:i64}.
 
 \begin{table}[!htbp]
+\caption{Coverage of the aligned evidence snapshot. The single-teacher training runs reached update 500; their complete capability suites available here end at 250. Multi-teacher runs have unequal coverage after interruptions and restarts. The DT update-100 checkpoint is incomplete. Reported curves use the completed measurements listed here.}
+\label{tab:coverage}
 \centering\small
 \begin{tabular}{lrl}
 \toprule
@@ -24,8 +26,6 @@ M-I64-DT & 50 & 0, 1, 50 \\
 M-I64-GT & 50, 100 & 0, 1, 50, 100 \\
 \bottomrule
 \end{tabular}
-\caption{Coverage of the aligned evidence snapshot. The single-teacher training runs reached update 500; their complete capability suites available here end at 250. Multi-teacher runs have unequal coverage after interruptions and restarts. The DT update-100 checkpoint is incomplete. Reported curves use the completed measurements listed here.}
-\label{tab:coverage}
 \end{table}
 
 \subsection{Evaluation and scoring}
@@ -35,19 +35,19 @@ Each capability suite contains MATH-500 (500 questions) \citep{hendrycks2021math
 Table~\ref{tab:all_capability} gives all twelve complete suites. Eight suites have local response-level artifacts: the shared initial student and seven multi-teacher checkpoints. Their 13,760 response records were checked against artifact hashes, expected sample counts, unique prompt/sample indices, and logged aggregate scores. The code artifacts report zero sandbox infrastructure errors. Recomputing all 6,336 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero score changes. Four single-teacher suites contribute 6,880 responses through previously verified completion summaries from a second node. Their per-question records remain on that node.
 
 \begin{table}[t]
-\centering\small
-\input{experiments/aligned_evidence_20260910/capability_table.tex}
 \caption{All completed aligned capability scores (\%). Scores use the standard dataset metrics and all evaluated responses. The shared initial student is counted once in the twelve-suite total.}
 \label{tab:all_capability}
+\centering\small
+\input{experiments/aligned_evidence_20260910/capability_table.tex}
 \end{table}
 
 The four RL teachers were evaluated separately on their respective domain benchmarks with the compatible native prompt and decoding protocol (Table~\ref{tab:teachers}). The science teacher's 792 saved responses also agree exactly with the current GPQA scorer. These teacher scores describe the available supervision on each target domain.
 
 \begin{table}[t]
-\centering\small
-\input{experiments/aligned_evidence_20260910/teacher_table.tex}
 \caption{Domain teacher reference evaluations, retained from the compatible September 6 evaluation campaign. Science uses GPQA average@4.}
 \label{tab:teachers}
+\centering\small
+\input{experiments/aligned_evidence_20260910/teacher_table.tex}
 \end{table}
 
 \subsection{Paired comparisons and evidence provenance}

@@ -52,10 +52,10 @@ For a fixed prefix, differentiating Equation~\ref{eq:full} gives
 using $\sum_v\nabla_\theta p_\theta(v)=0$. The sampling experiment draws fresh actions from this fixed-prefix distribution with fixed prefix weights. At each sample count, two independent draws are evaluated for each bank; counts use separate, non-nested draws. Relative error is $\|\widehat g-g_{\mathrm{full}}\|_2/\|g_{\mathrm{full}}\|_2$. This identity conditions on prefixes and weights. Original rollout losses additionally use the realized response and its eventual length-dependent weight.
 
 \begin{table}[t]
-\centering\small
-\input{experiments/aligned_evidence_20260910/coverage_table.tex}
 \caption{Fixed-prefix coverage and routed gradient scale. Probability mass and full-vocabulary student entropy (nats) are averaged over each row's four prefixes. A displayed mass of 100\% may reflect rounding at the reported precision.}
 \label{tab:coverage_mass}
+\centering\small
+\input{experiments/aligned_evidence_20260910/coverage_table.tex}
 \end{table}
 
 \section{Teacher Distribution Distance}

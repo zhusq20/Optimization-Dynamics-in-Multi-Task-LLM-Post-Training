@@ -1,4 +1,4 @@
-\begin{thebibliography}{9}
+\begin{thebibliography}{10}
 \providecommand{\natexlab}[1]{#1}
 \providecommand{\url}[1]{\texttt{#1}}
 \expandafter\ifx\csname urlstyle\endcsname\relax
@@ -57,6 +57,14 @@ Valentina Pyatkin, Saumya Malik, Victoria Graf, Hamish Ivison, Shengyi Huang,
 {Qwen Team}.
 \newblock Qwen3 technical report, 2025.
 \newblock URL \url{https://arxiv.org/abs/2505.09388}.
+
+\bibitem[Rafailov et~al.(2023)Rafailov, Sharma, Mitchell, Ermon, Manning, and
+  Finn]{rafailov2023dpo}
+Rafael Rafailov, Archit Sharma, Eric Mitchell, Stefano Ermon, Christopher~D.
+  Manning, and Chelsea Finn.
+\newblock Direct preference optimization: Your language model is secretly a
+  reward model, 2023.
+\newblock URL \url{https://arxiv.org/abs/2305.18290}.
 
 \bibitem[Rein et~al.(2023)Rein, Hou, Stickland, Petty, Pang, Dirani, Michael,
   and Bowman]{rein2023gpqa}

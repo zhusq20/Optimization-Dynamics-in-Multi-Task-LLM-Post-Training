@@ -1,4 +1,4 @@
-> 当前对齐实验设置：实验使用 **Qwen3-1.7B RL teacher → Qwen3-1.7B student**（以 2026-09-10 frozen protocol 为准）。RL Teacher Regularization and Domain Weights 附录 在 teacher 达到 KL-RL 最优策略的设定下，分析其 RL 目标如何进入完整序列的蒸馏梯度：reward 项的域系数为 λ/β，KL 项将 student 拉向 teacher 的 RL reference。Student 从该 reference 出发时，初始 KL 梯度为零；从不同策略出发时，初始梯度保留这一项。
+> 当前设置明确：实验使用 **Qwen3-1.7B RL teacher → Qwen3-1.7B-Base student**。Teacher 的 RL KL reference 与 student 的 Base 初始化需要区分，不能仅凭同架构、同参数规模视为相同。理想 KL-RL teacher 的 OPD–RL 梯度关系作为条件性理论补充放在附录；初始化处的纯 reward-gradient 简化额外要求 student 初始策略等于 teacher 的 KL reference，不列为当前实验结论或正文贡献。
 
 > 最新决定：主稿标题改为 **Token Balancing, Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation**。Update Sparsity 指参数更新稀疏性：分别报告单步优化器更新和累计参数变化，原始梯度用于辅助解释。Table 1 改为正文全宽的紧凑表格。下方记录保留前一轮修改过程，研究重心以此条为准。
 

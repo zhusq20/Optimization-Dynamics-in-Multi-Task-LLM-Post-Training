@@ -107,7 +107,7 @@ def main():
     check('latex_references_and_layout',not re.search(r'undefined|multiply defined|Overfull|LaTeX Error',log))
     pdf=pymupdf.open(ROOT/'iclr2027_conference.pdf');body='\n'.join(p.get_text() for p in pdf)
     check('compiled_figures_present',all(f'Figure {i}:' in body for i in range(1,12)))
-    check('compiled_tables_present',all(t in body for t in ['Table 1:','Table 2:','Table A1:','Table A2:','Table A3:','Table A4:']))
+    check('compiled_tables_present',all(t in body for t in [f'Table {i}:' for i in range(1,7)]))
     environment={'python':platform.python_version(),'numpy':np.__version__,'matplotlib':matplotlib.__version__,'pymupdf':pymupdf.__version__}
     (DATA/'plotting_environment.json').write_text(json.dumps(environment,indent=2)+'\n')
     report={'status':'passed','checked_at_utc':datetime.now(timezone.utc).isoformat(),'checks_passed':len(checks),

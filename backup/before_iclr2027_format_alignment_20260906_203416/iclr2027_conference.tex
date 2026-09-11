@@ -6,6 +6,7 @@
 % ------------------------------ Preamble ------------------------------------
 \usepackage{graphicx}
 \usepackage{float}
+\usepackage{subcaption}
 \usepackage{array}
 \usepackage{booktabs}
 \usepackage{xcolor}
@@ -31,12 +32,18 @@
 \newcommand{\pospart}[1]{\left[#1\right]_{+}}
 \newcommand{\ctr}[2]{\operatorname{ctr}_{#1}\!\left[#2\right]}
 \newcommand{\chisq}[2]{\chi^2\!\left(#1\,\|\,#2\right)}
+\newcommand{\siqi}[1]{\textcolor{blue}{[siqi: #1]}}
+\newcommand{\missing}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\missingfigure}[2][0.15\textheight]{%
+  \fbox{\begin{minipage}[c][#1][c]{0.94\linewidth}
+  \centering\missing{#2}
+  \end{minipage}}}
+
 % Optional math commands from https://github.com/goodfeli/dlbook_notation.
 \input{math_commands.tex}
 
 \usepackage{hyperref}
-% Keep the template default hyperlink borders (citations green, internal links red).
-\hypersetup{
+\hypersetup{hidelinks,
     pdftitle={Token Balancing, Update Sparsity, and Supervision Density in Multi-Teacher On-Policy Distillation},
     pdfauthor={Anonymous Authors}}
 \usepackage{url}
@@ -46,6 +53,8 @@
 
 \author{Anonymous Authors}
 
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
 
 %\iclrfinalcopy
 \begin{document}
@@ -66,8 +75,10 @@
 \bibliography{iclr2027_conference}
 \bibliographystyle{iclr2027_conference}
 
-\clearpage
 \appendix
+
+\setcounter{table}{0}
+\renewcommand{\thetable}{A\arabic{table}}
 
 \input{sections/005_experiment}
 \input{sections/009_appendix}

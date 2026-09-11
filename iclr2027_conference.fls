@@ -1,4 +1,4 @@
-PWD /workspace/dev/iclr2027/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training
+PWD /tmp/overleaf-merge-2026-09-11-0127
 INPUT /etc/texmf/web2c/texmf.cnf
 INPUT /usr/share/texmf/web2c/texmf.cnf
 INPUT /usr/share/texlive/texmf-dist/web2c/texmf.cnf
@@ -46,12 +46,6 @@ INPUT /usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/graphics.cfg
 INPUT /usr/share/texlive/texmf-dist/tex/latex/graphics-cfg/graphics.cfg
 INPUT /usr/share/texlive/texmf-dist/tex/latex/float/float.sty
 INPUT /usr/share/texlive/texmf-dist/tex/latex/float/float.sty
-INPUT /usr/share/texlive/texmf-dist/tex/latex/caption/subcaption.sty
-INPUT /usr/share/texlive/texmf-dist/tex/latex/caption/subcaption.sty
-INPUT /usr/share/texlive/texmf-dist/tex/latex/caption/caption.sty
-INPUT /usr/share/texlive/texmf-dist/tex/latex/caption/caption.sty
-INPUT /usr/share/texlive/texmf-dist/tex/latex/caption/caption3.sty
-INPUT /usr/share/texlive/texmf-dist/tex/latex/caption/caption3.sty
 INPUT /usr/share/texlive/texmf-dist/tex/latex/tools/array.sty
 INPUT /usr/share/texlive/texmf-dist/tex/latex/tools/array.sty
 INPUT /usr/share/texlive/texmf-dist/tex/latex/booktabs/booktabs.sty
@@ -366,6 +360,11 @@ INPUT ./figures/aligned_evidence_20260910/if_generation.pdf
 INPUT ./figures/aligned_evidence_20260910/if_generation.pdf
 INPUT ./figures/aligned_evidence_20260910/if_generation.pdf
 INPUT ./figures/aligned_evidence_20260910/if_generation.pdf
+INPUT ./sections/010_rl_teacher_connection.tex
+INPUT ./sections/010_rl_teacher_connection.tex
+INPUT ./sections/010_rl_teacher_connection.tex
+INPUT ./sections/010_rl_teacher_connection.tex
+INPUT sections/010_rl_teacher_connection.tex
 INPUT iclr2027_conference.aux
 INPUT ./iclr2027_conference.out
 INPUT ./iclr2027_conference.out
@@ -378,6 +377,7 @@ INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi6.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi7.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmmi9.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb
+INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr5.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr6.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr7.pfb
 INPUT /usr/share/texlive/texmf-dist/fonts/type1/public/amsfonts/cm/cmr9.pfb

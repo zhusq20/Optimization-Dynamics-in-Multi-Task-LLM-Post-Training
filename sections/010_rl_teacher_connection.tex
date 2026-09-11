@@ -1,0 +1,117 @@
+\section{RL Teacher Regularization and Domain Weights}
+\label{app:rl_teacher_connection}
+
+Our experiments distill RL-trained Qwen3-1.7B teachers into a
+Qwen3-1.7B student (Appendix~\ref{app:setup}). Teacher training introduces another source of
+domain weighting: its reward scale and KL penalty determine the signal
+passed to the student. We derive this connection by treating each teacher
+as the optimum of its KL-regularized RL objective and distilling its
+complete response distribution with reverse KL.
+
+\paragraph{The teacher's RL objective.}
+During RL, teacher $d$ is rewarded for solving its task and penalized for
+deviating from a fixed reference policy $\mu_d$. The student starts
+distillation from $\pi_{\theta_0}$, which in our experiments is
+Qwen3-1.7B. Thus $\mu_d$ specifies the reference in the teacher's
+training objective, while $\pi_{\theta_0}$ specifies the student's
+starting checkpoint.
+For each domain $d$, fix a prompt distribution $\mathcal D_d$, a
+sequence reward $R_d(x,y)$, and a KL penalty coefficient $\beta_d>0$.
+Define
+\begin{equation}
+\begin{aligned}
+\mathcal R_d(\theta)
+&=\mathbb E_{x\sim\mathcal D_d,\,y\sim\pi_\theta(\cdot\mid x)}
+  [R_d(x,y)],\\
+K_d(\theta)
+&=\mathbb E_{x\sim\mathcal D_d}
+  D_{\mathrm{KL}}\!\left(\pi_\theta(\cdot\mid x)
+  \|\mu_d(\cdot\mid x)\right),
+\qquad J_d(\theta)=\mathcal R_d(\theta)-\beta_d K_d(\theta).
+\end{aligned}
+\label{eq:rl_teacher_objective}
+\end{equation}
+With common support and finite expectations and normalizers, the optimum
+over response distributions has the standard form
+\citep[Appendix A.1]{rafailov2023dpo}:
+\begin{equation}
+q_d^*(y\mid x)
+=\frac{\mu_d(y\mid x)\exp(R_d(x,y)/\beta_d)}{Z_d(x)},
+\qquad
+Z_d(x)=\sum_y\mu_d(y\mid x)\exp(R_d(x,y)/\beta_d).
+\label{eq:rl_teacher_optimum}
+\end{equation}
+
+\paragraph{Gradient equivalence.}
+Consider the complete-sequence reverse KL, without response-length
+normalization,
+$L_d^{\mathrm{seq}}(\theta)=\mathbb E_{x\sim\mathcal D_d}
+D_{\mathrm{KL}}(\pi_\theta(\cdot\mid x)\|q_d^*(\cdot\mid x))$.
+Substituting Equation~\ref{eq:rl_teacher_optimum} gives
+\begin{equation}
+\begin{aligned}
+L_d^{\mathrm{seq}}(\theta)
+&=K_d(\theta)-\frac{\mathcal R_d(\theta)}{\beta_d}+C_d
+=-\frac{J_d(\theta)}{\beta_d}+C_d,\\
+-\nabla_\theta L_d^{\mathrm{seq}}(\theta)
+&=\frac{1}{\beta_d}\nabla_\theta J_d(\theta),
+\qquad C_d=\mathbb E_{x\sim\mathcal D_d}\log Z_d(x).
+\end{aligned}
+\label{eq:rl_teacher_gradient}
+\end{equation}
+Since $C_d$ is constant with respect to $\theta$, distilling this teacher
+has the same gradient direction as maximizing its RL objective, scaled
+by $1/\beta_d$. The derivative includes the change in the student's
+response distribution as its parameters change. The equality holds
+throughout student training, for any initialization.
+
+\paragraph{How teacher training changes domain weights.}
+With domain weights $\lambda_d$, the mixed descent direction separates
+into a reward term and a reference term:
+\begin{equation}
+-\nabla_\theta\sum_d\lambda_d L_d^{\mathrm{seq}}(\theta)
+=\sum_d\frac{\lambda_d}{\beta_d}\nabla_\theta\mathcal R_d(\theta)
+  -\sum_d\lambda_d\nabla_\theta K_d(\theta).
+\label{eq:rl_teacher_mixture}
+\end{equation}
+The reward terms push the student toward higher task rewards; the
+reference terms pull it toward the teachers' RL references. The coefficient
+of domain $d$'s reward gradient is therefore $\lambda_d/\beta_d$.
+For example, with equal domain weights and comparable reward units,
+mathematics and coding teachers with $\beta_d=0.05$ and $0.10$ give
+the mathematics reward gradient twice the coefficient of the coding
+reward gradient. The resulting update also depends on the magnitudes
+and directions of these gradients and the reference terms.
+
+If $R_d=s_d\widetilde R_d$ for $s_d>0$, the coefficient of
+$\nabla_\theta\mathbb E[\widetilde R_d]$ becomes
+$\lambda_d s_d/\beta_d$. Thus reward scale and KL strength act together:
+rescaling both by the same positive constant leaves the optimal
+teacher unchanged.
+
+\paragraph{What student initialization changes.}
+When the student starts from the same policy as every teacher's RL
+reference, $\pi_{\theta_0}=\mu_d$, each KL term is minimized and
+$\nabla_\theta K_d(\theta_0)=0$. The initial descent direction then
+contains only the reward gradients:
+\begin{equation}
+\left.-\nabla_\theta\sum_d\lambda_d L_d^{\mathrm{seq}}(\theta)
+\right|_{\theta_0}
+=\left.\sum_d\frac{\lambda_d}{\beta_d}
+  \nabla_\theta\mathcal R_d(\theta)\right|_{\theta_0}.
+\label{eq:rl_teacher_initial_gradient}
+\end{equation}
+When the student's initial policy differs from a teacher's RL
+reference, Equation~\ref{eq:rl_teacher_mixture} retains the corresponding
+KL gradient from the first update. Distillation then combines improving
+task reward with reducing the student's distance from that reference.
+
+\paragraph{Connection to token balancing.}
+The averaging rules in Section~\ref{sec:normalization} set the weights
+assigned to domains and responses. The derivation above explains how
+the teacher's RL objective sets the reward scale within a domain's
+sequence loss. Our token losses in Section~\ref{sec:setting} use fixed
+sampled prefixes, response-length averaging, and top-$k$ supervision
+or clipped advantages. Their local gradients depend on these loss
+choices as well as the teacher distribution; Equation~\ref{eq:rl_teacher_gradient}
+describes the full derivative of the complete-sequence objective.

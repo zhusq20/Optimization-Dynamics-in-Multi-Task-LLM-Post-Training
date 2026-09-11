@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "checked_at_utc": "2026-09-10T22:33:18.006155+00:00",
+  "checked_at_utc": "2026-09-11T01:32:51.144974+00:00",
   "checks_passed": 738,
   "frozen_sources": 70,
   "capability_suites": 12,
@@ -84,8 +84,8 @@
       "text_characters": 279
     }
   ],
-  "compiled_pdf_pages": 15,
-  "pdf_sha256": "7b46c4adc914b29da30765f92baec59dbde56faa84409450ab84217c47dc7741",
+  "compiled_pdf_pages": 16,
+  "pdf_sha256": "331c6c5c8d0db345de4fabc2f1319c96b7a64879390ba81582614bce008b6b56",
   "environment": {
     "python": "3.12.3",
     "numpy": "1.26.4",

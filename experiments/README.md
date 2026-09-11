@@ -4,6 +4,8 @@ The current manuscript uses the [September 10 aligned evidence bundle](aligned_e
 
 The bundle includes twelve complete capability suites, compatible teacher references, actual online parameter geometry, and the aligned M-PG/100 local mechanisms. The [verification report](aligned_evidence_20260910/verification_report.json) records source hashes, score checks, figure coverage, and manuscript validation.
 
+Teacher-conditioned gradients and proposed optimizer steps start from identical copies of an actual MOPD checkpoint. Mathematics, code, instruction following, and science each use their own frozen RL-trained Qwen3-1.7B teacher. The aligned student is initialized from Qwen3-1.7B, as recorded in the frozen protocol. The [RL-teacher appendix](../sections/010_rl_teacher_connection.tex) distinguishes each teacher's RL KL reference from the student initialization and derives how teacher reward scale, KL strength, and the reference policy enter the distillation gradient under an optimal-teacher model.
+
 Regenerate the current paper figures on CPU:
 
 ```bash
