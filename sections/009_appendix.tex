@@ -1,109 +1,140 @@
 \section{Length-Weighting Derivation}
 \label{app:normalization}
 
-Fix a rollout batch, its valid-token masks, and domain weights $\lambda_d$. Any PG coefficients are detached. For $n_d=|\mathcal B_d|$, let $\bar T_d=n_d^{-1}\sum_{i\in\mathcal B_d}T_i$ and $\bar g_d=n_d^{-1}\sum_{i\in\mathcal B_d}g_i$. Define the empirical covariance using the same $1/n_d$ normalization:
+Fix a rollout batch, its valid-token masks, and the domain weights
+$\lambda_d$. Any PG advantages are detached. Use the response mean
+$\ell_i$ and response gradient $g_i=\nabla_\theta\ell_i$ from
+Section~\ref{sec:normalization}. For $n_d=|\mathcal B_d|$, define mean
+response length $\bar T_d=n_d^{-1}\sum_{i\in\mathcal B_d}|y_i|$ and mean
+response gradient $\bar g_d=n_d^{-1}\sum_{i\in\mathcal B_d}g_i$.
+The empirical length--gradient covariance uses the same $1/n_d$
+normalization:
 \begin{equation}
-\operatorname{Cov}_d(T,g)=\frac{1}{n_d}\sum_{i\in\mathcal B_d}(T_i-\bar T_d)(g_i-\bar g_d).
+\operatorname{Cov}_d(|y|,g)
+=\frac{1}{n_d}\sum_{i\in\mathcal B_d}
+(|y_i|-\bar T_d)(g_i-\bar g_d),\qquad
+\frac{\sum_{i\in\mathcal B_d}|y_i|g_i}
+     {\sum_{i\in\mathcal B_d}|y_i|}
+=\bar g_d+\frac{\operatorname{Cov}_d(|y|,g)}{\bar T_d}.
+\label{eq:norm_covariance}
 \end{equation}
-Expanding gives $n_d^{-1}\sum_iT_i g_i-\bar T_d\bar g_d$. Dividing by $\bar T_d$ yields Equation~\ref{eq:weighting}. GT combines the resulting domain gradients using observed token shares; DT combines them using $\lambda_d$; DR combines $\bar g_d$ using $\lambda_d$. Multiplying each domain's globally averaged terms by its target weight divided by its observed token share therefore gives DT exactly.
+To verify the identity, expand the covariance as
+$n_d^{-1}\sum_i|y_i|g_i-\bar T_d\bar g_d$ and divide by $\bar T_d$.
+Global token averaging combines the right-hand side using each domain's
+observed token share; domain token averaging uses $\lambda_d$ instead.
+Domain response averaging gives $\sum_d\lambda_d\bar g_d$.
+Thus the change in the domain coefficient and the within-domain
+length--gradient covariance are distinct, even with identical rollouts.
+Multiplying a domain's globally averaged token terms by its target weight
+divided by its observed token share gives the domain-token rule exactly.
 
-The derivation is a finite-batch weighted-average identity. Response sampling, masks, and lengths are held fixed. Its population analogue involves an expectation of a ratio; replacing that expectation by a ratio of expectations requires additional assumptions or a large-batch limit.
+These are finite-batch identities. The expectation of a sample ratio
+is generally not the ratio of population expectations; replacing it
+with $\mathbb E[|y|g]/\mathbb E[|y|]$ requires an appropriate large-batch
+limit. The identities also do not differentiate through the response
+sampling distribution, masks, or response lengths.
 
-\section{Parameter and Optimizer Measurements}
+\section{Measurement Details and Optional Follow-up}
+
+\subsection{Teacher-conditioned masks at a common joint checkpoint}
 \label{app:records}
 
-\subsection{Coordinates and recorded quantities}
+The diagnostic record contains the joint student checkpoint, optimizer
+state, teacher identity, routed domain, prompt IDs, sampled response
+and mask, loss reduction, and gradient accumulation denominator.
+Each teacher-conditioned gradient and proposed step is computed from
+the same restored student state. They describe the parameters most affected by a teacher at that
+checkpoint, not a unique historical attribution of the cumulative joint delta.
 
-The online record distinguishes raw aggregate gradients, clipped gradients, actual FP32 optimizer steps, cumulative FP32 master changes, and cumulative BF16 model changes. Cumulative changes use the same initialization reference. All global statistics use unique model coordinates, excluding vocabulary padding and shared duplicates. Per-layer statistics and absolute-threshold sensitivities are retained in the frozen measurements. The sparsity value is the fraction at or below a threshold; figures report its complement. Energy concentration uses squared Euclidean norm and ranks coordinates by absolute change.
+Record raw and clipped gradients separately. Retain the actual optimizer
+step and its momentum and decay settings. A zero-gradient optimizer
+branch can identify motion caused by stored momentum or weight decay
+when those components dominate an overlap comparison. Prefer FP32
+master-weight differences for cumulative updates when available;
+converting already rounded BF16 checkpoints to FP32 does not recover
+unrecorded updates. Record exclusions, thresholds, relative scales,
+tie rules, and per-layer selected-parameter counts.
 
-For local calculations, the exported checkpoint contains FP32 master values, BF16 model values, first and second moments, optimizer hyperparameters, and step clocks. The BF16 values match all 1,720,574,976 coordinates in the native exported model. Teacher weight values are verified in the same precision. Local forward/backward computations evaluate these values in FP32 with TF32 disabled. All proposed steps are computed from the same saved state with a non-fused Adam implementation. The online training optimizer uses its own fused implementation.
+Comparisons selecting an equal fraction of parameters accompany
+absolute-threshold selections.
+A stratified random baseline preserves layer and source-weight-magnitude
+bins when feasible. Degenerate or tie-dominated gradients are marked;
+ranking a zero vector does not define a meaningful learned subnetwork.
+If both selections are empty, report overlap as undefined and exclude
+that comparison from averages. If only one is empty, overlap is zero.
 
-We evaluate three local states. \emph{Saved} retains both moments and the step clock. \emph{Reset m} zeros the first moment while retaining the second moment and clock. \emph{Fresh} zeros both moments and resets the clock. Global norm clipping at 1 is applied before the Adam calculation, and weight decay is zero. For the zero-gradient branch, the saved first moment continues to decay and move the master weights. A no-step master-to-BF16 cast gives an exact match to the saved model. Thirteen numerical checks cover the Adam formulas against PyTorch, loss gradients, parameter-coordinate inner products, support ties, and zero-vector handling. Figure~\ref{fig:thresholds} shows how absolute thresholds change the measured local activity.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/thresholds.pdf}
-\caption{Absolute-threshold sensitivity of the saved-state local steps. Lines show means over two banks and shading shows their range; the zero-gradient control has one value. The two panels use the same thresholds and separate FP32 master changes from BF16 writeback.}
-\label{fig:thresholds}
-\end{figure}
-
-\subsection{Response banks, overlaps, and gradient magnitudes}
-
-Banks use seeds 42 and 43, one response per domain per bank, a 2,048-token prompt cap, and a 256-token generation cap. All eight responses reach the cap. Four response positions are sampled without replacement per response. Each row's four prefixes receive equal weight. For routed gradients, each teacher scores its domain row; for common-bank gradients, it scores all four rows with equal domain weights. Crossed comparisons score every domain row with every teacher, keeping the number of prefixes per gradient at four. The 192 crossed-pair records and 48 routed/common pair records share underlying gradients, so points represent paired conditions within banks.
-
-Top-$k$ coordinate sets rank absolute gradient values, using a stable coordinate index to break cutoff ties. The diagnostic records the cutoff and whether a tie crosses the selection boundary. These tie flags accompany the source metrics, including overlaps from nearly degenerate gradients. Table~\ref{tab:coverage_mass} supplies the routed PG norms; the first bank's instruction-following gradient has norm $1.53\times10^{-9}$. Cosine normalizes magnitude, so opposite directions for such a row carry very little absolute gradient mass. Jaccard overlap measures selected locations and cosine measures signed direction. For reference, independent uniform sets of fraction $\rho$ have expected-intersection to expected-union ratio $\rho/(2-\rho)$, or approximately 0.00503 at $\rho=1\%$. This reference uses uniform coordinates; layer and weight-magnitude structure remain in the measured gradients.
-
-\section{Vocabulary Coverage and Sampling}
-\label{app:losses}
-
-The corrected teacher-top-64 diagnostic uses the fixed teacher set $T$ and full-vocabulary probabilities:
-\begin{equation}
-\ell_{\mathrm{T64}}=\sum_{v\in T}\left[p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)}-p_\theta(v)+q_d(v)\right].
-\label{eq:t64}
-\end{equation}
-Its gradient is $\sum_{v\in T}p_\theta(v)\log(p_\theta(v)/q_d(v))\nabla_\theta\log p_\theta(v)$. I64 instead uses the detached weights in Equation~\ref{eq:i64}, normalized over the original student set $S$. T64 and full vocabulary are local objective comparisons at the M-PG checkpoint; online capability curves compare PG and I64.
-
-For a fixed prefix, differentiating Equation~\ref{eq:full} gives
-\begin{align}
-\nabla_\theta\ell_{\mathrm{full}}
-&=\sum_{v\in\cV}p_\theta(v)\left(\log\frac{p_\theta(v)}{q_d(v)}+1\right)\nabla_\theta\log p_\theta(v)\\
-&=\mathbb E_{a\sim p_\theta}\!\left[\log\frac{p_\theta(a)}{q_d(a)}\nabla_\theta\log p_\theta(a)\right],
-\end{align}
-using $\sum_v\nabla_\theta p_\theta(v)=0$. The sampling experiment draws fresh actions from this fixed-prefix distribution with fixed prefix weights. At each sample count, two independent draws are evaluated for each bank; counts use separate, non-nested draws. Relative error is $\|\widehat g-g_{\mathrm{full}}\|_2/\|g_{\mathrm{full}}\|_2$. This identity conditions on prefixes and weights. Original rollout losses additionally use the realized response and its eventual length-dependent weight.
-
-\begin{table}[t]
-\caption{Fixed-prefix coverage and routed gradient scale. Probability mass and full-vocabulary student entropy (nats) are averaged over each row's four prefixes. A displayed mass of 100\% may reflect rounding at the reported precision.}
-\label{tab:coverage_mass}
-\centering\small
-\input{experiments/aligned_evidence_20260910/coverage_table.tex}
-\end{table}
-
-\section{Teacher Distribution Distance}
+\subsection{Teacher distribution difference}
 \label{app:teacher_distance}
 
-Teacher distance is computed on the full next-token vocabulary at matched prefixes:
+For teachers $d$ and $e$ at the same prefix, the Jensen--Shannon divergence is
 \begin{equation}
-\operatorname{JS}(q_d,q_e)=\tfrac12 D_{\mathrm{KL}}(q_d\|m)+\tfrac12 D_{\mathrm{KL}}(q_e\|m),
-\qquad m=\tfrac12(q_d+q_e).
+\operatorname{JS}(\pi_{\phi_d},\pi_{\phi_e})
+=\tfrac12 D_{\mathrm{KL}}(\pi_{\phi_d}\|m)
++\tfrac12 D_{\mathrm{KL}}(\pi_{\phi_e}\|m),
+\qquad m=\tfrac12(\pi_{\phi_d}+\pi_{\phi_e}).
 \label{eq:teacher_js}
 \end{equation}
-We average over the same equally weighted domains and prefixes for every pair. The twelve bank-pair measurements are paired with the corresponding gradient overlaps in Figure~\ref{fig:teacher_js}. Common-bank gradients exhibit a wider overlap range than routed gradients. The two banks and six pairs describe the relationship for these four teachers; comparisons sharing a teacher also share its distribution and gradients.
+It lies between zero and $\log 2$ with natural logarithms and is zero
+when the two next-token distributions agree. Average this quantity
+across the same prefix bank and domain weights for every pair.
+Replacing one teacher distribution with $\pi_\theta$ gives the
+teacher--student comparison. Truncated estimates must report their
+retained probability mass and must not be presented as exact
+full-vocabulary divergences.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_js.pdf}
-\caption{Full-vocabulary teacher JS versus gradient-support distance. Colors identify teacher pairs; circles and triangles identify banks. Each panel pairs the same twelve JS measurements with its PG or I64, routed or common-bank gradient overlap.}
-\label{fig:teacher_js}
-\end{figure}
+\subsection{Optional analysis if the loss comparison shows a stable difference}
+\label{app:optional_loss}
 
-\section{Response Behavior During Training and Evaluation}
-\label{app:behavior}
-\setcounter{topnumber}{3}
-\setcounter{totalnumber}{4}
+If a stable difference warrants further analysis, resample next actions
+on a fixed student-prefix bank and compare sample counts, an
+action-independent detached baseline, and the exact full-vocabulary
+gradient. These controls test whether the effect tracks sampling variance. A retained-head plus sampled-tail estimator can distinguish
+truncation from the full reverse-KL reference
+\citep{oh2026vopd,zhang2026emapg,yu2026denseupdates}.
 
-Figure~\ref{fig:training_behavior} shows all 128 M-PG rollout records, without smoothing. Equal prompt quotas coexist with larger mathematics token shares because mathematics responses are longer. Instruction-following truncation varies over the trajectory. The terminal-token panel records mean teacher-minus-student log probability only at observed completed terminal positions. It measures teacher supervision on those positions, with the corresponding observed-response counts retained in the source records.
+The independent action draws do not extend the response; prefix selection
+and weights remain fixed. Original rollout tokens with eventual
+response-length weights need not satisfy the same sampling identity. Forward KL, teacher versus student top-$k$, or within-set
+renormalization are objective changes and are labeled separately.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/training_dynamics.pdf}
-\caption{M-PG training response behavior in the available 128-update record. The dotted token-share reference is 25\%, matching the prompt quota. Truncation uses the 4,096-token training cap. Terminal signals average completed responses with valid teacher scores. Rollout index $r$ precedes optimizer update $r+1$.}
-\label{fig:training_behavior}
-\end{figure}
 
-Figure~\ref{fig:all_token_shares} shows token shares for the three I64 reductions in the frozen scalar record. Records at the same rollout clock are merged across metric writes before plotting. The frozen histories end at rollout indices 127 for M-PG, 99 for DR and DT, and 114 for GT. These histories record available rollout behavior; capability availability follows the completed suites in Table~\ref{tab:coverage}.
+\subsection{An optional amplitude calibration for teacher distance}
+\label{app:teacher_controls}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/all_token_shares.pdf}
-\caption{Valid-token allocation under the three I64 reductions. Colors match Figure~\ref{fig:training_behavior}: mathematics, code, instruction following, and science. All points are raw recorded values. The dotted reference is the common 25\% prompt share.}
-\label{fig:all_token_shares}
-\end{figure}
+A simple artificial target can help distinguish gradient magnitude from
+parameter selection. At a fixed prefix $(x,y_{<t})$, write
+$\pi_0=\pi_{\theta_0}$ for the reference student and freeze the teacher
+$\pi_{\phi_d}$. Define the normalized interpolated distribution
+\begin{equation}
+\pi_\alpha(v)=
+\frac{\pi_0(v)^{1-\alpha}\pi_{\phi_d}(v)^\alpha}
+     {\sum_{v'}\pi_0(v')^{1-\alpha}\pi_{\phi_d}(v')^\alpha},
+\qquad
+\left.\nabla_\theta D_{\mathrm{KL}}(\pi_\theta\|\pi_\alpha)
+\right|_{\theta_0}
+=\alpha\left.\nabla_\theta D_{\mathrm{KL}}
+(\pi_\theta\|\pi_{\phi_d})\right|_{\theta_0}.
+\label{eq:tilt_gradient}
+\end{equation}
+All probabilities condition on the same prefix. The log-ratio is an
+$\alpha$-scaled original log-ratio plus a constant across vocabulary tokens;
+the constant vanishes because $\sum_v\nabla_\theta\pi_\theta(v)=0$.
+For $\alpha>0$, positive scaling preserves the ranking of raw-gradient
+magnitudes while possibly changing absolute-threshold sparsity.
+This artificial calibration does not replace real-teacher comparisons
+or imply matched downstream capability.
 
-Evaluation diagnostics complement the standard scores in Figure~\ref{fig:if_generation}. The repetition flag applies to responses longer than 10,000 characters whose final 10,000 characters have a UTF-8 byte-length to level-9 zlib compressed-length ratio above 10. Completed, nonrepetitive reward is averaged over all responses, assigning zero to responses outside that category. The standard benchmark score retains its original definition and denominator. The figure uses the shared initial student and update-100 evaluations; the single-teacher summaries contain truncation and repetition but omit the combined reward diagnostic.
+\subsection{Reproducibility records}
 
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/if_generation.pdf}
-\caption{IFBench generation diagnostics alongside the standard capability results. The first two panels show truncation and repetition flags; the third shows reward from completed, nonrepetitive responses divided by the total response count. Missing single-teacher values in the third panel reflect summary availability. Evaluation uses the context-limited 32,768-token cap.}
-\label{fig:if_generation}
-\end{figure}
+Record exact student, teacher, tokenizer, data, and evaluator revisions;
+teacher training lineages; prompt schedules and seeds; decoding,
+EOS handling, cap, invalid responses, and loss masks; learning-rate
+schedule, optimizer moments, precision, clipping, and decay; candidate
+sets, probability normalization, teacher/student retained mass, and
+advantage handling. Keep per-prompt outputs, source measurements for
+every plot, and actual time and memory costs.
+
+Distinguish training seeds, diagnostic batch replicates, and evaluation
+resamples. Pairs sharing a teacher are dependent, and prompt-level
+uncertainty does not establish population-level teacher relationships.
+Historical synthetic GPAS calculations are not empirical evidence for these studies.

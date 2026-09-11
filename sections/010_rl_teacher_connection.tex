@@ -2,7 +2,7 @@
 \label{app:rl_teacher_connection}
 
 Our experiments distill RL-trained Qwen3-1.7B teachers into a
-Qwen3-1.7B student (Appendix~\ref{app:setup}). Teacher training introduces another source of
+Qwen3-1.7B-Base student. Teacher training introduces another source of
 domain weighting: its reward scale and KL penalty determine the signal
 passed to the student. We derive this connection by treating each teacher
 as the optimum of its KL-regularized RL objective and distilling its
@@ -12,7 +12,7 @@ complete response distribution with reverse KL.
 During RL, teacher $d$ is rewarded for solving its task and penalized for
 deviating from a fixed reference policy $\mu_d$. The student starts
 distillation from $\pi_{\theta_0}$, which in our experiments is
-Qwen3-1.7B. Thus $\mu_d$ specifies the reference in the teacher's
+Qwen3-1.7B-Base. Thus $\mu_d$ specifies the reference in the teacher's
 training objective, while $\pi_{\theta_0}$ specifies the student's
 starting checkpoint.
 For each domain $d$, fix a prompt distribution $\mathcal D_d$, a
@@ -101,7 +101,7 @@ contains only the reward gradients:
   \nabla_\theta\mathcal R_d(\theta)\right|_{\theta_0}.
 \label{eq:rl_teacher_initial_gradient}
 \end{equation}
-When the student's initial policy differs from a teacher's RL
+When the Base student's initial policy differs from a teacher's RL
 reference, Equation~\ref{eq:rl_teacher_mixture} retains the corresponding
 KL gradient from the first update. Distillation then combines improving
 task reward with reducing the student's distance from that reference.

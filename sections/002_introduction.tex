@@ -1,9 +1,53 @@
 \section{Introduction}
+\label{sec:intro}
 
-Multi-teacher on-policy distillation (MOPD) trains a shared student on its own responses using feedback from domain specialists \citep{ma2026mopdmultiteacheronpolicydistillation}. Its appeal is direct: mathematics, code, instruction following, and science can share one model while retaining specialized supervision. Its optimization is less transparent. Equal prompt quotas can yield unequal token weights, different teachers can act on overlapping coordinates, and a dense loss can leave only a small visible change in stored weights.
+Multi-teacher on-policy distillation (MOPD) transfers domain specialists
+into one student by scoring student-generated responses with their
+assigned teachers \citep{ma2026mopdmultiteacheronpolicydistillation}.
+The objective is to integrate their capabilities, but equal numbers
+of prompts from each domain need not give those domains equal influence
+on training. Open-MOPD identifies capability imbalance and studies
+token-share weighting, changing distillation gaps, and stale
+student-dependent rewards \citep{gao2026openmopddiagnosingfixingcapability}.
+These findings motivate examining how the objective weights each
+domain and which student parameters its teacher changes most.
 
-These observations concern three successive transformations. Loss averaging determines how responses contribute to the gradient. Adam combines that gradient with accumulated state. Finite-precision writeback determines which changes appear in the model checkpoint. Understanding the resulting capability allocation requires measuring these transformations separately. Token-share balancing already motivates interventions in Open-MOPD \citep{gao2026openmopddiagnosingfixingcapability}, while recent RL and distillation studies document sparse parameter changes and investigate restricted parameter updates \citep{mukherjee2025subnetworks,yu2026denseupdates}. We examine how these phenomena interact in a common multi-teacher setting.
+Prior work reports sparse cumulative parameter changes in RL
+\citep{mukherjee2025subnetworks} and OPD
+\citep{yu2026denseupdates,shen2026opdgeometry}.
+We use update sparsity to describe concentration of actual parameter
+changes, distinguishing individual optimizer steps from cumulative
+changes over training. We ask how multiple teachers affect a common
+student during MOPD, and use gradients as an additional measurement to
+separate the current loss signal from optimizer history. Independently
+trained students provide a reference, but their endpoints do not identify
+teacher contributions within the joint student.
 
-Our study uses a Qwen3-1.7B student initialized from the common parent of four RL teachers, with shared prompt formatting, decoding conventions, and optimizer settings. Six training configurations provide thirteen completed capability suites. Measurements from the joint sampled-gradient checkpoint at update 100 connect these trajectories to teacher-conditioned gradients and controlled local Adam steps. Two fixed response banks support comparisons of input domains, teacher identities, and vocabulary supervision.
+After introducing the MOPD learning objective in
+Section~\ref{sec:setting}, we develop three studies and place each
+experiment alongside its corresponding question:
+\begin{enumerate}
+\item \textbf{Token balancing (Section~\ref{sec:normalization}).}
+We derive how global-token, domain-token, and domain-response averaging
+weight domains and response lengths, then compare their effects on
+capability balance. The analysis explains existing loss reductions
+without introducing a new allocation algorithm.
+\item \textbf{Update sparsity (Section~\ref{sec:subnetworks}).}
+We measure the concentration of optimizer steps and cumulative parameter
+changes in single-teacher and joint OPD, compare the parameters most
+changed by each teacher at the same MOPD checkpoint, and relate their
+overlap to teacher distribution differences. Raw gradients help
+interpret these updates.
+\item \textbf{Supervision density (Section~\ref{sec:density}).}
+We compare sampled-token PG and teacher top-$k$ training in both
+settings, with full-vocabulary updates on common prefixes as a
+local reference. We test whether update sparsity differs materially
+and report capability alongside it.
+\end{enumerate}
 
-Three findings organize the paper. First, averaging rules induce different early capability tradeoffs; fixing domain weights and fixing response weights are separate operations (Section~\ref{sec:normalization}). Second, the apparent sparsity of a parameter change depends strongly on precision and optimizer history, and teacher-conditioned gradient directions depend on input composition (Section~\ref{sec:subnetworks}). Third, writeback density can remain nearly constant while the direction changes with the supervision estimator (Section~\ref{sec:density}). These findings provide a concrete account of how supervision is converted into parameter movement during multi-teacher distillation.
+Shared parameter locations can receive compatible or opposing changes,
+and sampled-token feedback still depends on all logits through the
+softmax normalizer. Neither low overlap nor limited vocabulary coverage
+therefore guarantees sparse parameter updates or better integration.
+\missing{Replace the prospective empirical contributions with observed
+findings and their measured scope once the experiments are complete.}
