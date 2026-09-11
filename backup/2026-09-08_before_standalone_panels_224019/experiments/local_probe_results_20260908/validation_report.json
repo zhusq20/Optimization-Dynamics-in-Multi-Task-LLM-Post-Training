@@ -1,0 +1,35 @@
+{
+  "at_utc": "2026-09-08T22:27:39.162361+00:00",
+  "passed": [
+    "All 189 copied source file hashes match",
+    "All 31 jobs are represented in the figure mapping",
+    "Figure manifest matches the final plot script",
+    "All 15 individual PDF/PNG figure pairs exist; PNGs have nonblank pixels and adequate dimensions",
+    "Combined PDF page dictionaries match 5 primary and 15 total pages",
+    "All eight plotting CSVs have expected row counts and resolvable source paths",
+    "Roadmap has 27 unique slots; core 15 E / 5 P / 4 N; F9a/F9b cancelled",
+    "Updated document links resolve"
+  ],
+  "visual_review": "Five primary figure families inspected; F2 categorical correction markers and F7 legend/limits adjusted to avoid misleading connections or covered points.",
+  "figures_sha256": {
+    "F1_lengths_and_weights.pdf": "9f20d206065d632c5903668e8dd5595d4dc3b29d17c657a06b7f02ec01795161",
+    "F2_normalization.pdf": "e5ecefb140b5c31941d2056bdc904674e4738ecc7598a0af413b1488a00438ff",
+    "F5_teacher_overlap_pg250_Overlap64.pdf": "7b03d219c16a3b703e3a45e98b95d0e08328b887123aee63e5c27e5e07b8a3a5",
+    "F5_teacher_overlap_pg250_PG.pdf": "25aba0dd32636b90481ca63c9e4fbb91ba73e89e072ed88a71c8f4e1e4b32364",
+    "F5_teacher_overlap_pg500_Overlap64.pdf": "25bbcc6905e7305bc935efbd314ed8f4f4f26e1d27d9f181cf718345e5ca4d3f",
+    "F5_teacher_overlap_pg500_PG.pdf": "726d1ea857bdac6bf38c606fb5dd2121afc71fb71e0588344fe1d4b9a1477e8a",
+    "F6_teacher_distance_pg250_Overlap64.pdf": "97511f98542e7307293213663067e68e8aacf85abfbb319c21bfefd15fcd0586",
+    "F6_teacher_distance_pg250_PG.pdf": "c7c968c232319b89aabed3d5d21dab65e213bfe2ba9d6094fe62a915b11be145",
+    "F6_teacher_distance_pg500_Overlap64.pdf": "f93acab9220368d6a51f299d1df04373f2cfc5e9ebf8aab9797deba3dd490ecb",
+    "F6_teacher_distance_pg500_PG.pdf": "99bce75e9f0e2cd802aab3e0254f86b7e23bd64c7d6cd65fc788401a57d9f633",
+    "F7_density_m-i64dr250.pdf": "047e503eea3f6fe840c52327dffbc05e53bdf88bc3c3cd837b2292f00e85b206",
+    "F7_density_m-pg250.pdf": "6d75993b1e7d9e7ea80050a1f2a7dca0865ff76153be5cb01117e29cae52ed9c",
+    "F7_density_m-pg500.pdf": "2e50b3f381e81fb4b97eff58a3266b9d4f3f2adfb6006f03217a43e9d4b335ed",
+    "F7_density_s-i64250.pdf": "32ea3ea43fb52291ab7ad7ea31e38b2ccde054cccbcc504966dd90c4b8ea863a",
+    "F7_density_s-pg250.pdf": "c10ca3a384120877dc394a101a278c31e0ff3c2604744f6bee0144d3d1a736d6",
+    "all_local_probe_figures.pdf": "9ef6cbf582b378f362e67be0d3a69908c19e6d2706c3a26cd41073f87cfd600e",
+    "figure_roadmap_9x3.pdf": "a24a5b50108b7b7b6b483736871a05a788b881ad435a9c88c195eae5cdbbb3d2",
+    "main_local_probe_figures.pdf": "7773dd84642123187d6592b08f6ca08423408f35b13c889562ee49a6c0cfebbd"
+  },
+  "scope": "Artifact consistency and plot reproduction; no new model experiment or scientific significance test"
+}

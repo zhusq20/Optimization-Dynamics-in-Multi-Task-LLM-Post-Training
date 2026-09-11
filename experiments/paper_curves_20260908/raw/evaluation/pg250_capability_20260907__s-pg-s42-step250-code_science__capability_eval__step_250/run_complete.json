@@ -1,0 +1,10 @@
+{
+  "completed_at_utc": "2026-09-07T04:05:29.169721+00:00",
+  "experiment_name": "qwen3-s-pg-s42-step250-code_science-eval",
+  "final_num_updates": 250,
+  "num_rollout": 0,
+  "schema_version": 1,
+  "start_rollout_id": 0,
+  "status": "complete",
+  "wandb_run_id": "of7hr73c"
+}

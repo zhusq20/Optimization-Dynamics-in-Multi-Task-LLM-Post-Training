@@ -1,0 +1,131 @@
+{
+  "verified_at_utc": "2026-09-10T00:42:09.617295+00:00",
+  "verification": "completion markers, metric steps, artifact and metric response counts",
+  "total_responses": 6880,
+  "runs": [
+    {
+      "model": "S-PG",
+      "step": 100,
+      "completed_at_utc": "2026-09-09T23:46:28.111581+00:00",
+      "output": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-pg-s42/capability_eval/step_100",
+      "scores": {
+        "MATH": 0.774,
+        "Code": 0.1875,
+        "IFBench": 0.18666666666666668,
+        "GPQA": 0.3181818181818182
+      },
+      "responses": {
+        "MATH": 500,
+        "Code": 128,
+        "IFBench": 300,
+        "GPQA": 792
+      },
+      "truncation": {
+        "MATH": 0.04,
+        "Code": 0.2265625,
+        "IFBench": 0.06666666666666667,
+        "GPQA": 0.0
+      },
+      "repetition": {
+        "MATH": 0.048,
+        "Code": 0.2265625,
+        "IFBench": 0.06333333333333334,
+        "GPQA": 0.0
+      },
+      "code_infrastructure_errors": 0
+    },
+    {
+      "model": "S-PG",
+      "step": 250,
+      "completed_at_utc": "2026-09-09T23:50:11.546722+00:00",
+      "output": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-pg-s42/capability_eval/step_250",
+      "scores": {
+        "MATH": 0.738,
+        "Code": 0.203125,
+        "IFBench": 0.17,
+        "GPQA": 0.35353535353535354
+      },
+      "responses": {
+        "MATH": 500,
+        "Code": 128,
+        "IFBench": 300,
+        "GPQA": 792
+      },
+      "truncation": {
+        "MATH": 0.066,
+        "Code": 0.1796875,
+        "IFBench": 0.06,
+        "GPQA": 0.0
+      },
+      "repetition": {
+        "MATH": 0.066,
+        "Code": 0.1796875,
+        "IFBench": 0.06,
+        "GPQA": 0.0
+      },
+      "code_infrastructure_errors": 0
+    },
+    {
+      "model": "S-I64",
+      "step": 100,
+      "completed_at_utc": "2026-09-09T23:49:57.029413+00:00",
+      "output": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-intersection64-s42/capability_eval/step_100",
+      "scores": {
+        "MATH": 0.746,
+        "Code": 0.1875,
+        "IFBench": 0.17666666666666667,
+        "GPQA": 0.33207070707070707
+      },
+      "responses": {
+        "MATH": 500,
+        "Code": 128,
+        "IFBench": 300,
+        "GPQA": 792
+      },
+      "truncation": {
+        "MATH": 0.046,
+        "Code": 0.2109375,
+        "IFBench": 0.07333333333333333,
+        "GPQA": 0.0
+      },
+      "repetition": {
+        "MATH": 0.052,
+        "Code": 0.2109375,
+        "IFBench": 0.06666666666666667,
+        "GPQA": 0.0
+      },
+      "code_infrastructure_errors": 0
+    },
+    {
+      "model": "S-I64",
+      "step": 250,
+      "completed_at_utc": "2026-09-10T00:13:47.323722+00:00",
+      "output": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-intersection64-s42/capability_eval/step_250",
+      "scores": {
+        "MATH": 0.744,
+        "Code": 0.2109375,
+        "IFBench": 0.18333333333333332,
+        "GPQA": 0.3244949494949495
+      },
+      "responses": {
+        "MATH": 500,
+        "Code": 128,
+        "IFBench": 300,
+        "GPQA": 792
+      },
+      "truncation": {
+        "MATH": 0.068,
+        "Code": 0.203125,
+        "IFBench": 0.07,
+        "GPQA": 0.003787878787878788
+      },
+      "repetition": {
+        "MATH": 0.072,
+        "Code": 0.203125,
+        "IFBench": 0.07333333333333333,
+        "GPQA": 0.003787878787878788
+      },
+      "code_infrastructure_errors": 0
+    }
+  ]
+}

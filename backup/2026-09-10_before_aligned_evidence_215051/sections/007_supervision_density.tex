@@ -1,0 +1,131 @@
+% ============================================================================
+\section{Does Supervision Density Change Update Sparsity?}
+\label{sec:density}
+% ============================================================================
+
+Our third study asks whether vocabulary-level supervision changes how
+strongly parameter updates concentrate on a small fraction of model parameters.
+Sampled-token PG uses feedback for the generated token, full-vocabulary
+reverse KL includes every vocabulary alternative, and teacher top-$k$
+provides a practical intermediate choice
+(Section~\ref{sec:setting}). This concerns vocabulary coverage at each
+prefix, rather than the number of supervised response positions.
+Sampled-token feedback does not imply a sparse parameter gradient:
+the sampled token's log probability depends on all logits through the
+softmax normalizer. Concentrated OPD parameter changes have also been
+observed with dense feedback \citep{yu2026denseupdates}. We therefore
+test for a difference without assuming that PG produces sparser updates
+or better capability integration.
+
+\subsection{Matched single-teacher and joint experiments}
+
+We select one representative single-teacher setting before inspecting
+results and compare PG with corrected teacher top-$64$ in that setting
+and in joint MOPD (Table~\ref{tab:density_controls}). These four online
+configurations use the losses in Equations~\ref{eq:mopd_pg}
+and~\ref{eq:mopd_topk}; the joint top-$64$ run also anchors
+Section~\ref{sec:normalization}. All use domain-response averaging and
+match initialization, teachers, optimizer, loss masks, response cap,
+prompt schedule, and update budget within each setting. The top-$64$
+loss uses probabilities normalized over the full vocabulary, without
+renormalizing within the selected tokens; we record any clipping.
+The shared model and training setup appears in
+Section~\ref{sec:normalization} and Appendix~\ref{app:setup}.
+
+\begin{table}[!htbp]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Setting & Online losses & Common-prefix reference \\
+\midrule
+Single teacher & PG, teacher top-$64$ & Full-vocabulary reverse KL \\
+Joint MOPD & PG, teacher top-$64$ & Full-vocabulary reverse KL \\
+\bottomrule
+\end{tabular}
+\caption{Supervision-density experiments. Four online configurations
+share full-vocabulary local measurements at matched checkpoints.}
+\label{tab:density_controls}
+\end{table}
+
+At the initial, early, intermediate, and final checkpoints, we evaluate
+all three losses on a small shared bank of student-generated prefixes.
+Each comparison holds the student, prefix weights, and optimizer state
+fixed; local PG uses fresh token samples at those prefixes.
+Full-vocabulary reverse-KL proposed steps provide the local reference in
+both settings, with raw gradients as a diagnostic; these local measurements
+cannot establish the cumulative changes of a full-vocabulary online run,
+which is conditional on measured resource feasibility. Online PG and
+top-$64$ branches generate their own on-policy responses, so their
+trajectories compare practical loss choices rather than isolating
+vocabulary coverage as the only causal difference.
+
+\subsection{Update concentration and learning outcomes}
+
+Our primary measurements are actual online steps and cumulative parameter
+changes from initialization, reported separately. Following
+Section~\ref{sec:subnetworks}, we report threshold curves, norms, and the
+fraction of squared change carried by the largest coordinates. To measure
+effective cumulative changes, we compare stored BF16 checkpoints with
+initialization at absolute tolerance $10^{-5}$, following
+\citet{mukherjee2025subnetworks}. FP32 master-weight differences separately
+characterize accumulated optimizer motion. Local comparisons use proposed steps from
+copies of the same optimizer state; repeated batches on the common prefix
+bank quantify sampling variability. Raw gradients before clipping provide
+secondary concentration measurements. Their sparsity need not equal update
+sparsity because momentum, clipping, weight decay, rounding, and cancellation
+across steps can change which parameters move.
+
+For the joint runs, we also compare which parameters the teachers' proposed
+steps select, with raw-gradient overlap as a diagnostic, using
+Section~\ref{sec:subnetworks}'s overlap measurement. Held-out per-domain
+capability, the macro-average,
+and worst-domain change accompany the sparsity results. Curves show
+generated-token exposure and GPU hours separately, with response counts,
+updates, and teacher-scoring and diagnostic overhead recorded.
+
+\paragraph{Preliminary observation: drift and effective BF16 changes.}
+In seed-$42$ top-$64$ runs with domain-response (DR) averaging, logged
+student mass inside the teacher's top-$64$ falls from $86.2\%$ to $37.0\%$
+for the single teacher and from $81.4\%$ to $51.7\%$ for joint training
+(rollout batches $1$--$50$ versus $200$--$249$). Joint domain-token and
+global-token means instead rise to $93.7\%$ and $94.9\%$, respectively;
+each run uses its own on-policy prefixes and configured averaging.
+Under the BF16 criterion above, single-teacher top-$64$ changes
+$5.33\%$ of parameters at update $100$, versus $2.55\%$ for PG.
+Their BF16 cumulative-change $L_2$ norms are $0.201$ and $0.125$,
+respectively.
+At update $250$, joint top-$64$ DR changes $9.92\%$, versus
+$5.90\%$, $11.72\%$, and $12.01\%$ for PG, domain-token, and global-token;
+BF16 cumulative-change $L_2$ norms are $0.425$, $0.269$, $0.537$, and
+$0.555$, respectively. Thus top-$64$ changes more effective BF16 weights
+than PG. The stronger distribution drift under DR is consistent with an
+interaction between truncation and response averaging, but does not
+coincide with the largest BF16 parameter changes among the averaging
+rules. The mechanism remains to be established.
+% Probability windows and FP32 diagnostics: experiments/topk_drift_sparsity_20260906.json
+% Full BF16 weight scan using the cited paper's criterion:
+% experiments/bf16_effective_changes_20260906.json
+
+\subsection{Interpretation and decision rule}
+
+At a fixed prefix, fresh unclipped sampled-token PG with a detached
+log-ratio coefficient has the same expected gradient as full-vocabulary
+reverse KL \citep{yu2026denseupdates,oh2026vopd}. This identity holds with
+fixed prefix weights; weighting an original rollout token by its eventual
+response length need not preserve it. Clipping and top-$k$ truncation
+also change the comparison, and equality in expectation does not equate
+sampled gradients, nonlinear optimizer steps, or training trajectories.
+
+We report paired-seed effect estimates and confidence intervals against
+a material difference margin specified before examining results.
+One-seed runs remain exploratory; prompt resampling measures evaluation
+uncertainty, not training-seed variation. Intervals entirely within the
+margin support no material sparsity difference in the tested regime;
+intervals spanning negligible and material effects are inconclusive.
+Only a stable, meaningful gap motivates
+the optional sampling-variance and truncation controls in
+Appendix~\ref{app:optional_loss}.
+
+\missing{PG/top-$64$ optimizer steps, cumulative changes, and capability;
+full-vocabulary local references and raw-gradient diagnostics.}

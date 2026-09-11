@@ -1,0 +1,13 @@
+{
+  "verified_at_utc": "2026-09-08T20:33:07.623758+00:00",
+  "job": "teachers-m-pg500-draw42",
+  "checkpoint_step": 500,
+  "artifacts": {
+    "measurements.json": "ffd5a0413e33745c826d1b4cb4e8a3cb8ba7ad1b77879651b08eafe9b71751fd",
+    "probe_manifest.json": "01ee7dd103b4693c4c6ba782355bf0389f8a78467e2cf7e13e09bcd2d6121ae2",
+    "run_complete.json": "d78ce6765560d1b15e56ca273192aabab0c57fa50ad52d7ffed8faccce6ad4e8",
+    "prefix_bank.json": "642a38ec968eacc3daf2ae8837c45d7c115733a1038eff6e15d2dc748c7ce3c8",
+    "support_records.json": "2c9a06991bbd36c17834dd32b97235e6e7474d92051d7bb04fa4b43ae84d5515",
+    "distributions.pt": "5d0ea9012414aa153f190c2aacffdb1ebb44a63200fb25765e144208a0454156"
+  }
+}

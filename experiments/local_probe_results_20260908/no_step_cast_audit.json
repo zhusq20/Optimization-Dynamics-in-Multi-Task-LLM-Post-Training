@@ -1,0 +1,22 @@
+{
+  "at_utc": "2026-09-08T21:11:04.384308+00:00",
+  "definition": "BF16(saved FP32 master) minus saved BF16 model; no gradient and no Adam step",
+  "results": [
+    {
+      "state": "m-pg250",
+      "snapshot": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/formal_20260906/m-pg-s42/paper/checkpoint_step_0250.pt",
+      "parameters": 1720574976,
+      "cast_without_optimizer_l2": 0.0,
+      "nonzero_fraction": 0.0,
+      "fraction_above_1e-5": 0.0
+    },
+    {
+      "state": "m-pg500",
+      "snapshot": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/formal_20260906/m-pg-s42/paper/checkpoint_step_0500.pt",
+      "parameters": 1720574976,
+      "cast_without_optimizer_l2": 0.0,
+      "nonzero_fraction": 0.0,
+      "fraction_above_1e-5": 0.0
+    }
+  ]
+}

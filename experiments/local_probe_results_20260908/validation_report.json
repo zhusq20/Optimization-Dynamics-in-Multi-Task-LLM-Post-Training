@@ -1,0 +1,176 @@
+{
+  "at_utc": "2026-09-08T23:14:51.238121+00:00",
+  "passed": [
+    "All 189 frozen source hashes match, including all 31 measurements",
+    "All 1040 plotted observations and conversion inputs independently match raw banks, weights or measurements",
+    "All 205 cell/range summaries match the full intended observations and preserve condition identities",
+    "F6 panels preserve all six teacher pairs in the same displayed order; both losses and checkpoints are covered",
+    "Plot script and all derived-data hashes match the final figure manifest",
+    "All 15 charts have standalone one-page PDF, nonblank high-resolution PNG and SVG; reading PDFs have 6 and 15 one-chart pages",
+    "Runtime rendering checks passed: no overlapping matrix labels or comparison markers, no in-image titles/prose; matrix number contrast at least 4.5",
+    "All eight full-precision raw plotting tables retain expected row counts and resolvable sources",
+    "Current 27-slot registry matches revised questions and six main candidates; cancelled training slots stay cancelled",
+    "Current document links resolve; the gallery has 15 external questions/readings and 15 caption sections"
+  ],
+  "source_files": 189,
+  "jobs": 31,
+  "plotted_observations": 1040,
+  "verified_summaries": 205,
+  "panel_observations": {
+    "F1a": 32,
+    "F1b": 16,
+    "F1c": 30,
+    "F2a": 28,
+    "F2b": 21,
+    "F2c": 21,
+    "F5a": 96,
+    "F5b": 192,
+    "F5c": 64,
+    "F6a": 24,
+    "F6b": 48,
+    "F6c": 48,
+    "F7a": 120,
+    "F7b": 200,
+    "F7c": 100
+  },
+  "png_dimensions": {
+    "F1a": [
+      1664,
+      1441
+    ],
+    "F1b": [
+      1596,
+      1269
+    ],
+    "F1c": [
+      1714,
+      1588
+    ],
+    "F2a": [
+      2087,
+      1420
+    ],
+    "F2b": [
+      2054,
+      1399
+    ],
+    "F2c": [
+      2087,
+      1479
+    ],
+    "F5a": [
+      1870,
+      1108
+    ],
+    "F5b": [
+      1886,
+      1657
+    ],
+    "F5c": [
+      1878,
+      1657
+    ],
+    "F6a": [
+      1710,
+      1357
+    ],
+    "F6b": [
+      1826,
+      1437
+    ],
+    "F6c": [
+      1826,
+      1437
+    ],
+    "F7a": [
+      2150,
+      1294
+    ],
+    "F7b": [
+      2321,
+      1693
+    ],
+    "F7c": [
+      2001,
+      1294
+    ]
+  },
+  "visual_review": {
+    "panels": [
+      "F1a",
+      "F1b",
+      "F1c",
+      "F2a",
+      "F2b",
+      "F2c",
+      "F5a",
+      "F5b",
+      "F5c",
+      "F6a",
+      "F6b",
+      "F6c",
+      "F7a",
+      "F7b",
+      "F7c"
+    ],
+    "reviewer_checks": [
+      "one explicit question per chart",
+      "no dense scatter clouds",
+      "all condition identities directly labeled",
+      "main/supporting distinction",
+      "paired ranges not presented as confidence intervals",
+      "large text, wrapped long labels, visible matrix numbers",
+      "no titles or explanatory paragraphs inside image files"
+    ]
+  },
+  "figure_hashes": {
+    "F1a.pdf": "ef6642e8af384359835d1317324af7096eee293b5ef4fd0f5e0480b709077ec1",
+    "F1a.png": "661bb0290cae00238db2c9602670d3f49c66ebe0d8dcd778ca133b861e7d7957",
+    "F1a.svg": "3ddf368c67d784c1e92b89211290c086f4d88d3758ae8bd39d1a247affbc41f2",
+    "F1b.pdf": "0d8d63696c5e02704f65129f597d5f1f7ff39d685f1b20bebabdd9c78d07e460",
+    "F1b.png": "d49306f87070a3699629be5657239739f4d93d510a44e808db4767b88125a2d4",
+    "F1b.svg": "741a3e31b71f78cb8b7ffbb2431eb00b3fe3b61d96ea95652d28b82103edd3a6",
+    "F1c.pdf": "700902fcd9d80dc9bbedd13efbdeeae89c326c7d2bf1e8689c1723af26e68e32",
+    "F1c.png": "b0cee5ab4efdd899f71384265f4d1b67ee5514360ebe51638d3b5640088a70be",
+    "F1c.svg": "2c9cf9f3e12302b6678f9869b06e4e14202e20a333ffafd74318f446a5b2b1b0",
+    "F2a.pdf": "62fd47cb9d896f45892778adc95e4e2a74a2c46ba34651086328978e2338d591",
+    "F2a.png": "41db150b3a691be04a262a54eac5d5bc6a62173a7bb51796671c0176f53e069f",
+    "F2a.svg": "8c9656a7fc5ab63a9da2d48af66630a6529a9961425418d2a85e0694bf7da622",
+    "F2b.pdf": "1c82a8cbf0e09d1e176cfb794b8a5699831063189c419f3104d24a782033e4d2",
+    "F2b.png": "96b17d2516cb6335c716e9c2c3075429ccceb2df2d2e5541457b9ed6eb7a8ce5",
+    "F2b.svg": "e2b1bb1fa1bde98676549c014733539104a183358fc39038b3e88361876458dd",
+    "F2c.pdf": "cc62768020b469ab4add5b1c679bf0ee749f3a058d5f666971029131e72f6627",
+    "F2c.png": "2329b653c52bcaca3c7158bd006e14670218fbf68fd9e94f9735d91955f12853",
+    "F2c.svg": "bb44ec0f2e0085f4e75e4aabbb2eb2e420d8421d2ea70788b57797e96d435ac7",
+    "F5a.pdf": "38c51846c903c1a8f08889e5b357ff71dd3de00e5671bbf0502c9ba9e41ac82b",
+    "F5a.png": "f42076cf8c198dc9d5c7dd53115969b68c3d12d947c56956bb77e16172cacf5f",
+    "F5a.svg": "13f8c6ef9ea241f7f33ec06ffc0743d64bcb0b5d9c7298d900be82dcdad1a1de",
+    "F5b.pdf": "4ee7274b0bfca9175f4817ce62dfa794fe4d9db1263465ac639f747eaf93d481",
+    "F5b.png": "d85db9d154047483feb641d6ed2aa22f3e5f1b0eda32412315f567d6c24b0358",
+    "F5b.svg": "fee6c40f08f86c66d982dae069f808f611404d0a5a96a4db7f1746f234d4a43e",
+    "F5c.pdf": "d7ad9a98f087bb88f2bcdc4d8ebb5e47f45b8d75b968b6da6218dc40ece37176",
+    "F5c.png": "d1cc5564f244ced649f0feb0486bf59e109ae3cc4935f5ef06b244676157a068",
+    "F5c.svg": "2e187c31ffc52e40decea48215501efaa8b4967838d5b8ed567ff62c5fe13819",
+    "F6a.pdf": "ecf05380d0186b323c4d2b57a36544fe36e65d45089d001e06a038a8da98a158",
+    "F6a.png": "0742424b6ed7ef13e7c69be05335a54c5e7edaad37e69e34e60e1ce61dc1698d",
+    "F6a.svg": "3cbeedf6e2aaa783be20b1a2e81f3831125bc4958d74772c2e9440c38466a096",
+    "F6b.pdf": "100494bf922e09402da2ffb0e351309ddba4d648a2b13cbb090d310808910cf0",
+    "F6b.png": "bc09e563a051e76a1a2aaa86f07829112ea84c8f80d63ce4e2a14bcbfff9c75f",
+    "F6b.svg": "db569e173d2edcc9882001b7c94605bb9f15b1affa43400f303e4d0e836a71a5",
+    "F6c.pdf": "de33b1f202e8eadd9d0e5872e3dc88ac77349cc08768b0c0b4f8b3ad1cd56721",
+    "F6c.png": "d9ab658ff74b44bc00f0e032410ed368dad56a5a2b873c2ac8c88c79e8c750ad",
+    "F6c.svg": "cb9a1ff61e34f1ae1ee2634b8e36c55d5093bc31d2d314a0406ecca948c1e462",
+    "F7a.pdf": "b70948c6eab3e77dee94c5c15797dd5bd46ce3509374e87b88a64c6077608417",
+    "F7a.png": "79bc70ab2137a194c04b58bc2c84c81c1096af148a2f2944c2d679eed1ac585d",
+    "F7a.svg": "fa2fa9dca67640b145e643924c5584105e685d571524fd8e35e8d2b60a504cc7",
+    "F7b.pdf": "0150d17c6022205f7ad599da89cb7a19b630a6251bde04a2dfd444da56747676",
+    "F7b.png": "8d00d60185fc9ab7e82971bf92a57149913a527df87f119023ad3d1bca98c17d",
+    "F7b.svg": "2f53a65acbb1973cd9fed0bd352dbba72dcb86203b8c169c2fc5cba35138996d",
+    "F7c.pdf": "4fd6dd99b084f4671736391d83887a2e7075717ac538420340f21fc22c3d4395",
+    "F7c.png": "f79ac76918e43365f9e0939f2c002830194b5d92c605f10191065ce06c5fe2d9",
+    "F7c.svg": "0e8e8bbab4f349212d682c27f730dbda60838a0860a935bedc1b3e91727245b4",
+    "main_panels.pdf": "632fb02c7ec2ef9a505df4d257252e67bad1d2893706d0da160fa30f1aebf27d",
+    "all_panels.pdf": "f10772806fa40fe29f9f32abd9488ad5a27ee44ed454d8971de04fc817589cdc"
+  },
+  "scope": "Scientific data/figure and document consistency; no new model experiment or significance test"
+}

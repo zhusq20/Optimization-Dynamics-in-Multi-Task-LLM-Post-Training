@@ -1,17 +1,38 @@
-# MOPD: three empirical studies
+# MOPD experiment figures
 
-> Current experiment inventory: [student Top16 / BF16 audit (2026-09-06)](STUDENT_TOP16_EXPERIMENT_AUDIT_20260906_zh.md). The current online top-k loss uses student-selected 16 tokens, and parameter-change statistics use BF16 only. This inventory updates the execution status and loss/measurement choices in the historical plan below.
+The current manuscript uses the [September 10 aligned evidence bundle](aligned_evidence_20260910/README_zh.md) and its **5 main figures + 6 appendix figures**. Open the [compiled paper](../iclr2027_conference.pdf), [figure files](../figures/aligned_evidence_20260910/), or [editorial review (中文)](aligned_evidence_20260910/EDITORIAL_REVIEW_zh.md).
 
-> Coverage and time budget: [student Top16 evidence checklist and runtime estimates](STUDENT_TOP16_COVERAGE_AND_RUNTIME_20260906_zh.md), including separate Qwen3 / SmolLM3 and seed budgets. Measured timings and planning assumptions are distinguished.
+The bundle includes twelve complete capability suites, compatible teacher references, actual online parameter geometry, and the aligned M-PG/100 local mechanisms. The [verification report](aligned_evidence_20260910/verification_report.json) records source hashes, score checks, figure coverage, and manuscript validation.
 
-The active specification is [the three-contribution plan](../MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md). It supersedes the GPAS-centered plan.
+Regenerate the current paper figures on CPU:
 
-1. Explain and measure the effect of global token averaging, domain token averaging, and response averaging on capability balance.
-2. Verify sparse OPD updates; measure teacher-conditioned support overlap at the same MOPD student checkpoint; compare teacher-pair distribution distance with subnetwork distance. Teacher–student gap is an auxiliary analysis.
-3. Compare vocabulary-level supervision density in single-teacher and multi-teacher OPD: sampled-token PG, top-64, and full-vocabulary KL. Small common-prefix full-vocabulary probes measure local updates; PG/top-64 online runs measure cumulative changes. Local probes do not imply completed full-vocabulary online training. Further noise or truncation analysis is conditional on a stable meaningful sparsity difference, not required by default.
+```bash
+python experiments/plot_aligned_evidence.py
+latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex
+python experiments/verify_aligned_evidence.py
+```
 
-The initial design reuses six training configurations: representative single-teacher PG/top-64, joint PG, and joint top-64 with the three reductions. Single-teacher references beyond that representative setting, more teachers, seeds, and a length-cap sweep depend on available checkpoints and measured resources. There is no new required sampling algorithm or disjoint-mask training method.
+## Archived September 8 figure package
 
-Teacher-conditioned gradients and proposed optimizer steps start from identical copies of an actual MOPD checkpoint. Independent single-teacher endpoint deltas are reference measurements, not historical attribution inside the joint run. Mathematics, code, instruction following, and science each use their own Qwen3-1.7B teacher trained with reinforcement learning (RL), giving four teacher weight sets.
+The package below is retained for provenance. Its mixed initialization/objective histories and previous local probes are superseded for the current manuscript; use the aligned bundle above for current claims.
 
-The end-to-end trainer and measured results for these studies are not yet present. Older analytical figures and synthetic calculations have been moved to an external recovery archive. The retained GPAS schematic generator (`generate_gpas_main_figure.py`), sampled-log-ratio utility (`measure_initial_kl.py`), and superseded GPAS plan are historical supporting materials; none constitute empirical evidence for the revised questions or required experiments in the current plan.
+Start with the [September 8 question-led gallery](../figures/paper_curves_20260908/index.html), [nine-figure main PDF](../figures/paper_curves_20260908/main_figures.pdf), or [raw W&B training/evaluation curve explorer](../figures/paper_curves_20260908/raw_curves.html).
+
+The September 8 sequence starts with four domain evaluation trajectories, then raw teacher-distance and token-share curves, and finally three focused local mechanism charts. The full set has **25 line charts, 4 point charts and 1 teacher-pair heatmap**. Each PDF/PNG/SVG contains one chart; the gallery places its question and reading guide outside the image.
+
+- [Design and paper references (中文)](paper_curves_20260908/DESIGN_zh.md): how Open-MOPD Fig.1/3/4 and MOPD Fig.2/3 inform this layout.
+- [Data/reproduction guide](paper_curves_20260908/README_zh.md), [caption drafts](paper_curves_20260908/FIGURE_CAPTIONS.md), [all figures PDF](../figures/paper_curves_20260908/all_figures.pdf).
+- [Raw curve CSV](paper_curves_20260908/raw_curve_values.csv), [evaluation attempts](paper_curves_20260908/evaluation_attempts.csv), [availability](paper_curves_20260908/evaluation_availability.csv), [validation](paper_curves_20260908/validation_report.json).
+- [September 8 roadmap (中文)](EXPERIMENT_FIGURE_ROADMAP_20260908_zh.md), [remaining scope](NEXT_EXPERIMENTS_20260908_zh.md).
+
+The frozen local scalar mirrors contain the values passed to `wandb.log`; the explorer retains every available point and defaults to no smoothing. `train/step` is a gradient-microbatch clock, not an optimizer update. Policy entropy is absent. Mixed Student64-to-I64 histories remain explicit; their step-100 checkpoints were trained with Student64. Repeated evaluation attempts are not independent training seeds.
+
+Regenerate on CPU from the portable data already in this repository:
+
+```bash
+python experiments/plot_paper_figures.py
+```
+
+To deliberately refresh from existing local run artifacts, run `python experiments/export_training_curves.py` first. This does not start training or evaluation.
+
+The [31-probe source package](local_probe_results_20260908/README_zh.md), its 15 previous charts, and the [earlier evidence snapshot](figure_audit_20260908/README_zh.md) are retained for provenance. Their previous heatmap-led main-figure recommendations are superseded. Local saved-Adam BF16 proposals remain distinct from actual online updates and capability measurements.

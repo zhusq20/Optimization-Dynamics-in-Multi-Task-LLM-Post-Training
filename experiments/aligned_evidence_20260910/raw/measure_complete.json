@@ -1,0 +1,28 @@
+{
+  "status": "complete",
+  "elapsed_seconds": 5322.951162815094,
+  "measurement_sha256": "20f5eb6264b84a01f977cd5bdef4a766c9cc7f55e59cc06003c6228ab35d55a0",
+  "source_sha256": {
+    "measure.py": "3837181561c3545c897f0cbdbbcc655b18838f7e466495131b3c1a8854207020",
+    "summarize_pg_variance.py": "542bb23dce762f8dfa00a1c43bd73baf671167092191b6a219acf5850c81d8e1",
+    "imported_topk.py": "75a5cc05d8f79b2406e9549d9c8023122711ab586a5932c5215c49d65cd5caeb",
+    "validate_numerics.py": "a958107315183916139d275ea3aeab91d646861134b31700793881ab4012719d",
+    "paper_diagnostics_source.py": "f724b56f8ea14ffd836d025a3a0e243d185988431a14754d61413d2c146e54a0",
+    "imported_sampler.py": "0d6871cdd3b03cf140e16a5dffca30e5fdbf5847b0cfc5ff8f1d339085d71e5e",
+    "imported_loss.py": "105b7777c1af0f6eb09c05af907b335aab2b1238b1e49b2720fe3760d9dfff87",
+    "finish_when_ready.py": "a8c2f89e4961c16c28503cd601e3edfccfd3b405d9de675fa2f29130f4d466a4",
+    "summarize.py": "9dbf9c1481da53883a2f446b5ac358e1f97d76104e07d74e71d8de3fab8d2ce6",
+    "direct_update_comparison.py": "7491a11558f0347db15ee4980c3bcdf21ef5df5bdd2248a32a61105439860195",
+    "collect_online_context.py": "ae8031b523c701536915cb1d46aa2ee5922118ed3175961b6e397da2129060be",
+    "prepare.py": "43ec12042b688688667c83fbfd8a9fb094d592365093d7f605a4c9d3ca4f25e9",
+    "bf16_reference_source.py": "36b16f6052485a2a6ee082ed1ec284fbd54e377cbda241241f8d47b45c3f4935",
+    "pg_variance.py": "3fcf73a20e9ea4354344446fb72294c4ca9e7d98275ef1ebf1645227d0f40393",
+    "imported_paper_diagnostics.py": "f724b56f8ea14ffd836d025a3a0e243d185988431a14754d61413d2c146e54a0"
+  },
+  "snapshot_step": 100,
+  "banks": 2,
+  "parameters": 1720574976,
+  "peak_gpu_memory_bytes": 16288018432,
+  "precision": "FP32 local gradients at stored BF16 model weights; non-fused FP32 Adam simulation; TF32 disabled",
+  "scope": "local counterfactual; fresh resets m,v,step; reset_m retains v and step; not online update or teacher attribution"
+}

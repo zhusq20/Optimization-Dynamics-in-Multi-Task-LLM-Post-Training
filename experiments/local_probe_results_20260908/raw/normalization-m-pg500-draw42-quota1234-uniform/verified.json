@@ -1,0 +1,12 @@
+{
+  "verified_at_utc": "2026-09-08T20:02:43.092352+00:00",
+  "job": "normalization-m-pg500-draw42-quota1234-uniform",
+  "checkpoint_step": 500,
+  "artifacts": {
+    "measurements.json": "b0302b8bb15154e26b8f2bc32e8ecc0efe4929649e62274c683120002a115b1f",
+    "probe_manifest.json": "f941134120102395756f17ba1294bd27d5ece9528af9c07bf0705fb927b71e3f",
+    "run_complete.json": "5e6fa7eb61e2f9452cd90a9b7f23c2f812961575fbcbe29347d67011f27afa5d",
+    "banks.json": "51380a5816a5164fd023e8246456b181be570693a7aaf68c9cf771886f209c9d",
+    "weights.json": "2d50240c1b697f4eb8f410ded0d59aec6d001fb6aba7610d70b8a06ded650bf1"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "completed_at_utc": "2026-09-07T05:09:23.539997+00:00",
+  "experiment_name": "qwen3-m-pg-s42-step500-code-eval",
+  "final_num_updates": 500,
+  "num_rollout": 0,
+  "schema_version": 1,
+  "start_rollout_id": 0,
+  "status": "complete",
+  "wandb_run_id": "3yq8zpp3"
+}

@@ -1,101 +1,64 @@
-\section{Shared Experimental Details}
+\section{Experimental Setup and Complete Capability Results}
 \label{app:setup}
 
-Sections~\ref{sec:normalization}--\ref{sec:density} contain the experiments;
-this appendix records shared resource and evaluation details.
+\subsection{Model, data, and training protocol}
 
-\paragraph{Training setup and run reuse.}
-Section~\ref{sec:normalization} specifies the student, domains, and four
-teacher weight sets. The $64$-response update comprises $16$ micro-batches
-of four responses, with equal domain quotas, one optimizer update per
-fresh rollout batch, and a $4{,}096$-token cap.
-The initial budget is at most $500$ updates per run, subject to a
-throughput pilot on a $96$-GB learner GPU and $48$-GB rollout/teacher GPUs.
-Exact model revisions, optimizer and decoding settings, data splits,
-and evaluation versions remain to be frozen before execution.
+The student is Qwen3-1.7B \citep{qwen2025qwen3}, revision \texttt{70d244cc86cc} (the full revision and weight hashes are in the frozen protocol). The four teachers are mathematics, code, instruction-following, and science RL descendants of the same initial model. Student and teacher use the native chat template with thinking disabled, the same assistant prefix, and no suffix removal. Generation stops at token 151643 or 151645; the model EOS token is 151645. The vocabulary contains 151,936 entries.
 
-A representative single-teacher setting is chosen before inspecting
-results. PG and corrected teacher top-$64$ in the single-teacher and
-joint settings give four configurations. The joint top-$64$ configuration
-with domain-response averaging is also the reference for the three-way
-normalization study, which adds two averaging rules. Thus six training
-configurations cover the core comparisons, with checkpoints reused for
-the update, teacher-overlap, and full-vocabulary measurements.
-Additional teacher settings, the response-cap comparison, and repeated
-seeds require separate resource accounting. Final training outcomes remain
-pending; Section~\ref{sec:density} records preliminary observations.
+All six configurations use AdamW with learning rate $2.5\times10^{-7}$, $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, zero weight decay, constant learning rate, and global gradient clipping at norm 1. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. An optimizer update aggregates 64 responses in sixteen four-response slices, with one response per execution microbatch. The optimizer is applied once after all domain blocks are accumulated. Consequently, the scalar logger's \texttt{train/step} counts gradient slices; all checkpoint axes in this paper count actual optimizer updates.
 
-\paragraph{Capability evaluation.}
-Use MATH-500 greedy pass@1, a frozen LiveCodeBench pass@1 slice,
-IFBench strict accuracy, and GPQA-Diamond average@4. Record evaluator,
-model, and data revisions and fix decoding within each comparison.
-Report raw per-domain scores, their macro-average, and the worst-domain
-change from initialization. Independently trained OPD students, where
-available, are references at matched domain exposure, not upper bounds
-or guarantees of jointly attainable capability. A lack of single-teacher
-transfer is not itself evidence of multi-teacher interference.
-Loss on a common held-out response bank and loss on fresh student
-responses are reported separately; a lower mean KL alone does not
-establish balanced capability integration.
+The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. The frozen protocol records the exact train, diagnostic, and held-out split hashes and teacher conversion manifests. I64 starts from initialization with the intersection objective in Equation~\ref{eq:i64}.
 
-\paragraph{Teacher reference results.}
-Table~\ref{tab:teacher_reference} reports the completed reference evaluations
-from September 6, 2026. Each RL-trained teacher is evaluated only on its
-own domain; the initial Qwen3-1.7B-Base student is evaluated on the same
-questions and labels. Scores include truncated responses.
-
-\begin{table}[htbp]
-\centering
-\small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{lrrrrr}
+\begin{table}[!htbp]
+\centering\small
+\begin{tabular}{lrl}
 \toprule
-Benchmark & Responses & Teacher & Initial & $\Delta$ (pp) & Trunc. \\
+Configuration & Complete capability checkpoints & Online geometry in this paper \\
 \midrule
-MATH-500 & 500 & 75.60 & 55.60 & +20.00 & 6.80 \\
-LiveCodeBench postcutoff & 128 & 23.44 & 0.78 & +22.66 & 24.22 \\
-IFBench strict & 300 & 29.00 & 17.33 & +11.67 & 7.33 \\
-GPQA-Diamond avg@4 & $198\times4$ & 34.60 & 18.81 & +15.78 & 0.51 \\
+Initial & 0 & Initial reference \\
+S-PG & 100, 250 & --- \\
+S-I64 & 100, 250 & --- \\
+M-PG & 50, 100 & 0, 1, 50, 100; local probes at 100 \\
+M-I64-DR & 50, 100 & 0, 1, 50, 100 \\
+M-I64-DT & 50 & 0, 1, 50 \\
+M-I64-GT & 50, 100 & 0, 1, 50, 100 \\
 \bottomrule
 \end{tabular}
-\caption{Domain-specific teacher references and the initial student.
-Scores and teacher truncation rates (Trunc.) are percentages;
-$\Delta$ is the teacher-minus-initial difference in percentage points,
-computed before rounding. MATH-500 and LiveCodeBench use pass@1;
-IFBench uses strict accuracy. GPQA averages correctness over four
-responses per question, rather than counting any correct response as
-success. Each row uses a different teacher and benchmark.}
-\label{tab:teacher_reference}
+\caption{Coverage of the aligned evidence snapshot. The single-teacher training runs reached update 500; their complete capability suites available here end at 250. Multi-teacher runs have unequal coverage after interruptions and restarts. The DT update-100 checkpoint is incomplete. Reported curves use the completed measurements listed here.}
+\label{tab:coverage}
 \end{table}
 
-The teachers produce respectively $378/500$, $30/128$, $87/300$, and
-$274/792$ correct responses. Mathematics, code, and instruction following
-use greedy decoding; GPQA uses temperature $1$ and top-$p=1$.
-The requested response limit is $32{,}768$ tokens, reduced as needed to
-fit each prompt within the $32{,}768$-token context.
-Teacher prompts retain the empty \texttt{<think>}\ldots\texttt{</think>}
-suffix from the chat template, whereas initial-student prompts remove
-it. Thus the observed differences compare the deployed evaluation
-configurations and do not isolate the effect of model weights.
+\subsection{Evaluation and scoring}
 
-Code generation warrants particular attention: $31/128$ teacher responses
-are truncated and none passes; $27/128$ have execution errors, with zero
-sandbox infrastructure errors. These categories can overlap.
-The initial student's code and IF truncation rates are $75.78\%$ and
-$69.67\%$, respectively, so generation behavior also matters when
-interpreting their score differences. These reference scores do not
-establish transfer to an OPD student or jointly attainable performance.
-% Auditable counts, source paths, completion records, and artifact hashes:
-% experiments/teacher_reference_results_20260906.json
+Each capability suite contains MATH-500 (500 questions) \citep{hendrycks2021math}, a fixed 128-question LiveCodeBench v6 subset \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 1,720 responses.
 
-\paragraph{Compute and uncertainty.}
-Record generated tokens, domain response counts, optimizer updates, and
-GPU hours separately, including teacher-scoring and diagnostic overhead.
-Key online comparisons use repeated paired training seeds when feasible;
-initial one-seed runs are exploratory. Prompt bootstrap estimates
-conditional evaluation uncertainty, not training-seed variation.
-Report effect sizes, confidence intervals, and the range of differences
-the experiment can resolve. Teacher pairs sharing weights or training
-lineage, and repeated checkpoints, are not independent observations.
-No sparsity advantage or capability improvement is claimed before
-measurement.
+Table~\ref{tab:all_capability} gives all twelve complete suites. Eight suites have local response-level artifacts: the shared initial student and seven multi-teacher checkpoints. Their 13,760 response records were checked against artifact hashes, expected sample counts, unique prompt/sample indices, and logged aggregate scores. The code artifacts report zero sandbox infrastructure errors. Recomputing all 6,336 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero score changes. Four single-teacher suites contribute 6,880 responses through previously verified completion summaries from a second node. Their per-question records remain on that node.
+
+\begin{table}[t]
+\centering\small
+\input{experiments/aligned_evidence_20260910/capability_table.tex}
+\caption{All completed aligned capability scores (\%). Scores use the standard dataset metrics and all evaluated responses. The shared initial student is counted once in the twelve-suite total.}
+\label{tab:all_capability}
+\end{table}
+
+The four RL teachers were evaluated separately on their respective domain benchmarks with the compatible native prompt and decoding protocol (Table~\ref{tab:teachers}). The science teacher's 792 saved responses also agree exactly with the current GPQA scorer. These teacher scores describe the available supervision on each target domain.
+
+\begin{table}[t]
+\centering\small
+\input{experiments/aligned_evidence_20260910/teacher_table.tex}
+\caption{Domain teacher reference evaluations, retained from the compatible September 6 evaluation campaign. Science uses GPQA average@4.}
+\label{tab:teachers}
+\end{table}
+
+\subsection{Paired comparisons and evidence provenance}
+
+For the paired comparisons, question identity includes the prompt, label, and question metadata, with post-generation response and sandbox diagnostics removed. Correspondence is verified before pairing. We bootstrap the per-question score differences 10,000 times using seed 1042; each GPQA question retains its four-response cluster. Figure~\ref{fig:normalization_ci} shows percentile 95\% intervals. These are nominal, unadjusted intervals over evaluation questions, conditional on the trained checkpoints. Training-seed variation is a separate source of uncertainty. The same procedure supplies the initial-to-checkpoint comparisons in the evidence bundle.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/normalization50.pdf}
+\caption{All paired update-50 I64 reduction contrasts against DR. Points give score differences in percentage points and bars give nominal 95\% paired prompt-bootstrap intervals. GPQA resamples questions with their four responses together.}
+\label{fig:normalization_ci}
+\end{figure}
+
+The source bundle \texttt{experiments/aligned\_evidence\_20260910} freezes the plotted measurements, prompt-level score records, source SHA-256 hashes, scoring implementation, protocol, and local diagnostic code. Figure generation reads only this bundle and runs on CPU. The manifest identifies the source artifact for each measurement. The aligned series uses the common initial parent and native response semantics throughout; earlier Base initialization, Student64-to-I64 continuations, and superseded teacher-top-$k$ runs are outside this series.

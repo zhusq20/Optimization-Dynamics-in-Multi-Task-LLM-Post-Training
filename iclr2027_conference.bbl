@@ -1,0 +1,75 @@
+\begin{thebibliography}{9}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Gao et~al.(2026)Gao, Chi, Yan, Feng, Wu, Jiang, He, Ma, Zhang, and
+  Zhou]{gao2026openmopddiagnosingfixingcapability}
+Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang,
+  Bingxiang He, Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou.
+\newblock {Open-MOPD}: Diagnosing and fixing capability imbalance in
+  multi-teacher on-policy distillation, 2026.
+\newblock URL \url{https://arxiv.org/abs/2608.19098}.
+
+\bibitem[Hendrycks et~al.(2021)Hendrycks, Burns, Kadavath, Arora, Basart, Tang,
+  Song, and Steinhardt]{hendrycks2021math}
+Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric
+  Tang, Dawn Song, and Jacob Steinhardt.
+\newblock Measuring mathematical problem solving with the {MATH} dataset.
+\newblock In \emph{Advances in Neural Information Processing Systems}, 2021.
+\newblock URL \url{https://arxiv.org/abs/2103.03874}.
+
+\bibitem[Jain et~al.(2024)Jain, Han, Gu, Li, Yan, Zhang, Wang, Solar-Lezama,
+  Sen, and Stoica]{jain2024livecodebench}
+Naman Jain, King Han, Alex Gu, Wen-Ding Li, Fanjia Yan, Tianjun Zhang, Sida
+  Wang, Armando Solar-Lezama, Koushik Sen, and Ion Stoica.
+\newblock Livecodebench: Holistic and contamination free evaluation of large
+  language models for code, 2024.
+\newblock URL \url{https://arxiv.org/abs/2403.07974}.
+
+\bibitem[Ma et~al.(2026)Ma, Wei, Zhao, Zhang, Xiao, Li, Yang, Gao, Wang, Li,
+  Dong, Sui, and Luo]{ma2026mopdmultiteacheronpolicydistillation}
+Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin
+  Yang, Bofei Gao, Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli
+  Luo.
+\newblock {MOPD}: Multi-teacher on-policy distillation for capability
+  integration in llm post-training, 2026.
+\newblock URL \url{https://arxiv.org/abs/2606.30406}.
+
+\bibitem[Mukherjee et~al.(2025)Mukherjee, Yuan, Hakkani-Tur, and
+  Peng]{mukherjee2025subnetworks}
+Sagnik Mukherjee, Lifan Yuan, Dilek Hakkani-Tur, and Hao Peng.
+\newblock Reinforcement learning finetunes small subnetworks in large language
+  models, 2025.
+\newblock URL \url{https://arxiv.org/abs/2505.11711v2}.
+\newblock Version 2; NeurIPS 2025.
+
+\bibitem[Pyatkin et~al.(2025)Pyatkin, Malik, Graf, Ivison, Huang, Dasigi,
+  Lambert, and Hajishirzi]{pyatkin2025ifbench}
+Valentina Pyatkin, Saumya Malik, Victoria Graf, Hamish Ivison, Shengyi Huang,
+  Pradeep Dasigi, Nathan Lambert, and Hannaneh Hajishirzi.
+\newblock Generalizing verifiable instruction following, 2025.
+\newblock URL \url{https://arxiv.org/abs/2507.02833}.
+
+\bibitem[{Qwen Team}(2025)]{qwen2025qwen3}
+{Qwen Team}.
+\newblock Qwen3 technical report, 2025.
+\newblock URL \url{https://arxiv.org/abs/2505.09388}.
+
+\bibitem[Rein et~al.(2023)Rein, Hou, Stickland, Petty, Pang, Dirani, Michael,
+  and Bowman]{rein2023gpqa}
+David Rein, Betty~Li Hou, Asa~Cooper Stickland, Jackson Petty, Richard~Yuanzhe
+  Pang, Julien Dirani, Julian Michael, and Samuel~R. Bowman.
+\newblock {GPQA}: A graduate-level google-proof q\&a benchmark, 2023.
+\newblock URL \url{https://arxiv.org/abs/2311.12022}.
+
+\bibitem[Yu et~al.(2026)Yu, Liu, Hu, Ma, Jiang, and Ye]{yu2026denseupdates}
+Guo Yu, Wenlin Liu, Yulan Hu, Hao-Xuan Ma, Jun-Peng Jiang, and Han-Jia Ye.
+\newblock Dense supervision, sparse updates: On the sparsity and geometry of
+  on-policy distillation, 2026.
+\newblock URL \url{https://arxiv.org/abs/2606.13657v3}.
+\newblock Version 3, July 30, 2026.
+
+\end{thebibliography}

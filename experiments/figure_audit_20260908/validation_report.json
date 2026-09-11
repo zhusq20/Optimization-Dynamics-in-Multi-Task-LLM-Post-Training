@@ -1,0 +1,69 @@
+{
+  "checked_at_utc": "2026-09-08T02:04:05.767860+00:00",
+  "status": "passed",
+  "scope": "Frozen evidence validation retained from its original check; revised planning documents, source compilation, panel registry, and rerendered artifacts checked now. No fresh reward re-scoring or training execution.",
+  "capability_points_verified": 25,
+  "capability_responses_verified": 10940,
+  "bf16_scan_vs_online_log_l2_pairs": 21,
+  "bf16_l2_max_relative_difference": 1.3590032806123903e-13,
+  "teacher_pair_numeric_consistency_rows": 72,
+  "core_24_status_counts": {
+    "E": 12,
+    "N": 4,
+    "P": 8
+  },
+  "all_panel_count": 27,
+  "lineage_label_conflicts_explicitly_retained": 12,
+  "python_compile_and_source_hashes": {
+    "build_figure_plan.py": "f048b0e47b8edfb77a51ff10c2257fb6e3be02ea2d63317a8c9b63b048767926",
+    "generate_gpas_main_figure.py": "faeb58d10ac445e145d77d782712e0809ea07445c0810bbc3cf9a39623396392",
+    "plot_figure_evidence.py": "d129437f4acbb33cf290cadb97ae9cddf8060e8cbfacc4d87f17958a63f9b707",
+    "audit_figure_evidence.py": "100d2035ba4646388fc021dbeed49742f802d8b5db871eafaf0f267c4bef08bc"
+  },
+  "pdf_structure_checks": {
+    "03_teacher_overlap.pdf": {
+      "page_objects": 1,
+      "bytes": 69762,
+      "sha256": "eac1bb2a14059423df7cf85fa67764212b0b4fa80e4efb35650bf25acc3413e6"
+    },
+    "figure_roadmap_9x3.pdf": {
+      "page_objects": 1,
+      "bytes": 76906,
+      "sha256": "a0f07f61789036b6ab5c9463bb4da2707b60078c44810067f65d95cfcdb6f1d1"
+    },
+    "exploratory_triptychs.pdf": {
+      "page_objects": 3,
+      "bytes": 101933,
+      "sha256": "dc58dfddb14c3ce7713574c901f65cfc9e2eb4e7148a1a6405193cfe3711979b"
+    },
+    "01_balancing_and_capability.pdf": {
+      "page_objects": 1,
+      "bytes": 47874,
+      "sha256": "938dd9d206ea9f6f5d533cef3d693c1382c789f76c16bbc636e925b6ef66748e"
+    },
+    "02_sparsity_and_density.pdf": {
+      "page_objects": 1,
+      "bytes": 75967,
+      "sha256": "84731b56c28b13a366abaa0ec24dbbcbea18862252792483fe975fcbad8188fc"
+    }
+  },
+  "visual_inspection": "Original three exploratory rows and roadmap inspected at initial validation. Revised sparsity/density row inspected after neutral title/axis edits; labels and layout remain legible.",
+  "frozen_evidence_validation_checked_at_utc": "2026-09-08T01:34:33.341719+00:00",
+  "planning_revision": {
+    "documents": {
+      "experiments/EXPERIMENT_FIGURE_ROADMAP_20260908_zh.md": "ca3be5169b3f2d4ffb435c944e3b4106631d9d4092e259a3ea5460d5dee32d78",
+      "experiments/NEXT_EXPERIMENTS_20260908_zh.md": "38822209a8412c9e83f5c9d6d6bb0709ab72c24965bbb4344b2d59edf933a4f9",
+      "experiments/README.md": "c8075f342c9d307419c41af1df3ba3c5a30f7f0b2273eee0dff2d2c08cc0d49e",
+      "experiments/figure_audit_20260908/README_zh.md": "8113c041620892c71c2d26d1c4c266f576ed6d0a045eccf36f0ad5fdc7a43cd2"
+    },
+    "local_links_checked": 59,
+    "active_timeline_narrative_removed": true,
+    "measurement_identities_and_raw_provenance_preserved": true,
+    "training_remaining_updates_at_0150": 1294,
+    "core_missing_capability_suites": 8,
+    "core_missing_capability_responses": 13760,
+    "next_bf16_scan_count": 9,
+    "new_experiments_launched": 0,
+    "evidence_snapshot_sha256": "9a85b1ccf34640ee74e85924412e7d58d725f4141b5d094ffd9366168c018fca"
+  }
+}

@@ -1,0 +1,140 @@
+\section{Length-Weighting Derivation}
+\label{app:normalization}
+
+Fix a rollout batch, its valid-token masks, and the domain weights
+$\lambda_d$. Any PG advantages are detached. Use the response mean
+$\ell_i$ and response gradient $g_i=\nabla_\theta\ell_i$ from
+Section~\ref{sec:normalization}. For $n_d=|\mathcal B_d|$, define mean
+response length $\bar T_d=n_d^{-1}\sum_{i\in\mathcal B_d}|y_i|$ and mean
+response gradient $\bar g_d=n_d^{-1}\sum_{i\in\mathcal B_d}g_i$.
+The empirical length--gradient covariance uses the same $1/n_d$
+normalization:
+\begin{equation}
+\operatorname{Cov}_d(|y|,g)
+=\frac{1}{n_d}\sum_{i\in\mathcal B_d}
+(|y_i|-\bar T_d)(g_i-\bar g_d),\qquad
+\frac{\sum_{i\in\mathcal B_d}|y_i|g_i}
+     {\sum_{i\in\mathcal B_d}|y_i|}
+=\bar g_d+\frac{\operatorname{Cov}_d(|y|,g)}{\bar T_d}.
+\label{eq:norm_covariance}
+\end{equation}
+To verify the identity, expand the covariance as
+$n_d^{-1}\sum_i|y_i|g_i-\bar T_d\bar g_d$ and divide by $\bar T_d$.
+Global token averaging combines the right-hand side using each domain's
+observed token share; domain token averaging uses $\lambda_d$ instead.
+Domain response averaging gives $\sum_d\lambda_d\bar g_d$.
+Thus the change in the domain coefficient and the within-domain
+length--gradient covariance are distinct, even with identical rollouts.
+Multiplying a domain's globally averaged token terms by its target weight
+divided by its observed token share gives the domain-token rule exactly.
+
+These are finite-batch identities. The expectation of a sample ratio
+is generally not the ratio of population expectations; replacing it
+with $\mathbb E[|y|g]/\mathbb E[|y|]$ requires an appropriate large-batch
+limit. The identities also do not differentiate through the response
+sampling distribution, masks, or response lengths.
+
+\section{Measurement Details and Optional Follow-up}
+
+\subsection{Teacher-conditioned masks at a common joint checkpoint}
+\label{app:records}
+
+The diagnostic record contains the joint student checkpoint, optimizer
+state, teacher identity, routed domain, prompt IDs, sampled response
+and mask, loss reduction, and gradient accumulation denominator.
+Each teacher-conditioned gradient and proposed step is computed from
+the same restored student state. They describe the parameters most affected by a teacher at that
+checkpoint, not a unique historical attribution of the cumulative joint delta.
+
+Record raw and clipped gradients separately. Retain the actual optimizer
+step and its momentum and decay settings. A zero-gradient optimizer
+branch can identify motion caused by stored momentum or weight decay
+when those components dominate an overlap comparison. Prefer FP32
+master-weight differences for cumulative updates when available;
+converting already rounded BF16 checkpoints to FP32 does not recover
+unrecorded updates. Record exclusions, thresholds, relative scales,
+tie rules, and per-layer selected-parameter counts.
+
+Comparisons selecting an equal fraction of parameters accompany
+absolute-threshold selections.
+A stratified random baseline preserves layer and source-weight-magnitude
+bins when feasible. Degenerate or tie-dominated gradients are marked;
+ranking a zero vector does not define a meaningful learned subnetwork.
+If both selections are empty, report overlap as undefined and exclude
+that comparison from averages. If only one is empty, overlap is zero.
+
+\subsection{Teacher distribution difference}
+\label{app:teacher_distance}
+
+For teachers $d$ and $e$ at the same prefix, the Jensen--Shannon divergence is
+\begin{equation}
+\operatorname{JS}(\pi_{\phi_d},\pi_{\phi_e})
+=\tfrac12 D_{\mathrm{KL}}(\pi_{\phi_d}\|m)
++\tfrac12 D_{\mathrm{KL}}(\pi_{\phi_e}\|m),
+\qquad m=\tfrac12(\pi_{\phi_d}+\pi_{\phi_e}).
+\label{eq:teacher_js}
+\end{equation}
+It lies between zero and $\log 2$ with natural logarithms and is zero
+when the two next-token distributions agree. Average this quantity
+across the same prefix bank and domain weights for every pair.
+Replacing one teacher distribution with $\pi_\theta$ gives the
+teacher--student comparison. Truncated estimates must report their
+retained probability mass and must not be presented as exact
+full-vocabulary divergences.
+
+\subsection{Optional analysis if the loss comparison shows a stable difference}
+\label{app:optional_loss}
+
+If a stable difference warrants further analysis, resample next actions
+on a fixed student-prefix bank and compare sample counts, an
+action-independent detached baseline, and the exact full-vocabulary
+gradient. These controls test whether the effect tracks sampling variance. A retained-head plus sampled-tail estimator can distinguish
+truncation from the full reverse-KL reference
+\citep{oh2026vopd,zhang2026emapg,yu2026denseupdates}.
+
+The independent action draws do not extend the response; prefix selection
+and weights remain fixed. Original rollout tokens with eventual
+response-length weights need not satisfy the same sampling identity. Forward KL, teacher versus student top-$k$, or within-set
+renormalization are objective changes and are labeled separately.
+
+
+\subsection{An optional amplitude calibration for teacher distance}
+\label{app:teacher_controls}
+
+A simple artificial target can help distinguish gradient magnitude from
+parameter selection. At a fixed prefix $(x,y_{<t})$, write
+$\pi_0=\pi_{\theta_0}$ for the reference student and freeze the teacher
+$\pi_{\phi_d}$. Define the normalized interpolated distribution
+\begin{equation}
+\pi_\alpha(v)=
+\frac{\pi_0(v)^{1-\alpha}\pi_{\phi_d}(v)^\alpha}
+     {\sum_{v'}\pi_0(v')^{1-\alpha}\pi_{\phi_d}(v')^\alpha},
+\qquad
+\left.\nabla_\theta D_{\mathrm{KL}}(\pi_\theta\|\pi_\alpha)
+\right|_{\theta_0}
+=\alpha\left.\nabla_\theta D_{\mathrm{KL}}
+(\pi_\theta\|\pi_{\phi_d})\right|_{\theta_0}.
+\label{eq:tilt_gradient}
+\end{equation}
+All probabilities condition on the same prefix. The log-ratio is an
+$\alpha$-scaled original log-ratio plus a constant across vocabulary tokens;
+the constant vanishes because $\sum_v\nabla_\theta\pi_\theta(v)=0$.
+For $\alpha>0$, positive scaling preserves the ranking of raw-gradient
+magnitudes while possibly changing absolute-threshold sparsity.
+This artificial calibration does not replace real-teacher comparisons
+or imply matched downstream capability.
+
+\subsection{Reproducibility records}
+
+Record exact student, teacher, tokenizer, data, and evaluator revisions;
+teacher training lineages; prompt schedules and seeds; decoding,
+EOS handling, cap, invalid responses, and loss masks; learning-rate
+schedule, optimizer moments, precision, clipping, and decay; candidate
+sets, probability normalization, teacher/student retained mass, and
+advantage handling. Keep per-prompt outputs, source measurements for
+every plot, and actual time and memory costs.
+
+Distinguish training seeds, diagnostic batch replicates, and evaluation
+resamples. Pairs sharing a teacher are dependent, and prompt-level
+uncertainty does not establish population-level teacher relationships.
+Historical synthetic GPAS calculations are not empirical evidence for these studies.

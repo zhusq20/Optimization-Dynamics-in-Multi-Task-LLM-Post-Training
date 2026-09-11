@@ -1,0 +1,10 @@
+{
+  "completed_at_utc": "2026-09-08T14:45:31.013590+00:00",
+  "experiment_name": "qwen3-s-itk64-s42-step100-math_if-retry1-eval",
+  "final_num_updates": 100,
+  "num_rollout": 0,
+  "schema_version": 1,
+  "start_rollout_id": 0,
+  "status": "complete",
+  "wandb_run_id": "078wwve7"
+}

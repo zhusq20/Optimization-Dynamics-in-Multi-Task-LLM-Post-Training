@@ -1,0 +1,33 @@
+{
+  "arguments": {
+    "snapshot": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/formal_20260906/m-pg-s42/paper/checkpoint_step_0500.pt",
+    "hf_checkpoint": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/formal_20260906/m-pg-s42/weights/iter_0000499",
+    "manifest": "/workspace/dev/iclr2027/slime_opd_geometry/local/sequential_paper_20260908_sn4622129202/generated/diagnostic.yaml",
+    "teachers": "/workspace/dev/iclr2027/slime_opd_geometry/local/sequential_paper_20260908_sn4622129202/generated/teachers.json",
+    "output": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/sequential_paper_20260908_sn4622129202/normalization-m-pg500-draw42",
+    "job": "normalization-m-pg500-draw42",
+    "snapshot_step": 500,
+    "loss": "topk_intersection",
+    "seed": 42,
+    "max_new_tokens": 512,
+    "max_prompt_tokens": 1024,
+    "responses_per_domain": 2,
+    "domain_response_counts": "",
+    "domain_weighting": "uniform",
+    "bank": null,
+    "device": "cuda:0",
+    "wandb_mode": "online",
+    "domain_counts": {
+      "math": 2,
+      "code": 2,
+      "if": 2,
+      "science": 2
+    }
+  },
+  "started_at_utc": "2026-09-08T19:49:51.278314+00:00",
+  "status": "complete",
+  "precision": "BF16 student forward/backward per response, FP32 cross-response accumulation, FP64 covariance audit, saved FP32 Adam, BF16 writeback",
+  "scope": "Full-response fixed-batch local intervention with 512-token cap; not online training or a benchmark capability score",
+  "paper_section": "Token Balancing and Response Length; Appendix Length-Weighting Derivation",
+  "completed_at_utc": "2026-09-08T19:59:37.979054+00:00"
+}

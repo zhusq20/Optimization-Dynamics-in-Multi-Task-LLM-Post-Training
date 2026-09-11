@@ -1,0 +1,27 @@
+{
+  "status": "passed",
+  "raw_curve_values_checked": 256276,
+  "static_raw_values_checked": 43546,
+  "local_probe_values_checked": 826,
+  "evaluation_attempts_verified": 52,
+  "selected_eval_points": 50,
+  "exported_figures": 30,
+  "main_pdf_pages": 9,
+  "all_pdf_pages": 30,
+  "labels_inside_export_checked": 551,
+  "method_transitions_preserved": true,
+  "browser_validation": {
+    "rendered_series": 380,
+    "default_raw_only": true,
+    "ema_keeps_raw": true,
+    "source_hover": true,
+    "download_csv_rows": 500,
+    "mobile_no_overflow": true,
+    "bundled_chinese_font_loaded": true,
+    "gallery_figures": 30,
+    "legacy_entry_redirect": true,
+    "javascript_errors": [],
+    "final_font_fallback_and_mobile_check": true
+  },
+  "final_render_script_sha256": "dadb1faa5528939118b1ca0cbd0fcef84cc8bde482a0e8b7a43e43ed7252d9f2"
+}

@@ -1,0 +1,13 @@
+{
+  "verified_at_utc": "2026-09-08T19:49:41.949725+00:00",
+  "job": "density-m-pg250-draw45",
+  "checkpoint_step": 250,
+  "artifacts": {
+    "measurements.json": "f23a8044bba26f71cc83594d8b210f43aa3eef832e93dc7b2599f2b57922fd69",
+    "probe_manifest.json": "47fb212f1d9e67f57924c59383a22d037dac10da492eb61b27aba45e07f44b3e",
+    "run_complete.json": "44083e74c5d7aec0d19b7c4ac4d195d05b76e359f9c2aa47e43a7ce38bb03cf2",
+    "prefix_bank.json": "d33602e87d921608c028c63869d89b598cb6abfa6253c94b68b110d6983417de",
+    "support_records.json": "9f3aaf5d9ec1b4da9e9d67f30a5efe0334d7ca57f830d49e0942b3e5b5a164af",
+    "distributions.pt": "e8aeea83bf0ab1f09b73c26ef8393041a6c422a2fb0f671fc8b6c95b8c2a907f"
+  }
+}
