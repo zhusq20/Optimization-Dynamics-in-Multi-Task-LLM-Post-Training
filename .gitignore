@@ -1,0 +1,36 @@
+# Local backups, rendered paper copies, and temporary build/review output.
+/backup/
+/tmp/
+/output/
+/iclr2027_conference.pdf
+
+# LaTeX build products (the bibliography is rebuilt from the tracked .bib).
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+
+# Large evidence bundles remain in the archive branch and in local checkouts.
+/experiments/paper_curves_20260908/
+/experiments/local_probe_results_20260908/
+/experiments/figure_audit_20260908/
+/experiments/aligned_evidence_20260910/raw/
+/experiments/aligned_evidence_20260910/prompt_scores.jsonl
+
+# Overleaf needs the current vector PDF figures, not old galleries or previews.
+/figures/*
+!/figures/aligned_evidence_20260910/
+/figures/aligned_evidence_20260910/*
+!/figures/aligned_evidence_20260910/*.pdf
+
+# Python and editor caches.
+__pycache__/
+*.py[cod]
+.DS_Store
