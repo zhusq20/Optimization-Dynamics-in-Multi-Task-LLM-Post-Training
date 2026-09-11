@@ -1,8 +1,17 @@
 # MOPD experiment figures
 
+> **Overleaf cleanup (2026-09-11):** `main` keeps the current manuscript,
+> generated tables, PDF figures, summaries, and scripts. Raw inputs, older
+> galleries, and compiled paper copies are available in the
+> [complete archive snapshot](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/archive/research-data-before-overleaf-cleanup-20260911).
+> Run the regeneration/audit commands below from that archive checkout; links
+> to removed raw data and older packages refer to paths in that snapshot.
+> Building the current paper only requires `latexmk`; see the
+> [root guide](../README.md).
+
 The [September 11 experiment inventory (中文)](EXPERIMENT_INVENTORY_20260911_zh.md) records the completed experiments, manuscript placement, and the newly incorporated aligned S-PG/500 evaluation.
 
-The current manuscript uses the [September 10 aligned evidence bundle](aligned_evidence_20260910/README_zh.md) and its **5 main figures + 6 appendix figures**. Open the [compiled paper](../iclr2027_conference.pdf), [figure files](../figures/aligned_evidence_20260910/), or [editorial review (中文)](aligned_evidence_20260910/EDITORIAL_REVIEW_zh.md).
+The current manuscript uses the [September 10 aligned evidence bundle](aligned_evidence_20260910/README_zh.md) and its **5 main figures + 6 appendix figures**. Compile `iclr2027_conference.tex` to produce the paper PDF locally; open the [figure files](../figures/aligned_evidence_20260910/), or [editorial review (中文)](aligned_evidence_20260910/EDITORIAL_REVIEW_zh.md).
 
 The bundle includes thirteen complete capability suites, compatible teacher references, actual online parameter geometry, and the aligned M-PG/100 local mechanisms. The [verification report](aligned_evidence_20260910/verification_report.json) records source hashes, score checks, figure coverage, and manuscript validation.
 

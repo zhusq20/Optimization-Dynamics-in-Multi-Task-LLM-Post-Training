@@ -1,0 +1,245 @@
+{
+  "audited_at_utc": "2026-09-06T23:05:51.492978+00:00",
+  "active_online_topk": {
+    "loss": "student_topk",
+    "k": 16
+  },
+  "runs": [
+    {
+      "run_id": "m-pg-s42",
+      "loss": "sampled_reverse_kl",
+      "last_logged_updates": 409,
+      "responses": 26176,
+      "complete_marker_exists": false,
+      "state": "running",
+      "driver_pid": 275497,
+      "paper_checkpoint_steps": [
+        0,
+        1,
+        50,
+        100,
+        250
+      ],
+      "hf_checkpoint_steps": [
+        1,
+        50,
+        100,
+        250
+      ],
+      "capability_evaluation_steps": [],
+      "source_hashes": {
+        "outputs/mopd_qwen3/formal_20260906/m-pg-s42/allocation.jsonl": "956363f5cdf68d1e42b06d6ea322033016a98d6dbb67918206e845a1cf77e02a",
+        "outputs/mopd_qwen3/formal_20260906/m-pg-s42/paper/measurements.jsonl": "3778a9a3e475925807a57629fcbd2c93f8eaf949bed8ab7e6ab7b109592040f2",
+        "outputs/mopd_qwen3/formal_20260906/m-pg-s42/provenance/run_manifest.json": "59b8f747907042ba605bd0ad829d41ac08e615a8b6ebd49d891c4c2129c201ba"
+      }
+    },
+    {
+      "run_id": "m-tk-dr-s42",
+      "loss": "teacher_topk",
+      "last_logged_updates": 444,
+      "responses": 28416,
+      "complete_marker_exists": false,
+      "state": "stopped_by_user",
+      "paper_checkpoint_steps": [
+        0,
+        1,
+        50,
+        100,
+        250
+      ],
+      "hf_checkpoint_steps": [
+        1,
+        50,
+        100,
+        250
+      ],
+      "capability_evaluation_steps": [],
+      "source_hashes": {
+        "outputs/mopd_qwen3/formal_20260906/m-tk-dr-s42/allocation.jsonl": "2d8ba85b11ffab91b174b7150dffb6f2cd2a2c7e6352e8ce8220023e045855cb",
+        "outputs/mopd_qwen3/formal_20260906/m-tk-dr-s42/paper/measurements.jsonl": "238b983664aac21dded92880d901716e52c33d27e83894599ba4c346f5cc35df",
+        "outputs/mopd_qwen3/formal_20260906/m-tk-dr-s42/provenance/run_manifest.json": "ee8c331e95415267542ccb524173946c41bf16e43a1a1003264c91f5c509c009"
+      },
+      "stop_record": "outputs/mopd_qwen3/formal_20260906/m-tk-dr-s42/run_stopped_by_user.json"
+    },
+    {
+      "run_id": "m-tk-dt-s42",
+      "loss": "teacher_topk",
+      "last_logged_updates": 439,
+      "responses": 28096,
+      "complete_marker_exists": false,
+      "state": "stopped_by_user",
+      "paper_checkpoint_steps": [
+        0,
+        1,
+        50,
+        100,
+        250
+      ],
+      "hf_checkpoint_steps": [
+        1,
+        50,
+        100,
+        250
+      ],
+      "capability_evaluation_steps": [],
+      "source_hashes": {
+        "outputs/mopd_qwen3/formal_20260906/m-tk-dt-s42/allocation.jsonl": "9b92a07abe3b451b60c9e5b0af5ace064517d0e8b5cc2aa5a0d767bfd3924af1",
+        "outputs/mopd_qwen3/formal_20260906/m-tk-dt-s42/paper/measurements.jsonl": "263876505b58b73be6761b7adca8f2175bb4b59b29a9d31b3a9aae8684bf4b4d",
+        "outputs/mopd_qwen3/formal_20260906/m-tk-dt-s42/provenance/run_manifest.json": "87ccded8a1a190d1ca20a81a34b6389d9add0606498dc565fefcfa79ec54cff4"
+      },
+      "stop_record": "outputs/mopd_qwen3/formal_20260906/m-tk-dt-s42/run_stopped_by_user.json"
+    },
+    {
+      "run_id": "m-tk-gt-s42",
+      "loss": "teacher_topk",
+      "last_logged_updates": 425,
+      "responses": 27200,
+      "complete_marker_exists": false,
+      "state": "stopped_by_user",
+      "paper_checkpoint_steps": [
+        0,
+        1,
+        50,
+        100,
+        250
+      ],
+      "hf_checkpoint_steps": [
+        1,
+        50,
+        100,
+        250
+      ],
+      "capability_evaluation_steps": [],
+      "source_hashes": {
+        "outputs/mopd_qwen3/formal_20260906/m-tk-gt-s42/allocation.jsonl": "521cdb4f261ff343d07b55427bcf5ee9a5b871631b05ca5e5ae53124ac04a4ec",
+        "outputs/mopd_qwen3/formal_20260906/m-tk-gt-s42/paper/measurements.jsonl": "f3b420a74f479658561da2c3e2f381ac2754cb009bc7c7a5be1c3b7a70b02ddd",
+        "outputs/mopd_qwen3/formal_20260906/m-tk-gt-s42/provenance/run_manifest.json": "0a9e2f767437afde600b94e20daeae16629f54e6f89b06dcb70d2eed239dd682"
+      },
+      "stop_record": "outputs/mopd_qwen3/formal_20260906/m-tk-gt-s42/run_stopped_by_user.json"
+    },
+    {
+      "run_id": "s-pg-s42",
+      "loss": "sampled_reverse_kl",
+      "last_logged_updates": 239,
+      "responses": 15296,
+      "complete_marker_exists": false,
+      "state": "running",
+      "remote_status_checked_at_utc": "2026-09-06T23:05:22.896299+00:00",
+      "process_identity": {
+        "pid": 377735,
+        "created": 1788678711.08
+      },
+      "paper_checkpoint_steps": [
+        0,
+        1,
+        50,
+        100
+      ],
+      "hf_checkpoint_steps": [
+        1,
+        50,
+        100
+      ],
+      "capability_evaluation_steps": [],
+      "source_hashes": {
+        "outputs/mopd_qwen3/formal_20260906/s-pg-s42/allocation.jsonl": "8935800fcc1bfdec97b3537167d2c6e86722038dd773e102b217b9d7ea40f5f3",
+        "outputs/mopd_qwen3/formal_20260906/s-pg-s42/paper/measurements.jsonl": "4dee45de917715eb3d9d049c5ebd4c3d6b713195e583dd58044fed4c61316cd9",
+        "outputs/mopd_qwen3/formal_20260906/s-pg-s42/provenance/run_manifest.json": "ab308a632224ae03ce51e2758f1c30fe5d0cbf455d936b947934267b0cfb8f3d"
+      }
+    },
+    {
+      "run_id": "s-tk-s42",
+      "loss": "teacher_topk",
+      "last_logged_updates": 278,
+      "responses": 17792,
+      "complete_marker_exists": false,
+      "state": "stopped_by_user",
+      "remote_status_checked_at_utc": "2026-09-06T23:05:22.896299+00:00",
+      "process_identity": {
+        "pid": 377752,
+        "created": 1788678711.91
+      },
+      "paper_checkpoint_steps": [
+        0,
+        1,
+        50,
+        100,
+        250
+      ],
+      "hf_checkpoint_steps": [
+        1,
+        50,
+        100,
+        250
+      ],
+      "capability_evaluation_steps": [],
+      "source_hashes": {
+        "outputs/mopd_qwen3/formal_20260906/s-tk-s42/allocation.jsonl": "2b7e5411def6e125d61a7e443ab5bf7c43dee4a135ae44112ea72c55da77f2de",
+        "outputs/mopd_qwen3/formal_20260906/s-tk-s42/paper/measurements.jsonl": "ed8c057f568a104ca05029e8b28e839791ad49d9b19d83ff62b4007900164a26",
+        "outputs/mopd_qwen3/formal_20260906/s-tk-s42/provenance/run_manifest.json": "216c7a4b551859d3fcdb92fc291de991da6022f9faf2034b9af840d9fc7c7f4f"
+      },
+      "stop_record": "outputs/mopd_qwen3/formal_20260906/s-tk-s42/run_stopped_by_user.json",
+      "restart_disabled": true,
+      "supervisor_state": "needs_attention"
+    }
+  ],
+  "completed_reference_evaluations": [
+    {
+      "target": "initial_student",
+      "status": "complete",
+      "source": "outputs/mopd_qwen3/formal_20260906/initial_student/capability_eval/step_0/run_complete.json"
+    },
+    {
+      "target": "teacher_math",
+      "status": "complete",
+      "source": "outputs/mopd_qwen3/formal_20260906/teacher_math/capability_eval/step_0/run_complete.json"
+    },
+    {
+      "target": "teacher_code",
+      "status": "complete",
+      "source": "outputs/mopd_qwen3/formal_20260906/teacher_code/capability_eval/step_0/run_complete.json"
+    },
+    {
+      "target": "teacher_if",
+      "status": "complete",
+      "source": "outputs/mopd_qwen3/formal_20260906/teacher_if/capability_eval/step_0/run_complete.json"
+    },
+    {
+      "target": "teacher_science",
+      "status": "complete",
+      "source": "outputs/mopd_qwen3/formal_20260906/teacher_science/capability_eval/step_0/run_complete.json"
+    }
+  ],
+  "legacy_probe": {
+    "manifest_status": "running",
+    "actual_state": "stopped_early_manual_hold",
+    "checkpoint_step": 0,
+    "complete_batches": [
+      0
+    ],
+    "partial_batches": [
+      1
+    ],
+    "topk_loss": "teacher_topk",
+    "source": "outputs/mopd_qwen3/formal_20260906/paper/node_exx_B7129/m-tk-dr_probe_step_0000"
+  },
+  "student_top16_validation": {
+    "existing_regression_log": "local/topk_open_mopd_check_20260906/implementation_tests.log",
+    "existing_test_result": "246 passed",
+    "live_scoring_contract": "local/topk_open_mopd_check_20260906/live_contract.json",
+    "complete_online_training_found": false
+  },
+  "stop_evidence": [
+    "local/paper_formal_20260906/topk_stop_requested_20260906.json",
+    "local/paper_formal_20260906/node_exx_B7129/topk_stop_requested_20260906.json",
+    "local/paper_formal_20260906/node_exx_B7129/topk_stop_result_20260906.json"
+  ],
+  "remote_restart_blocked_by": "local/paper_formal_20260906/node_exx_B7129/resume_memory.py:21",
+  "parameter_statistics": {
+    "source_precision": "bf16",
+    "primary_quantity": "cumulative_change_from_initial_bf16_checkpoint",
+    "criterion": "torch.isclose(delta_bf16, zeros_bf16, atol=1e-5)",
+    "fp32_parameter_comparison_required": false,
+    "existing_bf16_source": "bf16_effective_changes_20260906.json"
+  }
+}
