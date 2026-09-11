@@ -35,6 +35,28 @@ The `overleaf-2026-09-11-0155` branch contained the old results-pending draft.
 It is already merged into `main`; that merge preserves the completed results.
 Do not use that old branch as the current paper source.
 
+## Recovering a project still showing the old draft
+
+The September 11 diagnosis reproduced a truncated GitHub comparison:
+`287eaee...2736c5b` changes 721 paths in Git, but the JSON compare API returns
+only 300, all under `backup/` and `experiments/`. It omits the manuscript and
+all figure paths. GitHub documents a [300-file limit for the entire comparison](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
+This is a plausible explanation for missed Overleaf updates; the project's
+private synchronization state has not been inspected.
+
+The cleaned `main` snapshot contains only 78 files (about 1.72 MB), including
+one main document. Cleanup commits each change fewer than 100 files, but a
+first pull spanning the old history can still exceed the comparison limit.
+If a pull still leaves the old abstract or missing figures, importing `main`
+as a fresh Overleaf project avoids replaying that large historical diff:
+**New project → GitHub repo**, then select this repository. Keep the existing
+project until the new one is verified. A compact snapshot ZIP can also be
+created with `git archive --format=zip --output=../overleaf-main.zip HEAD`.
+
+Adding `.gitignore` alone does not remove tracked files; the cleanup explicitly
+removed those files from the index. It also does not filter an independent
+Overleaf-side upload of old project files.
+
 ## Research data and historical outputs
 
 The complete snapshot before the Overleaf cleanup is preserved in
