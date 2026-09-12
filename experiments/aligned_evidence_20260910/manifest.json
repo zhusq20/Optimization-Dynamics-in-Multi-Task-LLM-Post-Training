@@ -636,12 +636,6 @@
       "bytes": 1442
     },
     {
-      "source": "slime/rollout/rm_hub/gpqa.py",
-      "frozen": "raw/gpqa_scorer.py",
-      "sha256": "9a3014b359e901271fcff9f60a7351097fb72e9bce62a3b229ea1cc71c43bd12",
-      "bytes": 7025
-    },
-    {
       "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/run_complete.json",
       "frozen": "raw/S-PG_500_complete.json",
       "sha256": "8a865bee72eeae9ea52bdceabe0ffa9213d93e2e9d4e9b7e7cb3e761280900f0",
@@ -688,6 +682,186 @@
       "note": "compact audit rows; response text remains in source workspace"
     },
     {
+      "source": "slime/rollout/rm_hub/gpqa.py",
+      "frozen": "raw/gpqa_scorer.py",
+      "sha256": "9a3014b359e901271fcff9f60a7351097fb72e9bce62a3b229ea1cc71c43bd12",
+      "bytes": 7025
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/run_complete.json",
+      "frozen": "raw/M-PG_250_complete.json",
+      "sha256": "0e7e587b62a016f7540371bd4c71845e9a1ebff10b8407809a4d75d4575cb44a",
+      "bytes": 260
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/job.json",
+      "frozen": "raw/M-PG_250_job.json",
+      "sha256": "c064901ff84d64867612b2481e5298d9bd20e4349e22e60fb7341571ed0ccd7e",
+      "bytes": 4352
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/verified_summary.json",
+      "frozen": "raw/M-PG_250_verified_summary.json",
+      "sha256": "aa8ad45b35983682e9c2131064930440cb300e4b36f7071f74a87a88207f1d05",
+      "bytes": 396
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/metrics/eval.jsonl",
+      "frozen": "raw/M-PG_250_eval.jsonl",
+      "sha256": "6f5ebfd77a9f6ef816843c24362f94439ad8509bdfab9e1f566c25e7a483270e",
+      "bytes": 13801
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/artifacts/index.jsonl",
+      "frozen": "raw/M-PG_250_index.jsonl",
+      "sha256": "06b8d91ceb3242201440410fd94252aba488e6c1ab8d58a47c494a53715ce541",
+      "bytes": 15620
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/artifacts/math500_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "eaa2e11bf87a45c1cc1ec2802508ae3eb395af261cd441bac0f4e2722b2bba6e",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/artifacts/livecodebench_postcutoff_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "93d04513a16df506c15e10bf916ee3c793964f074e37add3e2ac595f86adbc2b",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/artifacts/ifbench_strict/updates_00000250_eval_only.jsonl",
+      "sha256": "8f3fa7572a05c41d6db36c8011fa9810c94bb5afcbcd48f82e0814504d88268c",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/artifacts/gpqa_diamond_avg4/updates_00000250_eval_only.jsonl",
+      "sha256": "58f7bbb91c828fa3a72040b7f0fae04ea7cf2840de64995732e4ba7111b44c91",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/run_complete.json",
+      "frozen": "raw/M-I64-DR_250_complete.json",
+      "sha256": "4175f3f1b34639f9f28e7fd003063afc82e09fd301fb06416e6a76ebe005e7d1",
+      "bytes": 270
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/job.json",
+      "frozen": "raw/M-I64-DR_250_job.json",
+      "sha256": "c13dbdb52c17c50a0cab1f8ddf533cd7792fb3157fcda9c487a10f1f8e6c256f",
+      "bytes": 4528
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/verified_summary.json",
+      "frozen": "raw/M-I64-DR_250_verified_summary.json",
+      "sha256": "6d210e2cd2f92f4cfb7950759ea6f674df584a0eee25f077e985cdf8440a0187",
+      "bytes": 396
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-DR_250_eval.jsonl",
+      "sha256": "55c6d102a8ae7de5d488591af0298cf9588609975dfd5af4be10e16a5883495c",
+      "bytes": 13906
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-DR_250_index.jsonl",
+      "sha256": "42e77caa4bf6b2296102d12341b0afd3422c63867c518cb6cf1b1a99c0a1b78c",
+      "bytes": 15797
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/artifacts/math500_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "ce2ba1140c951126aa3778ad536539dff92188c4d564d389f035331441867911",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/artifacts/livecodebench_postcutoff_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "ee41c904d156adbb0e4667a14873ea294083fba627cff783449697ea2f7626d2",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/artifacts/ifbench_strict/updates_00000250_eval_only.jsonl",
+      "sha256": "392b1a4530204c32d3d9bd2f00374b6a1d4eebaef5b853a7496c2850275490c0",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_250/artifacts/gpqa_diamond_avg4/updates_00000250_eval_only.jsonl",
+      "sha256": "4e10a66aba7591721b9c3e73ec364cd012877fcd28caed9027fd93ee0a423f92",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/run_complete.json",
+      "frozen": "raw/S-I64_500_complete.json",
+      "sha256": "bd73e9bbe5d54849368cf1643825c93226fad9f0dd26b47b3a1f8d326a900874",
+      "bytes": 267
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/job.json",
+      "frozen": "raw/S-I64_500_job.json",
+      "sha256": "1c2976311462acb72f6c64e00f0c16dca91515dec510bee0eb55af3ccd7a4825",
+      "bytes": 4779
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/verified_summary.json",
+      "frozen": "raw/S-I64_500_verified_summary.json",
+      "sha256": "c6fd180aaaab5b5ee8d0997fab09250ebf1721ceb0e941a98919d1cfb9dd4fcb",
+      "bytes": 409
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/metrics/eval.jsonl",
+      "frozen": "raw/S-I64_500_eval.jsonl",
+      "sha256": "4c367c4ba01568ab424ce8a3d924d2d04301875363c2574de1e59f1fe04c5a43",
+      "bytes": 13842
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/artifacts/index.jsonl",
+      "frozen": "raw/S-I64_500_index.jsonl",
+      "sha256": "86ea1f5bacab32d55f1648f6280d5c1afe1bbb8906bbccec619fa30f059fd227",
+      "bytes": 15765
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/artifacts/math500_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "e4962fe6a52e91eceee38fcf85f6d2633af5368688abd15527ac0f67313f6aa5",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/artifacts/livecodebench_postcutoff_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "2b05f0181263e7e805bc0ee9bdf64b79b2ea64b9fa4c76cddd9f27401b180347",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/artifacts/ifbench_strict/updates_00000500_eval_only.jsonl",
+      "sha256": "033f54ea3f2d4bb82ce5928c2da5da0a9555bd079f193e1b66f5d4099296284d",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42/capability_eval/step_500/artifacts/gpqa_diamond_avg4/updates_00000500_eval_only.jsonl",
+      "sha256": "7fe71c9ed83238439d0be984a7f2cb8ab40fe02687a4c2bd35018ebac5c6c3d2",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
       "source": "local/aligned_capability_20260909_a6000/results_summary.json",
       "frozen": "raw/single_capability.json",
       "sha256": "ffac36982ecc93f979fbbbebbcc897c50ff6f4bf12b2ff3aa4a502d8c7c050c7",
@@ -722,6 +896,396 @@
       "frozen": "raw/S-PG_500_export_verified.json",
       "sha256": "c916831f2391334760b34eccf9ecb4a60cb6232a6b7fce92ea7aded3663e787b",
       "bytes": 2009
+    },
+    {
+      "source": "local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-intersection64-s42/step_500/export_verified.json",
+      "frozen": "raw/S-I64_500_export_verified.json",
+      "sha256": "e9a6d7699ba9e62406c20097dd24c0c41b1dc64436e6eadf42b20a98f72178a4",
+      "bytes": 2057
+    },
+    {
+      "source": "local/dt_gt_configuration_20260909/generated/protocol.json",
+      "frozen": "raw/reduction_protocol.json",
+      "sha256": "8416bbc2fab883f9a2be81007829d8697e3fddcd63a6cb19fc402c40af17d6c2",
+      "bytes": 11402
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/paper/measurements.jsonl",
+      "frozen": "raw/M-PG_paper_20260912.jsonl",
+      "sha256": "4f7aa9f40329f654e85ff4912a4e861b335c01c84b13e2e6f27fc6609460cbab",
+      "bytes": 465072
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/paper/measurements.jsonl",
+      "frozen": "raw/M-I64-DR_paper_20260912.jsonl",
+      "sha256": "1871c3edbd4594579d9cea4009f8c125c7924bef628ef6b2e57ee0794e398470",
+      "bytes": 370786
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1042/run_complete.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1042/run_complete.json",
+      "sha256": "f8247e750e2fb7a45ab2abdca817bc1afd432ff2f7d97fb3d1f3954065de2539",
+      "bytes": 117
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1042/measurements.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1042/measurements.json",
+      "sha256": "6795af91196b3ff2d85e982fb4e1fc566837b66f8ea31520c5b10ef491534916",
+      "bytes": 160508
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1042/probe_manifest.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1042/probe_manifest.json",
+      "sha256": "47309a89ebf559e2ac954a9341cb2c90fd402787c89ae9e6a9a950ddeafea3e5",
+      "bytes": 1908
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1042/banks.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1042/banks.json",
+      "sha256": "b267a874eb1b91d9d0165745718d8a9abf81073e6725aa7485757baeda99918f",
+      "bytes": 1146061
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1042/weights.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1042/weights.json",
+      "sha256": "778e58f69b04a3e746b26b6f7bda10a2886b053c7d92d33efcbd80235b43a246",
+      "bytes": 2748
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1043/run_complete.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1043/run_complete.json",
+      "sha256": "6e4bb255482dc7b87691e32e9e6979ee7f4c5b8969b00f5ade8789ab1b86f895",
+      "bytes": 117
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1043/measurements.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1043/measurements.json",
+      "sha256": "4147da099349c60796eb6091b4ef4edd279b32171907a7526e6c3d6a1a31fc42",
+      "bytes": 160506
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1043/probe_manifest.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1043/probe_manifest.json",
+      "sha256": "fd744f89fe71c2e6cf76536454ccc1735fd092780ef5c2aadedba7e68eb65747",
+      "bytes": 1908
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1043/banks.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1043/banks.json",
+      "sha256": "68f68db187c4f5adab37a7b0d9870173839e29bb0895e5a543e07595470e15ee",
+      "bytes": 856431
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1043/weights.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1043/weights.json",
+      "sha256": "ca518e0456b93b4d7fe7d55638a475a54463b10d7a55403099ad1bf77493bfac",
+      "bytes": 2741
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1044/run_complete.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1044/run_complete.json",
+      "sha256": "41d59eeb335429217b6961f5db8333e937b8ea143d88263951b03e1b0a78582b",
+      "bytes": 117
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1044/measurements.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1044/measurements.json",
+      "sha256": "fb7698513ef0415445e2694f0f2aca0ec54b4da1ed6ea4e8bc9a7bdb588188ab",
+      "bytes": 160511
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1044/probe_manifest.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1044/probe_manifest.json",
+      "sha256": "fd284bc4152c42abbe79562e4ac2d245e06ad79dc3e6cd1783f08bbac5309366",
+      "bytes": 1908
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1044/banks.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1044/banks.json",
+      "sha256": "182933d2dc5358750e91bdc622f4bba90a95ba0755d0c80f370e96671e26caf9",
+      "bytes": 1241053
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg100-bank1044/weights.json",
+      "frozen": "raw/followup/normalization-mpg100-bank1044/weights.json",
+      "sha256": "67db0e7bd0ad89382f452322a73325c401e9e851e66dbf1ec7725046ee19ab83",
+      "bytes": 2761
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1042/run_complete.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1042/run_complete.json",
+      "sha256": "3e8cd40f6e95278056b3f8c39a7807c15689ef81b1d4784b62e542206563d2d9",
+      "bytes": 117
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1042/measurements.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1042/measurements.json",
+      "sha256": "66248bf1ffded2398f4f95412d741cc319a78c6b3649e4a9a4ee117290cc9de4",
+      "bytes": 160361
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1042/probe_manifest.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1042/probe_manifest.json",
+      "sha256": "ed3e6b4c1a3e356c216bab6af408e0fc5f51d52890dcfadfb8e21f9bce02d763",
+      "bytes": 1908
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1042/banks.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1042/banks.json",
+      "sha256": "1fa03d96c28548495ea168bfd6bc03314d1b4e087d3df663ead833068d2eab88",
+      "bytes": 1299632
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1042/weights.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1042/weights.json",
+      "sha256": "e3380ac117a556d443853c1eea496158048f617ad30e09dbe37e5ca1ad8a6670",
+      "bytes": 2762
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1043/run_complete.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1043/run_complete.json",
+      "sha256": "2b4d85da80288c45f1ab7fe6ac7b3a23e4daa4ed63da91c34648ee63e318c5f0",
+      "bytes": 117
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1043/measurements.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1043/measurements.json",
+      "sha256": "f3dbcafb4e4d4b14737fcdd3d6661766211a054ad7e95c6e678185d36ef48a73",
+      "bytes": 160372
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1043/probe_manifest.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1043/probe_manifest.json",
+      "sha256": "f768f41176b146ba714246b2fb5c1a47d1c1bdb84d166cde0492d6bd0e7404e6",
+      "bytes": 1908
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1043/banks.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1043/banks.json",
+      "sha256": "6ab64bf1a8eafe7e0d8f924f48f3b16253bdc6049301933f4a632b40df9fae31",
+      "bytes": 942915
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1043/weights.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1043/weights.json",
+      "sha256": "67694a74f80a76df593679d35fa82b95e5aa6b618e5aaa8cd727cf13a7a04daa",
+      "bytes": 2747
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1044/run_complete.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1044/run_complete.json",
+      "sha256": "a8982a3b3a303861b9259e36a6c70dfc7b5ab35a34df531416517120b79978f2",
+      "bytes": 117
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1044/measurements.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1044/measurements.json",
+      "sha256": "bccac2028f6fff4e2fec34874d74764c2550ac651ef351081169599b2ad79550",
+      "bytes": 160351
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1044/probe_manifest.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1044/probe_manifest.json",
+      "sha256": "d9669dbb2f009e4f13733f3b41b6c1df7738c49864d0d27fc79f87cc086c0cd1",
+      "bytes": 1908
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1044/banks.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1044/banks.json",
+      "sha256": "1833e0a64c932605fd4ae823afa02cf99efa565c18a84fa598606ca8910d31cc",
+      "bytes": 1421203
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/normalization-mpg250-bank1044/weights.json",
+      "frozen": "raw/followup/normalization-mpg250-bank1044/weights.json",
+      "sha256": "880260f8c9d8eb71a248bc3a2b87edcecef24f8afce20bd3a712586e208d6e65",
+      "bytes": 2766
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/run_complete.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/run_complete.json",
+      "sha256": "3c7fcebb4c11b6d60f0b587e40c672d2a67aef11699ea5d556dd6c8d04b65070",
+      "bytes": 336
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/measure_complete.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/measure_complete.json",
+      "sha256": "264c2a03c821012f9be9bf6fd19ed1b1eddcdddea81b42e0d773b4051b927c3b",
+      "bytes": 531
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/prepare_complete.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/prepare_complete.json",
+      "sha256": "c1c6994ca9d3d12e7de0ed534f7f8e9f42ec3068f0c7a471dbbe86d9a9ce9ac2",
+      "bytes": 223
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/measurements.jsonl",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/measurements.jsonl",
+      "sha256": "2a4e3f11db13a0d677f5fa3ad6bad1ca8e6388e04e8176fda589f2c4689874b1",
+      "bytes": 421910
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/config.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/config.json",
+      "sha256": "6513e633d7fb842037061fbcbed4a2d95403639b215e5f73c8bd5e8c83beaad4",
+      "bytes": 929
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/coverage.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/coverage.json",
+      "sha256": "8b928d7c1f310f404e4a871f0ee743ef1fcd956127bb926f10e7b3ca624699fe",
+      "bytes": 41909
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/input_manifest.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/input_manifest.json",
+      "sha256": "25ef09e41d6e2bd06a33717cf7e2d9933f6f1290bb43f9bd40163a677f737d1e",
+      "bytes": 7425
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/density-mpg100-long-bank1042/student_verified.json",
+      "frozen": "raw/followup/density-mpg100-long-bank1042/student_verified.json",
+      "sha256": "8154c394638680ea41d25b53c847fe29f5115ef04426d9e933dfde8d3e1b4ec7",
+      "bytes": 168
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/run_complete.json",
+      "frozen": "raw/followup/mechanism-i64dr100/run_complete.json",
+      "sha256": "e3229f3907eca5e0fa7061c9ee300f3a55aa7c11fa9c01d564faf9dedca63c88",
+      "bytes": 336
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/measure_complete.json",
+      "frozen": "raw/followup/mechanism-i64dr100/measure_complete.json",
+      "sha256": "d12325478798be47ad0d002066fba43da6b807e47a0bf4fb096484d6263cd0c8",
+      "bytes": 532
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/prepare_complete.json",
+      "frozen": "raw/followup/mechanism-i64dr100/prepare_complete.json",
+      "sha256": "d893963b2a6a2f672d3f4db42f0b9b265b82462bab9a8f4ce7c4300045bf45e9",
+      "bytes": 221
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/measurements.jsonl",
+      "frozen": "raw/followup/mechanism-i64dr100/measurements.jsonl",
+      "sha256": "45da7ba3ef1d612397066d064301819e223203d0375d1b6537323ea250fcc9ee",
+      "bytes": 423248
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/config.json",
+      "frozen": "raw/followup/mechanism-i64dr100/config.json",
+      "sha256": "146b4dc175899d076b15012b1b0c5dd3a082e210ba5ed11fd4eca12dc2cc65c6",
+      "bytes": 819
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/coverage.json",
+      "frozen": "raw/followup/mechanism-i64dr100/coverage.json",
+      "sha256": "1a90d34359e898599622a673162a1e5ba4678525bf17b21cefb462e6df302dd5",
+      "bytes": 42857
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/input_manifest.json",
+      "frozen": "raw/followup/mechanism-i64dr100/input_manifest.json",
+      "sha256": "b79cd3df925d5de969ced8de9f44f4a9de8bfb4c3110f82d4303cfb5bf614c6f",
+      "bytes": 7341
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-i64dr100/student_verified.json",
+      "frozen": "raw/followup/mechanism-i64dr100/student_verified.json",
+      "sha256": "8154c394638680ea41d25b53c847fe29f5115ef04426d9e933dfde8d3e1b4ec7",
+      "bytes": 168
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/run_complete.json",
+      "frozen": "raw/followup/mechanism-spg500/run_complete.json",
+      "sha256": "12053eb233118982358ff41f003f4b91fd0b107a0e6deb362a7bd65e1ec46d4d",
+      "bytes": 336
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/measure_complete.json",
+      "frozen": "raw/followup/mechanism-spg500/measure_complete.json",
+      "sha256": "b5629e820a7c5eab55cf52f6b3015fba0b369b06820287d1ad7e8a7a588080d0",
+      "bytes": 531
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/prepare_complete.json",
+      "frozen": "raw/followup/mechanism-spg500/prepare_complete.json",
+      "sha256": "e458c0e6e44a7cb1d13e4f61b42aefc14bd4d66ad0e5a70a949a570d4ff167d7",
+      "bytes": 224
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/measurements.jsonl",
+      "frozen": "raw/followup/mechanism-spg500/measurements.jsonl",
+      "sha256": "b8162a75844154cbe4feebe93ffee05f099acc0c7d280bf4c79469ad9756b07c",
+      "bytes": 423576
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/config.json",
+      "frozen": "raw/followup/mechanism-spg500/config.json",
+      "sha256": "15ef83e967f541faf11e327b0493aa2da86666451211e6339c0ec665cb9494dd",
+      "bytes": 756
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/coverage.json",
+      "frozen": "raw/followup/mechanism-spg500/coverage.json",
+      "sha256": "7d6d795a403196cd9d78d50ce39c80dabcd039c2aa614c827382ca1e9fcb5793",
+      "bytes": 41920
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/input_manifest.json",
+      "frozen": "raw/followup/mechanism-spg500/input_manifest.json",
+      "sha256": "d46f2faa8b1800530385782d07be9266c85a4b12309fe5200253bbb61ccba107",
+      "bytes": 7282
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/results/mechanism-spg500/student_verified.json",
+      "frozen": "raw/followup/mechanism-spg500/student_verified.json",
+      "sha256": "6b19d4bf3d78606d852e850d9b850f887811acad18b27c1f31b38581c27a2bb7",
+      "bytes": 131
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/normalization_probe.py",
+      "frozen": "raw/followup/src/normalization_probe.py",
+      "sha256": "7ccdf0549faf7fcbd06f3c673d5dc4fb44411df65a811c6c66c3d5ed0864b93e",
+      "bytes": 23429
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/bf16_local_probe.py",
+      "frozen": "raw/followup/src/bf16_local_probe.py",
+      "sha256": "e77a246006d88369038b900906413bdcf793c2cca3d074e0e002470f08167919",
+      "bytes": 43039
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/mechanism/prepare.py",
+      "frozen": "raw/followup/src/mechanism/prepare.py",
+      "sha256": "449cf7929e525e10d22d3c51624c1b67c6765ab6272ae8780a62977fb1d41cf8",
+      "bytes": 10234
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/mechanism/measure.py",
+      "frozen": "raw/followup/src/mechanism/measure.py",
+      "sha256": "85b5daf6909f2d28329696d97da49034656221dfd69b5dd322998346a93f2cd6",
+      "bytes": 14959
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/slime_plugins/mopd/loss.py",
+      "frozen": "raw/followup/src/slime_plugins/mopd/loss.py",
+      "sha256": "105b7777c1af0f6eb09c05af907b335aab2b1238b1e49b2720fe3760d9dfff87",
+      "bytes": 14334
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/slime_plugins/mopd/topk.py",
+      "frozen": "raw/followup/src/slime_plugins/mopd/topk.py",
+      "sha256": "75a5cc05d8f79b2406e9549d9c8023122711ab586a5932c5215c49d65cd5caeb",
+      "bytes": 6376
+    },
+    {
+      "source": "local/aligned_followup_20260911_sn4622129202/src/slime_plugins/mopd/paper_diagnostics.py",
+      "frozen": "raw/followup/src/slime_plugins/mopd/paper_diagnostics.py",
+      "sha256": "f724b56f8ea14ffd836d025a3a0e243d185988431a14754d61413d2c146e54a0",
+      "bytes": 11051
     }
   ],
   "bootstrap": {
@@ -730,6 +1294,6 @@
     "unit": "prompt cluster",
     "training_seeds": 1
   },
-  "updated_at_utc": "2026-09-11T01:45:27.283111+00:00",
-  "refresh_scope": "New complete capability suites only; existing online and local records retained."
+  "updated_at_utc": "2026-09-12T01:33:58.890128+00:00",
+  "refresh_scope": "Complete capability, paired joint update-250 geometry, and completed fixed-batch follow-ups; original online and local records retained."
 }

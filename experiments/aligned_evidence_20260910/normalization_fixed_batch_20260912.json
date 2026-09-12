@@ -1,0 +1,160 @@
+{
+  "records": [
+    {
+      "step": 100,
+      "bank_seed": 1042,
+      "gradient_comparisons": {
+        "DR_DT": {
+          "left_l2": 6.831925073773642,
+          "right_l2": 2.9689601699318806,
+          "difference_l2": 4.867720304028148,
+          "cosine": 0.7837623978204009
+        },
+        "DR_GT": {
+          "left_l2": 6.831925073773642,
+          "right_l2": 2.618014655394314,
+          "difference_l2": 5.593117222885696,
+          "cosine": 0.6218869847600936
+        },
+        "DT_GT": {
+          "left_l2": 2.9689601699318806,
+          "right_l2": 2.618014655394314,
+          "difference_l2": 1.1244555526202835,
+          "cosine": 0.9265875687884513
+        }
+      },
+      "max_identity_relative_residual": 1.524831324548726e-16,
+      "source": "raw/followup/normalization-mpg100-bank1042/measurements.json"
+    },
+    {
+      "step": 100,
+      "bank_seed": 1043,
+      "gradient_comparisons": {
+        "DR_DT": {
+          "left_l2": 7.412868029949816,
+          "right_l2": 4.335607031125926,
+          "difference_l2": 3.897601334533732,
+          "cosine": 0.9109849315505215
+        },
+        "DR_GT": {
+          "left_l2": 7.412868029949816,
+          "right_l2": 3.3080210492308417,
+          "difference_l2": 6.362900449544812,
+          "cosine": 0.5180489528753676
+        },
+        "DT_GT": {
+          "left_l2": 4.335607031125926,
+          "right_l2": 3.3080210492308417,
+          "difference_l2": 3.1038090462413717,
+          "cosine": 0.7009646286386731
+        }
+      },
+      "max_identity_relative_residual": 1.348894794748238e-16,
+      "source": "raw/followup/normalization-mpg100-bank1043/measurements.json"
+    },
+    {
+      "step": 100,
+      "bank_seed": 1044,
+      "gradient_comparisons": {
+        "DR_DT": {
+          "left_l2": 6.903078357397552,
+          "right_l2": 2.8272864981040673,
+          "difference_l2": 5.751805106407579,
+          "cosine": 0.5780294260869853
+        },
+        "DR_GT": {
+          "left_l2": 6.903078357397552,
+          "right_l2": 2.38038025811116,
+          "difference_l2": 5.606692711913595,
+          "cosine": 0.6658885858080437
+        },
+        "DT_GT": {
+          "left_l2": 2.8272864981040673,
+          "right_l2": 2.38038025811116,
+          "difference_l2": 0.736767987404596,
+          "cosine": 0.9745095828324605
+        }
+      },
+      "max_identity_relative_residual": 3.5183786429210433e-16,
+      "source": "raw/followup/normalization-mpg100-bank1044/measurements.json"
+    },
+    {
+      "step": 250,
+      "bank_seed": 1042,
+      "gradient_comparisons": {
+        "DR_DT": {
+          "left_l2": 21.83768804139973,
+          "right_l2": 1.439001245903172,
+          "difference_l2": 20.969937953951266,
+          "cosine": 0.6239891697935067
+        },
+        "DR_GT": {
+          "left_l2": 21.83768804139973,
+          "right_l2": 1.0379514190119847,
+          "difference_l2": 21.43604685176454,
+          "cosine": 0.4071623466661988
+        },
+        "DT_GT": {
+          "left_l2": 1.439001245903172,
+          "right_l2": 1.0379514190119847,
+          "difference_l2": 0.7326403895911274,
+          "cosine": 0.874157201405155
+        }
+      },
+      "max_identity_relative_residual": 1.5234199405894051e-15,
+      "source": "raw/followup/normalization-mpg250-bank1042/measurements.json"
+    },
+    {
+      "step": 250,
+      "bank_seed": 1043,
+      "gradient_comparisons": {
+        "DR_DT": {
+          "left_l2": 35.134594933358606,
+          "right_l2": 7.944659791763294,
+          "difference_l2": 29.301164697201052,
+          "cosine": 0.7863636073032808
+        },
+        "DR_GT": {
+          "left_l2": 35.134594933358606,
+          "right_l2": 1.4748455533218703,
+          "difference_l2": 34.675505304223165,
+          "cosine": 0.3302346255860604
+        },
+        "DT_GT": {
+          "left_l2": 7.944659791763294,
+          "right_l2": 1.4748455533218703,
+          "difference_l2": 7.326980584871194,
+          "cosine": 0.4953486095055211
+        }
+      },
+      "max_identity_relative_residual": 1.8218874462325198e-16,
+      "source": "raw/followup/normalization-mpg250-bank1043/measurements.json"
+    },
+    {
+      "step": 250,
+      "bank_seed": 1044,
+      "gradient_comparisons": {
+        "DR_DT": {
+          "left_l2": 8.139291176612561,
+          "right_l2": 1.2668707955260632,
+          "difference_l2": 7.721662164864266,
+          "cosine": 0.39902106944238014
+        },
+        "DR_GT": {
+          "left_l2": 8.139291176612561,
+          "right_l2": 1.0807858332646356,
+          "difference_l2": 7.8190061820678425,
+          "cosine": 0.35690702071452257
+        },
+        "DT_GT": {
+          "left_l2": 1.2668707955260632,
+          "right_l2": 1.0807858332646356,
+          "difference_l2": 0.375474231014398,
+          "cosine": 0.9611627075914221
+        }
+      },
+      "max_identity_relative_residual": 1.3076228606653245e-15,
+      "source": "raw/followup/normalization-mpg250-bank1044/measurements.json"
+    }
+  ]
+}

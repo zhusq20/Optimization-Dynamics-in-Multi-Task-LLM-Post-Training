@@ -111,6 +111,43 @@
     }
   },
   {
+    "model": "M-I64-DR",
+    "step": 250,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-11T15:02:53.106971+00:00",
+    "scores": {
+      "Math": 0.748,
+      "Code": 0.1796875,
+      "IF": 0.26,
+      "GPQA": 0.33964646464646464
+    },
+    "truncation": {
+      "Math": 0.056,
+      "Code": 0.2421875,
+      "IF": 0.09666666666666666,
+      "GPQA": 0.0012626262626262627
+    },
+    "repetition": {
+      "Math": 0.066,
+      "Code": 0.234375,
+      "IF": 0.09666666666666666,
+      "GPQA": 0.0012626262626262627
+    },
+    "healthy_reward": {
+      "Math": 0.746,
+      "Code": 0.1796875,
+      "IF": 0.23666666666666666,
+      "GPQA": 0.33964646464646464
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
     "model": "M-I64-DT",
     "step": 50,
     "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42",
@@ -296,6 +333,43 @@
     }
   },
   {
+    "model": "M-PG",
+    "step": 250,
+    "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-11T09:26:33.038317+00:00",
+    "scores": {
+      "Math": 0.734,
+      "Code": 0.1640625,
+      "IF": 0.26,
+      "GPQA": 0.30176767676767674
+    },
+    "truncation": {
+      "Math": 0.038,
+      "Code": 0.2109375,
+      "IF": 0.1,
+      "GPQA": 0.0025252525252525255
+    },
+    "repetition": {
+      "Math": 0.042,
+      "Code": 0.203125,
+      "IF": 0.10666666666666667,
+      "GPQA": 0.0025252525252525255
+    },
+    "healthy_reward": {
+      "Math": 0.734,
+      "Code": 0.1640625,
+      "IF": 0.24,
+      "GPQA": 0.30176767676767674
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
     "model": "S-I64",
     "step": 100,
     "source": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-intersection64-s42/capability_eval/step_100",
@@ -367,6 +441,43 @@
       "Code": null,
       "IF": null,
       "GPQA": null
+    }
+  },
+  {
+    "model": "S-I64",
+    "step": 500,
+    "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-11T02:56:52.649571+00:00",
+    "scores": {
+      "Math": 0.76,
+      "Code": 0.1796875,
+      "IF": 0.18666666666666668,
+      "GPQA": 0.3005050505050505
+    },
+    "truncation": {
+      "Math": 0.054,
+      "Code": 0.21875,
+      "IF": 0.06,
+      "GPQA": 0.0025252525252525255
+    },
+    "repetition": {
+      "Math": 0.06,
+      "Code": 0.21875,
+      "IF": 0.06,
+      "GPQA": 0.0025252525252525255
+    },
+    "healthy_reward": {
+      "Math": 0.76,
+      "Code": 0.1796875,
+      "IF": 0.17666666666666667,
+      "GPQA": 0.3005050505050505
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
     }
   },
   {

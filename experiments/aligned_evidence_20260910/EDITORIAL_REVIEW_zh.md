@@ -1,3 +1,5 @@
+> 此文件保留 2026-09-11 审稿记录。2026-09-12 已更新为完整比较、缺测批注、三列排图与新增结果；当前版本见[三问说明](../../MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md)、[结果盘点](../RESULTS_AUDIT_20260912_zh.md)和[引用核验](../REFERENCE_AUDIT_20260912_zh.md)。
+
 # 恢复三个原问题的写作核对
 
 2026-09-11，依据用户指定的 [7417292 版本正文](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/7417292c57aa0cbe8486cad4986aa5617cd0f681) 修正研究主线。

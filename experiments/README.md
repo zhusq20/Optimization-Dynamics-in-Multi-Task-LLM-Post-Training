@@ -1,3 +1,5 @@
+> **2026-09-12 当前版本：** 已新增核验三套完整能力评测、共同第 250 步联合参数几何、六组固定 batch 平均方式比较，以及四 bank 的完整局部监督比较。见[最新盘点](RESULTS_AUDIT_20260912_zh.md)与[当前复现指南](aligned_evidence_20260910/README_zh.md)。下文为 9 月 11 日工作记录，其中数量、图表位置和缺口以这两个新文档为准。
+
 # MOPD experiment figures
 
 > **Overleaf cleanup (2026-09-11):** `main` keeps the current manuscript,

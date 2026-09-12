@@ -1,4 +1,4 @@
-% Overleaf source revision: three-questions-restored-7417292-20260911
+% Overleaf source revision: evidence-complete-comparisons-20260912
 \documentclass{article} % For LaTeX2e
 \usepackage{iclr2027_conference,times}
 
@@ -22,6 +22,14 @@
 \newtheorem{corollary}{Corollary}
 \theoremstyle{remark}
 \newtheorem{remark}{Remark}
+
+% Visible author annotations replace incomplete experimental figures and tables.
+\newcommand{\completionnote}[2]{%
+  \par\smallskip\noindent
+  \fcolorbox{blue!35!black}{blue!3}{%
+    \parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule\relax}{%
+      \small\textbf{To complete: #1.} #2}}%
+  \par\smallskip}
 
 \newcommand{\cD}{\mathcal{D}}
 \newcommand{\cV}{\mathcal{V}}

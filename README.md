@@ -1,31 +1,33 @@
 # Optimization Dynamics in Multi-Task LLM Post-Training
 
-The manuscript follows the three research questions in the author's
-[7417292 reference version](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/7417292c57aa0cbe8486cad4986aa5617cd0f681):
+The manuscript studies three questions: loss averaging and capability balance;
+parameter-update concentration and teacher overlap; and vocabulary supervision
+in single-teacher and joint distillation.
 
-1. Token balancing and response length: averaging rules and capability balance.
-2. Update sparsity and teacher overlap: sparsity, overlap in a shared student,
-   then its relationship to teacher-distribution distance.
-3. Supervision density: PG/top-k update sparsity and capability in single-teacher
-   and joint settings.
+The September 12 revision audits existing results, including three newly located
+complete capability evaluations, paired joint geometry through update 250, and
+six fixed-batch averaging comparisons. The evidence inventory now contains
+16 capability suites (27,520 responses). Comparisons use common completed
+checkpoints; incomplete experiments are replaced by visible author annotations.
+Teacher-gradient diagnostics and numerical controls are in the appendix.
+All compound figures use a three-column layout.
 
-Experiments are explained alongside their question. The manuscript preserves
-thirteen completed capability evaluations and uses five main figures and six
-supporting appendix figures. Adam-state and input controls support the sparsity
-and overlap measurements; action-count studies and the RL-regularization
-supplement are outside the compiled paper.
-
-Compile the root **`iclr2027_conference.tex`**:
+Compile the root `iclr2027_conference.tex`:
 
 ```bash
+python experiments/plot_aligned_evidence.py
 latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex
+python experiments/verify_aligned_evidence.py
 ```
 
-The source marker is
-`Overleaf source revision: three-questions-restored-7417292-20260911`.
-See the [three-question scope (中文)](MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md)
-and [experiment guide](experiments/README.md) for evidence coverage and remaining
-comparisons. This revision changes local manuscript sources and figures.
+Current source marker: `evidence-complete-comparisons-20260912`.
+
+- [Current result audit (中文)](experiments/RESULTS_AUDIT_20260912_zh.md)
+- [Reference verification and related-paper observations (中文)](experiments/REFERENCE_AUDIT_20260912_zh.md)
+- [Three-question scope (中文)](MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md)
+- [Evidence and reproduction guide](experiments/aligned_evidence_20260910/README_zh.md)
+
+The following sections record the September 11 synchronization history.
 
 ## September 11 Overleaf synchronization repair
 

@@ -1,43 +1,26 @@
-\section{Experimental Setup and Complete Capability Results}
+\section{Experimental Protocol and Capability Results}
 \label{app:setup}
 
-The six configurations are shared across the three questions. The three I64 reductions address token balancing (Section~\ref{sec:normalization}); single-teacher and joint PG/I64 branches define the update-sparsity comparison (Section~\ref{sec:subnetworks}) and the supervision-density comparison (Section~\ref{sec:density}). Table~\ref{tab:coverage} distinguishes completed capability evaluations from available parameter measurements.
+The six configurations are shared across the three questions. The three I64 reductions address token balancing (Section~\ref{sec:normalization}); single-teacher and joint PG/I64 branches define the update-sparsity comparison (Section~\ref{sec:subnetworks}) and the supervision-density comparison (Section~\ref{sec:density}). Each reported comparison uses common completed checkpoints for its branches. The source inventory additionally records completed evaluations outside those comparisons.
 
 \subsection{Model, data, and training protocol}
 
 The student is Qwen3-1.7B \citep{qwen2025qwen3}, revision \texttt{70d244cc86cc} (the full revision and weight hashes are in the frozen protocol). The four frozen teachers are mathematics, code, instruction-following, and science RL descendants of the same initial model. Student and teacher use the native chat template with thinking disabled, the same assistant prefix, and no suffix removal. Generation stops at token 151643 or 151645; the model EOS token is 151645. The vocabulary contains 151,936 entries.
 
-All six configurations use AdamW with learning rate $2.5\times10^{-7}$, $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, zero weight decay, constant learning rate, and global gradient clipping at norm 1. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. An optimizer update aggregates 64 responses in sixteen four-response slices, with one response per execution microbatch. The optimizer is applied once after all domain blocks are accumulated. Consequently, the scalar logger's \texttt{train/step} counts gradient slices; all checkpoint axes in this paper count actual optimizer updates.
+All six configurations use AdamW with learning rate $2.5\times10^{-7}$, $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, zero weight decay, constant learning rate, and global gradient clipping at norm 1. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Training uses seed 42. An optimizer update aggregates 64 responses in sixteen four-response slices, with one response per execution microbatch. The optimizer is applied once after all domain blocks are accumulated. Consequently, the scalar logger's \texttt{train/step} counts gradient slices; all checkpoint axes in this paper count actual optimizer updates.
 
-The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. The frozen protocol records the exact train, diagnostic, and held-out split hashes and teacher conversion manifests. I64 starts from initialization with the intersection objective in Equation~\ref{eq:i64}.
+The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. The training splits contain 21,928 mathematics, 19,041 code, 16,447 instruction-following, and 19,542 science records from the frozen four-domain prompt bundle. Each domain has separate 64-record diagnostic and held-out splits. The frozen protocol records their exact hashes and the teacher conversion manifests. I64 starts from initialization with the intersection objective in Equation~\ref{eq:i64}.
 
-\begin{table}[!htbp]
-\caption{Coverage of the aligned evidence snapshot. The single-teacher training runs reached update 500; complete capability evaluations reach 500 for S-PG and 250 for S-I64. Multi-teacher runs have unequal coverage after interruptions and restarts. The DT update-100 checkpoint is incomplete. Reported curves use the completed measurements listed here.}
-\label{tab:coverage}
-\centering\small
-\begin{tabular}{lrl}
-\toprule
-Configuration & Complete capability checkpoints & Online geometry in this paper \\
-\midrule
-Initial & 0 & Initial reference \\
-S-PG & 100, 250, 500 & --- \\
-S-I64 & 100, 250 & --- \\
-M-PG & 50, 100 & 0, 1, 50, 100; local probes at 100 \\
-M-I64-DR & 50, 100 & 0, 1, 50, 100 \\
-M-I64-DT & 50 & 0, 1, 50 \\
-M-I64-GT & 50, 100 & 0, 1, 50, 100 \\
-\bottomrule
-\end{tabular}
-\end{table}
+\completionnote{Training data provenance}{Add the upstream dataset name, release or revision, and preprocessing reference for each of the four training splits. The frozen protocol identifies the exact files and sizes; the manuscript also needs a reader-facing mapping to their sources.}
 
 \subsection{Evaluation and scoring}
 
-Each capability suite contains MATH-500 (500 questions) \citep{hendrycks2021math}, a fixed 128-question LiveCodeBench v6 subset \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 1,720 responses.
+Each capability suite contains MATH-500 (500 questions from the MATH benchmark \citep{hendrycks2021math}; \href{https://huggingface.co/datasets/HuggingFaceH4/MATH-500}{dataset release}), a fixed 128-question LiveCodeBench v6 subset \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 1,720 responses.
 
-Table~\ref{tab:all_capability} gives all thirteen complete suites. Nine suites have local response-level artifacts: the shared initial student, seven multi-teacher checkpoints, and S-PG at update 500. Their 15,480 response records were checked against artifact hashes, expected sample counts, unique prompt/sample indices, and logged aggregate scores. The code artifacts report zero sandbox infrastructure errors. Recomputing all 7,128 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero score changes. Four single-teacher suites contribute 6,880 responses through previously verified completion summaries from a second node. Their per-question records remain on that node.
+The inventory contains sixteen complete suites totaling 27,520 responses. Twelve suites have local response-level artifacts: the shared initial student, nine multi-teacher checkpoints, and both single-teacher endpoints at update 500. Their 20,640 response records were checked against artifact hashes, expected sample counts, unique prompt/sample indices, and logged aggregate scores. The code artifacts report zero sandbox infrastructure errors. Recomputing all 9,504 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero score changes. Four single-teacher suites contribute 6,880 responses through previously verified completion summaries from a second node. Their per-question records remain on that node. Tables and comparison figures retain only checkpoints shared by all branches in each comparison; other completed scores remain in the inventory.
 
 \begin{table}[t]
-\caption{All completed aligned capability scores (\%). Scores use the standard dataset metrics and all evaluated responses. The shared initial student is counted once in the thirteen-suite total.}
+\caption{Capability scores (\%) at complete comparison checkpoints. The initial student is shared. GT/DT/DR use update 50; PG/I64 use common updates within each teacher setting. Scores use all evaluated responses.}
 \label{tab:all_capability}
 \centering\small
 \input{experiments/aligned_evidence_20260910/capability_table.tex}
@@ -46,7 +29,7 @@ Table~\ref{tab:all_capability} gives all thirteen complete suites. Nine suites h
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/capability.pdf}
-\caption{All completed capability trajectories from the shared initial student. M denotes four routed teachers and S the mathematics teacher. Lines connect measured checkpoints. The normalization comparison uses the three I64 reductions; the supervision comparison pairs PG and I64 within each setting. Single-teacher updates contain four times as many mathematics responses as joint updates.}
+\caption{PG/I64 capability comparisons from the shared initial student. M denotes four routed teachers and S the mathematics teacher. Lines connect common measured checkpoints: 100/250/500 for S and 50/100/250 for M. Single-teacher updates contain four times as many mathematics responses as joint updates.}
 \label{fig:capability}
 \end{figure}
 
@@ -69,5 +52,12 @@ For the paired comparisons, question identity includes the prompt, label, and qu
 \caption{All paired update-50 I64 reduction contrasts against DR. Points give score differences in percentage points and bars give nominal 95\% paired prompt-bootstrap intervals. GPQA resamples questions with their four responses together.}
 \label{fig:normalization_ci}
 \end{figure}
+
+\begin{table}[t]
+\caption{All PG/I64 domain contrasts at the last common capability checkpoints: single-teacher update 500 and joint update 250. Differences are I64 minus PG in percentage points. Intervals are nominal 95\% paired question-bootstrap intervals conditional on the trained checkpoints.}
+\label{tab:endpoint_paired}
+\centering\small
+\input{experiments/aligned_evidence_20260910/endpoint_paired_table.tex}
+\end{table}
 
 The source bundle \texttt{experiments/aligned\_evidence\_20260910} freezes the plotted measurements, prompt-level score records, source SHA-256 hashes, scoring implementation, protocol, and local diagnostic code. Figure generation reads only this bundle and runs on CPU. The manifest identifies the source artifact for each measurement. The aligned series uses the common initial parent and native response semantics throughout; earlier Base initialization, Student64-to-I64 continuations, and superseded teacher-top-$k$ runs are outside this series.

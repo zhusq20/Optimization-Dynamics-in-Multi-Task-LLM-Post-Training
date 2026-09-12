@@ -61,13 +61,20 @@ def main():
     old_audit = json.loads((OUT/'gpqa_score_audit.json').read_text()) if previous else {'responses':0,'disagreements':[]}
     assert not old_audit['disagreements']
     gpqa_audit = []
-    eval_runs = {**RUNS, 'S-PG': 'outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42'}
+    eval_runs = {
+        **RUNS,
+        'S-PG': 'outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42',
+        'S-I64': 'outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42',
+    }
     for model, rel in eval_runs.items():
         for marker in sorted((src / rel / 'capability_eval').glob('step_*/run_complete.json')):
             base = marker.parent; step = int(base.name.split('_')[1]); tag = f'{model}_{step}'
             if any(r['model']==model and r['step']==step for r in suites): continue
             complete = json.loads(freeze(str(marker.relative_to(src)), tag + '_complete.json'))
             assert complete['status'] == 'complete' and complete['final_num_updates'] == step
+            for name in ['job.json', 'verified_summary.json']:
+                if (base / name).is_file():
+                    freeze(str((base / name).relative_to(src)), tag + '_' + name)
             metrics = {}
             for line in freeze(str((base / 'metrics/eval.jsonl').relative_to(src)), tag + '_eval.jsonl').splitlines():
                 metrics.update(json.loads(line)['metrics'])
@@ -143,6 +150,10 @@ def main():
     pairs=[(('Initial',0),(r['model'],r['step'])) for r in suites
            if r['model']!='Initial' and r['verification']=='raw_artifacts']
     pairs += [(('M-I64-DR',50),(m,50)) for m in ['M-I64-DT','M-I64-GT']]
+    for left, right in [('S-PG', 'S-I64'), ('M-PG', 'M-I64-DR')]:
+        left_steps = {r['step'] for r in suites if r['model'] == left and r['verification'] == 'raw_artifacts'}
+        right_steps = {r['step'] for r in suites if r['model'] == right and r['verification'] == 'raw_artifacts'}
+        pairs += [((left, step), (right, step)) for step in sorted(left_steps & right_steps)]
     for (left,ls),(right,rs) in pairs:
         for domain in DATASETS:
             a,b=grouped[(left,ls,domain)],grouped[(right,rs,domain)]
@@ -171,6 +182,21 @@ def main():
     freeze(endpoint+'verified_summary.json', 'S-PG_500_verified_summary.json')
     freeze('local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-pg-s42/step_500/export_verified.json',
            'S-PG_500_export_verified.json')
+    for model, run in [('S-PG', 's-pg-s42'), ('S-I64', 's-intersection64-s42')]:
+        if any(r['model'] == model and r['step'] == 500 for r in suites):
+            conversion = json.loads(freeze(
+                f'local/recovery_blackwell_20260910_sn4622128200/eval_weights/{run}/step_500/export_verified.json',
+                f'{model}_500_export_verified.json'))
+            assert conversion['step'] == 500 and conversion['run'] == run
+            assert conversion['exact_original_key_set'] and conversion['all_finite']
+            assert conversion['serialized_tensors_equal_converted_native']
+    reduction_protocol = json.loads(freeze('local/dt_gt_configuration_20260909/generated/protocol.json',
+                                            'reduction_protocol.json'))
+    for key in ['initialization','student','teachers','prompt_format','response_semantics','evaluation','datasets']:
+        assert reduction_protocol[key] == shared_protocol[key], key
+    for domain, splits in reduction_protocol['splits'].items():
+        for split, record in splits.items():
+            assert record['sha256'] == shared_protocol['splits'][domain][split]['sha256']
     if args.capability_only:
         previous['updated_at_utc'] = datetime.now(timezone.utc).isoformat()
         previous['sources'] = manifest
