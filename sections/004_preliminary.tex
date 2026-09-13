@@ -1,26 +1,48 @@
-\section{Problem Formulation}
+\section{Preliminaries}
 \label{sec:setting}
 
-Let $\mathcal D_d$ be the prompt distribution for domain $d$, $q_d(v\mid h)$ its teacher distribution, and $p_\theta(v\mid h)$ the shared student distribution over vocabulary $\mathcal V$. At each update, the student samples a response $y$ to prompt $x$. Its assigned teacher scores the same prefixes $h=(x,y_{<t})$. Let $\lambda_d\geq0$ be the target domain weights, with $\sum_d\lambda_d=1$.
-
-For a per-position distillation loss $\ell_{d,t}$, a response-normalized objective is
+\paragraph{Multi-teacher on-policy distillation (MOPD).}
+For domain $d$, the student samples a response $y\sim p_\theta(\cdot\mid x)$ to a prompt $x\sim\mathcal D_d$. The assigned teacher $q_d$ scores the student prefixes $h_t=(x,y_{<t})$. Given token loss $\ell_{d,t}$ and domain weights $\lambda_d\geq0$ with $\sum_d\lambda_d=1$, the response-normalized objective is
 \begin{equation}
 \mathcal L(\theta)=\sum_d\lambda_d\,
 \mathbb E_{x\sim\mathcal D_d,\,y\sim p_\theta(\cdot\mid x)}
 \left[\frac{1}{|y|}\sum_{t=1}^{|y|}\ell_{d,t}(\theta)\right].
 \label{eq:mopd}
 \end{equation}
-Training differentiates the losses on the sampled responses while holding prefixes, valid-token masks, and response weights fixed. Section~\ref{sec:normalization} compares the resulting batch gradient with those from other averaging rules.
+This averages tokens within each response, then responses within each domain. Training holds sampled responses, masks, and averaging weights fixed when differentiating; fresh responses are generated at each update.
 
-At a fixed prefix, a full-vocabulary reference loss is reverse KL:
+\paragraph{Sampled-token, top-$k$, and full-vocabulary supervision.}
+These choices determine which vocabulary alternatives receive teacher feedback at each prefix. Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision computes reverse KL over the vocabulary $\mathcal V$:
 \begin{equation}
 \ell_{\mathrm{full}}=\sum_{v\in\mathcal V}p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)}.
 \label{eq:full}
 \end{equation}
-A sampled-token surrogate, written using stop-gradient $\sg[\cdot]$, is
+Sampled-token supervision (PG) uses only the generated token $a=y_t$:
 \begin{equation}
 \ell_{\mathrm{PG}}(a)=-\sg[\log q_d(a)-\log p_\theta(a)]\log p_\theta(a),
 \qquad a\sim p_\theta.
 \label{eq:pg}
 \end{equation}
-At a fixed prefix, its expected gradient equals $\nabla_\theta\ell_{\mathrm{full}}$; Appendix~\ref{app:losses} gives the derivation. Vocabulary-restricted supervision instead evaluates a selected set of alternatives. We use \emph{supervision density} to refer to the number of vocabulary alternatives scored at each prefix, and \emph{update concentration} to describe how parameter changes are distributed across coordinates. These refer to different objects.
+Here $\sg$ stops gradients through the log-ratio coefficient. At a fixed prefix, averaging this gradient over $a\sim p_\theta$ recovers the full-vocabulary reverse-KL gradient (Appendix~\ref{app:losses}).
+
+Top-$k$ supervision uses the $k$ most probable tokens under the student or teacher. We use their intersection: let $S$ and $T$ be the student and teacher top-$k$ sets fixed at rollout, and $I=S\cap T$. The loss is
+\begin{equation}
+\ell_{\mathrm{top}\text{-}k}=-\sum_{v\in I}\sg\!\left[
+\frac{p_\theta(v)}{\sum_{u\in S}p_\theta(u)}
+\bigl(\log q_d(v)-\log p_\theta(v)\bigr)\right]\log p_\theta(v).
+\label{eq:topk}
+\end{equation}
+The probabilities use full-vocabulary normalization; the detached weights are normalized over $S$ before restricting to $I$. An empty intersection gives zero loss. We call the number of supervised alternatives \emph{supervision density}.
+
+\paragraph{Loss averaging.}
+Let $\mathcal B_d$ contain the nonempty responses from domain $d$, $T_i$ be response $i$'s valid-token count, and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss. Write the batch loss as $\mathcal L=\sum_iw_i\ell_i$. For $i\in\mathcal B_d$, the three averaging rules assign weights
+\begin{equation}
+w_i^{\mathrm{GT}}=\frac{T_i}{\sum_jT_j},\qquad
+w_i^{\mathrm{DT}}=\frac{\lambda_dT_i}{\sum_{j\in\mathcal B_d}T_j},\qquad
+w_i^{\mathrm{DR}}=\frac{\lambda_d}{|\mathcal B_d|}.
+\label{eq:averaging}
+\end{equation}
+Global-token (GT) averaging weights domains by token count. Domain-token (DT) averaging fixes domain weights to $\lambda_d$ but still gives longer responses more weight within each domain. Domain-response (DR) averaging also weights responses equally within each domain, matching Equation~\ref{eq:mopd}.
+
+\paragraph{Gradient conflict.}
+We measure conflict between optimizer updates. Starting from identical copies of the student and optimizer state, apply one optimizer step using domain $d$'s mean loss and let $u_d=\theta_d^+-\theta$ be the resulting parameter change. For nonzero updates, define $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$. Negative values indicate opposing update directions; positive values indicate alignment.

@@ -1,0 +1,7 @@
+\section{Discussion}
+
+The averaging denominator is part of the training objective. Global-token averaging weights domains by generated token counts; domain-token averaging fixes domain weights; domain-response averaging additionally gives responses equal weight within each domain. The comparison shows a capability tradeoff: stronger mathematics under global-token averaging accompanies weaker instruction following than under domain-response averaging.
+
+Parameter concentration and vocabulary coverage describe different aspects of distillation. Both joint losses produce concentrated cumulative changes in BF16 model weights, while FP32 optimizer weights move more broadly. At a common state, the four local supervision choices yield very similar update concentration. Their online capability trajectories differ by domain and checkpoint. These observations motivate evaluating a distillation loss through both its update measurements and the capabilities it transfers.
+
+The experiments cover one model family and one training seed. The local comparison uses four prefix banks with high top-$k$ probability coverage; the bootstrap intervals quantify evaluation-question uncertainty at fixed checkpoints.

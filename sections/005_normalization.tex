@@ -3,27 +3,7 @@
 
 \subsection{How does loss averaging change domain weights?}
 
-The response-normalized objective in Equation~\ref{eq:mopd} gives each response equal weight within its domain. Averaging all valid tokens together instead makes response length part of the weighting rule. Open-MOPD identifies this effect under token-mean aggregation \citep[Section~3.3]{gao2026openmopddiagnosingfixingcapability}. Separating domain weights from response weights makes the effect of each averaging rule explicit.
-
-For response $i$, let $T_i$ be its valid-token count and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss. Let $\mathcal B_d$ contain the responses from domain $d$, with target weights $\sum_d\lambda_d=1$. Table~\ref{tab:normalization} compares the three reductions on the same batch.
-
-\begin{table}[t]
-\caption{Averaging rules on a fixed batch of nonempty responses. GT assigns domains their observed token shares; DT fixes domain weights; DR also gives responses equal weight within each domain.}
-\label{tab:normalization}
-\centering\small
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular*}{\linewidth}{@{\extracolsep{\fill}}ll@{}}
-\toprule
-Reduction & Batch loss \\
-\midrule
-Global token (GT) & $\sum_i T_i\ell_i/\sum_i T_i$ \\
-Domain token (DT) & $\sum_d\lambda_d\,\sum_{i\in\mathcal B_d}T_i\ell_i/\sum_{i\in\mathcal B_d}T_i$ \\
-Domain response (DR) & $\sum_d\lambda_d\,|\mathcal B_d|^{-1}\sum_{i\in\mathcal B_d}\ell_i$ \\
-\bottomrule
-\end{tabular*}
-\end{table}
-
-With equal prompt quotas, longer responses increase a domain's weight under GT. DT removes this between-domain length effect, while retaining length weighting within each domain. Writing $g_i=\nabla_\theta\ell_i$, the exact fixed-batch relation is
+Equation~\ref{eq:averaging} separates domain weighting from response weighting. With equal prompt quotas, longer responses increase a domain's weight under GT, as observed by Open-MOPD \citep[Section~3.3]{gao2026openmopddiagnosingfixingcapability}. DT fixes domain weights but retains length weighting within each domain. Writing $g_i=\nabla_\theta\ell_i$, the exact fixed-batch relation is
 \begin{equation}
 \frac{\sum_{i\in\mathcal B_d}T_i g_i}{\sum_{i\in\mathcal B_d}T_i}
 =\bar g_d+\frac{\operatorname{Cov}_d(T,g)}{\bar T_d}.
@@ -34,7 +14,7 @@ Here $\bar g_d$ and $\bar T_d$ are domain averages, and the covariance measures 
 \subsection{Experiment: averaging rules and capability balance}
 
 \paragraph{Comparison.}
-We train a Qwen3-1.7B student with four RL-trained teachers specializing in mathematics, code, instruction following, and science. The three branches use the same student/teacher top-64 intersection loss (I64; Appendix~\ref{app:losses}) and differ in global-token (GT), domain-token (DT), or domain-response (DR) averaging. They share initialization, teachers, prompt schedule, optimizer settings, and response cap. Each update uses 16 prompts per domain; DT and DR use domain weights $1/4$. Responses are sampled from each branch's current student. We compare all three branches at update 50 on four held-out benchmarks. Appendix~\ref{app:setup} gives the shared protocol and scoring.
+We train a Qwen3-1.7B student with four RL-trained teachers specializing in mathematics, code, instruction following, and science. The three branches use the same I64 loss (Equation~\ref{eq:topk}) and differ only in GT, DT, or DR averaging. They share initialization, teachers, prompt schedule, optimizer settings, and response cap. Each update uses 16 prompts per domain; DT and DR use domain weights $1/4$. Responses are sampled from each branch's current student. We compare all three branches at update 50 on four held-out benchmarks. Appendix~\ref{app:setup} gives the shared protocol and scoring.
 
 \paragraph{Response length changes the loss weights.}
 Across the first 50 GT rollout batches, mathematics receives a mean 44.05\% of valid tokens and instruction following 14.98\%, although each receives 25\% of prompts. Under GT, these are also their mean loss weights; DT and DR assign each domain 25\%. The mean mathematics weight is therefore nearly three times the mean instruction-following weight. Figure~\ref{fig:all_token_shares} gives the three branches' token shares over the same interval.

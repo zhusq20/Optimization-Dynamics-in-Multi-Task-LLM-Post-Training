@@ -4,6 +4,10 @@ The manuscript studies three questions: loss averaging and capability balance;
 parameter-update concentration and teacher overlap; and vocabulary supervision
 in single-teacher and joint distillation.
 
+A new section after the three studies develops a candidate stable multi-task
+OPD recipe in continuous prose. Its validation is marked as pending; the
+existing experimental results and three-question structure are preserved.
+
 The September 12 revision audits existing results, including three newly located
 complete capability evaluations, paired joint geometry through update 250, and
 six fixed-batch averaging comparisons. The evidence inventory now contains
@@ -20,7 +24,7 @@ latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex
 python experiments/verify_aligned_evidence.py
 ```
 
-Current source marker: `evidence-complete-comparisons-20260912`.
+Current source marker: `stable-recipe-draft-20260912`.
 
 - [Current result audit (中文)](experiments/RESULTS_AUDIT_20260912_zh.md)
 - [Reference verification and related-paper observations (中文)](experiments/REFERENCE_AUDIT_20260912_zh.md)
