@@ -1,44 +1,44 @@
 \section{Token Balancing and Response Length}
 \label{sec:normalization}
 
-\subsection{How does loss averaging change domain weights?}
+\subsection{Why can token balancing change MOPD optimization?}
 
-Equation~\ref{eq:averaging} separates domain weighting from response weighting. With equal prompt quotas, longer responses increase a domain's weight under GT, as observed by Open-MOPD \citep[Section~3.3]{gao2026openmopddiagnosingfixingcapability}. DT fixes domain weights but retains length weighting within each domain. Writing $g_i=\nabla_\theta\ell_i$, the exact fixed-batch relation is
+Equal prompt quotas do not imply equal optimization influence in MOPD: domains and teachers elicit responses of different lengths. The averaging rule therefore chooses what is balanced. GT weights every valid supervised token equally and lets long-response domains contribute more; DT fixes each domain's total weight but still favors longer responses within a domain; DR also weights responses equally within each domain. These choices can change which capabilities dominate a batch, even when the prompt mixture is unchanged.
+
+The distinction is visible directly in the gradient. Writing $g_i=\nabla_\theta\ell_i$, the token-weighted gradient within domain $d$ satisfies
 \begin{equation}
 \frac{\sum_{i\in\mathcal B_d}T_i g_i}{\sum_{i\in\mathcal B_d}T_i}
 =\bar g_d+\frac{\operatorname{Cov}_d(T,g)}{\bar T_d}.
 \label{eq:weighting}
 \end{equation}
-Here $\bar g_d$ and $\bar T_d$ are domain averages, and the covariance measures whether longer responses contribute systematically different gradients. DT retains this covariance term; DR removes it. Moreover, multiplying GT terms by the target domain weight divided by the observed token share gives DT exactly. This is the token-share correction in Open-MOPD \citep[Section~4.1, Eq.~(8)]{gao2026openmopddiagnosingfixingcapability}. DR makes the additional choice of weighting responses equally within each domain. Appendix~\ref{app:normalization} gives the derivation.
+The covariance term is nonzero whenever response length and gradient are related. DT retains this term; DR removes it. Correcting GT by the target-to-observed domain token share gives DT exactly, as in Open-MOPD \citep[Section~4.1, Eq.~(8)]{gao2026openmopddiagnosingfixingcapability}. We therefore test two linked questions: whether length weighting changes raw gradients and capability balance, and whether clipping and Adam preserve or mask that difference before it reaches the parameters. Appendix~\ref{app:normalization} gives the derivation.
 
 \subsection{Experiment: averaging rules and capability balance}
 
 \paragraph{Comparison.}
-We train a Qwen3-1.7B student with four RL-trained teachers specializing in mathematics, code, instruction following, and science. The three branches use the same I64 loss (Equation~\ref{eq:topk}) and differ only in GT, DT, or DR averaging. They share initialization, teachers, prompt schedule, optimizer settings, and response cap. Each update uses 16 prompts per domain; DT and DR use domain weights $1/4$. Responses are sampled from each branch's current student. We compare all three branches at update 50 on four held-out benchmarks. Appendix~\ref{app:setup} gives the shared protocol and scoring.
+Three online I64 branches differ only in GT, DT, or DR averaging. They share the student initialization, four routed teachers, prompt schedule, and optimizer; each update uses 16 prompts per domain. We compare their trajectories through the common update 500. Appendix~\ref{app:setup} gives the full protocol.
 
-\paragraph{Response length changes the loss weights.}
-Across the first 50 GT rollout batches, mathematics receives a mean 44.05\% of valid tokens and instruction following 14.98\%, although each receives 25\% of prompts. Under GT, these are also their mean loss weights; DT and DR assign each domain 25\%. The mean mathematics weight is therefore nearly three times the mean instruction-following weight. Figure~\ref{fig:all_token_shares} gives the three branches' token shares over the same interval.
+\paragraph{Length changes the path more than the endpoint.}
+Mathematics and instruction following each receive 25\% of prompts but contribute 44.05\% and 14.98\% of GT's valid tokens over the first 50 batches; GT therefore gives mathematics nearly three times the weight. DT and DR fix both domains at 25\% (Figure~\ref{fig:all_token_shares}). This imbalance changes early trajectories, yet no rule wins consistently across seeds (Figure~\ref{fig:normalization_capability}). At update 500, four-domain means are $38.58\pm0.75$\% (DR), $38.71\pm0.80$\% (DT), and $38.64\pm0.80$\% (GT). The 0.14-point span is below the 0.75--0.80-point seed standard deviations. MATH and IFBench approach their teachers, LiveCodeBench retains a gap, and GPQA starts near its teacher; rule ranks change across tasks and checkpoints. Here token balancing alters when and where capability improves, not the final aggregate.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/normalization_capability.pdf}
-\caption{GT/DT/DR capability comparison at update 50. The first four panels show domain scores, followed by their arithmetic mean and the smallest domain change from initialization. The initial student is shared. Lines connect the initial and update-50 evaluations; all three branches use one common training seed.}
+\includegraphics[width=\linewidth]{figures/three_seed_20260913/normalization_tasks_with_references.pdf}
+\caption{Task-level GT/DT/DR capability. Points and bars show mean $\pm$ one standard deviation across three seeds; horizontal offsets separate overlap. Dotted gray and dashed purple lines mark the initial student and domain teacher. Rule gaps remain small relative to seed variation and student--teacher gaps.}
 \label{fig:normalization_capability}
 \end{figure}
 
-\paragraph{Within-domain length weighting changes the gradient.}
-We also hold the student and response batch fixed, then recompute I64 gradients under all three reductions. The comparison uses M-PG checkpoints 100 and 250, each with three banks of eight responses per domain. DT and DR have the same domain weights, yet the cosine between their raw gradients ranges from 0.578 to 0.911 at update 100 and from 0.399 to 0.786 at update 250. Thus response weighting changes gradient direction even after the domain weights are fixed. Table~\ref{tab:fixed_batch_normalization} reports all six banks and all three pairwise comparisons. This isolates the within-batch weighting effect in Equation~\ref{eq:weighting}; the online branches above include the evolution of student-generated responses.
+\paragraph{The optimizer masks part of the gradient difference.}
+On six fixed response banks, the mean raw-gradient cosines are 0.680 (DR--DT), 0.483 (DR--GT), and 0.822 (DT--GT); hence equal domain weights do not make DR and DT equivalent. Global clipping leaves every cosine unchanged, even though it acts very differently online: DR is clipped on all 500 updates and retains a median 9.3\% of its gradient, compared with clipping on 46.2\% of DT updates and 15.0\% of GT updates. Applying one common saved Adam state then raises the three FP32 update cosines to 0.960, 0.939, and 0.979. Adam history therefore changes the effective update rather than merely transmitting the current clipped gradient. Appendix Figure~\ref{fig:optimizer_mediation_moments} shows that it also sets the step scale.
 
-\paragraph{Averaging redistributes capability gains.}
-GT achieves 74.2\% on mathematics versus DR's 69.6\%, a difference of 4.6 percentage points with a paired prompt-bootstrap interval of $[1.2,8.2]$. DR achieves 19.0\% on instruction following versus 17.0\% for both GT and DT. The DT-minus-DR interval on instruction following is $[-4.0,-0.33]$ points. Thus the rule with the highest mathematics score has a lower instruction-following score, while equal domain weights in DT still produce a different tradeoff from equal response weights in DR. Figure~\ref{fig:normalization_ci} reports all eight domain-level contrasts.
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/optimizer_mediation_20260913/optimizer_mediation.pdf}
+\caption{How optimization mediates GT/DT/DR differences. (a) Scalar clipping preserves gradient direction, while a common saved Adam state makes the proposed updates substantially more similar. Lines and error bars show the mean and one standard deviation across six fixed banks. (b) Fraction of the raw gradient retained across 500 online updates; percentages show how often clipping activates, boxes span the interquartile range, and whiskers the 5th--95th percentiles. (c) Immediate four-domain held-out reverse-KL change for saved-state Adam and same-norm SGD at two checkpoints. Open circles are individual banks; filled circles and error bars show the mean and one standard deviation across three banks. Lower is better.}
+\label{fig:optimizer_mediation}
+\end{figure}
 
-Table~\ref{tab:normalization50} gives the score comparison. GT has the highest four-domain mean (35.53\%), while DR has the smallest decline on its most affected domain ($-0.51$ points, compared with $-1.33$ for DT and GT). These summaries express two different goals: average capability and preserving capability across domains. The length-weighting identity explains which training examples receive more weight; the measured scores determine the resulting tradeoff.
+\paragraph{Similar Adam steps explain weak endpoint separation.}
+With saved-state Adam, the three reductions' mean immediate held-out KL decreases differ by only $2.9\times10^{-5}$, well within bank variation. Same-norm SGD exposes a wider, checkpoint-dependent spread: all three mean changes improve at update 100 but worsen at update 250. Thus a small downstream separation does not imply that the averaging gradients are equivalent. Clipping changes their magnitudes but not their angles, whereas shared Adam history pulls distinct gradients toward similar updates. Appendix~\ref{app:fixed_batch_normalization} gives the intervention details and all raw-gradient comparisons; Figure~\ref{fig:normalization_ci} reports the paired capability contrasts.
 
-\begin{table}[t]
-\caption{Capability scores (\%) at update 50. Mean averages the four domain scores. Worst $\Delta$ is the smallest domain change from initialization, in percentage points.}
-\label{tab:normalization50}
-\centering\small
-\input{experiments/aligned_evidence_20260910/normalization_table.tex}
-\end{table}
-
-\completionnote{Later-checkpoint normalization comparison}{Complete the GT, DT, and DR capability evaluations at a common later checkpoint before adding its comparison figure or table. The update-50 comparison above contains all three branches.}
+\FloatBarrier

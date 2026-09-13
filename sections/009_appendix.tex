@@ -16,6 +16,15 @@ At M-PG checkpoints 100 and 250, three banks (seeds 1042, 1043, and 1044) each c
 
 Table~\ref{tab:fixed_batch_normalization} reports every pairwise raw-gradient cosine. The domain-wise covariance decomposition is checked in FP64 over all 24 bank-domain groups; the largest relative residual is $1.53\times10^{-15}$. This numerical check verifies the aggregation identity. The observed gradient directions establish that the covariance contribution is nonzero on these batches.
 
+The optimizer-mediation experiment in Figure~\ref{fig:optimizer_mediation} reuses these six banks. Each aggregate gradient is globally clipped at norm 1 and applied to the same saved FP32 Adam state for that bank. The saved-state branch retains both moments; the reset-$m$ branch zeros the first moment while retaining the second moment and optimizer clock; reset-$(m,v)$ zeros both moments while retaining the clock. The momentum-free SGD control follows the negative gradient and is rescaled separately for DR, DT, and GT to match that reduction's saved-state Adam FP32 step norm. Every proposed FP32 step is cast to BF16 before evaluating one held-out response per domain. We report full-vocabulary reverse KL for evaluation; the training-consistent I64 surrogate is retained in the source bundle. These are immediate local interventions, not additional online training runs.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.52\linewidth]{figures/optimizer_mediation_20260913/optimizer_mediation_moments.pdf}
+\caption{Adam-moment controls across the six fixed banks. Points are individual FP32 step norms and short horizontal lines are means. Resetting the first moment while retaining the second reduces the step norm to roughly one third; resetting both moments more than doubles it. The optimizer clock is unchanged in all three conditions.}
+\label{fig:optimizer_mediation_moments}
+\end{figure}
+
 \begin{table}[t]
 \caption{Fixed-batch averaging comparison. Entries are raw-gradient cosines; each row uses one shared student and response bank. DR and DT share domain weights and differ only in within-domain response weighting.}
 \label{tab:fixed_batch_normalization}
@@ -131,7 +140,7 @@ We average over the same equally weighted domains and prefixes for every pair. F
 \section{Token Shares Under the Three Averaging Rules}
 \label{app:behavior}
 
-Figure~\ref{fig:all_token_shares} supports the loss-weighting comparison in Section~\ref{sec:normalization}. Each branch allocates 25\% of prompts to every domain. Under GT, the plotted token shares also give the domain loss weights. DT and DR fix those weights to 25\% even when generated token shares differ. Records at the same rollout clock are merged across metric writes before plotting; the plot shows the common first 50 rollout batches without smoothing, matching the capability comparison in Section~\ref{sec:normalization}. Longer histories remain in the source bundle.
+Figure~\ref{fig:all_token_shares} supports the loss-weighting comparison in Section~\ref{sec:normalization}. Each branch allocates 25\% of prompts to every domain. Under GT, the plotted token shares also give the domain loss weights; DT and DR keep fixed domain weights. Records at the same rollout clock are merged across metric writes. The first 50 unsmoothed batches expose the early imbalance; capability trajectories continue through update 500.
 
 \begin{figure}[t]
 \centering

@@ -2,6 +2,8 @@
 import argparse
 import hashlib
 import json
+from collections import defaultdict
+from functools import lru_cache
 from pathlib import Path
 
 import matplotlib
@@ -35,10 +37,47 @@ if (DATA/'online_geometry_20260912.json').is_file():
     GEO+=json.loads((DATA/'online_geometry_20260912.json').read_text())['geometry']
     GEO_SOURCES.append('online_geometry_20260912.json')
 COMPS=json.loads((DATA/'paired_comparisons.json').read_text())
+PROMPT_ROWS=[json.loads(line) for line in (DATA/'prompt_scores.jsonl').read_text().splitlines()]
 DENSITY_EXPERIMENT=next(r for r in json.loads((DATA/'completed_local_followup_20260912.json').read_text())['experiments']
                         if r['experiment']=='density-mpg100-long-bank1042')
 DENSITY_ROWS=DENSITY_EXPERIMENT['optimizer']
 plots=[]
+
+
+def prompt_units(model,step,domain):
+    """Return independent question scores, clustering GPQA's four samples."""
+    grouped=defaultdict(list)
+    for row in PROMPT_ROWS:
+        if row['model']==model and row['step']==step and row['domain']==domain:
+            grouped[(row['prompt_index'],row['identity'])].append(row['reward'])
+    expected={'Math':500,'Code':128,'IF':300,'GPQA':198}[domain]
+    samples={'Math':1,'Code':1,'IF':1,'GPQA':4}[domain]
+    assert len(grouped)==expected and all(len(values)==samples for values in grouped.values()),(model,step,domain)
+    return {identity:np.mean(values) for identity,values in grouped.items()}
+
+
+@lru_cache(maxsize=None)
+def conditional_eval_sd(model,step,measure):
+    """Conditional SD of the score estimator over evaluation questions (percentage points)."""
+    if measure in DOM:
+        values=np.array(list(prompt_units(model,step,measure).values()))
+        return 100*values.std(ddof=1)/np.sqrt(len(values))
+    if measure=='mean':
+        domain_se=np.array([conditional_eval_sd(model,step,domain) for domain in DOM])
+        return np.sqrt(np.square(domain_se).sum())/len(DOM)
+    if measure=='worst':
+        if model=='Initial':return 0.0
+        # Include selection of the worst domain in the paired prompt bootstrap.
+        draws=[]
+        for domain_index,domain in enumerate(DOM):
+            current=prompt_units(model,step,domain);initial=prompt_units('Initial',0,domain)
+            assert current.keys()==initial.keys(),(model,step,domain)
+            differences=np.array([current[key]-initial[key] for key in current])
+            rng=np.random.default_rng(1042+domain_index)
+            index=rng.integers(0,len(differences),size=(10000,len(differences)))
+            draws.append(100*differences[index].mean(axis=1))
+        return np.min(np.stack(draws),axis=0).std(ddof=1)
+    raise ValueError(measure)
 
 
 def save(fig,name,sources):
@@ -111,31 +150,44 @@ def capability(models=None, name='capability'):
     for ax,d,title in zip(axs,measures,titles):
         baseline=score(initial,d)
         ax.axhline(baseline,color='#777777',ls=':',lw=1)
-        ax.plot(0,baseline,'o',color='#777777',ms=3)
+        if normalization_view:
+            ax.errorbar(0,baseline,yerr=conditional_eval_sd('Initial',0,d),fmt='o',color='#777777',
+                        ms=3,capsize=1.5,elinewidth=.7)
+        else:
+            ax.plot(0,baseline,'o',color='#777777',ms=3)
         for m in models:
             c=COL[m]
             rr=sorted([r for r in CAP if r['model']==m and r['step'] in allowed_steps[m]],key=lambda r:r['step'])
             assert {r['step'] for r in rr}==allowed_steps[m] and rr,(m,name)
-            ax.plot([0]+[r['step'] for r in rr],[baseline]+[score(r,d) for r in rr],
-                    marker=MARK[m],color=c,ms=3.3,ls='--' if m.startswith('S') else '-',label=m)
+            x=[0]+[r['step'] for r in rr];y=[baseline]+[score(r,d) for r in rr]
+            ax.plot(x,y,marker=MARK[m],color=c,ms=3.3,
+                    ls='--' if m.startswith('S') else '-',label=m)
+            if normalization_view:
+                errors=[conditional_eval_sd('Initial',0,d)]+[conditional_eval_sd(m,r['step'],d) for r in rr]
+                ax.errorbar(x,y,yerr=errors,fmt='none',ecolor=c,capsize=1.5,elinewidth=.7,alpha=.85)
         ax.set(title=title,xlabel='Optimizer updates',ylabel='Change (pp)' if d=='worst' else 'Score (%)',xticks=ticks)
     fig.legend(*axs[0].get_legend_handles_labels(),ncol=len(models),loc='outside lower center',frameon=False)
-    finish(fig);save(fig,name,['capability.json'])
+    finish(fig);save(fig,name,['capability.json']+(['prompt_scores.jsonl'] if normalization_view else []))
     plots[-1]['models']=models
     plots[-1]['evaluated_steps']={m:sorted(allowed_steps[m]) for m in models}
     plots[-1]['measures']=measures
+    if normalization_view:
+        plots[-1]['uncertainty']='one conditional evaluation SE (score-estimator SD); GPQA clustered by question; worst change paired-bootstrap SD'
 
 
 def normalization():
+    models=['M-I64-DR','M-I64-DT','M-I64-GT']
+    endpoint=max(set.intersection(*({r['step'] for r in CAP if r['model']==model} for model in models)))
     fig,axs=panel_grid(4,1.7)
     for ax,d in zip(axs,DOM):
         for i,m in enumerate(['M-I64-DT','M-I64-GT']):
-            r=next(r for r in COMPS if r['left']=='M-I64-DR' and r['left_step']==50 and r['right']==m and r['domain']==d)
+            r=next(r for r in COMPS if r['left']=='M-I64-DR' and r['left_step']==endpoint and r['right']==m and r['domain']==d)
             ax.errorbar(r['delta_pp'],i,xerr=[[r['delta_pp']-r['lo_pp']],[r['hi_pp']-r['delta_pp']]],
                         fmt=MARK[m],color=COL[m],capsize=2,ms=4)
         ax.axvline(0,color='#999999',lw=.8,ls=':')
         ax.set(yticks=[0,1],yticklabels=['DT − DR','GT − DR'],title=d,xlabel='Difference (pp)',ylim=(-.6,1.6))
     finish(fig);save(fig,'normalization50',['paired_comparisons.json'])
+    plots[-1]['endpoint_step']=endpoint
 
 
 def geometry():
@@ -333,8 +385,12 @@ def tables():
             ([comment] if comment else [])+[r'\begin{tabular}{'+spec+'}',r'\toprule',header+r' \\',r'\midrule']+
             lines+[r'\bottomrule',r'\end{tabular}'])+'\n')
     order={'Initial':0,'S-PG':1,'S-I64':2,'M-PG':3,'M-I64-DR':4,'M-I64-DT':5,'M-I64-GT':6}
-    groups=[['M-I64-DR','M-I64-DT','M-I64-GT'],['S-PG','S-I64'],['M-PG','M-I64-DR']]
+    normalization_models=['M-I64-DR','M-I64-DT','M-I64-GT']
+    groups=[['S-PG','S-I64'],['M-PG','M-I64-DR']]
     paired={('Initial',0)}
+    normalization_endpoint=max(set.intersection(*(
+        {r['step'] for r in CAP if r['model']==model} for model in normalization_models)))
+    paired|={(model,normalization_endpoint) for model in normalization_models}
     for models in groups:
         common=set.intersection(*({r['step'] for r in CAP if r['model']==m} for m in models))
         paired|={(m,step) for m in models for step in common}
@@ -343,7 +399,7 @@ def tables():
     initial=next(r for r in CAP if r['model']=='Initial')['scores']
     normalization_rows=[]
     for m in ['M-I64-DR','M-I64-DT','M-I64-GT']:
-        scores=next(r for r in CAP if r['model']==m and r['step']==50)['scores']
+        scores=next(r for r in CAP if r['model']==m and r['step']==normalization_endpoint)['scores']
         mean=100*np.mean([scores[d] for d in DOM])
         worst=100*min(scores[d]-initial[d] for d in DOM)
         normalization_rows.append(m.replace('M-I64-','')+' & '+' & '.join(f"{100*scores[d]:.2f}" for d in DOM)

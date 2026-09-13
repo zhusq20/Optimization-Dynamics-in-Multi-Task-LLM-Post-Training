@@ -148,6 +148,43 @@
     }
   },
   {
+    "model": "M-I64-DR",
+    "step": 500,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-13T09:41:31.766890+00:00",
+    "scores": {
+      "Math": 0.758,
+      "Code": 0.1796875,
+      "IF": 0.2733333333333333,
+      "GPQA": 0.33207070707070707
+    },
+    "truncation": {
+      "Math": 0.046,
+      "Code": 0.1796875,
+      "IF": 0.12,
+      "GPQA": 0.0
+    },
+    "repetition": {
+      "Math": 0.06,
+      "Code": 0.171875,
+      "IF": 0.12333333333333334,
+      "GPQA": 0.0
+    },
+    "healthy_reward": {
+      "Math": 0.752,
+      "Code": 0.1796875,
+      "IF": 0.24333333333333335,
+      "GPQA": 0.33207070707070707
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
     "model": "M-I64-DT",
     "step": 50,
     "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42",
@@ -176,6 +213,117 @@
       "Code": 0.1875,
       "IF": 0.16666666666666666,
       "GPQA": 0.32323232323232326
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
+    "model": "M-I64-DT",
+    "step": 100,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-13T07:08:01.473094+00:00",
+    "scores": {
+      "Math": 0.748,
+      "Code": 0.1953125,
+      "IF": 0.19333333333333333,
+      "GPQA": 0.3333333333333333
+    },
+    "truncation": {
+      "Math": 0.048,
+      "Code": 0.2421875,
+      "IF": 0.09,
+      "GPQA": 0.0012626262626262627
+    },
+    "repetition": {
+      "Math": 0.06,
+      "Code": 0.234375,
+      "IF": 0.09,
+      "GPQA": 0.0012626262626262627
+    },
+    "healthy_reward": {
+      "Math": 0.748,
+      "Code": 0.1953125,
+      "IF": 0.18,
+      "GPQA": 0.3333333333333333
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
+    "model": "M-I64-DT",
+    "step": 250,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-13T11:35:58.899030+00:00",
+    "scores": {
+      "Math": 0.754,
+      "Code": 0.2109375,
+      "IF": 0.25333333333333335,
+      "GPQA": 0.32702020202020204
+    },
+    "truncation": {
+      "Math": 0.044,
+      "Code": 0.15625,
+      "IF": 0.1,
+      "GPQA": 0.0
+    },
+    "repetition": {
+      "Math": 0.05,
+      "Code": 0.1484375,
+      "IF": 0.10333333333333333,
+      "GPQA": 0.0
+    },
+    "healthy_reward": {
+      "Math": 0.754,
+      "Code": 0.2109375,
+      "IF": 0.23,
+      "GPQA": 0.32702020202020204
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
+    "model": "M-I64-DT",
+    "step": 500,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-13T11:34:48.178505+00:00",
+    "scores": {
+      "Math": 0.74,
+      "Code": 0.1796875,
+      "IF": 0.2866666666666667,
+      "GPQA": 0.3421717171717172
+    },
+    "truncation": {
+      "Math": 0.044,
+      "Code": 0.1640625,
+      "IF": 0.11666666666666667,
+      "GPQA": 0.0012626262626262627
+    },
+    "repetition": {
+      "Math": 0.052,
+      "Code": 0.15625,
+      "IF": 0.12,
+      "GPQA": 0.0025252525252525255
+    },
+    "healthy_reward": {
+      "Math": 0.74,
+      "Code": 0.1796875,
+      "IF": 0.2633333333333333,
+      "GPQA": 0.3421717171717172
     },
     "response_counts": {
       "Math": 500,
@@ -250,6 +398,80 @@
       "Code": 0.1796875,
       "IF": 0.20333333333333334,
       "GPQA": 0.3207070707070707
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
+    "model": "M-I64-GT",
+    "step": 250,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-13T09:05:43.034328+00:00",
+    "scores": {
+      "Math": 0.744,
+      "Code": 0.1875,
+      "IF": 0.25,
+      "GPQA": 0.3333333333333333
+    },
+    "truncation": {
+      "Math": 0.056,
+      "Code": 0.171875,
+      "IF": 0.1,
+      "GPQA": 0.0
+    },
+    "repetition": {
+      "Math": 0.058,
+      "Code": 0.1640625,
+      "IF": 0.09666666666666666,
+      "GPQA": 0.0
+    },
+    "healthy_reward": {
+      "Math": 0.744,
+      "Code": 0.1875,
+      "IF": 0.22666666666666666,
+      "GPQA": 0.3333333333333333
+    },
+    "response_counts": {
+      "Math": 500,
+      "Code": 128,
+      "IF": 300,
+      "GPQA": 792
+    }
+  },
+  {
+    "model": "M-I64-GT",
+    "step": 500,
+    "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42",
+    "verification": "raw_artifacts",
+    "completed_at": "2026-09-13T09:01:51.122457+00:00",
+    "scores": {
+      "Math": 0.742,
+      "Code": 0.1796875,
+      "IF": 0.2866666666666667,
+      "GPQA": 0.3371212121212121
+    },
+    "truncation": {
+      "Math": 0.046,
+      "Code": 0.171875,
+      "IF": 0.1,
+      "GPQA": 0.0025252525252525255
+    },
+    "repetition": {
+      "Math": 0.052,
+      "Code": 0.1640625,
+      "IF": 0.10333333333333333,
+      "GPQA": 0.003787878787878788
+    },
+    "healthy_reward": {
+      "Math": 0.74,
+      "Code": 0.1796875,
+      "IF": 0.2633333333333333,
+      "GPQA": 0.33585858585858586
     },
     "response_counts": {
       "Math": 500,

@@ -1,0 +1,11 @@
+{
+  "figure": "optimizer_mediation",
+  "panels": 3,
+  "appendix_figure": "optimizer_mediation_moments",
+  "appendix_panels": 1,
+  "fixed_bank_jobs": 6,
+  "online_clip_updates": 1500,
+  "measurements_sha256": "cbdc80333b18c32db72979bc3759b0f11cdb7889ea1ceddc07c0ebe083298a70",
+  "online_clip_sha256": "a9d5ccc2988e29ba2f7dda41e17fdbbfb7e92dd1749e97d49a09c880b2af87fd",
+  "script_sha256": "0bbae25a6475d8ddd763ff0f2f61374d3312a800f51545d1eb3eb18fc042b6ef"
+}

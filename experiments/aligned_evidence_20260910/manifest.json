@@ -682,12 +682,6 @@
       "note": "compact audit rows; response text remains in source workspace"
     },
     {
-      "source": "slime/rollout/rm_hub/gpqa.py",
-      "frozen": "raw/gpqa_scorer.py",
-      "sha256": "9a3014b359e901271fcff9f60a7351097fb72e9bce62a3b229ea1cc71c43bd12",
-      "bytes": 7025
-    },
-    {
       "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/capability_eval/step_250/run_complete.json",
       "frozen": "raw/M-PG_250_complete.json",
       "sha256": "0e7e587b62a016f7540371bd4c71845e9a1ebff10b8407809a4d75d4575cb44a",
@@ -860,54 +854,6 @@
       "rows": 792,
       "frozen": "prompt_scores.jsonl",
       "note": "compact audit rows; response text remains in source workspace"
-    },
-    {
-      "source": "local/aligned_capability_20260909_a6000/results_summary.json",
-      "frozen": "raw/single_capability.json",
-      "sha256": "ffac36982ecc93f979fbbbebbcc897c50ff6f4bf12b2ff3aa4a502d8c7c050c7",
-      "bytes": 3454
-    },
-    {
-      "source": "local/single_aligned_20260909_a6000/generated/protocol.json",
-      "frozen": "raw/single_protocol.json",
-      "sha256": "80a88ead6c81871339e2f1ae4e571000f98886b0b048426601276b5e641e3a32",
-      "bytes": 11552
-    },
-    {
-      "source": "local/single_aligned_20260909_a6000/generated/capability_eval.yaml",
-      "frozen": "raw/single_capability_eval.yaml",
-      "sha256": "8e89fbaba99ebf301ecd23626c0ed7e400fcba9dec7c1503f4ece5bdcab468ab",
-      "bytes": 1442
-    },
-    {
-      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/job.json",
-      "frozen": "raw/S-PG_500_job.json",
-      "sha256": "a7280f6245d54f6a385acb252204be1a3e5b65b0a2871b05cfbb0a54f1f98ad8",
-      "bytes": 4647
-    },
-    {
-      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/verified_summary.json",
-      "frozen": "raw/S-PG_500_verified_summary.json",
-      "sha256": "0e3f40e5ac8aa5b9ac422cb587b6a18641864fb6cc6bbd877e73792d580bdc0b",
-      "bytes": 395
-    },
-    {
-      "source": "local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-pg-s42/step_500/export_verified.json",
-      "frozen": "raw/S-PG_500_export_verified.json",
-      "sha256": "c916831f2391334760b34eccf9ecb4a60cb6232a6b7fce92ea7aded3663e787b",
-      "bytes": 2009
-    },
-    {
-      "source": "local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-intersection64-s42/step_500/export_verified.json",
-      "frozen": "raw/S-I64_500_export_verified.json",
-      "sha256": "e9a6d7699ba9e62406c20097dd24c0c41b1dc64436e6eadf42b20a98f72178a4",
-      "bytes": 2057
-    },
-    {
-      "source": "local/dt_gt_configuration_20260909/generated/protocol.json",
-      "frozen": "raw/reduction_protocol.json",
-      "sha256": "8416bbc2fab883f9a2be81007829d8697e3fddcd63a6cb19fc402c40af17d6c2",
-      "bytes": 11402
     },
     {
       "source": "outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123/paper/measurements.jsonl",
@@ -1286,6 +1232,408 @@
       "frozen": "raw/followup/src/slime_plugins/mopd/paper_diagnostics.py",
       "sha256": "f724b56f8ea14ffd836d025a3a0e243d185988431a14754d61413d2c146e54a0",
       "bytes": 11051
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/run_complete.json",
+      "frozen": "raw/M-I64-DR_500_complete.json",
+      "sha256": "287c00ab651cda78b110da5e827bb3a8ac78aabbde1cb05ee30ff65277dc97a6",
+      "bytes": 270
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/job.json",
+      "frozen": "raw/M-I64-DR_500_job.json",
+      "sha256": "7064ec3d586dd75cf0968976f4095852cbecee1dd4cf9a9debf6bbd570dd60f0",
+      "bytes": 4795
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/verified_summary.json",
+      "frozen": "raw/M-I64-DR_500_verified_summary.json",
+      "sha256": "12dd07b026296540bebf2695619c361a53fc8c70a460076c6745fb635abc4c42",
+      "bytes": 410
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-DR_500_eval.jsonl",
+      "sha256": "4c311554d81dbffe38e96707fc94002fbd1da1a943cea94e33a28e9eda6821b0",
+      "bytes": 13641
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-DR_500_index.jsonl",
+      "sha256": "490960516b5450af8672499abab1c8e8cd43a7a1b7638e9559182925dd3c558b",
+      "bytes": 15561
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/artifacts/math500_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "8aa0370bc5e19632b05444b95938a7f680a808924f78174b54b303083d753c2f",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/artifacts/livecodebench_postcutoff_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "787e920bcd5e47eb1058c9ca88d7fbe8a8435831a41231e33718a1c17e0af5b9",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/artifacts/ifbench_strict/updates_00000500_eval_only.jsonl",
+      "sha256": "a41596768ad10c1b0ae2c7bbb1fda39812e3d7982b0a92addc32c61256882d2b",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dr-s42/capability_eval/step_500/artifacts/gpqa_diamond_avg4/updates_00000500_eval_only.jsonl",
+      "sha256": "cce2990f21cfdee37fb22bf4475f890461b342e52b7cd958d0bf4548668dae05",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/run_complete.json",
+      "frozen": "raw/M-I64-DT_100_complete.json",
+      "sha256": "7a26dd04b74246e93d6b875521d5bd90ec9e5f927bfe71fccb8fac57c8355269",
+      "bytes": 1395
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/job.json",
+      "frozen": "raw/M-I64-DT_100_job.json",
+      "sha256": "fcb387f8d6e6952d74202d914a55ac03c3113e1b742b5924b358cb026b8c3786",
+      "bytes": 11381
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/verified_summary.json",
+      "frozen": "raw/M-I64-DT_100_verified_summary.json",
+      "sha256": "585f494f1283affdb6cae9939752f2183f43b16aaf03909f5b590d6ed09c2f85",
+      "bytes": 410
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-DT_100_eval.jsonl",
+      "sha256": "b90f67c555e3c028722a78aac4c4237f148ebee89bc901a11f771bdb192e1248",
+      "bytes": 13920
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-DT_100_index.jsonl",
+      "sha256": "e772d96096437ac27f33d4b2efb667fac1c84ece39ef853efb1fe9891b0aa6c9",
+      "bytes": 15827
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/artifacts/math500_pass1/updates_00000100_eval_only.jsonl",
+      "sha256": "f25c062ee472dea71939122da7fe1b5468528f0c63e90637dd5aa1eb18edc601",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/artifacts/livecodebench_postcutoff_pass1/updates_00000100_eval_only.jsonl",
+      "sha256": "0cfbcd25f42d34961349cb012537556cb93d4c951ba904274744d617ea4da2cf",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/artifacts/ifbench_strict/updates_00000100_eval_only.jsonl",
+      "sha256": "cd68cfa71773d50bc7c4b4a82da87d61438c4462569d19d96a4c5d00107fed7f",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_100/artifacts/gpqa_diamond_avg4/updates_00000100_eval_only.jsonl",
+      "sha256": "57674a4e17ccb38d5b499319ed31e2a7198588a5f399d3d6abce246c948761ee",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/run_complete.json",
+      "frozen": "raw/M-I64-DT_250_complete.json",
+      "sha256": "07fd7df02a4595ff5fdb2e9b47ac3096df9bf0dbb5c7e04cd79a5bbc461f1c09",
+      "bytes": 270
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/job.json",
+      "frozen": "raw/M-I64-DT_250_job.json",
+      "sha256": "d69ef0a5c33aabf69785582df6fb61b47099ab348f2f57bd7dc456a49fc4eda2",
+      "bytes": 4795
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/verified_summary.json",
+      "frozen": "raw/M-I64-DT_250_verified_summary.json",
+      "sha256": "c91b534cd282b310f4d2bd9b401a562e8feec169cb43a0f8b80fef7aab448d6b",
+      "bytes": 411
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-DT_250_eval.jsonl",
+      "sha256": "88bb5d3e704e5eaf2a1434a62f3b9653fc2309128447c18e65d8f05459bb6083",
+      "bytes": 13622
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-DT_250_index.jsonl",
+      "sha256": "27f1ecd29f6889320b91423f067e491f975cfa52c58bc50e4b9ffd7a25d07156",
+      "bytes": 15542
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/artifacts/math500_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "0b5f44e5274fe2a56217a80569b1f9bf0c101cbb9b06f4b6ca28eff22a42eaae",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/artifacts/livecodebench_postcutoff_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "8d4b4994d85beda8247347ab7b51b42d74c690b2dfa84c422f1cf25cf4c56264",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/artifacts/ifbench_strict/updates_00000250_eval_only.jsonl",
+      "sha256": "461ab0cd8dab80a2ad8e551e683a9bfe10a8bbd9e5c5935e20145f4332b4d886",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_250/artifacts/gpqa_diamond_avg4/updates_00000250_eval_only.jsonl",
+      "sha256": "bea417d62e08884da63b8830c85f07186a16374f42c6426be7663b36e6128dc9",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/run_complete.json",
+      "frozen": "raw/M-I64-DT_500_complete.json",
+      "sha256": "3253471f9c4df89eb27ecd20d4980e0649589e6b7db3548f87bd331c429a5a73",
+      "bytes": 270
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/job.json",
+      "frozen": "raw/M-I64-DT_500_job.json",
+      "sha256": "bbf970cbcc4e940a855720c74b3ebe49ab0bba6e4a42089848995920960aa82a",
+      "bytes": 4795
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/verified_summary.json",
+      "frozen": "raw/M-I64-DT_500_verified_summary.json",
+      "sha256": "a880d85a27c0b75072084581ddd65c92858415b942e040875eff15c4e1f13ff2",
+      "bytes": 408
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-DT_500_eval.jsonl",
+      "sha256": "eaec66419eec5cc5df83b8cfae5d4618c9602a9a7d084ce64945f1c04771ada2",
+      "bytes": 13958
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-DT_500_index.jsonl",
+      "sha256": "6b1772471b67871e9cc469b87876212dfc30a9a02d3cd8883f7aef64a1c32e53",
+      "bytes": 15878
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/artifacts/math500_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "ee51a155ab887713484f73f575aca7cc375bb9f367dee4457217b85ac7c82710",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/artifacts/livecodebench_postcutoff_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "ef0a50eff21c7dbefceef82a03f02dc48b69baef023cb3e66946bf02a5ceba49",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/artifacts/ifbench_strict/updates_00000500_eval_only.jsonl",
+      "sha256": "ff777ab607e1a2710313a4a0e4334fc46ece0e9a7dd7ec9e536d82b7bfa58012",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-dt-s42/capability_eval/step_500/artifacts/gpqa_diamond_avg4/updates_00000500_eval_only.jsonl",
+      "sha256": "3a59b53a16df1573ac6071138618337bad1d0203f787aae146985cf3cf9c54a1",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/run_complete.json",
+      "frozen": "raw/M-I64-GT_250_complete.json",
+      "sha256": "a4e0ec2727790dc8516fe4f2f5fdb7bae87a34f683419c2cac466abdbe60d718",
+      "bytes": 270
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/job.json",
+      "frozen": "raw/M-I64-GT_250_job.json",
+      "sha256": "2e0825ea9f37aa79f7488993fde16862349552b1d4dbb158d536b4708e96627f",
+      "bytes": 4795
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/verified_summary.json",
+      "frozen": "raw/M-I64-GT_250_verified_summary.json",
+      "sha256": "cc2d8b5c9beeb4f9d636c52cf8fa8e0b03b9a8e3969888d41611931e8a0e4a75",
+      "bytes": 392
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-GT_250_eval.jsonl",
+      "sha256": "38da1cdbb8de03c4bb9bd08bf964e2fda94417adbca6257e38c538fc1acf3f44",
+      "bytes": 13458
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-GT_250_index.jsonl",
+      "sha256": "d0e55ef7050915ee5c71f61146fae322b52f959a857fc9207583b0a09f8ea092",
+      "bytes": 15378
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/artifacts/math500_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "fab64ffc333affd27fb63ae5e62c8bedebcc60b563ebb9df999eb4471a017dff",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/artifacts/livecodebench_postcutoff_pass1/updates_00000250_eval_only.jsonl",
+      "sha256": "668db34fc4ba9bb3252fe61810de94a348e0c5f2aaf5911fc1cfd236d8954adf",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/artifacts/ifbench_strict/updates_00000250_eval_only.jsonl",
+      "sha256": "a3789b53ec954e96ed2047fa49e06cd3c99c4d5595fe876850ca358d93499271",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_250/artifacts/gpqa_diamond_avg4/updates_00000250_eval_only.jsonl",
+      "sha256": "433c8328f0d248c53ebb4098fa5c93ea303569f6cd732c653aa70fbe251c1297",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/run_complete.json",
+      "frozen": "raw/M-I64-GT_500_complete.json",
+      "sha256": "354e1b7555ddd1331ba3c33549da190cfe6becc806b3f00a85fc628db45fb02d",
+      "bytes": 270
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/job.json",
+      "frozen": "raw/M-I64-GT_500_job.json",
+      "sha256": "50047479bbeefc6c5d8ac73d89bda27a1db201398cc8a47019f549490509d6a1",
+      "bytes": 4795
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/verified_summary.json",
+      "frozen": "raw/M-I64-GT_500_verified_summary.json",
+      "sha256": "4313331e14baca8800ed9e47641a1d7188437fa4207a49df0dbf862a1b8bba4e",
+      "bytes": 409
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/metrics/eval.jsonl",
+      "frozen": "raw/M-I64-GT_500_eval.jsonl",
+      "sha256": "096db62d6eac08d3c8eb7e26b6b2dfe4090d5884112c802428692fbef22d2c67",
+      "bytes": 13918
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/artifacts/index.jsonl",
+      "frozen": "raw/M-I64-GT_500_index.jsonl",
+      "sha256": "dec4ad073ec44b6b8ee22417fd10ed5cf7c6ab1f9c857185d1fcac910880f5b0",
+      "bytes": 15838
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/artifacts/math500_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "49e218987121879d782f67961f3ac2a94a34d105439bfd8e2a504ac99c2da211",
+      "rows": 500,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/artifacts/livecodebench_postcutoff_pass1/updates_00000500_eval_only.jsonl",
+      "sha256": "9abbdbc8a304c439971a016b862ab99c3753853d9b0f6b46d66ec48a4553c424",
+      "rows": 128,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/artifacts/ifbench_strict/updates_00000500_eval_only.jsonl",
+      "sha256": "029dcf17d92455589182aae79cb7a3fe57b520cf5865958728934f85f9abe9fb",
+      "rows": 300,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_20260909_sn4622128200/m-intersection64-gt-s42/capability_eval/step_500/artifacts/gpqa_diamond_avg4/updates_00000500_eval_only.jsonl",
+      "sha256": "c174bdec8cf6f136aac81a6192ab995b0b3f639d7731bb7dfba944cc97bc75fe",
+      "rows": 792,
+      "frozen": "prompt_scores.jsonl",
+      "note": "compact audit rows; response text remains in source workspace"
+    },
+    {
+      "source": "slime/rollout/rm_hub/gpqa.py",
+      "frozen": "raw/gpqa_scorer.py",
+      "sha256": "9a3014b359e901271fcff9f60a7351097fb72e9bce62a3b229ea1cc71c43bd12",
+      "bytes": 7025
+    },
+    {
+      "source": "local/aligned_capability_20260909_a6000/results_summary.json",
+      "frozen": "raw/single_capability.json",
+      "sha256": "ffac36982ecc93f979fbbbebbcc897c50ff6f4bf12b2ff3aa4a502d8c7c050c7",
+      "bytes": 3454
+    },
+    {
+      "source": "local/single_aligned_20260909_a6000/generated/protocol.json",
+      "frozen": "raw/single_protocol.json",
+      "sha256": "80a88ead6c81871339e2f1ae4e571000f98886b0b048426601276b5e641e3a32",
+      "bytes": 11552
+    },
+    {
+      "source": "local/single_aligned_20260909_a6000/generated/capability_eval.yaml",
+      "frozen": "raw/single_capability_eval.yaml",
+      "sha256": "8e89fbaba99ebf301ecd23626c0ed7e400fcba9dec7c1503f4ece5bdcab468ab",
+      "bytes": 1442
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/job.json",
+      "frozen": "raw/S-PG_500_job.json",
+      "sha256": "a7280f6245d54f6a385acb252204be1a3e5b65b0a2871b05cfbb0a54f1f98ad8",
+      "bytes": 4647
+    },
+    {
+      "source": "outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42/capability_eval/step_500/verified_summary.json",
+      "frozen": "raw/S-PG_500_verified_summary.json",
+      "sha256": "0e3f40e5ac8aa5b9ac422cb587b6a18641864fb6cc6bbd877e73792d580bdc0b",
+      "bytes": 395
+    },
+    {
+      "source": "local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-pg-s42/step_500/export_verified.json",
+      "frozen": "raw/S-PG_500_export_verified.json",
+      "sha256": "c916831f2391334760b34eccf9ecb4a60cb6232a6b7fce92ea7aded3663e787b",
+      "bytes": 2009
+    },
+    {
+      "source": "local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-intersection64-s42/step_500/export_verified.json",
+      "frozen": "raw/S-I64_500_export_verified.json",
+      "sha256": "e9a6d7699ba9e62406c20097dd24c0c41b1dc64436e6eadf42b20a98f72178a4",
+      "bytes": 2057
+    },
+    {
+      "source": "local/dt_gt_configuration_20260909/generated/protocol.json",
+      "frozen": "raw/reduction_protocol.json",
+      "sha256": "8416bbc2fab883f9a2be81007829d8697e3fddcd63a6cb19fc402c40af17d6c2",
+      "bytes": 11402
     }
   ],
   "bootstrap": {
@@ -1294,6 +1642,6 @@
     "unit": "prompt cluster",
     "training_seeds": 1
   },
-  "updated_at_utc": "2026-09-12T01:33:58.890128+00:00",
-  "refresh_scope": "Complete capability, paired joint update-250 geometry, and completed fixed-batch follow-ups; original online and local records retained."
+  "updated_at_utc": "2026-09-13T22:20:24.797650+00:00",
+  "refresh_scope": "Complete Initial and GT/DT/DR capability suites only; existing online and local records retained."
 }

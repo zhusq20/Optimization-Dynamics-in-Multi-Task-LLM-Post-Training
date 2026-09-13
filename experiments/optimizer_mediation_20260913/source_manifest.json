@@ -1,0 +1,46 @@
+{
+  "created_at_utc": "2026-09-13T21:25:22.262939+00:00",
+  "status": "complete",
+  "experiment": "fixed-bank GT/DT/DR optimizer mediation",
+  "jobs": 6,
+  "virtual_branches": 72,
+  "online_updates": 1500,
+  "sources": [
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/results/mediation-mpg100-bank1042/measurements.json",
+      "sha256": "00cc5f95ececb2216957474942aaf83902e6ac198a5dc0592a7d1688922a8c13",
+      "job": "mediation-mpg100-bank1042"
+    },
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/results/mediation-mpg100-bank1043/measurements.json",
+      "sha256": "e128bfe9d86c5f02301152f63b006f7d3230190fb4287a8f61937f1c5837f1d0",
+      "job": "mediation-mpg100-bank1043"
+    },
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/results/mediation-mpg100-bank1044/measurements.json",
+      "sha256": "773f185cecaad4353e17bfd40c0e03112361a9e9213d1d9d578da80a3d50b4ad",
+      "job": "mediation-mpg100-bank1044"
+    },
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/results/mediation-mpg250-bank1042/measurements.json",
+      "sha256": "be98c5eeac29d5f03fb94b040b8cc3cafadfd8a52f4366eea589c2555f8c80c7",
+      "job": "mediation-mpg250-bank1042"
+    },
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/results/mediation-mpg250-bank1043/measurements.json",
+      "sha256": "0ab4a6c6fe825e043c367d32834e66979435ef641616e154e9feb213cd5320ca",
+      "job": "mediation-mpg250-bank1043"
+    },
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/results/mediation-mpg250-bank1044/measurements.json",
+      "sha256": "03077bf62f7d38fcc4ce37fb6d3c4deb89f6b0b1e4127ed65dd5bc485cf7764e",
+      "job": "mediation-mpg250-bank1044"
+    },
+    {
+      "path": "slime_opd_geometry/local/optimizer_mediation_20260913/online_clip_coefficients.jsonl",
+      "sha256": "c145537fbedcada818a4e6b19b3da3ee79ceb161060bfc92d7da7952609a8f47",
+      "records": 1500
+    }
+  ],
+  "export_script_sha256": "47d2fe1b0cce167e0bcc2b965c44c93c065c39477b7a17174a1b3e75597343e0"
+}

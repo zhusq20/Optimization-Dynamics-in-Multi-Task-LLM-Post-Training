@@ -8,10 +8,10 @@ A new section after the three studies develops a candidate stable multi-task
 OPD recipe in continuous prose. Its validation is marked as pending; the
 existing experimental results and three-question structure are preserved.
 
-The September 12 revision audits existing results, including three newly located
-complete capability evaluations, paired joint geometry through update 250, and
-six fixed-batch averaging comparisons. The evidence inventory now contains
-16 capability suites (27,520 responses). Comparisons use common completed
+The September 13 revision audits existing results, including complete GT/DT/DR
+capability trajectories through update 500, paired joint geometry through
+update 250, and six fixed-batch averaging comparisons. The evidence inventory
+now contains 22 capability suites (37,840 responses). Comparisons use common completed
 checkpoints; incomplete experiments are replaced by visible author annotations.
 Teacher-gradient diagnostics and numerical controls are in the appendix.
 All compound figures use a three-column layout.
@@ -20,11 +20,13 @@ Compile the root `iclr2027_conference.tex`:
 
 ```bash
 python experiments/plot_aligned_evidence.py
+python experiments/plot_optimizer_mediation.py
 latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex
 python experiments/verify_aligned_evidence.py
+python experiments/verify_optimizer_mediation.py
 ```
 
-Current source marker: `stable-recipe-draft-20260912`.
+Current source marker: `optimizer-mediation-20260913`.
 
 - [Current result audit (中文)](experiments/RESULTS_AUDIT_20260912_zh.md)
 - [Reference verification and related-paper observations (中文)](experiments/REFERENCE_AUDIT_20260912_zh.md)

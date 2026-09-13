@@ -24,11 +24,21 @@
 /experiments/aligned_evidence_20260910/raw/
 /experiments/aligned_evidence_20260910/prompt_scores.jsonl
 
+# Local exploratory analyses and their alternative renders.
+/experiments/capability_uncertainty_*/
+/figures/estimated_three_seed_*/
+
 # Overleaf needs the current vector PDF figures, not old galleries or previews.
 /figures/*
 !/figures/aligned_evidence_20260910/
 /figures/aligned_evidence_20260910/*
 !/figures/aligned_evidence_20260910/*.pdf
+!/figures/optimizer_mediation_20260913/
+/figures/optimizer_mediation_20260913/*
+!/figures/optimizer_mediation_20260913/*.pdf
+!/figures/three_seed_20260913/
+/figures/three_seed_20260913/*
+!/figures/three_seed_20260913/*.pdf
 
 # Python and editor caches.
 __pycache__/

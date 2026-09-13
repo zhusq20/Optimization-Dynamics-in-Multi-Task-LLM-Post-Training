@@ -74,7 +74,11 @@ def main():
     comp=read('paired_comparisons.json')
     raw_ids={(r['model'],r['step']) for r in local}
     expected_pairs={(('Initial',0),identity) for identity in raw_ids if identity!=('Initial',0)}
-    expected_pairs|={(('M-I64-DR',50),(m,50)) for m in ['M-I64-DT','M-I64-GT']}
+    normalization_steps=set.intersection(*(
+        {step for model_name,step in raw_ids if model_name==model}
+        for model in ['M-I64-DR','M-I64-DT','M-I64-GT']))
+    expected_pairs|={(('M-I64-DR',step),(model,step))
+                     for step in normalization_steps for model in ['M-I64-DT','M-I64-GT']}
     for left,right in [('S-PG','S-I64'),('M-PG','M-I64-DR')]:
         common={step for model,step in raw_ids if model==left}&{step for model,step in raw_ids if model==right}
         expected_pairs|={((left,step),(right,step)) for step in common}
@@ -181,6 +185,12 @@ def main():
             common=set.intersection(*({r['step'] for r in cap if r['model']==m} for m in model_group))
             check('capability_figure_has_only_complete_matched_checkpoints',
                   all(figure['evaluated_steps'][m]==sorted(common) for m in model_group),[name,model_group,sorted(common)])
+    normalization_common=set.intersection(*({r['step'] for r in cap if r['model']==m}
+                                             for m in ['M-I64-DR','M-I64-DT','M-I64-GT']))
+    check('normalization_contrast_uses_latest_common_checkpoint',
+          figures['normalization50']['endpoint_step']==max(normalization_common))
+    check('normalization_figure_reports_conditional_evaluation_uncertainty',
+          'conditional evaluation SE' in figures['normalization_capability']['uncertainty'])
     common_geometry=set.intersection(*({r['step'] for r in geo if r['model']==m and r['quantity']==q}
                                       for m in ['M-PG','M-I64-DR'] for q in ['delta_fp32','delta_bf16']))
     check('geometry_figure_has_complete_matched_checkpoints',
@@ -191,7 +201,11 @@ def main():
     check('token_share_figure_uses_common_interval',figures['all_token_shares']['rollout_indices']==list(range(50)))
     paired_table_ids={('Initial',0)}
     density_table_ids=set()
-    for model_group in [['M-I64-DR','M-I64-DT','M-I64-GT'],['S-PG','S-I64'],['M-PG','M-I64-DR']]:
+    normalization_models=['M-I64-DR','M-I64-DT','M-I64-GT']
+    normalization_endpoint=max(set.intersection(*({r['step'] for r in cap if r['model']==m}
+                                                  for m in normalization_models)))
+    paired_table_ids|={(model,normalization_endpoint) for model in normalization_models}
+    for model_group in [['S-PG','S-I64'],['M-PG','M-I64-DR']]:
         common=set.intersection(*({r['step'] for r in cap if r['model']==m} for m in model_group))
         identities={(model,step) for model in model_group for step in common}
         paired_table_ids|=identities
@@ -226,9 +240,11 @@ def main():
     check('all_tex_references_defined',set(refs)<=set(labels),sorted(set(refs)-set(labels)))
     check('unique_tex_labels',len(labels)==len(set(labels)))
     figure_paths=re.findall(r'\\includegraphics\[[^]]+\]\{([^}]+)\}',tex)
-    check('only_aligned_figures_in_manuscript',len(figure_paths)==11 and all(p.startswith('figures/aligned_evidence_20260910/') for p in figure_paths))
+    aligned_paths=[p for p in figure_paths if p.startswith('figures/aligned_evidence_20260910/')]
+    optimizer_paths=[p for p in figure_paths if p.startswith('figures/optimizer_mediation_20260913/')]
+    check('only_verified_figures_in_manuscript',len(figure_paths)==13 and len(aligned_paths)==11 and len(optimizer_paths)==2)
     check('figure_manifest_matches_manuscript',
-          {Path(p).stem for p in figure_paths}=={r['id'] for r in fig_manifest['figures']})
+          {Path(p).stem for p in aligned_paths}=={r['id'] for r in fig_manifest['figures']})
     notes=[]
     for start in re.finditer(r'\\completionnote\{',tex):
         cursor=start.end()-1;arguments=[]

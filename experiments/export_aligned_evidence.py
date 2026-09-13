@@ -38,7 +38,11 @@ def main():
     ap = argparse.ArgumentParser(); ap.add_argument('--source', type=Path, required=True)
     ap.add_argument('--capability-only', action='store_true',
                     help='Add newly completed suites while preserving frozen training/mechanism records.')
+    ap.add_argument('--normalization-only', action='store_true',
+                    help='With --capability-only, refresh only Initial and GT/DT/DR capability suites.')
     args = ap.parse_args(); src = args.source.resolve()
+    if args.normalization_only and not args.capability_only:
+        ap.error('--normalization-only requires --capability-only')
     OUT.mkdir(exist_ok=True); (OUT / 'raw').mkdir(exist_ok=True)
     previous = json.loads((OUT/'manifest.json').read_text()) if args.capability_only else None
     manifest = list(previous['sources']) if previous else []
@@ -66,10 +70,23 @@ def main():
         'S-PG': 'outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-pg-s42',
         'S-I64': 'outputs/mopd_qwen3_aligned_capability_20260910_sn4622128200/s-intersection64-s42',
     }
-    for model, rel in eval_runs.items():
+    scan_runs = eval_runs
+    if args.normalization_only:
+        keep = {'Initial', 'M-I64-DR', 'M-I64-DT', 'M-I64-GT'}
+        scan_runs = {model: rel for model, rel in eval_runs.items() if model in keep}
+    for model, rel in scan_runs.items():
         for marker in sorted((src / rel / 'capability_eval').glob('step_*/run_complete.json')):
             base = marker.parent; step = int(base.name.split('_')[1]); tag = f'{model}_{step}'
-            if any(r['model']==model and r['step']==step for r in suites): continue
+            marker_rel=str(marker.relative_to(src))
+            exists=any(r['model']==model and r['step']==step for r in suites)
+            recorded=any(r['source']==marker_rel for r in manifest)
+            if exists and recorded:continue
+            if exists and not recorded:
+                # Recover cleanly if a previous refresh was interrupted after writing
+                # compact score files but before committing the source manifest.
+                suites=[r for r in suites if not (r['model']==model and r['step']==step)]
+                prompt_rows=[r for r in prompt_rows if not (r['model']==model and r['step']==step)]
+                old_audit['responses']-=COUNTS['GPQA']
             complete = json.loads(freeze(str(marker.relative_to(src)), tag + '_complete.json'))
             assert complete['status'] == 'complete' and complete['final_num_updates'] == step
             for name in ['job.json', 'verified_summary.json']:
@@ -149,7 +166,13 @@ def main():
     comparisons=[]
     pairs=[(('Initial',0),(r['model'],r['step'])) for r in suites
            if r['model']!='Initial' and r['verification']=='raw_artifacts']
-    pairs += [(('M-I64-DR',50),(m,50)) for m in ['M-I64-DT','M-I64-GT']]
+    normalization_steps = set.intersection(*(
+        {r['step'] for r in suites if r['model'] == model and r['verification'] == 'raw_artifacts'}
+        for model in ['M-I64-DR', 'M-I64-DT', 'M-I64-GT']
+    ))
+    pairs += [(('M-I64-DR', step), (model, step))
+              for step in sorted(normalization_steps)
+              for model in ['M-I64-DT', 'M-I64-GT']]
     for left, right in [('S-PG', 'S-I64'), ('M-PG', 'M-I64-DR')]:
         left_steps = {r['step'] for r in suites if r['model'] == left and r['verification'] == 'raw_artifacts'}
         right_steps = {r['step'] for r in suites if r['model'] == right and r['verification'] == 'raw_artifacts'}
@@ -200,7 +223,9 @@ def main():
     if args.capability_only:
         previous['updated_at_utc'] = datetime.now(timezone.utc).isoformat()
         previous['sources'] = manifest
-        previous['refresh_scope'] = 'New complete capability suites only; existing online and local records retained.'
+        previous['refresh_scope'] = ('Complete Initial and GT/DT/DR capability suites only; existing online and local records retained.'
+                                     if args.normalization_only else
+                                     'New complete capability suites only; existing online and local records retained.')
         dump(OUT/'manifest.json', previous)
         print(json.dumps({'suites':len(suites),'raw_prompt_rows':len(prompt_rows),
                           'paired_comparisons':len(comparisons),'new_gpqa_rescored':len(gpqa_audit)}))
