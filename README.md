@@ -3,7 +3,10 @@
 The default branch contains only the files needed to compile the current paper,
 plus this README and `.gitignore`. Section 3 uses a six-panel figure in two
 rows of three; Sections 4 and 5 each use three panels in one row. Supporting
-views remain in the appendix, including normalization aggregates. Normalization
+views remain in the appendix, including normalization aggregates. The appendix
+uses measured capability and cumulative-geometry trajectories through update
+500, update-500 paired intervals, and a compact local-concentration table;
+controls already shown in the main figures are referenced rather than repeated. Normalization
 capability curves retain the original estimated seed values with explicit caption
 provenance; the author reports agreement with subsequent three-seed experiments.
 

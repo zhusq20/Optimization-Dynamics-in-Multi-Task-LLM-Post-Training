@@ -1,35 +1,35 @@
-\section{Supporting Views for the Three Main Figures}
+\section{Supporting Views for the Main Figures}
 \label{app:nine_panel_support}
 
-The normalization figure uses six panels; the other two main figures use three panels each.
-The following views retain the aggregate normalization trajectories, detailed optimizer intervention, update-250 joint geometry, and original M-PG/100 concentration measurements referenced in the text.
-The normalization capability curves retain the original estimated seed values, as identified in their captions. The supervision capability contrasts use measured seed-42 scores.
-The separate author-audit DR/500 calculation (two measured seeds and one retained estimate) is stored with its provenance and is not interpreted as three-run empirical uncertainty.
+\paragraph{Capability provenance.}
+Figures~\ref{fig:normalization_capability}(c--f) and~\ref{fig:normalization_aggregate_support} retain the original means and sample standard deviations from measured seed-42 and estimated seed-43/44 scores. The authors report agreement with subsequent three-seed experiments; the retained estimates are not independently verified measurements. The separate author-audit DR/500 calculation uses two measured seeds and one retained estimate and is not interpreted as three-run empirical uncertainty. Figure~\ref{fig:supervision_overview}(c) uses measured seed-42 scores; its contrasts are point estimates rather than tests of training-seed significance.
+
+\paragraph{Teacher-update controls.}
+Figure~\ref{fig:subnetwork_overview}(a) compares DR cumulative changes at update 500. Panels (b,c) use the common M-PG/500 student and optimizer state. Each bank contains six teacher pairs; large points average four banks. SGD and reset-$m$ steps are individually norm-matched to saved-state Adam. Teacher-pair observations share teachers and banks and are dependent. Steps use non-fused PyTorch updates on saved-state copies, rather than bitwise replay of the online optimizer. Single-teacher and joint runs differ in per-domain response exposure as specified in Appendix~\ref{app:setup}.
+
+\paragraph{Local supervision controls.}
+Figure~\ref{fig:supervision_overview}(a,b) uses four banks per joint-student state. Losses share prefixes and saved optimizer state within each row, while inputs may differ across rows. Direct T64 step-direction pairs were not recorded. Panel (c) matches task, setting, and update, including the completed joint update-500 evaluation. Table~\ref{tab:local_concentration} supplies the FP32 and energy-concentration measurements for the M-PG/100 comparison described in Appendix~\ref{app:losses}.
+
+\subsection{Additional control figures}
+\label{app:added_controls}
+
+Figure~\ref{fig:normalization_interventions} reuses the six fixed banks and online clipping records described in Appendix~\ref{app:fixed_batch_normalization}. Reset-$m$ and reset-$(m,v)$ retain the optimizer clock. Panel (c) averages four domain probe losses within each bank; its error bars are sample standard deviations across the three banks at each checkpoint, not training-seed uncertainty.
+
+Figure~\ref{fig:sampling_history_controls}(a) uses three M-PG/100 rollout banks with a 4,096-token response cap, containing 48 responses and 288 prefixes. Twelve fixed-prefix subbanks each receive two independent PG action draws at counts 1, 16, and 64; the I64 reference is evaluated once per subbank. Mean PG gradient cosines to full vocabulary are 0.5374, 0.8652, and 0.9667; I64 is 0.999988. These are local diagnostic repeats. Panels (b,c) instead use the two 256-token-cap banks from Appendix~\ref{app:records}; the zero-gradient branch is measured once. Reset-$m$ retains the second moment and clock, whereas fresh Adam resets both moments and the clock. These separate experiments do not form one paired intervention chain.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section3_capability_support.pdf}
-\caption{Aggregate GT/DT/DR capability trajectories. (a) Equally weighted four-domain mean with averaged initial-student and domain-teacher references. (b) Worst domain change from initialization; zero denotes no regression. Points and error bars retain the original means and sample standard deviations from measured seed-42 and estimated seed-43/44 scores. The authors report agreement with subsequent three-seed experiments; these retained estimates are not independently verified measurements. Updates use a linear axis.}
+\caption{Aggregate GT/DT/DR capability: (a) four-domain mean with student/teacher references; (b) worst-domain change from initialization. Zero denotes no regression. Error bars show mean $\pm$ SD, including estimated seed scores.}
 \label{fig:normalization_aggregate_support}
 \end{figure}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/optimizer_mediation_20260913/optimizer_mediation.pdf}
-\caption{How optimization mediates GT/DT/DR differences. (a) Scalar clipping preserves gradient direction, while a common saved Adam state makes the proposed updates substantially more similar. Lines and error bars show the mean and one standard deviation across six fixed banks. (b) Fraction of the raw gradient retained across 500 online updates; percentages show how often clipping activates, boxes span the interquartile range, and whiskers the 5th--95th percentiles. (c) Immediate four-domain held-out reverse-KL change for saved-state Adam and same-norm SGD at two checkpoints. Open circles are individual banks; filled circles and error bars show the mean and one standard deviation across three banks. Lower is better.}
-\label{fig:optimizer_mediation}
-\end{figure}
+\paragraph{Cumulative trajectories.}
+Figure~\ref{fig:geometry} extends the update-500 summary in Figure~\ref{fig:subnetwork_overview}(a) to the recorded trajectories. Single-teacher geometry uses the previously verified shared measurements and provenance snapshot; those remote model tensors were not remeasured for this appendix. The single-teacher runs receive four times as many mathematics responses per update as the joint runs.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/cumulative_geometry.pdf}
-\caption{Cumulative changes in joint PG and I64 training through update 250. (a,b) Nonzero fractions in FP32 optimizer weights and BF16 model weights. (c) Coordinate fractions accounting for 90\% of squared change at update 250. Both branches use domain-response averaging.}
+\includegraphics[width=\linewidth]{figures/appendix_mvp_20260914/cumulative_geometry.pdf}
+\caption{Cumulative PG/I64 changes through update 500 in single-teacher (S) and joint (M) training. (a,b) Nonzero fractions in FP32 and BF16. (c,d) Coordinate fractions carrying 90\% of squared change in each precision. Lines connect measured updates 1, 50, 100, 250, and 500; joint I64 uses DR.}
 \label{fig:geometry}
-\end{figure}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/supervision_density.pdf}
-\caption{Local supervision comparison at M-PG update 100. (a,b) Nonzero fractions for FP32 optimizer steps and BF16 model changes. (c) Squared step norm in the largest 1\% of coordinates. Points show four prefix banks; every loss uses the same saved optimizer state.}
-\label{fig:density}
 \end{figure}

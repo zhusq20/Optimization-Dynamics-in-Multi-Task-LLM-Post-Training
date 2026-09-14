@@ -1,9 +1,9 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section5_supervision.pdf}
-\caption{Local supervision geometry and online capability.
-(a) Mean BF16 nonzero fractions over four banks at each of four joint-student states. Each row compares PG/I64/T64/full on identical prefixes and saved optimizer state; inputs may differ between rows.
-(b) Cosine to full-vocabulary supervision for the raw gradient, proposed FP32 step, and BF16 change. Colored lines show PG bank means and small points show individual banks; colors identify the student state. The grey band spans all I64 banks and states. Direct T64 step-direction pairs were not recorded and are not imputed.
-(c) Measured seed-42 I64-minus-PG capability differences for mathematics-only (S) and joint (M) training. Positive values favor I64. Every cell matches task, setting, and update; the joint comparison includes the completed update-500 evaluation. S and M differ in per-domain response exposure. The contrasts are point estimates, not tests of training-seed significance.}
+\caption{Supervision geometry and capability.
+(a) Mean BF16 nonzero fractions by student state and loss.
+(b) Alignment with full-vocabulary supervision: PG bank means (lines) and individual banks (points), with the I64 range shaded.
+(c) I64-minus-PG task scores (percentage points); positive values favor I64. S/M denote single-teacher/joint training.}
 \label{fig:supervision_overview}
 \end{figure}

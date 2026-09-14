@@ -16,14 +16,7 @@ At M-PG checkpoints 100 and 250, three banks (seeds 1042, 1043, and 1044) each c
 
 Table~\ref{tab:fixed_batch_normalization} reports every pairwise raw-gradient cosine. The domain-wise covariance decomposition is checked in FP64 over all 24 bank-domain groups; the largest relative residual is $1.53\times10^{-15}$. This numerical check verifies the aggregation identity. The observed gradient directions establish that the covariance contribution is nonzero on these batches.
 
-The optimizer-mediation experiment in Figure~\ref{fig:optimizer_mediation} reuses these six banks. Each aggregate gradient is globally clipped at norm 1 and applied to the same saved FP32 Adam state for that bank. The saved-state branch retains both moments; the reset-$m$ branch zeros the first moment while retaining the second moment and optimizer clock; reset-$(m,v)$ zeros both moments while retaining the clock. The momentum-free SGD control follows the negative gradient and is rescaled separately for DR, DT, and GT to match that reduction's saved-state Adam FP32 step norm. Every proposed FP32 step is cast to BF16 before evaluating one held-out response per domain. We report full-vocabulary reverse KL for evaluation; the training-consistent I64 surrogate is retained in the source bundle. These are immediate local interventions, not additional online training runs.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.52\linewidth]{figures/optimizer_mediation_20260913/optimizer_mediation_moments.pdf}
-\caption{Adam-moment controls across the six fixed banks. Points are individual FP32 step norms and short horizontal lines are means. Resetting the first moment while retaining the second reduces the step norm to roughly one third; resetting both moments more than doubles it. The optimizer clock is unchanged in all three conditions.}
-\label{fig:optimizer_mediation_moments}
-\end{figure}
+The optimizer interventions in Figure~\ref{fig:normalization_interventions} reuse these six banks. Each aggregate gradient is globally clipped at norm 1 and applied to the same saved FP32 Adam state for that bank. The saved-state branch retains both moments; the reset-$m$ branch zeros the first moment while retaining the second moment and optimizer clock; reset-$(m,v)$ zeros both moments while retaining the clock. The momentum-free SGD control follows the negative gradient and is rescaled separately for DR, DT, and GT to match that reduction's saved-state Adam FP32 step norm. Every proposed FP32 step is cast to BF16 before evaluating one held-out response per domain. We report full-vocabulary reverse KL for evaluation; the training-consistent I64 surrogate is retained in the source bundle. These are immediate local interventions, not additional online training runs.
 
 \begin{table}[t]
 \caption{Fixed-batch averaging comparison. Entries are raw-gradient cosines; each row uses one shared student and response bank. DR and DT share domain weights and differ only in within-domain response weighting.}
@@ -41,46 +34,34 @@ The online record distinguishes raw aggregate gradients, clipped gradients, actu
 
 For local calculations, the exported checkpoint contains FP32 master values, BF16 model values, first and second moments, optimizer hyperparameters, and step clocks. The BF16 values match all 1,720,574,976 coordinates in the native exported model. Teacher weight values are verified in the same precision. Local forward/backward computations evaluate these values in FP32 with TF32 disabled. All proposed steps are computed from the same saved state with a non-fused Adam implementation. The online training optimizer uses its own fused implementation.
 
-We evaluate three local states. \emph{Saved} retains both moments and the step clock. \emph{Reset m} zeros the first moment while retaining the second moment and clock. \emph{Fresh} zeros both moments and resets the clock. Global norm clipping at 1 is applied before the Adam calculation, and weight decay is zero. For the zero-gradient branch, the saved first moment continues to decay and move the master weights. A no-step master-to-BF16 cast gives an exact match to the saved model. Thirteen numerical checks cover the Adam formulas against PyTorch, loss gradients, parameter-coordinate inner products, support ties, and zero-vector handling. Figure~\ref{fig:thresholds} shows how absolute thresholds change the measured local activity.
+We evaluate three local states. \emph{Saved} retains both moments and the step clock. \emph{Reset m} zeros the first moment while retaining the second moment and clock. \emph{Fresh} zeros both moments and resets the clock. Global norm clipping at 1 is applied before the Adam calculation, and weight decay is zero. The plotted controls use two response banks; the zero-gradient control is evaluated once. For the zero-gradient branch, the saved first moment continues to decay and move the master weights. A no-step master-to-BF16 cast gives an exact match to the saved model. Thirteen numerical checks cover the Adam formulas against PyTorch, loss gradients, parameter-coordinate inner products, support ties, and zero-vector handling. Figure~\ref{fig:thresholds} shows how absolute thresholds change the measured local activity.
 
 The zero-current-gradient branch changes 0.1403\% of BF16 coordinates, compared with 0.1486\% for PG. Resetting the first moment gives 0.0504\% for PG; resetting both moments and the clock gives 0.5140\%. These controls explain why a sparse gradient selection cannot by itself identify the parameters changed by an optimizer step. They supplement the update-sparsity measurements in Sections~\ref{sec:subnetworks} and~\ref{sec:density}.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/adam_precision.pdf}
-\caption{Supporting optimizer-state controls at M-PG update 100. Points show two response banks; the zero-gradient control is evaluated once. (a,b) Nonzero fractions for FP32 steps and BF16 changes. (c) Saved moments, reset first moment, and fresh moments and clock. Weight decay is zero.}
-\label{fig:adam}
-\end{figure}
+Figure~\ref{fig:sampling_history_controls}(b,c) displays these BF16 controls. The full FP32 and BF16 measurements are retained in the evidence bundle.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/thresholds.pdf}
-\caption{Absolute-threshold sensitivity of the saved-state local steps. Lines show means over two banks and shading shows their range; the zero-gradient control has one value. The two panels use the same thresholds and separate FP32 master changes from BF16 writeback.}
+\caption{Threshold sensitivity of FP32 steps and BF16 changes. Lines show bank means; shading spans their range.}
 \label{fig:thresholds}
 \end{figure}
 
 \subsection{Response banks, overlaps, and gradient magnitudes}
 \label{app:gradient_overlap}
 
-Banks use seeds 42 and 43, one response per domain per bank, a 2,048-token prompt cap, and a 256-token generation cap. All eight responses reach the cap. Four response positions are sampled without replacement per response. Each row's four prefixes receive equal weight. For routed gradients, each teacher scores its domain row; for common-bank gradients, it scores all four rows with equal domain weights. Crossed comparisons score every domain row with every teacher, keeping the number of prefixes per gradient at four. The 192 crossed-pair records and 48 routed/common pair records share underlying gradients, so points represent paired conditions within banks.
+These raw-gradient diagnostics use the M-PG/100 student, whereas Figure~\ref{fig:subnetwork_overview}(b,c) measures teacher-conditioned optimizer steps at M-PG/500. Banks use seeds 42 and 43, one response per domain per bank, a 2,048-token prompt cap, and a 256-token generation cap. All eight responses reach the cap. Four response positions are sampled without replacement per response. Each row's four prefixes receive equal weight. For routed gradients, each teacher scores its domain row; for common-bank gradients, it scores all four rows with equal domain weights. Crossed comparisons score every domain row with every teacher, keeping the number of prefixes per gradient at four. The 192 crossed-pair records and 48 routed/common pair records share underlying gradients, so points represent paired conditions within banks.
 
 Top-$k$ coordinate sets rank absolute gradient values, using a stable coordinate index to break cutoff ties. The diagnostic records the cutoff and whether a tie crosses the selection boundary. These tie flags accompany the source metrics, including overlaps from nearly degenerate gradients. Table~\ref{tab:coverage_mass} supplies the routed PG norms; the first bank's instruction-following gradient has norm $1.53\times10^{-9}$. Cosine normalizes magnitude, so opposite directions for such a row carry very little absolute gradient mass. Jaccard overlap measures selected locations and cosine measures signed direction. For reference, independent uniform sets of fraction $\rho$ have expected-intersection to expected-union ratio $\rho/(2-\rho)$, or approximately 0.00503 at $\rho=1\%$. This reference uses uniform coordinates; layer and weight-magnitude structure remain in the measured gradients.
 
-Applying Equation~\ref{subnet_overlap} to the largest-magnitude 1\% of raw-gradient coordinates gives the six-pair comparison in Figure~\ref{fig:teacher_overlap}. Across the two banks, routed gradients have mean Jaccard overlap 0.0951 for PG and 0.0999 for I64. Their ranges are 0.0744--0.1077 and 0.0737--0.1178. When every teacher instead scores all four domain responses, the respective means are 0.3808 and 0.4577. The latter comparison changes both input composition and prefix count; the crossed input control below fixes the count.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_overlap.pdf}
-\caption{Teacher-pair raw-gradient comparison at M-PG update 100. Entries show mean Jaccard over two banks for the largest-magnitude 1\% of routed gradient coordinates. Both panels use the same scale.}
-\label{fig:teacher_overlap}
-\end{figure}
+Applying Equation~\ref{subnet_overlap} to the largest-magnitude 1\% of raw-gradient coordinates gives mean routed Jaccard overlaps of 0.0951 for PG and 0.0999 for I64 across the two banks and six teacher pairs. Their ranges are 0.0744--0.1077 and 0.0737--0.1178. When every teacher instead scores all four domain responses, the respective means are 0.3808 and 0.4577. The latter comparison changes both input composition and prefix count; the crossed input control below fixes the count.
 
 Holding the teacher fixed while changing the input domain yields mean gradient cosines of 0.0059 for PG and 0.0072 for I64. Holding the input domain fixed while changing teachers produces both aligned and opposed gradients. For routed gradients the mean cosines are $-0.0020$ and $0.0081$, respectively, despite partial coordinate overlap. Figure~\ref{fig:teacher} supplies this input and direction context for the teacher-overlap results in Section~\ref{sec:subnetworks}.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_input.pdf}
-\caption{Supporting input controls for teacher overlap at M-PG update 100. Left and center: crossed comparisons keep four prefixes per gradient. Right: top-1\% gradient Jaccard versus signed cosine for routed and common-bank gradients. Dots share teachers and banks and are dependent comparisons.}
+\caption{Input dependence of teacher overlap. Left/center: crossed teacher--input comparisons. Right: top-1\% gradient Jaccard versus signed cosine for routed and common inputs.}
 \label{fig:teacher}
 \end{figure}
 
@@ -88,7 +69,14 @@ Holding the teacher fixed while changing the input domain yields mean gradient c
 \label{app:losses}
 
 \paragraph{Four-bank local experiment.}
-The local supervision comparison in Figure~\ref{fig:density} uses four response banks with seeds 2042--2045 at M-PG update 100. Each bank contains one response per domain. Generation uses the training prompt format, a 2,048-token prompt cap, and a 4,096-token response cap. The 16 response lengths range from 81 to 4,096 tokens; two responses reach the cap. Six positions per response give 96 prefixes. PG actions are freshly sampled from the student at the cached prefixes. Every loss uses the same prefixes and domain-response weights. Gradients are globally clipped at norm 1 before applying the same saved Adam state.
+The M-PG/100 row of Figure~\ref{fig:supervision_overview}(a) uses four response banks with seeds 2042--2045. Each bank contains one response per domain. Generation uses the training prompt format, a 2,048-token prompt cap, and a 4,096-token response cap. The 16 response lengths range from 81 to 4,096 tokens; two responses reach the cap. Six positions per response give 96 prefixes. PG actions are freshly sampled from the student at the cached prefixes. Every loss uses the same prefixes and domain-response weights. Gradients are globally clipped at norm 1 before applying the same saved Adam state. Table~\ref{tab:local_concentration} adds the FP32 and energy-concentration measurements for this state.
+
+\begin{table}[t]
+\centering\small
+\caption{Local concentration at M-PG/100, averaged over four matched banks. NZ is the percentage of nonzero coordinates; top-1\% is the percentage of squared step norm carried by the largest 1\% of coordinates. These are local bank means, not training-seed estimates.}
+\label{tab:local_concentration}
+\input{experiments/appendix_mvp_20260914/local_concentration_table.tex}
+\end{table}
 
 The teacher-top-64 student probability mass averages 99.918\% across the 96 prefixes. The bank-domain averages range from 99.279\% to 100\%, and the lowest individual-prefix mass is 96.709\%. The source bundle records all 16 bank-domain coverage entries and every proposed update. Student BF16 values match the saved model exactly. The local loss and Adam implementations are the same as in the two-bank controls in Appendix~\ref{app:records}.
 
@@ -128,23 +116,9 @@ Teacher distance is computed on the full next-token vocabulary at matched prefix
 \qquad m=\tfrac12(q_d+q_e).
 \label{eq:teacher_js}
 \end{equation}
-We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:teacher_js} pairs all twelve bank-pair JS measurements with their corresponding gradient overlaps. Teacher JS ranges from 0.00151 to 0.02714 nats. Routed gradient-selection differences lie in a narrow band, while common-input differences vary more widely. The ordering of teacher pairs changes with the input bank and supervision choice. These pairwise observations share teachers, prefixes, and a student checkpoint.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_js.pdf}
-\caption{Teacher prediction differences and raw-gradient selection differences at M-PG update 100. Colors identify the six teacher pairs; circles and triangles identify the two banks. Each panel pairs the same teacher JS values with PG or I64 gradient overlap on routed or common inputs.}
-\label{fig:teacher_js}
-\end{figure}
+We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:subnetwork_overview}(c) pairs this distance with common-input optimizer-step selections at M-PG/500. The earlier M-PG/100 raw-gradient diagnostic contains twelve bank-pair JS measurements, ranging from 0.00151 to 0.02714 nats; its pair-level records remain in the evidence bundle. Both diagnostics share teachers and prefixes within each bank, so teacher-pair observations are dependent.
 
 \section{Token Shares Under the Three Averaging Rules}
 \label{app:behavior}
 
-Figure~\ref{fig:all_token_shares} supports the loss-weighting comparison in Section~\ref{sec:normalization}. Each branch allocates 25\% of prompts to every domain. Under GT, the plotted token shares also give the domain loss weights; DT and DR keep fixed domain weights. Records at the same rollout clock are merged across metric writes. The first 50 unsmoothed batches expose the early imbalance; capability trajectories continue through update 500.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/all_token_shares.pdf}
-\caption{Valid-token shares over the first 50 rollout batches for mathematics, code, instruction following, and science under the three I64 reductions. The dotted reference is the common 25\% prompt share. Rollout index $r$ precedes optimizer update $r+1$. GT uses these shares as domain loss weights; DT and DR use fixed domain weights.}
-\label{fig:all_token_shares}
-\end{figure}
+Figure~\ref{fig:normalization_capability}(a) shows GT domain weights over the first 50 batches. Each branch allocates 25\% of prompts to every domain. Under GT, token shares also give the domain loss weights; DT and DR keep fixed domain weights even when their generated token shares differ. Records at the same rollout clock are merged across metric writes. Rollout index $r$ precedes optimizer update $r+1$. The unsmoothed GT/DT/DR token-share records are retained in the evidence bundle; capability trajectories continue through update 500.

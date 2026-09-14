@@ -17,19 +17,19 @@ The multi-teacher configurations allocate 16 prompts to each domain per update a
 
 Each capability suite contains MATH-500 (500 questions from the MATH benchmark \citep{hendrycks2021math}; \href{https://huggingface.co/datasets/HuggingFaceH4/MATH-500}{dataset release}), a fixed 128-question LiveCodeBench v6 subset \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 1,720 responses.
 
-The seed-42 evidence inventory contains 22 complete suites totaling 37,840 responses. Eighteen suites have local response-level artifacts: the shared initial student, fifteen multi-teacher checkpoints, and both single-teacher endpoints at update 500. Their 30,960 records match artifact hashes, expected sample counts, unique prompt/sample indices, and logged scores; code evaluations report zero infrastructure errors. Recomputing all 14,256 GPQA responses with the recorded \texttt{final-answer-v2} scorer gives zero changes. Four single-teacher suites contribute 6,880 responses through verified completion summaries from a second node; their per-question records remain there. Comparisons retain only checkpoints complete for every included branch.
+The seed-42 evidence inventory contains 23 complete suites totaling 39,560 responses, including the completed M-PG/500 evaluation. Nineteen suites have local response-level artifacts: the shared initial student, sixteen multi-teacher checkpoints, and both single-teacher endpoints at update 500. Their 32,680 records have verified artifact hashes, expected sample counts, unique prompt/sample indices, and aggregate scores; code evaluations report zero infrastructure errors. The original bundle's 14,256 GPQA responses were also rescored with \texttt{final-answer-v2}, with zero changes. The added M-PG/500 suite contributes 1,720 responses, including 792 GPQA responses whose saved rewards are used here. Four single-teacher suites contribute 6,880 responses through verified completion summaries from a second node; their per-question records remain there. Comparisons retain only checkpoints complete for every included branch.
 
 \begin{table}[t]
-\caption{Seed-42 capability scores (\%) at complete comparison checkpoints. The initial student is shared. GT/DT/DR use update 500; PG/I64 use common updates within each teacher setting.}
+\caption{Seed-42 capability scores (\%) at complete comparison checkpoints. The initial student is shared. GT/DT/DR use update 500; PG/I64 use common updates within each teacher setting. These are individual measured-run scores; Figure~\ref{fig:normalization_capability}(c--f) shows the GT/DT/DR trajectory summaries with their separately stated seed provenance.}
 \label{tab:all_capability}
 \centering\small
-\input{experiments/aligned_evidence_20260910/capability_table.tex}
+\input{experiments/appendix_mvp_20260914/capability_table.tex}
 \end{table}
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/capability.pdf}
-\caption{PG/I64 capability comparisons from the shared initial student. M denotes four routed teachers and S the mathematics teacher. Lines connect common measured checkpoints: 100/250/500 for S and 50/100/250 for M. Single-teacher updates contain four times as many mathematics responses as joint updates.}
+\includegraphics[width=\linewidth]{figures/appendix_mvp_20260914/capability.pdf}
+\caption{Seed-42 PG/I64 capability trajectories through update 500 from the shared initial student. S denotes mathematics-only training; M denotes joint training. Lines connect matched measured checkpoints: 100/250/500 for S and 50/100/250/500 for M.}
 \label{fig:capability}
 \end{figure}
 
@@ -49,15 +49,15 @@ For the paired comparisons, question identity includes the prompt, label, and qu
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/normalization50.pdf}
-\caption{Paired update-500 I64 reduction contrasts against DR. Bars give nominal 95\% prompt-bootstrap intervals; GPQA resamples questions with their four responses together.}
+\caption{Update-500 I64 capability contrasts against DR, with nominal 95\% paired question-bootstrap intervals.}
 \label{fig:normalization_ci}
 \end{figure}
 
 \begin{table}[t]
-\caption{All PG/I64 domain contrasts at the last common capability checkpoints: single-teacher update 500 and joint update 250. Differences are I64 minus PG in percentage points. Intervals are nominal 95\% paired question-bootstrap intervals conditional on the trained checkpoints.}
+\caption{PG/I64 domain contrasts at the last common capability checkpoint, update 500, in both settings. Differences are I64 minus PG in percentage points. Intervals are nominal 95\% paired question-bootstrap intervals conditional on the trained checkpoints.}
 \label{tab:endpoint_paired}
 \centering\small
-\input{experiments/aligned_evidence_20260910/endpoint_paired_table.tex}
+\input{experiments/appendix_mvp_20260914/endpoint_paired_table.tex}
 \end{table}
 
-The source bundle \texttt{experiments/aligned\_evidence\_20260910} freezes the plotted measurements, prompt-level score records, source SHA-256 hashes, scoring implementation, protocol, and local diagnostic code. Figure generation reads only this bundle and runs on CPU. The manifest identifies the source artifact for each measurement. The aligned series uses the common initial parent and native response semantics throughout; earlier Base initialization, Student64-to-I64 continuations, and superseded teacher-top-$k$ runs are outside this series.
+The original source bundle \texttt{experiments/aligned\_evidence\_20260910} freezes measurements, prompt-level score records, source SHA-256 hashes, scoring implementation, protocol, and local diagnostic code. The \texttt{nine\_panel\_20260914} bundle adds the completed update-500 comparisons. The \texttt{appendix\_mvp\_20260914} bundle records the updated appendix tables, paired intervals, compact M-PG/500 scores, and input/output hashes. Figure generation uses frozen measurements and runs on CPU. The aligned series uses the common initial parent and native response semantics throughout; earlier Base initialization, Student64-to-I64 continuations, and superseded teacher-top-$k$ runs are outside this series.
