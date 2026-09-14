@@ -1,0 +1,17 @@
+{
+  "status": "complete",
+  "elapsed_seconds": 207.70247626304626,
+  "banks": 2,
+  "repeats_per_draw_count": 2,
+  "draw_counts": [
+    1,
+    16,
+    64
+  ],
+  "results_sha256": "87734e0b97ef88c11426f719036482dbb1880bc2c34aba9bbaa76ea04b239c4f",
+  "actions_sha256": "5e2f50cc965ba8a7df698475f6d67e68ed16ad9b61ebc13749fb1e233e5b9a85",
+  "source_sha256": "3fcf73a20e9ea4354344446fb72294c4ca9e7d98275ef1ebf1645227d0f40393",
+  "prefixes_and_teacher_scores_shared_with_main_probe": true,
+  "scope": "Conditional sampling variability at fixed prefixes; not training seed variation",
+  "peak_gpu_memory_bytes": 22705207808
+}

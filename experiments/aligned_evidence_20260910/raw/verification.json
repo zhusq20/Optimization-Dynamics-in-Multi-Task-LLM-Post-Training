@@ -1,0 +1,20 @@
+{
+  "status": "passed",
+  "records": 433,
+  "banks": 2,
+  "teacher_pairs": 48,
+  "optimizer_records": 42,
+  "zero_comparisons": 16,
+  "measurement_sha256": "20f5eb6264b84a01f977cd5bdef4a766c9cc7f55e59cc06003c6228ab35d55a0",
+  "summarizer_sha256": "d541fe0747aac0aca57cbce8967fe524359af88be7cee128593bc071a3de677e",
+  "figure_sha256": {
+    "online_geometry_context.png": "dfcec01d7444b6e35e6a822cbebbf0d40c1537b25b6b8c4e7c7994504be52665",
+    "teacher_input_control.png": "ea288ea631de7ff4118a9ae994ea38b38b50fd1f41f3ba1eb91e681a7050e38c",
+    "adam_precision_control.png": "0ec989a0cb202f84e8780e90dc3ee47ecc5a0ba41594c0c3bd3b6d2336a1aceb",
+    "pg_sampling_control.png": "7d54c7408d244b1c7faa65dd026802c2ca09e307cdc62a38b66f7634b4d0d70c",
+    "adam_precision_control.pdf": "f6da1ef5edca2d6e204cbd9e8ba326dcec2f7365fc2dcf69278d0caedceb476f",
+    "teacher_input_control.pdf": "36626481bbff15caecf6da489f2456fae93eada0c7ac0205b7693f22f1ed347c",
+    "online_geometry_context.pdf": "8b51a0e09c5d0abb28b632294b6f0136758a7d5137e7a9a96aeb0d46bfdb086d",
+    "pg_sampling_control.pdf": "5924206a205122d0a47125472de5498ce8c323438056947fbf8bbaaefa90dd80"
+  }
+}

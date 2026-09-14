@@ -1,0 +1,803 @@
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+000
+001
+      T OKEN BALANCING , G RADIENT S PARSITY,
+002   AND S UPERVISION D ENSITY IN
+003
+004   M ULTI -T EACHER O N -P OLICY D ISTILLATION
+005
+006
+       Anonymous authors
+007
+       Paper under double-blind review
+008
+009
+010
+011                                              A BSTRACT
+012
+013            Multi-teacher on-policy distillation (MOPD) aims to consolidate specialized ca-
+014            pabilities in a single student. We examine three aspects of its optimization: token
+015            balancing, gradient sparsity, and supervision density. Starting from the MOPD
+016            learning objective, we first show how loss averaging determines both domain
+017            weights and the relative weight of long and short responses. A finite-batch gra-
+018            dient decomposition separates these effects and motivates matched experiments
+019
+               on capability balance. Second, we investigate whether different teachers concen-
+               trate their gradients on overlapping parameter subsets within the same MOPD
+020
+               student, and whether more different teacher distributions correspond to more dif-
+021
+               ferent subsets. Prior observations of sparse cumulative OPD parameter changes
+022            motivate this question but do not establish gradient sparsity; we measure gra-
+023            dients, optimizer steps, and cumulative changes separately. Third, we compare
+024            sampled-token policy gradients with teacher top-k supervision in single-teacher
+025            and joint training, using full-vocabulary reverse-KL gradients at shared prefixes
+026            as a local reference. The planned experiments pair gradient concentration with
+027            per-domain capability and account for sampling variability, training exposure, and
+028            compute. Each question is developed together with its experimental design, with-
+029            out presuming that sparse gradients, low teacher overlap, or sampled supervision
+030
+               improve capability integration. Empirical outcomes remain to be measured.
+031
+032
+033   1   I NTRODUCTION
+034
+035   Multi-teacher on-policy distillation (MOPD) transfers domain specialists into one student by scoring
+036   student-generated responses with their assigned teachers (Ma et al., 2026). The objective is to inte-
+037   grate their capabilities, but equal numbers of prompts from each domain need not give those domains
+038   equal influence on training. Open-MOPD identifies capability imbalance and studies token-share
+039   weighting, changing distillation gaps, and stale student-dependent rewards (Gao et al., 2026). These
+040   findings motivate examining how the objective weights each domain and which student parameters
+041   receive its strongest gradients.
+042   Prior work reports sparse cumulative parameter changes in RL (Mukherjee et al., 2025) and OPD
+043   (Yu et al., 2026; Shen et al., 2026). Such observations do not establish that instantaneous gradients
+044   are sparse: optimizer state and accumulation over training can change both the size and location
+045   of parameter movement. We make this distinction explicit and ask how multiple teachers act on a
+046   common student during MOPD. Gradients measured in that shared student are more directly relevant
+047   to this question than endpoints of separately trained students.
+048   After introducing the MOPD learning objective in Section 2, we develop three studies and place
+049   each experiment alongside its corresponding question:
+050
+051        1. Token balancing (Section 3). We derive how global-token, domain-token, and domain-
+052           response averaging weight domains and response lengths, then compare their effects on
+053           capability balance. The analysis explains existing loss reductions without introducing a
+              new allocation algorithm.
+
+
+                                                       1
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+054
+            2. Gradient sparsity (Section 4). We measure gradient concentration in single-teacher and
+055            joint OPD, compare the parameter subsets receiving each teacher’s strongest gradients in
+056            the same MOPD student, and relate their overlap to teacher distribution differences. Opti-
+057            mizer steps and cumulative changes provide complementary measurements.
+058         3. Supervision density (Section 5). We compare sampled-token PG and teacher top-k train-
+059            ing in both settings, with full-vocabulary gradients on common prefixes as a local reference.
+060            We test whether gradient sparsity differs materially and report capability alongside it.
+061
+062   Overlapping gradient coordinates can carry compatible or opposing changes, and sampled-token
+063   feedback still depends on all logits through the softmax normalizer. Neither low overlap nor limited
+064
+      vocabulary coverage therefore guarantees sparse gradients or better integration. [TODO: Replace
+      the prospective empirical contributions with observed findings and their measured scope once
+065
+      the experiments are complete.]
+066
+067
+068   2   MOPD L EARNING O BJECTIVE
+069
+070   We follow the notation and loss definitions of Ma et al. (2026), Section 3.2. The student policy
+071
+      is πθ and the frozen teacher for domain d is πϕd . A prompt x is drawn from the training mixture
+      and the student generates a response y ∼ πθ (· | x). At position t, both models condition on the
+072
+      same prefix (x, y<t ). Following MOPD, we abbreviate these conditional probabilities as πθ (v) and
+073
+      πϕd (v), where v is a vocabulary token. Teachers and student share the vocabulary and tokenizer.
+074
+075   Reverse-KL objective. MOPD minimizes the student–teacher reverse KL at each response posi-
+076   tion and averages over the response length |y|:
+077                                                                             
+                                                        |y|
+078                                                 1  X    X            π θ (v)
+                            Lrev-KL = Ex, y∼πθ               πθ (v) log         .          (1)
+079                                                |y| t=1 v             πϕd (v)
+080
+081   Each prompt is scored by its assigned teacher. The factor 1/|y| gives each response a mean token
+082   loss; it does not give every token in the entire training batch equal weight. This distinction motivates
+083
+      Section 3.
+084
+      Sampled-token policy gradient. MOPD assigns each generated token a detached log-probability
+085
+      advantage, ÂMOPD,t = sg[log πϕd (yt ) − log πθ (yt )], where sg stops gradients. The clipped value is
+086
+087   Âclip
+        MOPD,t = clip(ÂMOPD,t , −Amax , Amax ), and the policy-gradient (PG) loss is
+                                                                                     
+088                                                         |y|
+                                                     1
+                                                           X
+089                      LPG
+                          MOPD (θ) = −Ex, y∼πθ                  Âclip    log πθ (yt ) .               (2)
+090                                                    |y| t=1 MOPD,t
+091   This loss uses the sampled token yt at each position. Clipping is part of the practical recipe and must
+092   be recorded when comparing losses.
+093
+094   Teacher top-k distillation. Let Ttd = TopKk (πϕd (· | x, y<t )) be the teacher’s k most probable
+095   tokens. MOPD instead evaluates                                                      
+096                                        |y|                                          
+                                     1                        πθ (v)
+                                          X    X
+097           LTopK
+               MOPD (θ) = Ex, y∼πθ                 πθ (v) log          − πθ (v) + πϕd (v)  .      (3)
+098                                   |y| t=1   d
+                                                              π ϕd (v)
+                                                 v∈Tt
+099
+      These are full-vocabulary probabilities, without renormalization over the selected tokens. The cor-
+100
+      rection −πθ (v)+πϕd (v) makes each selected-token term minimal when the two probabilities match;
+101   it does not recover the omitted vocabulary terms. With the entire vocabulary included, the correction
+102   sums to zero and the loss reduces to Equation 1.
+103
+104   Gradients measured in this paper. We differentiate the chosen loss on fixed student-generated
+105   responses, holding prefixes, masks, teachers, and detached advantages fixed. These local training
+106   gradients do not include derivatives through the generation of the responses or their lengths. The un-
+107   clipped sampled-token gradient matches the full reverse-KL gradient in expectation at a fixed prefix;
+      clipping, top-k truncation, and trajectory-dependent weighting need separate treatment (Section 5).
+
+
+                                                         2
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+108
+      3     T OKEN BALANCING AND R ESPONSE L ENGTH
+109
+110   3.1   H OW DOES LOSS AVERAGING CHANGE DOMAIN WEIGHTS ?
+111
+112   The MOPD objective in Section 2 averages token losses within each response. Open-MOPD an-
+113   alyzes a different implementation: averaging all response tokens together gives instruction fol-
+114   lowing approximately 1% of the token weight despite supplying 20% of the prompts (Gao et al.,
+115   2026). Length imbalance therefore depends on the averaging rule; it is not intrinsic to the response-
+116   normalized MOPD objective.
+      For response yi , write its mean token loss as ℓi = |yi |−1 t ℓi,t , using any of the per-position losses
+                                                                 P
+117
+118   in Section 2. Let B
+                        Pd contain the responses from domain d in the batch. The intended domain weights
+119   are λd ≥ 0, with d λd = 1. Table 1 compares three averaging rules using only these quantities.
+120
+121                             Averaging rule                  Batch loss
+122                                                             P
+123                                                                 |yi |ℓi
+                                All tokens together              Pi
+124                                                                 i |yi
+                                                                        P |
+                                                                            i∈B |yi |ℓi
+                                                                X
+125                             Tokens within each domain           λd P d
+126                                                              d           i∈Bd |yi |
+
+127
+                                                                X          1 X
+                                Responses within each domain        λd             ℓi
+                                                                        |Bd | i∈B
+128                                                               d              d
+
+129
+130   Table 1: Loss averaging on the same rollout batch. Each domain has at least one nonempty response.
+131   The last rule recovers an ordinary response mean when λd equals the domain’s share of responses.
+132
+133
+      With equal numbers of prompts, a domain producing responses ten times as long receives ten times
+      the weight under the first rule. The second rule fixes each domain’s total weight to λd , as in Open-
+134
+      MOPD’s token-share balancing, but longer responses still count more within that domain. The third
+135
+      rule also gives responses equal weight inside each domain. Thus domain balancing and response-
+136   length normalization address different effects.
+137
+138   The same distinction holds for gradients. Writing the response gradient as gi = ∇θ ℓi , the token-
+139
+      weighted gradient within a domain equals its mean response gradient plus the covariance between
+      response length and gi , divided by mean response length. Appendix B gives the exact fixed-batch
+140
+      identity and its short proof. This is a weighted-average identity, not a new optimizer. Equal domain
+141
+      weights do not imply equal gradient magnitudes or compatible gradient directions.
+142
+143
+      3.2   E XPERIMENT: COMPARE AVERAGING RULES ON IDENTICAL BATCHES AND ONLINE
+144
+145   Shared setting. All three studies use a Qwen3-1.7B student on mathematics, code, instruction fol-
+146   lowing, and science. Math and instruction following have domain-specific Qwen3-1.7B RL teach-
+147   ers; code and science currently share one Qwen3-4B teacher. The reference run uses equal domain
+148   prompt quotas and weights, 64 responses per update, one update per fresh rollout batch, and a 4,096-
+149   token response cap. The initial budget is at most 500 updates per run, subject to a throughput pilot.
+150   Appendix A records the shared setup and evaluation protocol. The experiments below are planned;
+151
+      measured results are not yet available.
+152
+      Fixed-batch comparison. At early, intermediate, and late checkpoints, apply all three rules to the
+153
+      same responses and corrected teacher top-64 losses. Record domain token shares, response lengths,
+154
+      gradient norms and directions before clipping, and the length–gradient covariance. Check the de-
+155   composition and evaluate each proposed step on a common held-out response bank. Accumulate
+156   the correct sums and denominators across micro-batches and workers: averaging unequal micro-
+157   batch means can change the intended loss. An unequal-quota check first matches λd to prompt
+158   shares, then tests uniform weights separately, so changes in the domain prior are distinguishable
+159   from length weighting. [TODO: Loss-reduction audit and gradient measurements.]
+160
+161   Online comparison. Train three branches differing only in the averaging rule. They share initial-
+      ization, teachers, prompt schedule, length limits, and optimizer settings; each generates responses
+
+
+                                                         3
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+162
+      from its own evolving student. The response-averaged top-64 branch is reused in Sections 4 and 5.
+163   Report per-domain capability, macro-average, and worst-domain change against both updates and
+164   generated tokens, with GPU time reported separately. A supporting 1,024 versus 4,096 cap com-
+165   parison records truncation and answer-completion rates. Shortening responses changes the available
+166   prefixes and may remove solution endings, so it is a separate intervention from loss reweighting.
+167   Neither the algebra nor the cap comparison guarantees a capability improvement. [TODO: Per-
+168   domain capability curves for the three averaging rules.]
+169
+170   4     G RADIENT S PARSITY AND T EACHER OVERLAP
+171
+172   We ask whether OPD gradients concentrate on a small fraction of parameters, whether different
+173   teachers affect the same parameters within one MOPD student, and whether teacher distribution
+174   differences predict this overlap. Each question includes its planned experiment; no outcome is
+175   assumed.
+176
+177   4.1   D OES GRADIENT SPARSITY PERSIST UNDER MULTIPLE TEACHERS ?
+178
+179   Prior work reports concentrated parameter changes in RL fine-tuning (Mukherjee et al., 2025) and
+180   OPD (Yu et al., 2026; Shen et al., 2026). These observations motivate measuring both gradients and
+181
+      parameter changes in our setting. For a domain gradient gd = ∇θ Ld , where Ld is that domain’s
+      mean loss, we report the fraction of parameters with absolute gradient at most a threshold τ , together
+182
+      with the fraction of squared gradient norm carried by the largest-magnitude ρ fraction of parameters.
+183
+      We sweep τ and ρ: “gradient sparsity” here means near-zero gradients or concentrated gradient
+184   energy, not necessarily exact zeros.
+185
+186   Experiment. Using the representative single-teacher and joint runs from Section 5, collect gradi-
+187   ents at initialization and early, intermediate, and final checkpoints. Compare each domain’s gradient
+188   and the combined MOPD gradient under the same loss reduction, reporting curves against both do-
+189   main exposure and compute. Match diagnostic response counts per domain across single-teacher and
+190   joint students, report valid-token counts, and check sensitivity to batch size; record the combined
+191   gradient’s full batch size separately. Repeat over fresh student-rollout batches, record accumula-
+192   tion denominators, and accumulate raw gradients in FP32 before clipping or optimizer processing.
+193   Threshold curves, gradient norms, and energy concentration jointly show whether apparent sparsity
+194
+      reflects small overall scale or concentration on particular parameters.
+195   As secondary measurements, record optimizer steps and cumulative changes ∆ = θ − θ0 . These
+196   are not equivalent to gradients: AdamW momentum and weight decay can move parameters with
+197   a zero current gradient, and changes from successive steps can cancel. Compare FP32 master-
+198   weight differences with exported BF16 checkpoint differences to identify rounding-induced zeros;
+199   converting BF16 values to FP32 cannot recover lost changes. This comparison checks the reported
+200
+      parameter-change phenomenon while separately testing gradient sparsity in MOPD.
+201
+202   4.2   D O TEACHERS AFFECT THE SAME PARAMETERS IN ONE STUDENT ?
+203
+      At a fixed MOPD checkpoint θ, compute each routed domain’s gradient gd using its teacher πϕd and
+204
+      student-generated responses. We call parameters with large absolute gradients active parameters for
+205   that teacher and batch. This is a measurement of local sensitivity, not a claim that the model contains
+206   a fixed, isolated subnetwork. To compare locations fairly, first select the same fraction of parameters
+207   for every teacher, ranked by absolute gradient. For domains d and e,
+208
+                                         number of parameters selected by both teachers
+209                    overlap(d, e) =                                                   .               (4)
+210
+                                         number of parameters selected by either teacher
+211   Zero means no shared selected parameters; one means identical selections. The corresponding dif-
+212   ference is one minus this overlap. We also report absolute-threshold selections, which retain infor-
+213   mation about gradient scale as well as location.
+214
+215   Experiment. Every teacher calculation starts from the same frozen student checkpoint. Repeat
+      over diagnostic batches and report overlap matrices across checkpoints, with concentration curves
+
+
+                                                        4
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+216
+      alongside them. Compare global selections and selections made separately within each layer against
+217   random selections with matching counts, including per-layer results. Signed gradient alignment
+218   provides additional context: shared parameters can receive compatible or opposing gradients, so
+219   lower overlap is not assumed better.
+220
+      Separately compare proposed optimizer steps, each computed from an identical copy of the opti-
+221
+      mizer state without advancing training. Their overlap can reflect shared momentum or decay and
+222
+      does not decompose the joint AdamW step into additive teacher contributions. Independently trained
+223   single-teacher endpoint changes provide a reference only: those students follow different trajectories
+224   and cannot identify teacher contributions inside the joint student. Appendix C.1 specifies recording
+225   and threshold conventions.
+226
+227   4.3   D O MORE DIFFERENT TEACHERS AFFECT MORE DIFFERENT PARAMETERS ?
+228
+229   We measure the difference between teachers πϕd and πϕe by their Jensen–Shannon divergence, a
+230   symmetric, bounded measure of how differently they distribute probability over next tokens. Ev-
+231   ery teacher scores the same cached, held-out student prefixes, with common domain weights. We
+232   also record each teacher’s difference from the current student πθ and its gradient and step norms.
+233   Appendix C.2 gives the distribution-distance formula.
+234
+235   Experiment. At each checkpoint, plot teacher distribution difference against the parameter-
+236
+      selection difference from the routed batches above. A smaller control recomputes all teacher gra-
+      dients on identical prefixes, testing whether an association persists when the response contexts also
+237
+      match. For PG, pair the same freshly sampled next tokens and fixed prefix weights across teachers,
+238
+      repeating the paired draws across batches. Available intermediate teacher checkpoints can add vari-
+239   ation without training new teachers. Code and science share one Qwen3-4B teacher, so their routed
+240   comparison reflects context differences rather than two independent teacher models.
+241
+242
+      Show individual pair trajectories and run-level uncertainty. Pairs that share a teacher or training
+      lineage, and repeated checkpoints, are dependent observations. Relate teacher–student differences
+243
+      to gradient concentration and observed transfer as additional analyses. A small teacher pool supports
+244
+      a setting-specific association, not a universal monotone relationship; larger, smaller, or unchanged
+245   parameter overlap are all valid outcomes.
+246
+247
+248   5     D OES S UPERVISION D ENSITY C HANGE G RADIENT S PARSITY ?
+249
+250   Our third study asks whether vocabulary-level supervision changes how strongly gradients concen-
+251   trate on a small fraction of model parameters. Sampled-token PG uses feedback for the generated
+252
+      token, full-vocabulary reverse KL includes every vocabulary alternative, and teacher top-k provides
+      a practical intermediate choice (Section 2). This concerns vocabulary coverage at each prefix, rather
+253
+      than the number of supervised response positions. Sampled-token feedback does not imply a sparse
+254
+      parameter gradient: the sampled token’s log probability depends on all logits through the softmax
+255   normalizer. Concentrated OPD parameter changes have also been observed with dense feedback (Yu
+256   et al., 2026). We therefore test for a difference without assuming that PG produces sparser gradients
+257   or better capability integration.
+258
+259   5.1   M ATCHED SINGLE - TEACHER AND JOINT EXPERIMENTS
+260
+261   We select one representative single-teacher setting before inspecting results and compare PG with
+262   corrected teacher top-64 in that setting and in joint MOPD (Table 2). These four online configu-
+263   rations use the losses in Equations 2 and 3; the joint top-64 run also anchors Section 3. All use
+264   domain-response averaging and match initialization, teachers, optimizer, loss masks, response cap,
+265   prompt schedule, and update budget within each setting. The top-64 loss uses probabilities nor-
+266
+      malized over the full vocabulary, without renormalizing within the selected tokens; we record any
+      clipping. The shared model and training setup appears in Section 3 and Appendix A.
+267
+268   At the initial, early, intermediate, and final checkpoints, we evaluate all three losses on a small
+269   shared bank of student-generated prefixes. Each comparison holds the student, prefix weights,
+      and optimizer state fixed; local PG uses fresh token samples at those prefixes. Full-vocabulary
+
+
+                                                        5
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+270
+                         Setting          Online losses        Common-prefix reference
+271
+272                      Single teacher   PG, teacher top-64   Full-vocabulary reverse KL
+                         Joint MOPD       PG, teacher top-64   Full-vocabulary reverse KL
+273
+274
+      Table 2: Supervision-density experiments. Four online configurations share full-vocabulary local
+275
+      measurements at matched checkpoints.
+276
+277
+278   reverse-KL gradients and proposed optimizer steps are a primary local reference in both settings;
+279   a full-vocabulary online run is conditional on measured resource feasibility. Online PG and top-64
+280   branches generate their own on-policy responses, so their trajectories compare practical loss choices
+281   rather than isolating vocabulary coverage as the only causal difference.
+282
+283   5.2   G RADIENT CONCENTRATION AND LEARNING OUTCOMES
+284
+285
+      Our primary measurements use raw gradients before clipping. Following Section 4, we report the
+      fraction of coordinates below each magnitude threshold, gradient norms, and the fraction of squared
+286
+      gradient magnitude carried by the largest coordinates. Repeated batches on the common prefix
+287
+      bank quantify sampling variability. We separately measure proposed steps from copies of the same
+288   optimizer state, actual online steps, and cumulative parameter changes from initialization. Steps
+289   and cumulative changes use FP32 master weights when available, with exported-checkpoint mea-
+290   surements reported separately. Their sparsity need not equal gradient sparsity because momentum,
+291   clipping, weight decay, and rounding can change which parameters move.
+292
+      For the joint runs, we also compare which high-magnitude gradient coordinates the teachers share,
+293
+      using Section 4’s overlap measurement. Held-out per-domain capability, the macro-average, and
+294   worst-domain change accompany the sparsity results. Curves show generated-token exposure and
+295   GPU hours separately, with response counts, updates, and teacher-scoring and diagnostic overhead
+296   recorded.
+297
+298   5.3   I NTERPRETATION AND DECISION RULE
+299
+300   At a fixed prefix, fresh unclipped sampled-token PG with a detached log-ratio coefficient has the
+301   same expected gradient as full-vocabulary reverse KL (Yu et al., 2026; Oh et al., 2026). This identity
+302   holds with fixed prefix weights; weighting an original rollout token by its eventual response length
+303   need not preserve it. Clipping and top-k truncation also change the comparison, and equality in
+304
+      expectation does not equate sampled gradients, nonlinear optimizer steps, or training trajectories.
+305   We report paired-seed effect estimates and confidence intervals against a material difference margin
+306   specified before examining results. One-seed runs remain exploratory; prompt resampling measures
+307   evaluation uncertainty, not training-seed variation. Intervals entirely within the margin support no
+308   material sparsity difference in the tested regime; intervals spanning negligible and material effects
+309   are inconclusive. Only a stable, meaningful gap motivates the optional sampling-variance and trun-
+310
+      cation controls in Appendix C.3.
+311   [TODO: PG/top-64 gradients and capability; full-vocabulary references; optimizer steps and
+312   cumulative changes.]
+313
+314   6     R ELATED W ORK
+315
+316   Capability integration and task weighting. MOPD consolidates routed domain teachers in pol-
+317   icy space (Ma et al., 2026). Open-MOPD diagnoses token-share and reward-related imbalances
+318   (Gao et al., 2026). Our first study separates cross-domain weighting from within-domain response-
+319   length weighting in existing loss reductions. Prior work on multi-task loss weighting and gradient
+320   conflict also motivates distinguishing weight balance from joint capability gains (Chen et al., 2018;
+321   Yu et al., 2020).
+322
+323   Sparse parameter changes and teacher differences. Mukherjee et al. (2025) report sparse cu-
+      mulative parameter changes in RL and repeated changes in similar parameter subsets across settings.
+
+
+                                                          6
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+324
+      Yu et al. (2026) establish related OPD signatures, including overlap when varying teachers and ex-
+325   periments that restrict training to selected parameters. Shen et al. (2026) examine update subspaces
+326   and response-position thinning. These results motivate our study but do not establish sparsity of
+327   instantaneous gradients. Teacher compatibility also affects distillation success (Li et al., 2026; Ma
+328   et al., 2026). We measure raw gradients separately from parameter changes and ask whether teach-
+329   ers with more different distributions produce their strongest gradients on more different subsets of a
+330   shared MOPD student.
+331
+332   Vocabulary coverage and gradient estimation. MOPD provides sampled-token and corrected
+333   teacher-top-k objectives (Ma et al., 2026). Variance-reduced sampled OPD (Oh et al., 2026), exact-
+334
+      head plus sampled-tail estimation (Zhang & Ba, 2026), and tail-aware losses (Huang & Wei, 2026)
+      motivate separating vocabulary coverage from the choice of objective and estimator. Our loss study
+335
+      compares raw gradient concentration under practical PG and top-k training, with full-vocabulary
+336
+      local measurements in both single-teacher and joint settings. Established estimator controls are
+337   reserved for interpreting a stable difference; we do not propose a new estimator.
+338
+339
+340
+      7   D ISCUSSION
+341
+      The three studies connect loss weighting, gradient concentration in a shared MOPD student, and
+342
+      vocabulary-level supervision. Their interpretation depends on distinguishing raw gradients from op-
+343
+      timizer steps and cumulative parameter changes. Sparse cumulative changes alone do not establish
+344   sparse gradients, while overlapping high-magnitude gradients can indicate either shared or opposing
+345   corrections.
+346
+347
+      The PG/top-k comparison tests for a material difference rather than assuming an advantage for sam-
+      pled supervision. A resolved absence of such a difference is informative within the tested regime;
+348
+      a stable gap can motivate further analysis. Likewise, teacher distribution differences may or may
+349
+      not predict which parameters receive strong gradients. Capability measurements determine whether
+350   these optimization patterns accompany useful integration.
+351
+352   [TODO: State the supported observations, including null relationships, and their model, task,
+353
+      teacher, loss, and measurement scope after completing the experiments.]
+354
+355   AI USE STATEMENT
+356
+      Generative AI tools assisted with manuscript organization, language, mathematical analysis, and
+357   experimental design. The authors remain responsible for reviewing claims, proofs, code, and results.
+358
+359
+      E THICS STATEMENT
+360
+361   The proposed study uses existing language models and reasoning and instruction-following datasets.
+362   Model and data biases and automated verifier errors can affect capability comparisons. Data prove-
+363   nance, invalid outputs, and evaluator failures should accompany the results.
+364
+365   R EPRODUCIBILITY STATEMENT
+366
+367
+      Sections 3–5 present the three studies together with their experimental designs. Appendix A records
+      the shared setup, and Appendix C.1 specifies the gradient and parameter-change measurements. The
+368
+      repository currently contains the manuscript, analytical calculations, and study specifications; mea-
+369
+      sured outcomes for these experiments are not yet available. [TODO: Release runnable training
+370   and diagnostics, frozen configurations, source data for figures, per-seed outputs, exact check-
+371   points, and measured resource use before claiming empirical reproducibility.]
+372
+373
+374
+      R EFERENCES
+375   Zhao Chen, Vijay Badrinarayanan, Chen-Yu Lee, and Andrew Rabinovich. Gradnorm: Gradi-
+376     ent normalization for adaptive loss balancing in deep multitask networks. In Proceedings of
+377     the 35th International Conference on Machine Learning, pp. 794–803, 2018. URL https:
+        //proceedings.mlr.press/v80/chen18a.html.
+
+
+                                                        7
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+378
+      Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang, Bingxiang He,
+379     Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou. Open-MOPD: Diagnosing and fixing capability
+380     imbalance in multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/
+381     2608.19098.
+382
+383   Huipeng Huang and Hongxin Wei. Tail-aware top-k on-policy distillation, 2026. URL https:
+384     //arxiv.org/abs/2608.14728.
+385
+      Yaxuan Li, Yuxin Zuo, Bingxiang He, Jinqian Zhang, Chaojun Xiao, Cheng Qian, Tianyu Yu, Huan
+386
+        ang Gao, Wenkai Yang, Zhiyuan Liu, and Ning Ding. Rethinking on-policy distillation of large
+387
+        language models: Phenomenology, mechanism, and recipe, 2026. URL https://arxiv.
+388     org/abs/2604.13016.
+389
+390   Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+391    Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli Luo. MOPD: Multi-teacher on-
+392    policy distillation for capability integration in llm post-training, 2026. URL https://arxiv.
+393    org/abs/2606.30406.
+394
+      Sagnik Mukherjee, Lifan Yuan, Dilek Hakkani-Tur, and Hao Peng. Reinforcement learning finetunes
+395
+        small subnetworks in large language models, 2025. URL https://arxiv.org/abs/2505.
+396     11711v2. Version 2; NeurIPS 2025.
+397
+398   Minjae Oh, Sangjun Song, Gyubin Choi, Yunho Choi, and Yohan Jo. KL for a KL: On-policy
+399    distillation with control variate baseline, 2026. URL https://arxiv.org/abs/2605.
+400    07865.
+401
+402
+      Zhennan Shen, Yanshu Li, Qingyu Yin, Chak Tou Leong, Zhilin Wang, Yanxu Chen, Rongduo
+        Han, Sunbowen Lee, and Yi R. Fung. On the geometry of on-policy distillation, 2026. URL
+403
+        https://arxiv.org/abs/2606.07082v3. Version 3, June 14, 2026.
+404
+405   Guo Yu, Hao-Xuan Ma, Jun-Peng Jiang, Han-Jia Ye, Wenlin Liu, and Yulan Hu. Dense supervision,
+406     sparse updates: On the sparsity and geometry of on-policy distillation, 2026. URL https:
+407     //arxiv.org/abs/2606.13657v3. Version 3, July 30, 2026.
+408
+409   Tianhe Yu, Saurabh Kumar, Abhishek Gupta, Sergey Levine, Karol Hausman, and Chelsea Finn.
+410
+        Gradient surgery for multi-task learning, 2020. URL https://arxiv.org/abs/2001.
+        06782.
+411
+412   Lunjun Zhang and Jimmy Ba. EMA policy gradient: Taming reinforcement learning for LLMs with
+413     EMA anchor and top-k KL, 2026. URL https://arxiv.org/abs/2602.04417.
+414
+415
+416   A    S HARED E XPERIMENTAL D ETAILS
+417
+418   Sections 3–5 contain the experiments; this appendix records shared resource and evaluation details.
+419
+420   Training setup and run reuse. Section 3 specifies the student, domains, and three teacher weight
+421   sets. The 64-response update comprises 16 micro-batches of four responses, with equal domain
+422   quotas, one optimizer update per fresh rollout batch, and a 4,096-token cap. The initial budget
+423   is at most 500 updates per run, subject to a throughput pilot on a 96-GB learner GPU and 48-
+424   GB rollout/teacher GPUs. Exact model revisions, optimizer and decoding settings, data splits, and
+425   evaluation versions remain to be frozen before execution.
+426   A representative single-teacher setting is chosen before inspecting results. PG and corrected teacher
+427   top-64 in the single-teacher and joint settings give four configurations. The joint top-64 configu-
+428   ration with domain-response averaging is also the reference for the three-way normalization study,
+429   which adds two averaging rules. Thus six training configurations cover the core comparisons, with
+430   checkpoints reused for the gradient, teacher-overlap, and full-vocabulary measurements. Additional
+431   teacher settings, the response-cap comparison, and repeated seeds require separate resource account-
+      ing. The manuscript does not yet report measured outcomes for these studies.
+
+                                                       8
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+432
+      Capability evaluation. Use MATH-500 greedy pass@1, a frozen LiveCodeBench pass@1 slice,
+433   IFBench strict accuracy, and GPQA-Diamond average@4. Record evaluator, model, and data revi-
+434   sions and fix decoding within each comparison. Report raw per-domain scores, their macro-average,
+435   and the worst-domain change from initialization. Independently trained OPD students, where avail-
+436   able, are references at matched domain exposure, not upper bounds or guarantees of jointly attain-
+437   able capability. A lack of single-teacher transfer is not itself evidence of multi-teacher interference.
+438   Loss on a common held-out response bank and loss on fresh student responses are reported sepa-
+439   rately; a lower mean KL alone does not establish balanced capability integration.
+440
+441   Compute and uncertainty. Record generated tokens, domain response counts, optimizer updates,
+442   and GPU hours separately, including teacher-scoring and diagnostic overhead. Key online compar-
+443
+      isons use repeated paired training seeds when feasible; initial one-seed runs are exploratory. Prompt
+      bootstrap estimates conditional evaluation uncertainty, not training-seed variation. Report effect
+444
+      sizes, confidence intervals, and the range of differences the experiment can resolve. Teacher pairs
+445
+      sharing weights or training lineage, and repeated checkpoints, are not independent observations. No
+446   sparsity advantage or capability improvement is claimed before measurement.
+447
+448
+449
+      B     L ENGTH -W EIGHTING D ERIVATION
+450
+451
+      Fix a rollout batch, its valid-token masks, and the domain weights λd . Any PG advantages are
+      detached. Use the response mean ℓi andP     response gradient gi = ∇θ ℓi from Section 3. For nP     d = |Bd |,
+452
+      define mean response length T̄d = n−1  d       i∈Bd |yi | and mean response gradient ḡd = nd
+                                                                                                      −1
+                                                                                                            i∈Bd gi .
+453
+454
+      The empirical length–gradient covariance uses the same 1/nd normalization:
+                                                                     P
+455                           1 X                                              |yi |gi         Covd (|y|, g)
+             Covd (|y|, g) =          (|yi | − T̄d )(gi − ḡd ),       Pi∈Bd           = ḡd +               . (5)
+456                          nd
+                                 i∈Bd                                     i∈Bd |yi |                T̄d
+457
+      To verify the identity, expand the covariance as n−1
+                                                                   P
+458                                                             d    i |yi |gi − T̄d ḡd and divide by T̄d . Global
+459   token averaging combines the right-hand side using each domain’s observed        P      token share; domain
+460   token averaging uses λd instead. Domain response averaging gives d λd ḡd . Thus the change
+461   in the domain coefficient and the within-domain length–gradient covariance are distinct, even with
+462   identical rollouts. Multiplying a domain’s globally averaged token terms by its target weight divided
+463
+      by its observed token share gives the domain-token rule exactly.
+464   These are finite-batch identities. The expectation of a sample ratio is generally not the ratio of pop-
+465   ulation expectations; replacing it with E[|y|g]/E[|y|] requires an appropriate large-batch limit. The
+466   identities also do not differentiate through the response sampling distribution, masks, or response
+467   lengths.
+468
+469   C     M EASUREMENT D ETAILS AND O PTIONAL F OLLOW- UP
+470
+471   C.1    T EACHER - CONDITIONED MASKS AT A COMMON JOINT CHECKPOINT
+472
+473   The diagnostic record contains the joint student checkpoint, optimizer state, teacher identity, routed
+474   domain, prompt IDs, sampled response and mask, loss reduction, and gradient accumulation denom-
+475   inator. Each teacher-conditioned gradient and proposed step is computed from the same restored
+476
+      student state. They describe the parameters most affected by a teacher at that checkpoint, not a
+      unique historical attribution of the cumulative joint delta.
+477
+478   Record raw and clipped gradients separately. Retain the actual optimizer step and its momentum and
+479   decay settings. A zero-gradient optimizer branch can identify motion caused by stored momentum or
+480   weight decay when those components dominate an overlap comparison. Prefer FP32 master-weight
+481   differences for cumulative updates when available; converting already rounded BF16 checkpoints to
+482
+      FP32 does not recover unrecorded updates. Record exclusions, thresholds, relative scales, tie rules,
+      and per-layer selected-parameter counts.
+483
+484   Comparisons selecting an equal fraction of parameters accompany absolute-threshold selections. A
+485   stratified random baseline preserves layer and source-weight-magnitude bins when feasible. De-
+      generate or tie-dominated gradients are marked; ranking a zero vector does not define a meaningful
+
+
+                                                            9
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+486
+      learned subnetwork. If both selections are empty, report overlap as undefined and exclude that com-
+487   parison from averages. If only one is empty, overlap is zero.
+488
+489
+      C.2    T EACHER DISTRIBUTION DIFFERENCE
+490
+491   For teachers d and e at the same prefix, the Jensen–Shannon divergence is
+492
+493
+                 JS(πϕd , πϕe ) = 21 DKL (πϕd ∥m) + 21 DKL (πϕe ∥m),        m = 12 (πϕd + πϕe ).         (6)
+494   It lies between zero and log 2 with natural logarithms and is zero when the two next-token distribu-
+495   tions agree. Average this quantity across the same prefix bank and domain weights for every pair.
+496   Replacing one teacher distribution with πθ gives the teacher–student comparison. Truncated esti-
+497   mates must report their retained probability mass and must not be presented as exact full-vocabulary
+498   divergences.
+499
+500   C.3    O PTIONAL ANALYSIS IF THE LOSS COMPARISON SHOWS A STABLE DIFFERENCE
+501
+502
+      If a stable difference warrants further analysis, resample next actions on a fixed student-prefix bank
+      and compare sample counts, an action-independent detached baseline, and the exact full-vocabulary
+503
+      gradient. These controls test whether the effect tracks sampling variance. A retained-head plus
+504
+      sampled-tail estimator can distinguish truncation from the full reverse-KL reference (Oh et al., 2026;
+505   Zhang & Ba, 2026; Yu et al., 2026).
+506
+507   The independent action draws do not extend the response; prefix selection and weights remain fixed.
+508
+      Original rollout tokens with eventual response-length weights need not satisfy the same sampling
+      identity. Forward KL, teacher versus student top-k, or within-set renormalization are objective
+509
+      changes and are labeled separately.
+510
+511
+      C.4    A N OPTIONAL AMPLITUDE CALIBRATION FOR TEACHER DISTANCE
+512
+513   A simple artificial target can help distinguish gradient magnitude from parameter selection. At a
+514   fixed prefix (x, y<t ), write π0 = πθ0 for the reference student and freeze the teacher πϕd . Define
+515   the normalized interpolated distribution
+516
+517
+                          π0 (v)1−α πϕd (v)α
+            πα (v) = P            ′ 1−α π (v ′ )α
+                                                  ,   ∇θ DKL (πθ ∥πα )|θ0 = α ∇θ DKL (πθ ∥πϕd )|θ0 .     (7)
+518                      v ′ π0 (v )     ϕd
+519   All probabilities condition on the same prefix. The log-ratio is an Pα-scaled original log-ratio plus
+520   a constant across vocabulary tokens; the constant vanishes because v ∇θ πθ (v) = 0. For α > 0,
+521   positive scaling preserves the ranking of raw-gradient magnitudes while possibly changing absolute-
+522   threshold sparsity. This artificial calibration does not replace real-teacher comparisons or imply
+523   matched downstream capability.
+524
+525   C.5    R EPRODUCIBILITY RECORDS
+526
+527   Record exact student, teacher, tokenizer, data, and evaluator revisions; teacher training lineages;
+528
+      prompt schedules and seeds; decoding, EOS handling, cap, invalid responses, and loss masks;
+      learning-rate schedule, optimizer moments, precision, clipping, and decay; candidate sets, probabil-
+529
+      ity normalization, teacher/student retained mass, and advantage handling. Keep per-prompt outputs,
+530
+      source measurements for every plot, and actual time and memory costs.
+531
+532   Distinguish training seeds, diagnostic batch replicates, and evaluation resamples. Pairs sharing a
+533   teacher are dependent, and prompt-level uncertainty does not establish population-level teacher re-
+534
+      lationships. Historical synthetic GPAS calculations are not empirical evidence for these studies.
+535
+536
+537
+538
+539
+
+
+
+                                                         10
+

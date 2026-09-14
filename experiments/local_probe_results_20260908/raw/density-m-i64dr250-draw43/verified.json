@@ -1,0 +1,13 @@
+{
+  "verified_at_utc": "2026-09-08T19:49:44.079420+00:00",
+  "job": "density-m-i64dr250-draw43",
+  "checkpoint_step": 250,
+  "artifacts": {
+    "measurements.json": "30a7e5aa3fc06ddadca5a803a4b29e61bfe73abfa447cd127f0e3cff074b4439",
+    "probe_manifest.json": "2392ae63dd19a34e12457f1088dc42951f28cd6593e4aa134dd31234b415ee7c",
+    "run_complete.json": "af6849773529fb6ec53456c8ee8a229be74664b5b55013f2c42a2bc9571bfe91",
+    "prefix_bank.json": "5fafdd63a34bbf9eb253f54fba3af98d08d5ec3b86e840671359810553f15f22",
+    "support_records.json": "1d3f8e4cefb0e23064ac84c14d06ad253e8db1257244459ed81f4a8eb2d3171a",
+    "distributions.pt": "648d8d9cc4d50332917aa1c4acb9898544a38d225873f0e5deadff20405e5636"
+  }
+}

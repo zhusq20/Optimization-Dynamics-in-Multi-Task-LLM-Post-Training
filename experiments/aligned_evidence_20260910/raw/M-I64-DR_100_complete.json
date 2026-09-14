@@ -1,0 +1,10 @@
+{
+  "completed_at_utc": "2026-09-09T23:52:59.735512+00:00",
+  "experiment_name": "qwen3-m-intersection64-dr-s42-eval",
+  "final_num_updates": 100,
+  "num_rollout": 0,
+  "schema_version": 1,
+  "start_rollout_id": 0,
+  "status": "complete",
+  "wandb_run_id": "7hqzdi1h"
+}

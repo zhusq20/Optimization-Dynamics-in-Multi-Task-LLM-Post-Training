@@ -1,0 +1,12 @@
+{
+  "verified_at_utc": "2026-09-08T20:00:00.681838+00:00",
+  "job": "normalization-m-pg500-draw42",
+  "checkpoint_step": 500,
+  "artifacts": {
+    "measurements.json": "8a4e24e8f688b04cc862bc9e8624b606f8cfacacf533c6f7169ae6888bc43847",
+    "probe_manifest.json": "4f216977276627ff5ffdeab1b587009d09da5caabcdb1c57f1d16c90ad7498cd",
+    "run_complete.json": "9e643ae281ce6017bab79a3e3f6b13caf0c3950a54aee3bb44b2ddf73a889bde",
+    "banks.json": "10a8f68cc447ea03688271779475c00f6b9adb04df24c74edc75061df0f9e33f",
+    "weights.json": "46d6686cb0601f2462f87f29554bcac158f612e1cb3e5fea14491852d326e9e4"
+  }
+}

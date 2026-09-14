@@ -1,0 +1,122 @@
+[
+  {
+    "panel": "F1a",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F1b",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F1c",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F2a",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F2b",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F2c",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F5a",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F5b",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F5c",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F6a",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F6b",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F6c",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F7a",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F7b",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  },
+  {
+    "panel": "F7c",
+    "matrix_labels_overlap": false,
+    "comparison_markers_overlap": false,
+    "axes_titles": 0,
+    "figure_prose": 0,
+    "matrix_contrast_minimum": 4.5
+  }
+]

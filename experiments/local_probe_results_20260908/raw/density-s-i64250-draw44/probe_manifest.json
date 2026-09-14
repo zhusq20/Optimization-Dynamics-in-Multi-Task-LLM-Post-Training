@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "status": "complete",
+  "started_at_utc": "2026-09-08T19:20:03.690576+00:00",
+  "job": "density-s-i64250-draw44",
+  "arguments": {
+    "job": "density-s-i64250-draw44",
+    "snapshot": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/student_top64_single_intersection_20260907/s-itk64-s42/paper/checkpoint_step_0250.pt",
+    "hf_checkpoint": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/student_top64_single_intersection_20260907/s-itk64-s42/weights/iter_0000249",
+    "manifest": "/workspace/dev/iclr2027/slime_opd_geometry/local/sequential_paper_20260908_sn4622129202/generated/diagnostic.yaml",
+    "teachers": "/workspace/dev/iclr2027/slime_opd_geometry/local/sequential_paper_20260908_sn4622129202/generated/teachers.json",
+    "tasks": "math",
+    "domain_weights": "1.0",
+    "output": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/sequential_paper_20260908_sn4622129202/density-s-i64250-draw44",
+    "device": "cuda:0",
+    "seed": 44,
+    "snapshot_step": 250,
+    "max_prompt_tokens": 2048,
+    "max_new_tokens": 256,
+    "prefixes_per_response": 4,
+    "topk": 64,
+    "pg_advantage_clip": 0.0,
+    "losses": "sampled_pg,student_topk,topk_intersection,teacher_topk,full_vocab,sampled_pg_draw1,sampled_pg_draw2,sampled_pg_draw3",
+    "bank": null,
+    "teacher_losses": "",
+    "wandb_project": "iclr2027-mopd-dynamics",
+    "wandb_entity": "zsqzz",
+    "wandb_mode": "online"
+  },
+  "precision": {
+    "student_forward": "BF16",
+    "teacher_forward": "BF16",
+    "gradient_collection": "BF16 model gradients converted to CPU FP32",
+    "optimizer_state": "saved FP32 master weights and Adam moments",
+    "reported_model_update": "BF16(new master) minus saved BF16 model value"
+  },
+  "scope": "fixed-prefix local mechanism probe; no training checkpoint is mutated",
+  "completed_at_utc": "2026-09-08T19:42:03.913979+00:00",
+  "measurement": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/sequential_paper_20260908_sn4622129202/density-s-i64250-draw44/measurements.json",
+  "snapshot_ordered_state_sha256": "ce6711a21318d6ec9f01d669afa7af64f8cb997fcf779ffaf23c1eae3ff0b290"
+}

@@ -1,0 +1,120 @@
+{
+  "checked_at_utc": "2026-09-08T01:50:14.995225+00:00",
+  "host": "exx-B7129F83AV8E4HR-N",
+  "group_name_scope": "Current experiment-group names; measurement identity remains checkpoint-specific.",
+  "runs": [
+    {
+      "group_name": "M-PG",
+      "run_id": "m-pg-s42",
+      "directory": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/formal_20260906/m-pg-s42",
+      "updates": 500,
+      "remaining_updates": 0,
+      "complete_marker": true,
+      "hf_steps": [
+        1,
+        50,
+        100,
+        250,
+        500
+      ],
+      "snapshot_steps": [
+        0,
+        1,
+        50,
+        100,
+        250,
+        500
+      ],
+      "recent_step_seconds_median": 156.2120526486542,
+      "last_log_mtime_utc": "2026-09-07T03:26:26.104671+00:00"
+    },
+    {
+      "group_name": "S-PG",
+      "run_id": "s-pg-s42",
+      "directory": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/formal_20260906/s-pg-s42",
+      "updates": 313,
+      "remaining_updates": 187,
+      "complete_marker": false,
+      "hf_steps": [
+        1,
+        50,
+        100,
+        250
+      ],
+      "snapshot_steps": [
+        0,
+        1,
+        50,
+        100,
+        250
+      ],
+      "recent_step_seconds_median": 276.09391211600087,
+      "last_log_mtime_utc": "2026-09-08T01:48:02.876452+00:00"
+    },
+    {
+      "group_name": "M-Overlap64-DR",
+      "run_id": "m-itk64-dr-s42",
+      "directory": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/student_top64_intersection_20260907/m-itk64-dr-s42",
+      "updates": 235,
+      "remaining_updates": 265,
+      "complete_marker": false,
+      "hf_steps": [],
+      "snapshot_steps": [],
+      "recent_step_seconds_median": 156.81031616777182,
+      "last_log_mtime_utc": "2026-09-08T01:47:53.724432+00:00"
+    },
+    {
+      "group_name": "M-Overlap64-DT",
+      "run_id": "m-itk64-dt-s42",
+      "directory": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/student_top64_intersection_20260907/m-itk64-dt-s42",
+      "updates": 246,
+      "remaining_updates": 254,
+      "complete_marker": false,
+      "hf_steps": [],
+      "snapshot_steps": [],
+      "recent_step_seconds_median": 153.85654075117782,
+      "last_log_mtime_utc": "2026-09-08T01:49:22.480626+00:00"
+    },
+    {
+      "group_name": "M-Overlap64-GT",
+      "run_id": "m-itk64-gt-s42",
+      "directory": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/student_top64_intersection_20260907/m-itk64-gt-s42",
+      "updates": 243,
+      "remaining_updates": 257,
+      "complete_marker": false,
+      "hf_steps": [],
+      "snapshot_steps": [],
+      "recent_step_seconds_median": 170.65908739576116,
+      "last_log_mtime_utc": "2026-09-08T01:49:20.132621+00:00"
+    },
+    {
+      "group_name": "S-Overlap64",
+      "run_id": "s-itk64-s42",
+      "directory": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3/student_top64_single_intersection_20260907/s-itk64-s42",
+      "updates": 169,
+      "remaining_updates": 331,
+      "complete_marker": false,
+      "hf_steps": [],
+      "snapshot_steps": [],
+      "recent_step_seconds_median": 208.47382170699711,
+      "last_log_mtime_utc": "2026-09-08T01:49:42.916670+00:00"
+    }
+  ],
+  "remaining_updates_total": 1294,
+  "pg100_retry": {
+    "at_utc": "2026-09-08T01:49:53.759790+00:00",
+    "jobs": [
+      {
+        "job": "m-pg-s42-step100-math_if-retry-20260908",
+        "state": "running"
+      },
+      {
+        "job": "s-pg-s42-step100-math_if-retry-20260908",
+        "state": "running"
+      }
+    ],
+    "all_verified_complete": false
+  },
+  "source": "Shared files; local GPU query below does not establish remote process health",
+  "local_gpu_snapshot": "0, NVIDIA RTX A6000, GPU-d4346ab5-61de-9bc7-1d3e-163ea5974ea1, 2 MiB, 0 %\n1, NVIDIA RTX A6000, GPU-ab8a4a49-4e57-d815-da99-23df12f968a1, 2 MiB, 0 %\n2, NVIDIA RTX A6000, GPU-659546e7-0000-52b0-02fa-1d2a3afe4ae3, 2 MiB, 0 %\n3, NVIDIA RTX A6000, GPU-4b07e406-7ca1-0d8f-9af8-288f36e0d75c, 34378 MiB, 96 %\n4, NVIDIA RTX A6000, GPU-260af65a-dddc-6437-3c37-50ff3420eb97, 38473 MiB, 0 %\n5, NVIDIA RTX A6000, GPU-2f87dd73-cc5e-9203-eaa7-fe01ef7800fb, 24122 MiB, 92 %\n6, NVIDIA RTX A6000, GPU-b11efc54-96e3-2df5-e85a-ff6e292a69e6, 38453 MiB, 0 %\n7, NVIDIA RTX A6000, GPU-9238f2bf-eab0-46a8-902d-62cc4eec0677, 24234 MiB, 54 %\n8, NVIDIA RTX A6000, GPU-00b0cc23-fd3f-cf5b-716d-c741f1493356, 8756 MiB, 0 %\n9, NVIDIA RTX A6000, GPU-f3ba9f94-913b-133d-399b-df46b5c9ce89, 8708 MiB, 0 %\n"
+}

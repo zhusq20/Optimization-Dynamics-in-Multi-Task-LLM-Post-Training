@@ -32,8 +32,8 @@ domains = ["Math", "Code", "IF", "GPQA"]
 titles = {
     "Math": "(a) MATH-500",
     "Code": "(b) LiveCodeBench",
-    "IF": "(c) IFBench strict",
-    "GPQA": "(d) GPQA (avg@4)",
+    "IF": "(c) IFBench (strict)",
+    "GPQA": "(d) GPQA Diamond (avg@4)",
 }
 teacher_names = {
     "Math": "teacher_math",
@@ -67,7 +67,7 @@ plt.rcParams.update(
     {
         "font.family": "DejaVu Sans",
         "font.size": 8.3,
-        "axes.titlesize": 8.8,
+        "axes.titlesize": 9.2,
         "axes.labelsize": 8.3,
         "xtick.labelsize": 7.4,
         "ytick.labelsize": 7.4,
@@ -79,7 +79,7 @@ plt.rcParams.update(
     }
 )
 
-fig, axes = plt.subplots(2, 3, figsize=(6.75, 4.05), layout="constrained")
+fig, axes = plt.subplots(2, 2, figsize=(6.75, 4.25), layout="constrained")
 
 for ax, domain in zip(axes.flat, domains):
     student_score = 100 * initial[domain]
@@ -133,109 +133,28 @@ for ax, domain in zip(axes.flat, domains):
     ax.text(
         4.49,
         teacher_score,
-        f"T {teacher_score:.1f}",
+        f"Teacher {teacher_score:.1f}",
         color="#4B3F72",
         ha="right",
         va="bottom",
-        fontsize=6.3,
+        fontsize=6.8,
         bbox=label_box,
         zorder=4,
     )
     ax.text(
         4.49,
         student_score,
-        f"S {student_score:.1f}",
+        f"Student {student_score:.1f}",
         color="#5F5F5F",
         ha="right",
         va="top",
-        fontsize=6.3,
+        fontsize=6.8,
         bbox=label_box,
         zorder=4,
     )
 
-# (e) Aggregate score with student and teacher references averaged over domains.
-ax = axes[1, 1]
-student_mean = 100 * np.mean([initial[d] for d in domains])
-teacher_mean = 100 * np.mean([teacher[d] for d in domains])
-ax.axhline(student_mean, color="#6F6F6F", ls=":", lw=1.15, zorder=0)
-ax.axhline(teacher_mean, color="#4B3F72", ls=(0, (5, 2.5)), lw=1.05, zorder=0)
-mean_lower = [student_mean, teacher_mean]
-mean_upper = [student_mean, teacher_mean]
-for model in models:
-    rows = [record(model, step, "mean") for step in steps]
-    means = np.array([float(r["mean_pct"]) for r in rows])
-    sds = np.array([float(r["sample_sd_pct"]) for r in rows])
-    x = positions[1:] + offsets[model]
-    ax.plot(
-        np.r_[positions[0], x],
-        np.r_[student_mean, means],
-        color=colors[model],
-        marker=markers[model],
-        ms=3.4,
-        lw=1.25,
-        zorder=2,
-    )
-    ax.errorbar(
-        x, means, yerr=sds, fmt="none", ecolor=colors[model],
-        capsize=1.7, elinewidth=0.8, zorder=1,
-    )
-    mean_lower.extend(means - sds)
-    mean_upper.extend(means + sds)
-lo, hi = min(mean_lower), max(mean_upper)
-ax.set_ylim(lo - 0.9, hi + 0.9)
-ax.set_xlim(-0.28, 4.55)
-ax.set_title("(e) Four-domain mean", loc="left", pad=3)
-ax.set_xticks(positions, ["0", "50", "100", "250", "500"])
-ax.text(
-    4.49, teacher_mean, f"T {teacher_mean:.1f}", color="#4B3F72",
-    ha="right", va="bottom", fontsize=6.3, bbox=label_box, zorder=4,
-)
-ax.text(
-    4.49, student_mean, f"S {student_mean:.1f}", color="#5F5F5F",
-    ha="right", va="top", fontsize=6.3, bbox=label_box, zorder=4,
-)
-
-# (f) Minimum domain change tests whether gains sacrifice another task.
-ax = axes[1, 2]
-ax.axhline(0, color="#6F6F6F", ls=":", lw=1.15, zorder=0)
-worst_lower = [0]
-worst_upper = [0]
-for model in models:
-    rows = [record(model, step, "worst_change") for step in steps]
-    means = np.array([float(r["mean_pct"]) for r in rows])
-    sds = np.array([float(r["sample_sd_pct"]) for r in rows])
-    x = positions[1:] + offsets[model]
-    ax.plot(
-        np.r_[positions[0], x],
-        np.r_[0, means],
-        color=colors[model],
-        marker=markers[model],
-        ms=3.4,
-        lw=1.25,
-        zorder=2,
-    )
-    ax.errorbar(
-        x, means, yerr=sds, fmt="none", ecolor=colors[model],
-        capsize=1.7, elinewidth=0.8, zorder=1,
-    )
-    worst_lower.extend(means - sds)
-    worst_upper.extend(means + sds)
-lo, hi = min(worst_lower), max(worst_upper)
-ax.set_ylim(lo - 0.6, hi + 0.6)
-ax.set_xlim(-0.28, 4.55)
-ax.set_title("(f) Worst-domain change", loc="left", pad=3)
-ax.set_xticks(positions, ["0", "50", "100", "250", "500"])
-ax.text(
-    4.49, 0, "No regression", color="#5F5F5F", ha="right", va="top",
-    fontsize=6.3, bbox=label_box, zorder=4,
-)
-
-for ax in axes.flat:
-    ax.grid(axis="y", color="#DDDDDD", lw=0.5)
-    ax.set_axisbelow(True)
 for ax in axes[:, 0]:
     ax.set_ylabel("Score (%)")
-axes[1, 2].set_ylabel("Change (pp)")
 for ax in axes[1, :]:
     ax.set_xlabel("Optimizer updates")
 
@@ -277,10 +196,11 @@ for ext in ["pdf", "png", "svg"]:
 plt.close(fig)
 
 caption = (
-    "GT/DT/DR capability (mean and one sample standard deviation across three seeds). Panels a--d "
-    "show task scores with initial-student and domain-teacher references; panel e shows their "
-    "four-domain mean with averaged references; panel f shows the worst domain change from "
-    "initialization, where zero denotes no regression. Horizontal offsets separate overlap."
+    "Task-level capability under gradient normalization. Curves and bars show the mean and one "
+    "sample standard deviation over three seeds; small horizontal offsets only separate coincident "
+    "GT/DT/DR observations. The dotted gray and dashed purple lines mark the shared initial student "
+    "and the corresponding domain teacher. Across checkpoints, differences among normalization rules "
+    "remain small relative to both seed variation and the task-specific student--teacher gaps."
 )
 (DATA / "task_reference_figure_caption.txt").write_text(caption + "\n")
 print(caption)

@@ -1,0 +1,45 @@
+{
+  "at_utc": "2026-09-10T22:36:57.914001+00:00",
+  "run": "s-pg-s42",
+  "step": 500,
+  "native": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-pg-s42/checkpoints/iter_0000499",
+  "original_export": "/root/.cache/mopd_runs/qwen3_aligned/20260909_sn4622122392/s-pg-s42/weights/iter_0000499",
+  "target": "/workspace/dev/iclr2027/slime_opd_geometry/local/recovery_blackwell_20260910_sn4622128200/eval_weights/s-pg-s42/step_500",
+  "native_files": {
+    "metadata.json": {
+      "size": 119,
+      "mtime_ns": 1789008581722822777
+    },
+    ".metadata": {
+      "size": 160599,
+      "mtime_ns": 1789008581198821261
+    },
+    "__0_0.distcp": {
+      "size": 12044726892,
+      "mtime_ns": 1789008394862278600
+    },
+    "common.pt": {
+      "size": 56551,
+      "mtime_ns": 1789008378238229809
+    },
+    "__0_1.distcp": {
+      "size": 12045067977,
+      "mtime_ns": 1789008396090282201
+    }
+  },
+  "native_metadata_sha256": "4a0ea0f096a0e66de82e2d6da4d2ae4072c1d5deb8a669e2aa23e604255a72da",
+  "native_common_sha256": "9d93053c81aa5b8039f0a40be165f35e24f6a8d2899595ae7966c9bb48274c75",
+  "tensor_keys": 310,
+  "exact_original_key_set": true,
+  "all_finite": true,
+  "serialized_tensors_equal_converted_native": true,
+  "sha256": {
+    "model-00001-of-00007.safetensors": "796709d24780f2fb5ee199425cd81f619a61856aae467cbb83d6040a7af85fd9",
+    "model-00002-of-00007.safetensors": "7161a416cf04e20311ac456c286889eb7243585bd8373716b72ab6641c7a7040",
+    "model-00003-of-00007.safetensors": "4328599ff53a474de6bab2f528a99d1bf5922af9b3e9d8b125ef37f7dd6d41ce",
+    "model-00004-of-00007.safetensors": "5400292bdab497788f42d6c96027c80a051098e7f5bbcbba7648f2125c395b10",
+    "model-00005-of-00007.safetensors": "6120e1560e972b26ae21602883a3976f83b3aa889795f186f39c1011ac68374d",
+    "model-00006-of-00007.safetensors": "1bbb8901c578d698806903bb6871caf538f5cfe3f2d7e707191a6e6140b65b43",
+    "model-00007-of-00007.safetensors": "118602abcad2907b164ff7720fa6c09ab50cbfe398b2512732d1cd63470f7664"
+  }
+}
