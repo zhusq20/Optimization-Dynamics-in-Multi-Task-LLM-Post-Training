@@ -1,69 +1,45 @@
 # Optimization Dynamics in Multi-Task LLM Post-Training
 
-The manuscript studies three questions: loss averaging and capability balance;
-parameter-update concentration and teacher overlap; and vocabulary supervision
-in single-teacher and joint distillation.
+The default branch contains only the files needed to compile the current paper,
+plus this README and `.gitignore`: 40 files in total. Figure 1 is the six-panel
+GT/DT/DR capability figure (two rows, three columns).
 
-A new section after the three studies develops a candidate stable multi-task
-OPD recipe in continuous prose. Its validation is marked as pending; the
-existing experimental results and three-question structure are preserved.
+## Compile
 
-The September 13 revision audits existing results, including complete GT/DT/DR
-capability trajectories through update 500, paired joint geometry through
-update 250, and six fixed-batch averaging comparisons. The evidence inventory
-now contains 22 capability suites (37,840 responses). Comparisons use common completed
-checkpoints; incomplete experiments are replaced by visible author annotations.
-Teacher-gradient diagnostics and numerical controls are in the appendix.
-All compound figures use a three-column layout.
-
-Compile the root `iclr2027_conference.tex`:
+Compile the root `iclr2027_conference.tex` with pdfLaTeX and BibTeX:
 
 ```bash
-python experiments/plot_aligned_evidence.py
-python experiments/plot_optimizer_mediation.py
 latexmk -pdf -interaction=nonstopmode -halt-on-error iclr2027_conference.tex
-python experiments/verify_aligned_evidence.py
-python experiments/verify_optimizer_mediation.py
 ```
 
-Current source marker: `optimizer-mediation-20260913`.
+The already-generated figure PDFs and table `.tex` files are included. No
+experiment data, plotting scripts, Python environment, or GPU is needed to
+compile the paper. Standard LaTeX packages are supplied by the TeX installation.
 
-- [Current result audit (中文)](experiments/RESULTS_AUDIT_20260912_zh.md)
-- [Reference verification and related-paper observations (中文)](experiments/REFERENCE_AUDIT_20260912_zh.md)
-- [Three-question scope (中文)](MOPD_THREE_CONTRIBUTIONS_2026-09-05_zh.md)
-- [Evidence and reproduction guide](experiments/aligned_evidence_20260910/README_zh.md)
+In Overleaf, set the main document to `iclr2027_conference.tex` at the project
+root, then use **Recompile from scratch**.
 
-The following sections record the September 11 synchronization history.
+## Research archive and local files
 
-## September 11 Overleaf synchronization repair
-
-The project is [here](https://www.overleaf.com/project/6a8a831a5a9b43dfa3f0c368).
-In **Integrations → GitHub**, click **Continue** after the repair merge, then
-pull if prompted. Select the root main document and recompile from scratch.
-
-The `overleaf-2026-09-11-0312` snapshot at `fdebceb` exactly matches the older
-`287eaee` snapshot plus the first 300 file changes returned by GitHub for
-`287eaee...2736c5b`. That response excluded the manuscript and every figure.
-This reproduces why a merged Git history still left the old paper in Overleaf.
-GitHub documents the [300-file comparison limit](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
-
-This repair starts from the actual Overleaf snapshot and replaces its current
-paper files with the completed-results version from `be8128e`. The merge uses
-the Overleaf snapshot as its first parent and the previous `main` as its second
-parent. Its synchronization difference contains fewer than 100 changed files,
-including all eleven figure PDFs and all revised paper sections. The two stale
-compiled paper PDFs and 45 large archived data files are removed from tracking.
-
-Some historical files are temporarily retained to keep this recovery difference
-small. The full cleanup must be resumed in separate synchronization steps after
-the corrected paper is visible in Overleaf. `.gitignore` remains in place; it
-does not automatically untrack files or filter Overleaf-side uploads.
-
-## Preserved data and compact manuscript snapshot
-
-The complete original research snapshot remains on
+The complete tracked tree immediately before this cleanup is preserved on
+[`archive/before-compile-only-20260914`](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/archive/before-compile-only-20260914).
+The earlier large research snapshot is on
 [`archive/research-data-before-overleaf-cleanup-20260911`](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/archive/research-data-before-overleaf-cleanup-20260911).
-The compact 78-file manuscript snapshot is preserved at
-[`be8128e`](https://github.com/zhusq20/Optimization-Dynamics-in-Multi-Task-LLM-Post-Training/tree/be8128e54897588e1ed652e7f73a07290bc27762).
-Local evidence files are retained. See [the experiment guide](experiments/README.md)
-for reproduction instructions using the complete archive checkout.
+
+Removed research files remain on disk in the working checkout and are ignored
+by Git. The default branch no longer synchronizes them to Overleaf. Git history
+has not been rewritten. Add any future compilation dependency explicitly to
+`.gitignore` before tracking it.
+
+## Recovering an old Overleaf project
+
+Older Overleaf snapshots can still contain files from before the cleanup.
+A successful Git merge does not prove every file reached Overleaf: the GitHub
+comparison API returns at most 300 changed files, and the September 14 recovery
+comparison had 446. Its response omitted the six-panel figure and its section.
+
+If the existing project remains stale after pulling, importing the current
+GitHub repository into a new Overleaf project (or uploading the compact source
+ZIP as a new project) obtains the complete 40-file tree without relying on the
+old incremental comparison. The source ZIP should contain no compiled paper
+PDF, temporary outputs, or experimental data.

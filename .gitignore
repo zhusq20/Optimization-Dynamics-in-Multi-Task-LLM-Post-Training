@@ -1,46 +1,58 @@
-# Local backups, rendered paper copies, and temporary build/review output.
-/backup/
-/tmp/
-/output/
-/iclr2027_conference.pdf
-
-# LaTeX build products (the bibliography is rebuilt from the tracked .bib).
-*.aux
-*.bbl
-*.blg
-*.fdb_latexmk
-*.fls
-*.log
-*.out
-*.synctex.gz
-*.toc
-*.lof
-*.lot
-
-# Large evidence bundles remain in the archive branch and in local checkouts.
-/experiments/paper_curves_20260908/
-/experiments/local_probe_results_20260908/
-/experiments/figure_audit_20260908/
-/experiments/aligned_evidence_20260910/raw/
-/experiments/aligned_evidence_20260910/prompt_scores.jsonl
-
-# Local exploratory analyses and their alternative renders.
-/experiments/capability_uncertainty_*/
-/figures/estimated_three_seed_*/
-
-# Overleaf needs the current vector PDF figures, not old galleries or previews.
+# The default branch is the Overleaf compilation source only.
+# Research data, scripts, backups, and build products remain local.
+# To add a new compilation input, add its path to this allowlist first.
+/*
+!/experiments/
+/experiments/*
+!/figures/
 /figures/*
+!/sections/
+/sections/*
+!/experiments/aligned_evidence_20260910/
+/experiments/aligned_evidence_20260910/*
 !/figures/aligned_evidence_20260910/
 /figures/aligned_evidence_20260910/*
-!/figures/aligned_evidence_20260910/*.pdf
 !/figures/optimizer_mediation_20260913/
 /figures/optimizer_mediation_20260913/*
-!/figures/optimizer_mediation_20260913/*.pdf
 !/figures/three_seed_20260913/
 /figures/three_seed_20260913/*
-!/figures/three_seed_20260913/*.pdf
-
-# Python and editor caches.
-__pycache__/
-*.py[cod]
-.DS_Store
+!/.gitignore
+!/README.md
+!/experiments/aligned_evidence_20260910/capability_table.tex
+!/experiments/aligned_evidence_20260910/coverage_table.tex
+!/experiments/aligned_evidence_20260910/density_capability_table.tex
+!/experiments/aligned_evidence_20260910/endpoint_paired_table.tex
+!/experiments/aligned_evidence_20260910/normalization_fixed_batch_table.tex
+!/experiments/aligned_evidence_20260910/teacher_table.tex
+!/fancyhdr.sty
+!/figures/aligned_evidence_20260910/adam_precision.pdf
+!/figures/aligned_evidence_20260910/all_token_shares.pdf
+!/figures/aligned_evidence_20260910/capability.pdf
+!/figures/aligned_evidence_20260910/cumulative_geometry.pdf
+!/figures/aligned_evidence_20260910/normalization50.pdf
+!/figures/aligned_evidence_20260910/supervision_density.pdf
+!/figures/aligned_evidence_20260910/teacher_input.pdf
+!/figures/aligned_evidence_20260910/teacher_js.pdf
+!/figures/aligned_evidence_20260910/teacher_overlap.pdf
+!/figures/aligned_evidence_20260910/thresholds.pdf
+!/figures/optimizer_mediation_20260913/optimizer_mediation.pdf
+!/figures/optimizer_mediation_20260913/optimizer_mediation_moments.pdf
+!/figures/three_seed_20260913/normalization_six_panel.pdf
+!/iclr2027_conference.bib
+!/iclr2027_conference.bst
+!/iclr2027_conference.sty
+!/iclr2027_conference.tex
+!/math_commands.tex
+!/natbib.sty
+!/sections/001_abstract.tex
+!/sections/002_introduction.tex
+!/sections/003_relatedwork.tex
+!/sections/004_preliminary.tex
+!/sections/005_experiment.tex
+!/sections/005_normalization.tex
+!/sections/006_teacher_subnetworks.tex
+!/sections/007_discussion.tex
+!/sections/007_recipe.tex
+!/sections/007_supervision_density.tex
+!/sections/008_checklist.tex
+!/sections/009_appendix.tex

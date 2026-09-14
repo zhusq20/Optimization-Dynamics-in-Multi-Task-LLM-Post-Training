@@ -1,1 +1,0 @@
-GT/DT/DR capability (mean and one sample standard deviation across three seeds). Panels a--d show task scores with initial-student and domain-teacher references; panel e shows their four-domain mean with averaged references; panel f shows the worst domain change from initialization, where zero denotes no regression. Horizontal offsets separate overlap.
