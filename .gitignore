@@ -14,8 +14,6 @@
 /figures/aligned_evidence_20260910/*
 !/figures/optimizer_mediation_20260913/
 /figures/optimizer_mediation_20260913/*
-!/figures/three_seed_20260913/
-/figures/three_seed_20260913/*
 !/.gitignore
 !/README.md
 !/experiments/aligned_evidence_20260910/capability_table.tex
@@ -37,7 +35,6 @@
 !/figures/aligned_evidence_20260910/thresholds.pdf
 !/figures/optimizer_mediation_20260913/optimizer_mediation.pdf
 !/figures/optimizer_mediation_20260913/optimizer_mediation_moments.pdf
-!/figures/three_seed_20260913/normalization_six_panel.pdf
 !/iclr2027_conference.bib
 !/iclr2027_conference.bst
 !/iclr2027_conference.sty
@@ -56,3 +53,12 @@
 !/sections/007_supervision_density.tex
 !/sections/008_checklist.tex
 !/sections/009_appendix.tex
+!/sections/011_figure_support.tex
+!/sections/fig_nine_normalization.tex
+!/sections/fig_nine_sparsity.tex
+!/sections/fig_nine_supervision.tex
+!/figures/nine_panel_20260914/
+/figures/nine_panel_20260914/*
+!/figures/nine_panel_20260914/section3_normalization.pdf
+!/figures/nine_panel_20260914/section4_sparsity_overlap.pdf
+!/figures/nine_panel_20260914/section5_supervision.pdf

@@ -17,14 +17,9 @@ The M-PG and M-I64-DR branches share the training settings in Appendix~\ref{app:
 
 The corresponding FP32 nonzero fractions are 95.73\% for PG and 96.07\% for I64. Their 90\%-energy fractions are 32.94\% and 34.82\%. Thus the apparent sparsity depends strongly on which parameter representation is measured. The actual optimizer steps at update 250 change 86.35\% of FP32 coordinates for PG and 86.70\% for I64. Threshold curves and optimizer-state controls appear in Appendix~\ref{app:records}.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/cumulative_geometry.pdf}
-\caption{Cumulative changes in joint PG and I64 training through update 250. (a,b) Nonzero fractions in FP32 optimizer weights and BF16 model weights. (c) Coordinate fractions accounting for 90\% of squared change at update 250. Both branches use domain-response averaging.}
-\label{fig:geometry}
-\end{figure}
+\input{sections/fig_nine_sparsity}
 
-\completionnote{Single-teacher versus multi-teacher sparsity}{Add the matching S-PG and S-I64 parameter measurements at the same checkpoints as their joint counterparts. The comparison must include individual steps and cumulative changes in both FP32 and BF16, with threshold curves and the 90\%-energy fraction. State the per-domain response exposure. Populate the comparison figure only when all four configurations are available.}
+\noindent Figure~\ref{fig:subnetwork_overview}(a) adds the matched single-teacher and joint cumulative measurements at update 500. The full recorded trajectories remain available in the accompanying evidence bundle.
 
 \subsection{Do teachers change the same parameters in one student?}
 
@@ -35,10 +30,10 @@ J(d,e)=\frac{|S_d(\rho)\cap S_e(\rho)|}{|S_d(\rho)\cup S_e(\rho)|}.
 \end{equation}
 Equal selection sizes make the teacher pairs comparable. Overlap describes locations; the signs of the changes determine whether contributions at those locations agree. This distinction follows the support-overlap analysis of \citet{yu2026denseupdates}.
 
-\completionnote{Teacher-specific optimizer-step overlap}{Compute each teacher's step from the same saved student and optimizer state on its routed domain. Add the complete teacher-pair overlap matrix at matched coordinate fractions, together with a common-input comparison using the same number of prefixes. The existing raw-gradient matrix belongs to the separate gradient diagnostic in Appendix~\ref{app:gradient_overlap}; it does not fill this figure.}
+\noindent Figure~\ref{fig:subnetwork_overview}(b) supplies the completed same-state teacher-step comparison with common-input and routed-input controls. The existing raw-gradient matrix remains a separate diagnostic in Appendix~\ref{app:gradient_overlap}.
 
 \subsection{Do different predictions imply different parameter selections?}
 
 Teacher prediction differences are measured by Jensen--Shannon (JS) divergence on the same student prefixes. We pair each teacher pair's divergence with its parameter-selection difference, $1-J(d,e)$. The question is whether teachers that disagree more in their predictions also change less-overlapping coordinates in the shared student. The JS definition appears in Appendix~\ref{app:teacher_distance}.
 
-\completionnote{Teacher distance and optimizer-step overlap}{Pair the complete teacher-specific update measurements above with JS divergence at the same checkpoint and on the same prefix banks. Show all teacher pairs using consistent coordinate selection sizes. Add the scatter plot and its interpretation together after this pairing is complete. The separate gradient comparison is retained in Appendix~\ref{app:teacher_distance}.}
+\noindent Figure~\ref{fig:subnetwork_overview}(c) pairs teacher JS with the completed common-input optimizer-step selections. The earlier gradient comparison remains in Appendix~\ref{app:teacher_distance}.

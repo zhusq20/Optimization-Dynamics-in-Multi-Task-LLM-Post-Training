@@ -1,0 +1,28 @@
+\section{Supporting Views for the Three Main Figures}
+\label{app:nine_panel_support}
+
+The main figures combine the completed comparisons in three panels per study.
+The following views retain the detailed optimizer intervention, update-250 joint geometry, and original M-PG/100 concentration measurements referenced in the text.
+The new main capability contrasts use measured seed-42 scores; estimated seed values are excluded.
+The separate author-audit DR/500 calculation (two measured seeds and one retained estimate) is stored with its provenance and is not interpreted as three-run empirical uncertainty.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/optimizer_mediation_20260913/optimizer_mediation.pdf}
+\caption{How optimization mediates GT/DT/DR differences. (a) Scalar clipping preserves gradient direction, while a common saved Adam state makes the proposed updates substantially more similar. Lines and error bars show the mean and one standard deviation across six fixed banks. (b) Fraction of the raw gradient retained across 500 online updates; percentages show how often clipping activates, boxes span the interquartile range, and whiskers the 5th--95th percentiles. (c) Immediate four-domain held-out reverse-KL change for saved-state Adam and same-norm SGD at two checkpoints. Open circles are individual banks; filled circles and error bars show the mean and one standard deviation across three banks. Lower is better.}
+\label{fig:optimizer_mediation}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/cumulative_geometry.pdf}
+\caption{Cumulative changes in joint PG and I64 training through update 250. (a,b) Nonzero fractions in FP32 optimizer weights and BF16 model weights. (c) Coordinate fractions accounting for 90\% of squared change at update 250. Both branches use domain-response averaging.}
+\label{fig:geometry}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/supervision_density.pdf}
+\caption{Local supervision comparison at M-PG update 100. (a,b) Nonzero fractions for FP32 optimizer steps and BF16 model changes. (c) Squared step norm in the largest 1\% of coordinates. Points show four prefix banks; every loss uses the same saved optimizer state.}
+\label{fig:density}
+\end{figure}

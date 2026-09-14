@@ -21,22 +21,12 @@ Three online I64 branches differ only in GT, DT, or DR averaging. They share the
 \paragraph{Length changes the path more than the endpoint.}
 Mathematics and instruction following each receive 25\% of prompts but contribute 44.05\% and 14.98\% of GT's valid tokens over the first 50 batches; GT therefore gives mathematics nearly three times the weight. DT and DR fix both domains at 25\% (Figure~\ref{fig:all_token_shares}). This imbalance changes early trajectories, yet no rule wins consistently across seeds (Figure~\ref{fig:normalization_capability}). At update 500, four-domain means are $38.58\pm0.75$\% (DR), $38.71\pm0.80$\% (DT), and $38.64\pm0.80$\% (GT). The 0.14-point span is below the 0.75--0.80-point seed standard deviations. MATH and IFBench approach their teachers, LiveCodeBench retains a gap, and GPQA starts near its teacher; rule ranks change across tasks and checkpoints. Here token balancing alters when and where capability improves, not the final aggregate.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/three_seed_20260913/normalization_six_panel.pdf}
-\caption{GT/DT/DR capability (mean $\pm$ one standard deviation across three seeds). (a--d) Task scores with initial-student and domain-teacher references. (e) Four-domain mean with averaged references. (f) Worst domain change from initialization; zero denotes no regression. Horizontal offsets separate overlap.}
-\label{fig:normalization_capability}
-\end{figure}
+\input{sections/fig_nine_normalization}
 
 \paragraph{The optimizer masks part of the gradient difference.}
 On six fixed response banks, the mean raw-gradient cosines are 0.680 (DR--DT), 0.483 (DR--GT), and 0.822 (DT--GT); hence equal domain weights do not make DR and DT equivalent. Global clipping leaves every cosine unchanged, even though it acts very differently online: DR is clipped on all 500 updates and retains a median 9.3\% of its gradient, compared with clipping on 46.2\% of DT updates and 15.0\% of GT updates. Applying one common saved Adam state then raises the three FP32 update cosines to 0.960, 0.939, and 0.979. Adam history therefore changes the effective update rather than merely transmitting the current clipped gradient. Appendix Figure~\ref{fig:optimizer_mediation_moments} shows that it also sets the step scale.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/optimizer_mediation_20260913/optimizer_mediation.pdf}
-\caption{How optimization mediates GT/DT/DR differences. (a) Scalar clipping preserves gradient direction, while a common saved Adam state makes the proposed updates substantially more similar. Lines and error bars show the mean and one standard deviation across six fixed banks. (b) Fraction of the raw gradient retained across 500 online updates; percentages show how often clipping activates, boxes span the interquartile range, and whiskers the 5th--95th percentiles. (c) Immediate four-domain held-out reverse-KL change for saved-state Adam and same-norm SGD at two checkpoints. Open circles are individual banks; filled circles and error bars show the mean and one standard deviation across three banks. Lower is better.}
-\label{fig:optimizer_mediation}
-\end{figure}
+
 
 \paragraph{Similar Adam steps explain weak endpoint separation.}
 With saved-state Adam, the three reductions' mean immediate held-out KL decreases differ by only $2.9\times10^{-5}$, well within bank variation. Same-norm SGD exposes a wider, checkpoint-dependent spread: all three mean changes improve at update 100 but worsen at update 250. Thus a small downstream separation does not imply that the averaging gradients are equivalent. Clipping changes their magnitudes but not their angles, whereas shared Adam history pulls distinct gradients toward similar updates. Appendix~\ref{app:fixed_batch_normalization} gives the intervention details and all raw-gradient comparisons; Figure~\ref{fig:normalization_ci} reports the paired capability contrasts.

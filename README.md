@@ -1,8 +1,10 @@
 # Optimization Dynamics in Multi-Task LLM Post-Training
 
 The default branch contains only the files needed to compile the current paper,
-plus this README and `.gitignore`: 40 files in total. Figure 1 is the six-panel
-GT/DT/DR capability figure (two rows, three columns).
+plus this README and `.gitignore`. Sections 3, 4, and 5 each use one
+three-panel figure arranged in a single row. Detailed supporting views remain
+in the appendix. The new panels use measured evidence; the separate DR
+author-audit estimate is not used as empirical seed variation.
 
 ## Compile
 
@@ -40,6 +42,6 @@ comparison had 446. Its response omitted the six-panel figure and its section.
 
 If the existing project remains stale after pulling, importing the current
 GitHub repository into a new Overleaf project (or uploading the compact source
-ZIP as a new project) obtains the complete 40-file tree without relying on the
+ZIP as a new project) obtains the complete compilation-source tree without relying on the
 old incremental comparison. The source ZIP should contain no compiled paper
 PDF, temporary outputs, or experimental data.

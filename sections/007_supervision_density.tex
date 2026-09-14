@@ -14,12 +14,7 @@ The local experiment evaluates PG, I64, corrected teacher-top-64 supervision (T6
 \paragraph{Local changes are similarly concentrated across losses.}
 Figure~\ref{fig:density} shows that all four losses change about 88.0\% of FP32 coordinates. Mean BF16 nonzero fractions are 0.149\% for PG and 0.150\% for I64, T64, and full vocabulary. The largest 1\% of coordinates carry about 8.8\% of the FP32 squared step norm and all of the BF16 squared step norm. Local concentration is therefore very similar across the four losses at this shared state. The shared Adam history contributes to this result: a zero-current-gradient control alone changes 0.140\% of BF16 coordinates.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/supervision_density.pdf}
-\caption{Local supervision comparison at M-PG update 100. (a,b) Nonzero fractions for FP32 optimizer steps and BF16 model changes. (c) Squared step norm in the largest 1\% of coordinates. Points show four prefix banks; every loss uses the same saved optimizer state.}
-\label{fig:density}
-\end{figure}
+\input{sections/fig_nine_supervision}
 
 The teacher's top-64 tokens contain a mean 99.918\% of student probability across these prefixes, with a minimum of 96.709\% at an individual prefix. The selected vocabulary therefore retains most of the student probability in this experiment. Appendix~\ref{app:losses} gives the sampling and coverage details; Appendix~\ref{app:records} provides separate threshold and optimizer-state controls.
 
@@ -39,4 +34,4 @@ In joint training, both losses reach 26.0\% on instruction following at update 2
 \input{experiments/aligned_evidence_20260910/density_capability_table.tex}
 \end{table}
 
-The capability comparison and the local update comparison answer different parts of the supervision question. Broader feedback yields almost unchanged concentration at the fixed state, but the trained students develop different capability profiles. The matching single-teacher parameter measurements are specified in the annotation in Section~\ref{sec:subnetworks}.
+The capability comparison and the local update comparison answer different parts of the supervision question. Broader feedback yields almost unchanged concentration at the fixed state, but the trained students develop different capability profiles. The matching single-teacher parameter measurements appear in Figure~\ref{fig:subnetwork_overview}(a).
