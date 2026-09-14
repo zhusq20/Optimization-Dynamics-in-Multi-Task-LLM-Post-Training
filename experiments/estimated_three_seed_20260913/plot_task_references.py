@@ -271,7 +271,7 @@ fig.legend(
     handlelength=2.2,
 )
 
-stem = FIG / "normalization_tasks_with_references"
+stem = FIG / "normalization_six_panel"
 for ext in ["pdf", "png", "svg"]:
     fig.savefig(stem.with_suffix(f".{ext}"), dpi=300)
 plt.close(fig)
