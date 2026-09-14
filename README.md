@@ -1,10 +1,11 @@
 # Optimization Dynamics in Multi-Task LLM Post-Training
 
 The default branch contains only the files needed to compile the current paper,
-plus this README and `.gitignore`. Sections 3, 4, and 5 each use one
-three-panel figure arranged in a single row. Detailed supporting views remain
-in the appendix. The new panels use measured evidence; the separate DR
-author-audit estimate is not used as empirical seed variation.
+plus this README and `.gitignore`. Section 3 uses a six-panel figure in two
+rows of three; Sections 4 and 5 each use three panels in one row. Supporting
+views remain in the appendix, including normalization aggregates. Normalization
+capability curves retain the original estimated seed values with explicit caption
+provenance; the author reports agreement with subsequent three-seed experiments.
 
 ## Compile
 
