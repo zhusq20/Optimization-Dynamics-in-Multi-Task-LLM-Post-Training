@@ -2,14 +2,14 @@
 \label{sec:setting}
 
 \paragraph{Multi-teacher on-policy distillation (MOPD).}
-For domain $d$, the student samples a response $y\sim p_\theta(\cdot\mid x)$ to a prompt $x\sim\mathcal D_d$. The assigned teacher $q_d$ scores the student prefixes $h_t=(x,y_{<t})$. Given token loss $\ell_{d,t}$ and domain weights $\lambda_d\geq0$ with $\sum_d\lambda_d=1$, the response-normalized objective is
+For domain $d$, the student samples a response $y\sim p_\theta(\cdot\mid x)$ to a prompt $x\sim\mathcal D_d$. The assigned teacher $q_d$ scores the student prefixes $h_t=(x,y_{<t})$. Given token loss $\ell_{d,t}$ and target domain weights $\lambda_d\geq0$ with $\sum_d\lambda_d=1$, we take the domain-response (DR) objective as our reference:
 \begin{equation}
-\mathcal L(\theta)=\sum_d\lambda_d\,
+\mathcal L_{\mathrm{DR}}(\theta)=\sum_d\lambda_d\,
 \mathbb E_{x\sim\mathcal D_d,\,y\sim p_\theta(\cdot\mid x)}
 \left[\frac{1}{|y|}\sum_{t=1}^{|y|}\ell_{d,t}(\theta)\right].
 \label{eq:mopd}
 \end{equation}
-This averages tokens within each response, then responses within each domain. Training holds sampled responses, masks, and averaging weights fixed when differentiating; fresh responses are generated at each update.
+This averages tokens within each response, then responses within each domain, and combines domains using $\lambda_d$. Below, we define its batch counterpart and two alternative averaging rules that change the relative weights of domains or responses. Training holds sampled responses, masks, and averaging weights fixed when differentiating; fresh responses are generated at each update.
 
 \paragraph{Sampled-token, top-$k$, and full-vocabulary supervision.}
 These choices determine which vocabulary alternatives receive teacher feedback at each prefix. Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision computes reverse KL over the vocabulary $\mathcal V$:
@@ -35,14 +35,27 @@ Top-$k$ supervision uses the $k$ most probable tokens under the student or teach
 The probabilities use full-vocabulary normalization; the detached weights are normalized over $S$ before restricting to $I$. An empty intersection gives zero loss. We call the number of supervised alternatives \emph{supervision density}.
 
 \paragraph{Loss averaging.}
-Let $\mathcal B_d$ contain the nonempty responses from domain $d$, $T_i$ be response $i$'s valid-token count, and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss. Write the batch loss as $\mathcal L=\sum_iw_i\ell_i$. For $i\in\mathcal B_d$, the three averaging rules assign weights
+Let $\mathcal B=\bigcup_d\mathcal B_d$ be a rollout batch, with $\mathcal B_d$ containing the nonempty responses from domain $d$; assume every domain is represented. Let $T_i$ be response $i$'s valid-token count and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean loss over valid tokens. For averaging rule $A\in\{\mathrm{GT},\mathrm{DT},\mathrm{DR}\}$, the batch loss is
 \begin{equation}
-w_i^{\mathrm{GT}}=\frac{T_i}{\sum_jT_j},\qquad
+\widehat{\mathcal L}_{A}(\theta;\mathcal B)
+=\sum_{i\in\mathcal B}w_i^{A}\ell_i(\theta).
+\label{eq:batch_loss}
+\end{equation}
+Here $w_i^{A}$ is the resulting response weight, determined by the averaging rule rather than an additional free coefficient. For $i\in\mathcal B_d$, the three rules give
+\begin{equation}
+w_i^{\mathrm{GT}}=\frac{T_i}{\sum_{j\in\mathcal B}T_j},\qquad
 w_i^{\mathrm{DT}}=\frac{\lambda_dT_i}{\sum_{j\in\mathcal B_d}T_j},\qquad
 w_i^{\mathrm{DR}}=\frac{\lambda_d}{|\mathcal B_d|}.
 \label{eq:averaging}
 \end{equation}
-Global-token (GT) averaging weights domains by token count. Domain-token (DT) averaging fixes domain weights to $\lambda_d$ but still gives longer responses more weight within each domain. Domain-response (DR) averaging also weights responses equally within each domain, matching Equation~\ref{eq:mopd}.
+Substituting $w_i^{\mathrm{DR}}$ gives the sample-average counterpart of Equation~\ref{eq:mopd}:
+\begin{equation}
+\widehat{\mathcal L}_{\mathrm{DR}}(\theta;\mathcal B)
+=\sum_d\lambda_d\frac{1}{|\mathcal B_d|}
+\sum_{i\in\mathcal B_d}\left[\frac{1}{T_i}\sum_t\ell_{i,t}(\theta)\right].
+\label{eq:dr_batch}
+\end{equation}
+Thus $\lambda_d$ sets the domain's total weight, while $w_i^{\mathrm{DR}}=\lambda_d/|\mathcal B_d|$ distributes it equally across that domain's responses. Domain-token (DT) averaging preserves the same domain weights but distributes them in proportion to response length. Global-token (GT) averaging additionally replaces the target domain weights with observed domain token shares. GT and DT therefore generally reweight the reference objective, rather than merely providing different estimates of it.
 
 \paragraph{Gradient conflict.}
 We measure conflict between optimizer updates. Starting from identical copies of the student and optimizer state, apply one optimizer step using domain $d$'s mean loss and let $u_d=\theta_d^+-\theta$ be the resulting parameter change. For nonzero updates, define $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$. Negative values indicate opposing update directions; positive values indicate alignment.
