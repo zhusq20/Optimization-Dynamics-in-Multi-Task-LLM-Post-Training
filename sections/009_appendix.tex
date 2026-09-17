@@ -107,13 +107,13 @@ using $\sum_v\nabla_\theta p_\theta(v)=0$. This identity conditions on fixed pre
 \input{experiments/aligned_evidence_20260910/coverage_table.tex}
 \end{table}
 
-\section{Teacher Distribution Distance}
-\label{app:teacher_distance}
+% \section{Teacher Distribution Distance}
+% \label{app:teacher_distance}
 
-We measure teacher distribution differences using Jensen--Shannon divergence on the full next-token vocabulary at identical prefixes:
-\begin{equation}
-\operatorname{JS}(q_d,q_e)=\tfrac12 D_{\mathrm{KL}}(q_d\|m)+\tfrac12 D_{\mathrm{KL}}(q_e\|m),
-\qquad m=\tfrac12(q_d+q_e).
-\label{eq:teacher_js}
-\end{equation}
-We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:teacher_overlap_support}(b) pairs this distance with the largest-magnitude coordinates of optimizer steps on shared inputs at M-PG/500. The earlier M-PG/100 raw-gradient diagnostic contains twelve batch--teacher-pair JS measurements, ranging from 0.00151 to 0.02714 nats; the per-pair measurements are retained in the experiment archive. Both diagnostics share teachers and prefixes within each batch, so teacher-pair observations are dependent.
+% We measure teacher distribution differences using Jensen--Shannon divergence on the full next-token vocabulary at identical prefixes:
+% \begin{equation}
+% \operatorname{JS}(q_d,q_e)=\tfrac12 D_{\mathrm{KL}}(q_d\|m)+\tfrac12 D_{\mathrm{KL}}(q_e\|m),
+% \qquad m=\tfrac12(q_d+q_e).
+% \label{eq:teacher_js}
+% \end{equation}
+% We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:teacher_overlap_support}(b) pairs this distance with the largest-magnitude coordinates of optimizer steps on shared inputs at M-PG/500. The earlier M-PG/100 raw-gradient diagnostic contains twelve batch--teacher-pair JS measurements, ranging from 0.00151 to 0.02714 nats; the per-pair measurements are retained in the experiment archive. Both diagnostics share teachers and prefixes within each batch, so teacher-pair observations are dependent.
