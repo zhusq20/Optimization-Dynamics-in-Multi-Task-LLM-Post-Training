@@ -3,6 +3,6 @@
 \includegraphics[width=\linewidth]{figures/added_control_figures_20260914/sampling_history_controls.pdf}
 \caption{\textbf{More token samples increase PG gradient cosine to full-vocabulary KL; Adam momentum alone changes nearly as many BF16 parameters as PG.}
 (a) Gradient cosine to full-vocabulary KL.
-(b,c) Nonzero BF16 changes with a zero current gradient or reset Adam moments. Points denote cached batches; bars show means.}
+(b,c) Nonzero BF16 changes with a zero current gradient or reset moments. Reset-$m$ keeps the second moment and step count; fresh Adam resets both moments and the count. Points denote cached batches; bars show means.}
 \label{fig:sampling_history_controls}
 \end{figure}

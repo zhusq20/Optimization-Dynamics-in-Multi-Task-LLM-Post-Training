@@ -22,7 +22,7 @@ Sampled-token supervision uses a policy-gradient (PG) surrogate with the teacher
 \qquad a\sim p_\theta.
 \label{eq:pg}
 \end{equation}
-Here $\sg$ denotes stop-gradient. At a fixed prefix, the expectation of the PG gradient over $a\sim p_\theta$ equals the full-vocabulary reverse-KL gradient (Appendix~\ref{app:losses}).
+Here $\sg$ denotes stop-gradient. At a fixed prefix, the expectation of the PG gradient over $a\sim p_\theta$ equals the full-vocabulary reverse-KL gradient because $\sum_v\nabla_\theta p_\theta(v)=0$ (derivation in Appendix~\ref{app:losses}).
 
 Top-$k$ supervision restricts the loss to a candidate set of likely next tokens. We use the intersection of the student and teacher top-$k$ sets: let $S$ and $T$ contain their respective $k$ most probable tokens, computed at rollout and held fixed during gradient computation, and let $I=S\cap T$. The loss is
 \begin{equation}

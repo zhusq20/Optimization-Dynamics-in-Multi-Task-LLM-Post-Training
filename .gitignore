@@ -89,3 +89,9 @@
 !/experiments/completed_results_20260917/math_sensitivity_table.tex
 !/sections/012_completed_results.tex
 !/figures/nine_panel_20260914/appendix_teacher_overlap.pdf
+
+# Additional completed coverage and domain-probe measurements (2026-09-17).
+!/figures/coverage_domain_controls_20260917/
+/figures/coverage_domain_controls_20260917/*
+!/figures/coverage_domain_controls_20260917/i16_online_coverage.pdf
+!/figures/coverage_domain_controls_20260917/normalization_domain_probe.pdf

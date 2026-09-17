@@ -2,7 +2,7 @@
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section4_sparsity_overlap.pdf}
 \caption{\textbf{BF16 parameter changes are sparse; accumulated Adam momentum explains most update alignment on domain-specific inputs.}
-(a) Nonzero (NZ) and 90\%-energy (E90) coordinate fractions; S/M denote single-teacher/joint training.
+(a) Nonzero (NZ) and 90\%-energy (E90) coordinate fractions; S/M denote single-teacher/joint training. M-DR/DT/GT use I64; other rows use DR.
 (b,c) FP32 update cosines on domain-specific/shared inputs. ``Minus zero'' subtracts the step from Adam with the current gradient set to zero; small/large points show batch/overall means.}
 \label{fig:subnetwork_overview}
 \end{figure}
