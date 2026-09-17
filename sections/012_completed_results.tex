@@ -52,3 +52,24 @@ Removing the four questions leaves the four-domain-mean ranking unchanged for al
 \end{figure}
 
 Figure~\ref{fig:teacher_overlap_support} supplements the zero-gradient baseline subtraction at M-PG/500 using the controls in Appendix~\ref{app:nine_panel_support}. It compares PG and I64 under Adam with trained moments, reset-$m$, and norm-matched SGD. Shared inputs hold student prefixes fixed between teachers; domain-specific inputs change both the teacher and the input domain. Each of four batches contains six teacher pairs; these observations are dependent because they reuse teachers and responses. These gradient and update measurements do not directly measure changes in task performance.
+
+\clearpage
+\subsection{Online coverage and per-domain normalization effects}
+\label{app:i16_online_coverage}
+\label{app:domain_probe_breakdown}
+
+\paragraph{Online I16 coverage.}
+For seed-42 I16-DR, each of 500 updates has 16 logged slices of four responses. We average their masked, response-averaged summaries equally per update, rather than pooling tokens. Candidate sets are fixed at rollout; student probabilities are measured during training. Across 8,000 slices, mean $p_\theta(I)$, $r$, and $|I|$ are 99.616\%, 99.879\%, and 15.048. The mean empty fraction is 0.00270\%, nonzero in 80 slices across 62 updates. The lowest slice-mean mass is 86.67\% and largest slice-mean empty fraction 1.85\%; these are not prefix-level extremes. Different inputs and aggregation preclude a paired comparison with the offline I64 measurements (Table~\ref{tab:intersection_coverage}).
+
+\paragraph{Per-domain probe losses.}
+We disaggregate Figure~\ref{fig:normalization_interventions}(c), using the same six batches and twelve branches per batch (Appendix~\ref{app:fixed_batch_normalization}). Each batch has one held-out response per domain. At update 250, saved-state Adam under DR/DT/GT increases IF KL by $0.362/0.293/0.272\times10^{-3}$, while the four-domain changes are $0.041/-0.002/-0.027\times10^{-3}$. Thus DT/GT lower the mean despite an IF increase. These local loss changes do not establish long-term capability regressions.
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/coverage_domain_controls_20260917/i16_online_coverage.pdf}
+\includegraphics[width=\linewidth]{figures/coverage_domain_controls_20260917/normalization_domain_probe.pdf}
+\caption{\textbf{High average coverage and low mean probe loss can conceal exceptions.}
+(a--c) I16 per-update means of 16 logged slices, without temporal smoothing; the mass axis spans 98.5--100\%.
+(d,e) Full-vocabulary KL after minus before BF16 writeback, in units of $10^{-3}$. Cells show three-batch means; dots show batches 1042--1044 from left to right. The shared symmetric-log color scale is linear within $\pm0.1$. SGD is matched to each rule's Adam step norm.}
+\label{fig:coverage_domain_controls}
+\end{figure}
