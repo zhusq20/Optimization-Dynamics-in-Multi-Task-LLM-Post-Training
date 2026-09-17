@@ -116,7 +116,7 @@ Teacher distance is computed on the full next-token vocabulary at matched prefix
 \qquad m=\tfrac12(q_d+q_e).
 \label{eq:teacher_js}
 \end{equation}
-We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:subnetwork_overview}(c) pairs this distance with common-input optimizer-step selections at M-PG/500. The earlier M-PG/100 raw-gradient diagnostic contains twelve bank-pair JS measurements, ranging from 0.00151 to 0.02714 nats; its pair-level records remain in the evidence bundle. Both diagnostics share teachers and prefixes within each bank, so teacher-pair observations are dependent.
+We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:teacher_overlap_support}(b) pairs this distance with common-input optimizer-step selections at M-PG/500. The earlier M-PG/100 raw-gradient diagnostic contains twelve bank-pair JS measurements, ranging from 0.00151 to 0.02714 nats; its pair-level records remain in the evidence bundle. Both diagnostics share teachers and prefixes within each bank, so teacher-pair observations are dependent.
 
 \section{Token Shares Under the Three Averaging Rules}
 \label{app:behavior}

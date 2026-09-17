@@ -1,7 +1,7 @@
 \section{Update Sparsity and Teacher Overlap}
 \label{sec:subnetworks}
 
-This study proceeds from concentration of parameter changes to overlap between teachers, then to the relationship between that overlap and teacher predictions. Prior work observes concentrated changes under dense distillation supervision \citep{yu2026denseupdates}. We examine the corresponding measurements in a jointly trained student.
+This study examines how numerical representation and optimizer history affect the concentration, overlap, and direction of teacher-conditioned parameter changes. Prior work observes concentrated changes under dense distillation supervision \citep{yu2026denseupdates}. We examine the corresponding measurements in a jointly trained student.
 
 \subsection{How concentrated are joint parameter changes?}
 
@@ -30,10 +30,15 @@ J(d,e)=\frac{|S_d(\rho)\cap S_e(\rho)|}{|S_d(\rho)\cup S_e(\rho)|}.
 \end{equation}
 Equal selection sizes make the teacher pairs comparable. Overlap describes locations; the signs of the changes determine whether contributions at those locations agree. This distinction follows the support-overlap analysis of \citet{yu2026denseupdates}.
 
-\noindent Figure~\ref{fig:subnetwork_overview}(b) supplies the completed same-state teacher-step comparison with common-input and routed-input controls. The raw-gradient input controls remain a separate diagnostic in Appendix~\ref{app:gradient_overlap}.
+At the common M-PG/500 state, routed-input teacher updates have mean FP32 cosines of 0.8774 for PG and 0.8347 for I64 under saved-state Adam. Resetting the first moment or using norm-matched SGD brings their mean cosines close to zero (Figure~\ref{fig:subnetwork_overview}b). Each small point summarizes six teacher pairs within one of four response banks; large points average the four banks. These are local diagnostic repeats, not independent training runs. Appendix~\ref{app:completed_results} retains the joint overlap--direction and teacher-JS views, while Appendix~\ref{app:gradient_overlap} gives the separate raw-gradient input controls.
 
-\subsection{Do different predictions imply different parameter selections?}
+\subsection{How much alignment remains after removing the history-only step?}
 
-Teacher prediction differences are measured by Jensen--Shannon (JS) divergence on the same student prefixes. We pair each teacher pair's divergence with its parameter-selection difference, $1-J(d,e)$. The question is whether teachers that disagree more in their predictions also change less-overlapping coordinates in the shared student. The JS definition appears in Appendix~\ref{app:teacher_distance}.
+Let $U(g;H)$ denote an optimizer step for current gradient $g$ at saved optimizer state $H$. We compare the complete teacher-conditioned step with its difference from the zero-current-gradient step,
+\begin{equation}
+\delta U_d=U(g_d;H)-U(0;H).
+\label{eq:history_subtracted}
+\end{equation}
+This difference retains the same parameters and optimizer state in both branches. It is a nonlinear counterfactual difference, not an additive decomposition of teacher contributions.
 
-\noindent Figure~\ref{fig:subnetwork_overview}(c) pairs teacher JS with the completed common-input optimizer-step selections. Appendix~\ref{app:teacher_distance} also specifies the scope of the earlier raw-gradient diagnostic.
+Under routed inputs, the mean PG/I64 cosines fall to 0.0098/0.0067 after this subtraction (Figure~\ref{fig:subnetwork_overview}b). Under common inputs, they fall from 0.8415/0.8562 to 0.2373/0.3462 (panel c). The strong alignment of the complete steps therefore depends on shared optimizer history and input conditions. Routed inputs vary both teacher identity and input domain; common-input controls hold the prefixes fixed. Coordinate overlap can remain substantial even when directions differ, and neither statistic establishes the absence of cross-domain functional harm. The required teacher-by-probe-domain loss intervention is distinct from this geometric comparison.

@@ -23,6 +23,11 @@ Mathematics and instruction following each receive 25\% of prompts but contribut
 
 \input{sections/fig_nine_normalization}
 
+\paragraph{Completed endpoints across objectives and optimizers.}
+Table~\ref{tab:completed_endpoints} extends the comparison to PG under all three averaging rules, I16 under DR, and three PG/SGD runs. These endpoints use seed 42 and are separate from the three-seed normalization summaries above. PG/Adam reaches four-domain means of 38.29\%, 38.03\%, and 38.36\% under DR, DT, and GT; PG/SGD reaches 39.46\%, 39.14\%, and 38.39\%. Thus the small spread among the I64/Adam endpoints does not establish the same behavior across objectives and optimizers. This is a matched-update comparison; the SGD learning rate and deployment differ, so it does not isolate a single optimizer mechanism or establish an efficiency ranking. Appendix~\ref{app:completed_results} reports the additional evaluation protocol and independent test results.
+
+\input{experiments/completed_results_20260917/endpoint_table}
+
 \paragraph{The optimizer masks part of the gradient difference.}
 On six fixed response banks, the mean raw-gradient cosines are 0.680 (DR--DT), 0.483 (DR--GT), and 0.822 (DT--GT); hence equal domain weights do not make DR and DT equivalent. Global clipping leaves every cosine unchanged, even though it acts very differently online: DR is clipped on all 500 updates and retains a median 9.3\% of its gradient, compared with clipping on 46.2\% of DT updates and 15.0\% of GT updates (Figure~\ref{fig:normalization_interventions}a). Applying one common saved Adam state then raises the three FP32 update cosines to 0.960, 0.939, and 0.979. Adam history therefore changes the effective update rather than merely transmitting the current clipped gradient. Figure~\ref{fig:normalization_interventions}(b) shows that it also sets the step scale.
 

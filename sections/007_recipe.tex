@@ -16,3 +16,7 @@ s_d(\theta)\geq s_d(\theta_0)-\epsilon_d
 \label{eq:retention}
 \end{equation}
 Among eligible checkpoints, choose the one with the highest prespecified aggregate utility, retaining the initial student if none improves it. Assess uncertainty using paired development-score differences and evaluate the selected checkpoint on a separate test set. Report maximum per-domain regression along training and variability across independent runs alongside the selected model's capability scores.
+
+
+\paragraph{Completed selection and independent testing.}
+We apply endpoint, maximum-development-utility, and retention-constrained selection to ten seed-42 trajectories, with the domain tolerances fixed at two percentage points and equal utility weights before the new test results. Retention and unconstrained maximum utility select the same checkpoint on all ten trajectories: update 500 in nine cases and update 250 for PG--DT/Adam. In the latter case, the selected checkpoint scores 43.14\% on the independent four-domain test, versus 43.51\% at update 500. These results do not demonstrate an additional benefit from the retention constraint. The development benchmarks had been observed previously, so selection is exploratory; the independent test uses separately frozen questions from different sources. Appendix~\ref{app:completed_results} reports all test scores, the actual selections, and the remaining limits of matched-cost and functional validation.

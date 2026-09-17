@@ -4,6 +4,6 @@
 \caption{Supervision geometry and capability.
 (a) Mean BF16 nonzero fractions by student state and loss.
 (b) Alignment with full-vocabulary supervision: PG bank means (lines) and individual banks (points), with the I64 range shaded.
-(c) I64-minus-PG task scores (percentage points); positive values favor I64. S/M denote single-teacher/joint training.}
+(c) I64-minus-PG scores for single-teacher (S) and joint (M) training, plus I16-minus-PG scores for joint training. Each comparison uses DR, Adam, measured seed 42, and the same benchmark protocol (full MATH500, LCB, IFBench, and GPQA) at updates 100/250/500. Positive percentage-point differences favor I64 or I16 over the corresponding PG run. I16 adds an online candidate-size comparison; panels (a,b) retain the I64 local controls and do not measure I16 geometry.}
 \label{fig:supervision_overview}
 \end{figure}
