@@ -4,29 +4,31 @@
 \subsection{Evaluation scope and the independent domain test}
 \label{app:independent_domain_test}
 
-Table~\ref{tab:completed_endpoints} reports ten joint-training configurations at update 500, each using training seed 42. This matrix combines the previously reported PG-DR and I64-DR/DT/GT Adam trajectories with I16-DR, PG-DT/GT Adam, and PG-DR/DT/GT SGD. It does not represent ten additional runs beyond the earlier trajectories. The original benchmarks contain 500 mathematics questions, a 128-question LiveCodeBench slice, 300 IFBench questions, and 198 GPQA-Diamond questions. Mathematics, code, and IF use one response per question; GPQA uses four responses, averaged within question. The full development grid comprises 37 trained checkpoints and one shared initial evaluation: updates 50/100/250/500 for the seven Adam trajectories and 100/250/500 for the three SGD trajectories.
+The ten seed-42 joint-training trajectories use the development benchmarks and checkpoint grid described in Appendix~\ref{app:setup}. The analyses below add testing on separate questions, frozen checkpoint selection, coverage measurements, and overlap sensitivity.
 
 Table~\ref{tab:independent_test} uses a separately frozen additional-domain test with 256 questions per domain, for 1,024 questions and 1,792 responses per model. Mathematics and code are drawn from the Skywork-OR1-RL-Data mathematics and TACO-based code pools; IF uses Nemotron-RL-instruction\_following; Science uses the Nemotron-RL-knowledge-mcqa validation split restricted by a fixed natural-science keyword filter. Questions are the first eligible unique candidates in frozen source order, selected without model scores. Normalized exact and lexical near-duplicate checks exclude the original training bundle and known evaluation pools. These checks do not establish exhaustive semantic decontamination or absence of pretraining exposure.
 
-The additional test uses math answer verification, code unit tests, instruction-following constraints, and science multiple-choice scoring. Mathematics, code, and IF use greedy decoding; Science uses four responses per question at temperature 1. The generation context budget is 32,768 tokens, with thinking disabled. The source distributions and the code/IF scorers differ from the original benchmark protocol, so the two tables are reported separately. All completed code evaluations have zero recorded infrastructure errors. The four-domain mean is an equal-weight descriptive aggregate. The available question-paired bootstrap intervals describe finite-test uncertainty, not variability across independent training seeds.
+The additional test uses math answer verification, code unit tests, instruction-following constraints, and science multiple-choice scoring. Mathematics, code, and IF use greedy decoding; Science uses four responses per question at temperature 1. The generation context budget is 32,768 tokens, with thinking disabled. The source distributions and the code/IF scorers differ from the original benchmark protocol, so the two tables are reported separately. The four-domain mean is an equal-weight descriptive aggregate. The available question-paired bootstrap intervals describe finite-test uncertainty, not variability across independent training seeds.
 
 \input{experiments/completed_results_20260917/independent_test_table}
 
 \subsection{Frozen checkpoint-selection outcomes}
 \label{app:completed_selection}
 
-The selection protocol fixes a tolerance of 2 percentage points per domain relative to initialization, equal domain weights, and a minimum useful mean gain of 1 percentage point. It compares the endpoint, maximum-development-utility checkpoint, and maximum-utility checkpoint satisfying the retention constraints. Selections were frozen before the selected models' independent test inference. Development selection uses the already observed original benchmarks and is therefore exploratory.
+The three selection rules in Section~\ref{sec:recipe} are applied to the development grids in Appendix~\ref{app:setup}. Selections were frozen before independent test inference and are not recomputed using the test or overlap-sensitivity results. The additional PG-DT/Adam evaluation at update 250 is included because both development selection rules chose it.
 
 \input{experiments/completed_results_20260917/selection_table}
 
-The retention and maximum-utility rules select identical checkpoints in all ten trajectories. Nine trajectories select update 500 under all three rules. For PG-DT/Adam, the two selection rules choose update 250: its independent-test mean is 43.140\%, compared with 43.506\% at update 500. Thus this comparison does not establish an advantage for retention-constrained selection. All selected models satisfy the retention and useful-gain conditions as test point estimates; this is not a simultaneous confidence guarantee. PG-DR/Adam has two development checkpoints outside the tolerance: GPQA falls from 32.197\% initially to 28.030\% at update 50 and 30.177\% at update 250, before reaching 34.975\% at update 500. Endpoint retention therefore does not imply retention throughout training.
+All selected models satisfy the retention and useful-gain conditions as test point estimates; this is not a simultaneous confidence guarantee. PG-DR/Adam nevertheless has two development checkpoints outside the tolerance: GPQA falls from 32.197\% initially to 28.030\% at update 50 and 30.177\% at update 250, before reaching 34.975\% at update 500. Endpoint retention therefore does not imply retention throughout training.
 
 \subsection{Actual intersection coverage}
 \label{app:actual_intersection_coverage}
 
+For each of four student states (M-PG and M-I64-DR at updates 100 and 500), four banks provide one response per domain and six sampled positions per response: 96 prefixes per state. Each response is scored by its domain teacher. We measure $p_\theta(I\mid h)$ for the actual intersection $I=S\cap T$ and the retained fraction $r=p_\theta(I\mid h)/p_\theta(S\mid h)$.
+
 \input{experiments/completed_results_20260917/intersection_coverage_table}
 
-Table~\ref{tab:intersection_coverage} measures the student probability mass in the actual student--teacher candidate intersection, rather than in the teacher candidate set alone. All 384 sampled routed prefixes have intersection mass above 95\%, and none has an empty intersection. This high-coverage regime helps delimit the local comparisons with full-vocabulary feedback. It does not establish the same behavior for low-coverage prefixes, other teacher configurations, or the full online I16 training trajectory. The four banks are local sampling repeats, not independent training seeds; inputs can differ across student states.
+Table~\ref{tab:intersection_coverage} measures the student probability mass in the actual student--teacher candidate intersection, rather than in the teacher candidate set alone. Across 384 routed prefixes, the minimum intersection mass is 96.55\%, and none has an empty intersection. This high-coverage regime helps delimit the local comparisons with full-vocabulary feedback. It does not establish the same behavior for low-coverage prefixes, other teacher configurations, or the full online I16 training trajectory. The four banks are local sampling repeats, not independent training seeds; inputs can differ across student states.
 
 \subsection{Sensitivity to known mathematics overlap}
 \label{app:math_overlap_sensitivity}
@@ -35,7 +37,7 @@ The frozen Qwen training pool contains five records matching four known MATH-500
 
 \input{experiments/completed_results_20260917/math_sensitivity_table}
 
-The ordering by four-domain mean is unchanged across the twelve reported checkpoints. The frozen checkpoint selections are retained. This comparison neither retrains on a filtered pool nor constitutes an exhaustive overlap or contamination audit.
+The ordering by four-domain mean is unchanged across the twelve reported checkpoints. MATH-496 denotes the retained subset, not a new official benchmark. The frozen checkpoint selections are retained. This comparison neither retrains on a filtered pool nor constitutes an exhaustive overlap or contamination audit.
 
 \subsection{Teacher-update overlap and distributional similarity}
 \label{app:teacher_overlap_support}
@@ -43,8 +45,8 @@ The ordering by four-domain mean is unchanged across the twelve reported checkpo
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/appendix_teacher_overlap.pdf}
-\caption{Supporting overlap views at the shared M-PG/500 student and optimizer state. (a) Top-1\% FP32 update-set Jaccard versus update cosine for PG/I64, common/routed inputs, and saved-state Adam, reset-$m$, and norm-matched SGD. Small points summarize banks and large points average four banks. (b) Common-input teacher JS versus $1-$Jaccard for Adam and SGD; each point is one teacher pair within one bank (six pairs per bank, four banks). Pairs share teachers and banks, so these points are dependent. These geometric associations do not measure cross-domain capability harm.}
+\caption{Teacher-update overlap and distributional similarity. (a) Top-1\% FP32 update-set Jaccard versus cosine; small points summarize banks and large points average banks. (b) Common-input teacher JS versus $1-$Jaccard; each point is a teacher pair within a bank. These geometric associations do not measure cross-domain capability harm.}
 \label{fig:teacher_overlap_support}
 \end{figure}
 
-Figure~\ref{fig:teacher_overlap_support} preserves the overlap and teacher-distribution comparisons alongside the history-subtracted controls in the main text. It uses local updates on copies of a saved state, not bitwise replay of the online optimizer. Common inputs hold the student prefixes fixed across teachers; routed inputs change the teacher and its input domain together.
+Figure~\ref{fig:teacher_overlap_support} complements the main history-subtracted analysis using the M-PG/500 state and controls described in Appendix~\ref{app:nine_panel_support}. It compares PG/I64 under saved-state Adam, reset-$m$, and norm-matched SGD. Common inputs hold student prefixes fixed across teachers; routed inputs change the teacher and its input domain together. Each of four banks contains six teacher pairs; observations share teachers and banks and are dependent.

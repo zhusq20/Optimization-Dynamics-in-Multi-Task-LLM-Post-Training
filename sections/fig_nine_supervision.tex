@@ -1,9 +1,9 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section5_supervision.pdf}
-\caption{Supervision geometry and capability.
+\caption{Vocabulary feedback changes gradient direction while local BF16 activity remains similar; capability gains vary by task and checkpoint.
 (a) Mean BF16 nonzero fractions by student state and loss.
 (b) Alignment with full-vocabulary supervision: PG bank means (lines) and individual banks (points), with the I64 range shaded.
-(c) I64-minus-PG scores for single-teacher (S) and joint (M) training, plus I16-minus-PG scores for joint training. Each comparison uses DR, Adam, measured seed 42, and the same benchmark protocol (full MATH500, LCB, IFBench, and GPQA) at updates 100/250/500. Positive percentage-point differences favor I64 or I16 over the corresponding PG run. I16 adds an online candidate-size comparison; panels (a,b) retain the I64 local controls and do not measure I16 geometry.}
+(c) I64/I16 score differences from PG within single-teacher (S) or joint (M) training. Positive values favor I64 or I16.}
 \label{fig:supervision_overview}
 \end{figure}

@@ -78,3 +78,14 @@
 /figures/appendix_mvp_20260914/*
 !/figures/appendix_mvp_20260914/capability.pdf
 !/figures/appendix_mvp_20260914/cumulative_geometry.pdf
+
+# Completed endpoint and additional-control compilation inputs (2026-09-17).
+!/experiments/completed_results_20260917/
+/experiments/completed_results_20260917/*
+!/experiments/completed_results_20260917/endpoint_table.tex
+!/experiments/completed_results_20260917/independent_test_table.tex
+!/experiments/completed_results_20260917/selection_table.tex
+!/experiments/completed_results_20260917/intersection_coverage_table.tex
+!/experiments/completed_results_20260917/math_sensitivity_table.tex
+!/sections/012_completed_results.tex
+!/figures/nine_panel_20260914/appendix_teacher_overlap.pdf

@@ -1,8 +1,8 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section4_sparsity_overlap.pdf}
-\caption{Parameter precision and shared history shape update geometry.
-(a) Nonzero (NZ) and 90\%-energy (E90) coordinate fractions (\%); S/M denote single-teacher/joint training. Color uses a square-root scale.
-(b,c) Routed/common inputs at the same M-PG/500 state: FP32 teacher-update cosine for saved Adam, the difference $U(g;H)-U(0;H)$ (``Minus zero''), reset-$m$, and norm-matched SGD. Small points average six teacher pairs within each of four response banks; large points average the four banks. Banks are diagnostic repeats, not training seeds. Reset-$m$ retains the second moment and clock, and is also norm-matched. Subtracting the zero-current-gradient step removes most routed alignment; this counterfactual difference is not an additive teacher contribution.}
+\caption{Stored BF16 changes are concentrated; removing the history-only step eliminates most routed teacher-update alignment.
+(a) Nonzero (NZ) and 90\%-energy (E90) coordinate fractions; S/M denote single-teacher/joint training. Color uses a square-root scale.
+(b,c) FP32 teacher-update cosines for routed/common inputs. ``Minus zero'' denotes $U(g;H)-U(0;H)$. Small points show bank means over teacher pairs; large points average banks.}
 \label{fig:subnetwork_overview}
 \end{figure}

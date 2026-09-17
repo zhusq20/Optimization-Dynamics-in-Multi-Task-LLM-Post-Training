@@ -1,10 +1,9 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/added_control_figures_20260914/sampling_history_controls.pdf}
-\caption{Sampling and optimizer-history controls at M-PG/100.
-(a) Mean gradient alignment with full vocabulary as PG action count increases; the dashed line denotes I64.
-(b) BF16 activity with saved Adam, including a zero-current-gradient step; bars show means.
-(c) Activity after resetting optimizer history.
-Panels (b,c) use two short-response banks, separate from (a)'s three long-response banks; zero gradient is measured once. Details appear in Appendix~\ref{app:added_controls}.}
+\caption{More PG actions improve gradient alignment, while optimizer history strongly affects BF16 activity.
+(a) Mean gradient cosine to full vocabulary; the dashed line denotes I64.
+(b) A zero-current-gradient step alone produces nearly as much BF16 activity as the supervised steps; bars show means.
+(c) Activity after resetting optimizer history. Points in (b,c) denote banks.}
 \label{fig:sampling_history_controls}
 \end{figure}

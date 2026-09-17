@@ -46,5 +46,5 @@ w_i=
 \end{equation}
 Under GT, $T_i$ cancels the response-mean denominator in $\ell_i$, so every valid token receives equal weight and each domain's total weight equals its observed token share. DT fixes each domain's total weight to $\lambda_d$ while retaining equal token weights within that domain. DR distributes $\lambda_d$ equally across responses within each domain. Thus all three rules instantiate Equation~\ref{eq:mopd} with the same token loss but different response weights.
 
-\paragraph{Gradient conflict.}
-We measure conflict between optimizer updates. Starting from identical copies of the student and optimizer state, apply one optimizer step using domain $d$'s mean loss and let $u_d=\theta_d^+-\theta$ be the resulting parameter change. For nonzero updates, define $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$. Negative values indicate opposing update directions; positive values indicate alignment.
+\paragraph{Update alignment.}
+Let $u_d$ be the parameter change proposed by an optimizer using domain $d$'s mean loss at a given student and optimizer state. For nonzero updates, define $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$. Negative values indicate opposing update directions; positive values indicate alignment. This geometric measure does not by itself determine the effect on domain capabilities.

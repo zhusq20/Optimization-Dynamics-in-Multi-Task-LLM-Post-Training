@@ -7,8 +7,13 @@ views remain in the appendix, including normalization aggregates. The appendix
 uses measured capability and cumulative-geometry trajectories through update
 500, update-500 paired intervals, and a compact local-concentration table;
 controls already shown in the main figures are referenced rather than repeated. Normalization
-capability curves retain the original estimated seed values with explicit caption
-provenance; the author reports agreement with subsequent three-seed experiments.
+capability curves retain their existing means, sample standard deviations, and error
+bars. On September 17, 2026, the authors confirmed that their seed-43/44 series
+are real experimental data. The source confirmation is recorded in the project
+provenance memory; historical filenames do not determine the current data status.
+The expanded seed-42 endpoint table, teacher history subtraction, and I16
+comparison are accompanied by independent-test, selection, coverage, and
+known-overlap sensitivity tables in the appendix.
 
 ## Compile
 
