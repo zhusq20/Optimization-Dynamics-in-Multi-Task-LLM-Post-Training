@@ -1,52 +1,54 @@
-\section{Completed Capability Comparisons and Additional Controls}
+\section{Additional Test Results and Robustness Checks}
 \label{app:completed_results}
 
-\subsection{Evaluation scope and the independent domain test}
+\subsection{Additional test sets for the same four domains}
 \label{app:independent_domain_test}
 
-The ten seed-42 joint-training trajectories use the development benchmarks and checkpoint grid described in Appendix~\ref{app:setup}. The analyses below add testing on separate questions, frozen checkpoint selection, coverage measurements, and overlap sensitivity.
+The ten seed-42 joint-training trajectories use the development benchmarks and checkpoint grid in Appendix~\ref{app:setup}. The following analyses evaluate selected checkpoints on separate test questions, measure candidate-set coverage, and check sensitivity to known training--evaluation overlap.
 
-Table~\ref{tab:independent_test} uses a separately frozen additional-domain test with 256 questions per domain, for 1,024 questions and 1,792 responses per model. Mathematics and code are drawn from the Skywork-OR1-RL-Data mathematics and TACO-based code pools; IF uses Nemotron-RL-instruction\_following; Science uses the Nemotron-RL-knowledge-mcqa validation split restricted by a fixed natural-science keyword filter. Questions are the first eligible unique candidates in frozen source order, selected without model scores. Normalized exact and lexical near-duplicate checks exclude the original training bundle and known evaluation pools. These checks do not establish exhaustive semantic decontamination or absence of pretraining exposure.
+Table~\ref{tab:independent_test} uses additional test sets fixed before inference, with 256 questions per domain: 1,024 questions and 1,792 responses per model. Mathematics and code come from the Skywork-OR1-RL-Data mathematics and TACO-based code pools; instruction following uses Nemotron-RL-instruction\_following; science uses the Nemotron-RL-knowledge-mcqa validation split restricted by a fixed natural-science keyword filter. Questions are the first eligible unique candidates in the fixed source order, selected without model scores. Normalized exact-match and lexical near-duplicate checks remove questions matching the original training bundle or known evaluation pools. These checks do not establish exhaustive semantic decontamination or rule out pretraining exposure.
 
-The additional test uses math answer verification, code unit tests, instruction-following constraints, and science multiple-choice scoring. Mathematics, code, and IF use greedy decoding; Science uses four responses per question at temperature 1. The generation context budget is 32,768 tokens, with thinking disabled. The source distributions and the code/IF scorers differ from the original benchmark protocol, so the two tables are reported separately. The four-domain mean is an equal-weight descriptive aggregate. The available question-paired bootstrap intervals describe finite-test uncertainty, not variability across independent training seeds.
+Scoring uses mathematics answer verification, code unit tests, instruction-following constraints, and science multiple-choice accuracy. Mathematics, code, and instruction following use greedy decoding; science uses four responses per question at temperature 1. The context budget is 32,768 tokens, with thinking disabled. The data distributions and code/instruction-following scorers differ from the development benchmarks, so their scores are reported separately. The four-domain mean weights domains equally. Question-paired bootstrap intervals quantify finite-test uncertainty and do not estimate variation from training seeds.
 
 \input{experiments/completed_results_20260917/independent_test_table}
 
-\subsection{Frozen checkpoint-selection outcomes}
+\subsection{Checkpoint selection before test evaluation}
 \label{app:completed_selection}
 
-The three selection rules in Section~\ref{sec:recipe} are applied to the development grids in Appendix~\ref{app:setup}. Selections were frozen before independent test inference and are not recomputed using the test or overlap-sensitivity results. The additional PG-DT/Adam evaluation at update 250 is included because both development selection rules chose it.
+We apply the three selection rules in Section~\ref{sec:recipe} to the development grid in Appendix~\ref{app:setup}. Checkpoint choices are fixed before test inference and remain unchanged after the test and overlap-sensitivity analyses. Both development-based rules choose update 250 for PG-DT/Adam and update 500 for the other nine trajectories. The separate PG-DT/Adam update-250 test evaluation allows direct comparison with its update-500 endpoint.
 
 \input{experiments/completed_results_20260917/selection_table}
 
-All selected models satisfy the retention and useful-gain conditions as test point estimates; this is not a simultaneous confidence guarantee. PG-DR/Adam nevertheless has two development checkpoints outside the tolerance: GPQA falls from 32.197\% initially to 28.030\% at update 50 and 30.177\% at update 250, before reaching 34.975\% at update 500. Endpoint retention therefore does not imply retention throughout training.
+The retention constraint does not change the checkpoint selected by maximum development mean for any trajectory. On the additional test sets, the update-250 PG-DT/Adam checkpoint scores 0.366 percentage points below its update-500 endpoint in four-domain mean. Thus earlier selection by development mean does not improve the separate-test mean in this case. All selected models satisfy the retention and useful-gain conditions when assessed using test point estimates, which is not a simultaneous confidence guarantee. PG-DR/Adam nevertheless has two development checkpoints outside the retention tolerance: GPQA falls from 32.197\% initially to 28.030\% at update 50 and 30.177\% at update 250, before reaching 34.975\% at update 500. Evaluating only the final checkpoint would miss these intermediate regressions.
 
-\subsection{Actual intersection coverage}
+\subsection{Probability mass retained by the candidate intersection}
 \label{app:actual_intersection_coverage}
 
-For each of four student states (M-PG and M-I64-DR at updates 100 and 500), four banks provide one response per domain and six sampled positions per response: 96 prefixes per state. Each response is scored by its domain teacher. We measure $p_\theta(I\mid h)$ for the actual intersection $I=S\cap T$ and the retained fraction $r=p_\theta(I\mid h)/p_\theta(S\mid h)$.
+For each of four student checkpoints (M-PG and M-I64-DR at updates 100 and 500), four cached response batches provide one response per domain and six sampled positions per response: 96 prefixes per checkpoint. Each response is scored by its domain teacher. We measure $p_\theta(I\mid h)$ for the actual intersection $I=S\cap T$ and the retained fraction $r=p_\theta(I\mid h)/p_\theta(S\mid h)$.
 
 \input{experiments/completed_results_20260917/intersection_coverage_table}
 
-Table~\ref{tab:intersection_coverage} measures the student probability mass in the actual student--teacher candidate intersection, rather than in the teacher candidate set alone. Across 384 routed prefixes, the minimum intersection mass is 96.55\%, and none has an empty intersection. This high-coverage regime helps delimit the local comparisons with full-vocabulary feedback. It does not establish the same behavior for low-coverage prefixes, other teacher configurations, or the full online I16 training trajectory. The four banks are local sampling repeats, not independent training seeds; inputs can differ across student states.
+The minimum student probability mass in the actual student--teacher top-64 intersection is 96.55\% over the 384 sampled prefixes, and no intersection is empty (Table~\ref{tab:intersection_coverage}). Thus the single-step I64/full-vocabulary comparisons use prefixes where truncation discards little student probability mass. They do not establish the same behavior when the intersection has low probability mass, with other teachers, or during I16 training. The four batches repeat response sampling at each checkpoint; they are not independent training seeds, and responses may differ between checkpoints.
 
 \subsection{Sensitivity to known mathematics overlap}
 \label{app:math_overlap_sensitivity}
 
-The frozen Qwen training pool contains five records matching four known MATH-500 underlying problems, including wording or answer-form variants. The affected MATH test identifiers are counting-and-probability problem 430 and intermediate-algebra problems 1849, 2146, and 582. Their presence in the training pool does not establish that each was sampled by a particular run or caused a performance increase. We remove these four fixed evaluation questions from the existing per-question scores as an offline sensitivity analysis, retaining the original 500-question results as the main protocol.
+The fixed Qwen training pool contains five records matching four known MATH-500 problems, including variants in wording or answer format. The affected MATH test identifiers are counting-and-probability problem 430 and intermediate-algebra problems 1849, 2146, and 582. Their presence in the pool does not show whether a run sampled them or whether they improved its score. We remove these four questions from the existing per-question evaluation results, retaining the original 500-question results as the main protocol.
 
 \input{experiments/completed_results_20260917/math_sensitivity_table}
 
-The ordering by four-domain mean is unchanged across the twelve reported checkpoints. MATH-496 denotes the retained subset, not a new official benchmark. The frozen checkpoint selections are retained. This comparison neither retrains on a filtered pool nor constitutes an exhaustive overlap or contamination audit.
+Removing the four questions leaves the four-domain-mean ranking unchanged for all twelve reported checkpoints. MATH-496 names the retained subset, not a new official benchmark. We keep the checkpoint choices fixed. This analysis does not retrain on a filtered pool or provide an exhaustive contamination audit.
 
 \subsection{Teacher-update overlap and distributional similarity}
 \label{app:teacher_overlap_support}
 
-\begin{figure}[t]
+\begin{figure}[!htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/appendix_teacher_overlap.pdf}
-\caption{Teacher-update overlap and distributional similarity. (a) Top-1\% FP32 update-set Jaccard versus cosine; small points summarize banks and large points average banks. (b) Common-input teacher JS versus $1-$Jaccard; each point is a teacher pair within a bank. These geometric associations do not measure cross-domain capability harm.}
+\caption{\textbf{Coordinate overlap and update direction measure different properties.}
+(a) Top-1\% FP32 update-set Jaccard versus cosine; small/large points show batch/overall means.
+(b) Teacher-distribution JS divergence versus $1-$Jaccard on shared inputs; each point is a teacher pair within a batch.}
 \label{fig:teacher_overlap_support}
 \end{figure}
 
-Figure~\ref{fig:teacher_overlap_support} complements the main history-subtracted analysis using the M-PG/500 state and controls described in Appendix~\ref{app:nine_panel_support}. It compares PG/I64 under saved-state Adam, reset-$m$, and norm-matched SGD. Common inputs hold student prefixes fixed across teachers; routed inputs change the teacher and its input domain together. Each of four banks contains six teacher pairs; observations share teachers and banks and are dependent.
+Figure~\ref{fig:teacher_overlap_support} supplements the zero-gradient baseline subtraction at M-PG/500 using the controls in Appendix~\ref{app:nine_panel_support}. It compares PG and I64 under Adam with trained moments, reset-$m$, and norm-matched SGD. Shared inputs hold student prefixes fixed between teachers; domain-specific inputs change both the teacher and the input domain. Each of four batches contains six teacher pairs; these observations are dependent because they reuse teachers and responses. These gradient and update measurements do not directly measure changes in task performance.

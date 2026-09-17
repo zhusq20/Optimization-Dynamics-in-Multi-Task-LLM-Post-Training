@@ -1,42 +1,41 @@
-\section{Update Sparsity and Teacher Overlap}
+\section{Parameter-Update Sparsity and Teacher Alignment}
 \label{sec:subnetworks}
 
-This study examines how numerical representation and optimizer history affect the concentration, overlap, and direction of teacher-conditioned parameter changes. Prior work observes concentrated changes under dense distillation supervision \citep{yu2026denseupdates}. We examine the corresponding measurements in a jointly trained student.
+The joint student changes only a small fraction of its BF16 weights, even though the optimizer changes most FP32 master weights. In addition, updates computed from different teachers can point in similar directions because they use the same accumulated Adam moments. These results qualify the interpretation of concentrated parameter changes reported for distillation \citep{yu2026denseupdates}: both numerical precision and the optimizer state affect which changes are observed.
 
-\subsection{How concentrated are joint parameter changes?}
+\subsection{Sparse BF16 changes mask widespread FP32 updates}
 
 Write $\Delta=\theta-\theta_0$ for cumulative changes from initialization and $u=\theta_{\mathrm{after}}-\theta_{\mathrm{before}}$ for an individual optimizer step. For either change vector $z$ with $P$ coordinates, we report the fraction of parameters whose absolute change exceeds threshold $\tau$:
 \begin{equation}
  f_\tau(z)=\frac{1}{P}\sum_{j=1}^{P}\mathbf 1\{|z_j|>\tau\}.
  \label{eq:active_fraction}
 \end{equation}
-We also report the smallest coordinate fraction accounting for 90\% of the squared change. This measures concentration without choosing an absolute threshold. Both quantities are computed separately for FP32 optimizer weights and BF16 stored model weights.
+We also report the smallest coordinate fraction accounting for 90\% of the squared change, which measures concentration without an absolute threshold. We compute both statistics for the optimizer's FP32 master weights and the model's stored BF16 weights. These are parameter-change measurements, distinct from raw gradients before clipping and the optimizer transformation.
 
-\paragraph{Joint-training comparison.}
-The joint PG and I64-DR branches share the training settings in Appendix~\ref{app:setup}, including domain-response averaging. At update 500, PG changes 7.30\% of BF16 coordinates, with 90\% of squared change in 3.79\% of coordinates; I64 changes 8.46\%, with 90\% of squared change in 4.38\% (Figure~\ref{fig:subnetwork_overview}a). Both joint runs concentrate their stored parameter changes in a small fraction of the model.
+The joint PG and I64-DR runs use the same training settings, including equal domain weights and equal response weights within each domain (Appendix~\ref{app:setup}). After 500 updates, 7.30\% of PG's BF16 weights differ from initialization, and 3.79\% of coordinates account for 90\% of the squared change. The corresponding I64 fractions are 8.46\% and 4.38\% (Figure~\ref{fig:subnetwork_overview}a). Both runs therefore concentrate their cumulative BF16 changes in a small fraction of parameters.
 
-The corresponding FP32 nonzero fractions are 97.37\% for PG and 97.17\% for I64; their 90\%-energy fractions are 34.03\% and 35.14\%. The optimizer steps at this checkpoint change 86.80\% and 87.05\% of FP32 coordinates, respectively. Thus sparse BF16-visible changes coexist with broad FP32 activity in both cumulative changes and individual steps. Appendix Figure~\ref{fig:geometry} gives the trajectories, and Appendix~\ref{app:records} provides threshold and optimizer-state controls.
+In FP32, however, 97.37\% of PG's master weights and 97.17\% of I64's differ from initialization; 34.03\% and 35.14\% of coordinates account for 90\% of their squared changes. The individual optimizer step at update 500 changes 86.80\% and 87.05\% of FP32 coordinates, respectively. Most parameters thus receive FP32 updates, while many changes disappear when represented in BF16. Sparse differences between BF16 checkpoints do not imply that the optimizer updates only a small subset of parameters. Appendix Figure~\ref{fig:geometry} gives the trajectories, and Appendix~\ref{app:records} reports threshold and optimizer-state controls.
 
 \input{sections/fig_nine_sparsity}
 
-\subsection{Do teachers change the same parameters in one student?}
+\subsection{Adam moments align updates from different teachers}
 
-Comparing teacher-specific updates requires identical copies of the joint student and its optimizer state. For teacher $d$, let $S_d(\rho)$ contain the largest-magnitude $\rho$ fraction of its parameter changes. We compare selected coordinates using Jaccard overlap:
+We compute a separate optimizer step for each teacher using identical copies of the joint student and its saved Adam state, including the first and second moments. For teacher $d$, let $S_d(\rho)$ contain the largest-magnitude $\rho$ fraction of its parameter updates. We compare these coordinate sets using Jaccard overlap:
 \begin{equation}
 J(d,e)=\frac{|S_d(\rho)\cap S_e(\rho)|}{|S_d(\rho)\cup S_e(\rho)|}.
 \label{subnet_overlap}
 \end{equation}
-Equal selection sizes make the teacher pairs comparable. Overlap describes locations; the signs of the changes determine whether contributions at those locations agree. This distinction follows the support-overlap analysis of \citet{yu2026denseupdates}.
+Equal selection sizes make teacher pairs comparable. Jaccard overlap measures whether the largest updates occur at the same coordinates, whereas cosine similarity also accounts for update signs and magnitudes. Teachers can update the same coordinates in opposing directions, as distinguished in the support-overlap analysis of \citet{yu2026denseupdates}.
 
-At the common M-PG/500 state, we compare teachers on shared prefixes (common inputs) and on their respective domain prefixes (routed inputs). Each result averages the six teacher pairs within each of four response banks, then averages banks; these are local diagnostic repeats. Routed teacher updates have mean FP32 cosines of 0.8774 for PG and 0.8347 for I64 under saved-state Adam. Resetting the first moment or using norm-matched SGD brings their mean cosines close to zero (Figure~\ref{fig:subnetwork_overview}b). Appendix~\ref{app:teacher_overlap_support} gives the joint overlap--direction and teacher-JS views, and Appendix~\ref{app:gradient_overlap} gives raw-gradient input controls.
+At the joint PG checkpoint after 500 updates, we compare teachers given the same prefixes (common inputs) and teachers given prefixes from their assigned domains (routed inputs). Each result averages the six teacher pairs within each of four sampled response batches, then averages the batches; these repetitions do not measure training-seed variation. With routed inputs and the saved Adam moments, the mean pairwise cosine between FP32 updates is 0.8774 for PG and 0.8347 for I64. Resetting the first moment while retaining the second, or replacing Adam with SGD scaled to the same step norm, reduces both mean cosines to near zero (Figure~\ref{fig:subnetwork_overview}b). The accumulated first moment therefore accounts for much of the alignment between these teacher-conditioned steps. Appendix~\ref{app:teacher_overlap_support} relates coordinate overlap to update cosine and teacher-distribution similarity; Appendix~\ref{app:gradient_overlap} controls for input choice when comparing raw gradients.
 
-\subsection{How much alignment remains after removing the history-only step?}
+\subsection{Subtracting the zero-gradient step removes most update alignment}
 
-Let $U(g;H)$ denote an optimizer step for current gradient $g$ at saved optimizer state $H$. We compare the complete teacher-conditioned step with its difference from the zero-current-gradient step,
+Adam can change parameters even when the current gradient is zero: its first moment retains gradients from earlier updates. To measure how a teacher's current gradient changes the proposed step, we subtract this zero-gradient baseline. Let $U(g;H)$ be the parameter update computed from gradient $g$ using saved state $H$, which includes the first and second moments and the step count. For teacher $d$, we compute
 \begin{equation}
 \delta U_d=U(g_d;H)-U(0;H).
 \label{eq:history_subtracted}
 \end{equation}
-This difference retains the same parameters and optimizer state in both branches. It is a nonlinear counterfactual difference, not an additive decomposition of teacher contributions.
+Both steps start from identical parameters and optimizer state. Thus $\delta U_d$ measures the change in the Adam step caused by supplying $g_d$ instead of zero. It still depends on the saved moments, and Adam's nonlinear transformation prevents interpreting it as an additive teacher contribution.
 
-Under routed inputs, the mean PG/I64 cosines fall to 0.0098/0.0067 after this subtraction (Figure~\ref{fig:subnetwork_overview}b). Under common inputs, they fall from 0.8415/0.8562 to 0.2373/0.3462 (panel c). The strong alignment of the complete steps therefore depends on shared optimizer history and input conditions. Coordinate overlap can remain substantial even when directions differ, and neither statistic establishes the absence of cross-domain capability harm. That question requires measuring how teacher-conditioned steps affect per-domain losses or capabilities.
+With routed inputs, the mean pairwise cosines fall from 0.8774/0.8347 for the complete PG/I64 steps to 0.0098/0.0067 for $\delta U_d$ (Figure~\ref{fig:subnetwork_overview}b). With common inputs, they fall from 0.8415/0.8562 to 0.2373/0.3462 (panel c). After subtraction, teachers given their respective domain prefixes therefore produce update differences whose pairwise cosine is nearly zero on average, despite the strong alignment of their complete Adam steps. Similar complete steps need not reflect similar directions induced by current teacher gradients. Neither coordinate overlap nor update cosine establishes whether one teacher improves or harms another domain's performance; that requires per-domain loss or capability evaluation.

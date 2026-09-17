@@ -1,42 +1,45 @@
-\section{Supporting Views for the Main Figures}
+\section{Supporting Measurements for the Main Figures}
 \label{app:nine_panel_support}
 
-\paragraph{Capability provenance.}
-Figures~\ref{fig:normalization_capability}(c--f) and~\ref{fig:normalization_aggregate_support} report means and sample standard deviations over the three experimental seeds 42, 43, and 44, whose provenance is confirmed by the authors. The expanded endpoint matrix and Figure~\ref{fig:supervision_overview}(c) use seed-42 scores; these additional contrasts are point estimates rather than tests of training-seed significance.
+\paragraph{Training-seed uncertainty.}
+Figures~\ref{fig:normalization_capability}(c--f) and~\ref{fig:normalization_aggregate_support} report means and sample standard deviations for three training seeds (42, 43, and 44). The expanded endpoint table and Figure~\ref{fig:supervision_overview}(c) use seed 42; they do not estimate training-seed variability. In Figure~\ref{fig:normalization_capability}(a), legend values are mean domain token shares over the plotted batches.
 
 \paragraph{Teacher-update controls.}
-Figure~\ref{fig:subnetwork_overview}(a) compares DR cumulative changes at update 500. Panels (b,c) use the common M-PG/500 student and optimizer state, separating routed and common inputs. Each of four banks contains six teacher pairs; the displayed bank points and means preserve this grouping. The history-subtracted control uses Equation~\ref{eq:history_subtracted} and reports FP32 update cosines. SGD and reset-$m$ steps are individually norm-matched to saved-state Adam; reset-$m$ retains the second moment and optimizer clock. Teacher-pair observations share teachers and banks and are dependent. Steps use non-fused PyTorch updates on saved-state copies, rather than bitwise replay of the online optimizer. Single-teacher and joint runs differ in per-domain response exposure as specified in Appendix~\ref{app:setup}.
+Figure~\ref{fig:subnetwork_overview}(a) compares cumulative parameter changes under DR at update 500; the heatmap uses a square-root color scale. Panels (b,c) start from the same M-PG/500 student parameters and Adam moments. With domain-specific inputs, each teacher scores responses from its own domain; with shared inputs, all teachers score the same prefixes. Each of four cached response batches contains six teacher pairs. Small points summarize pairs within a batch, and large points average batches. Equation~\ref{eq:history_subtracted} subtracts the Adam step with the current gradient set to zero before computing FP32 update cosines. It subtracts the zero-gradient baseline; the remaining difference still depends nonlinearly on the saved moments. SGD and reset-$m$ steps are individually rescaled to the norm of the Adam step with trained moments; reset-$m$ retains the second moment and step counter. Teacher pairs reuse teachers and responses, so pairwise observations are dependent. These calculations use non-fused PyTorch updates on copies of saved checkpoints and need not reproduce the fused training optimizer bit for bit. Mathematics-only and joint training also differ in mathematics prompt exposure (Appendix~\ref{app:setup}).
 
-\paragraph{Local supervision controls.}
-Figure~\ref{fig:supervision_overview}(a,b) uses four banks at each of four joint-student states: M-PG and M-I64-DR at updates 100 and 500. Losses share prefixes and saved optimizer state within each row, while inputs may differ across rows. Direct T64 step-direction pairs were not recorded, and I16 is evaluated only in the online capability comparison. Panel (c) matches task, setting, and update for S-I64, M-I64, and the added M-I16 branch, each relative to PG in its own teacher setting. Table~\ref{tab:local_concentration} supplies the FP32 and energy-concentration measurements for the M-PG/100 comparison described in Appendix~\ref{app:losses}.
+\paragraph{Vocabulary-supervision controls.}
+Figure~\ref{fig:supervision_overview}(a,b) uses four cached response batches at each of four student checkpoints: M-PG and M-I64-DR at updates 100 and 500. Losses use identical prefixes and Adam moments within each checkpoint, while responses can differ between checkpoints. Panel (a) reports batch means. In panel (b), points are individual batches, lines connect PG batch means, and shading spans the I64 measurements. Direct pairwise comparisons of T64 update directions were not recorded; I16 appears only in the end-to-end training results. Panel (c) compares S-I64, M-I64, and M-I16 with PG at the same task, teacher setting, and update. Table~\ref{tab:local_concentration} adds FP32 and energy-concentration measurements for the M-PG/100 comparison in Appendix~\ref{app:losses}.
 
-\subsection{Additional control figures}
+\subsection{Additional optimizer and sampling controls}
 \label{app:added_controls}
 
-Figure~\ref{fig:normalization_interventions} reuses the six fixed banks and online clipping records described in Appendix~\ref{app:fixed_batch_normalization}. Reset-$m$ and reset-$(m,v)$ retain the optimizer clock. Panel (c) averages four domain probe losses within each bank; its error bars are sample standard deviations across the three banks at each checkpoint, not training-seed uncertainty.
+Figure~\ref{fig:normalization_interventions} uses the six cached response batches and training clipping records described in Appendix~\ref{app:fixed_batch_normalization}. In panel (a), boxes mark the interquartile range and whiskers the 5th--95th percentiles; labels give the fraction of training updates clipped. Reset-$m$ and reset-$(m,v)$ retain the optimizer step counter. Panel (c) averages four domain probe losses within each batch; error bars show sample standard deviations over the three batches at each checkpoint.
 
-Figure~\ref{fig:sampling_history_controls}(a) uses three M-PG/100 rollout banks with a 4,096-token response cap, containing 48 responses and 288 prefixes. Twelve fixed-prefix subbanks each receive two independent PG action draws at counts 1, 16, and 64; the I64 reference is evaluated once per subbank. Mean PG gradient cosines to full vocabulary are 0.5374, 0.8652, and 0.9667; I64 is 0.999988. These are local diagnostic repeats. Panels (b,c) instead use the two 256-token-cap banks from Appendix~\ref{app:records}; the zero-gradient branch is measured once. Reset-$m$ retains the second moment and clock, whereas fresh Adam resets both moments and the clock. These separate experiments do not form one paired intervention chain.
+Figure~\ref{fig:sampling_history_controls}(a) uses three M-PG/100 response batches, with a 4,096-token response cap, containing 48 responses and 288 prefixes. Twelve fixed subsets of prefixes each receive two independent draws of 1, 16, or 64 PG actions per prefix. I64 is evaluated once per subset. Increasing the sample count raises the mean PG gradient cosine to full-vocabulary KL from 0.5374 to 0.8652 and 0.9667; I64 reaches 0.999988. These repeats measure sampling variation at a fixed checkpoint. Panels (b,c) use the separate two-batch experiment with a 256-token response cap (Appendix~\ref{app:records}); its zero-gradient control is evaluated once. Reset-$m$ retains the second moment and step counter, whereas fresh Adam resets both moments and the counter. The sampling and moment-reset experiments use different response batches and are not paired.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section3_capability_support.pdf}
-\caption{Aggregate GT/DT/DR capability: (a) four-domain mean with student/teacher references; (b) worst-domain change from initialization. Zero denotes no regression. Error bars show mean $\pm$ sample SD across the three reported experimental seeds.}
+\caption{\textbf{Mean performance gains can coexist with a regression in an individual domain.}
+(a) Four-domain mean; S/T mark the initial student/teacher.
+(b) Worst-domain change from initialization; zero means no regression. Error bars show mean $\pm$ SD over three training seeds.}
 \label{fig:normalization_aggregate_support}
 \end{figure}
 
-\paragraph{Cumulative trajectories.}
-Figure~\ref{fig:geometry} extends the update-500 summary in Figure~\ref{fig:subnetwork_overview}(a) to the recorded trajectories.
+\paragraph{Cumulative parameter changes.}
+Figure~\ref{fig:geometry} shows the trajectories underlying the update-500 summary in Figure~\ref{fig:subnetwork_overview}(a).
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/appendix_mvp_20260914/cumulative_geometry.pdf}
-\caption{Cumulative PG/I64 changes through update 500 in single-teacher (S) and joint (M) training. (a,b) Nonzero fractions in FP32 and BF16. (c,d) Coordinate fractions carrying 90\% of squared change in each precision. Lines connect measured updates 1, 50, 100, 250, and 500; joint I64 uses DR.}
+\caption{\textbf{Cumulative BF16 changes remain much sparser than FP32 changes.}
+PG/I64 under DR in single-teacher (S) and joint (M) training: (a,b) nonzero fractions; (c,d) coordinate fractions containing 90\% of squared change. Lines connect measured updates 1, 50, 100, 250, and 500.}
 \label{fig:geometry}
 \end{figure}
 
-\section{Exposure and Candidate Weighting}
+\section{Prompt Exposure and Candidate-Set Weights}
 \label{app:recipe_details}
 
-With domain losses averaged separately, prompt quotas and loss weights play different roles: increasing a quota at fixed $\lambda_d$ changes exposure and estimation variance without directly increasing that domain's expected gradient weight. The single-teacher runs receive four times as many mathematics prompts per update as joint runs, which limits causal attribution of their capability differences to teacher count alone.
+When each domain loss is averaged separately, its prompt quota and loss weight control different quantities. Increasing the quota at fixed $\lambda_d$ changes the number of sampled responses and the variance of the gradient estimate, without directly increasing the domain's expected contribution to the total gradient. Mathematics-only runs receive four times as many mathematics prompts per update as joint runs. Their score differences therefore cannot be attributed to teacher count alone.
 
-Candidate coverage also changes the scale of vocabulary feedback. For the student candidate set $S$ and teacher intersection $I$ in Equation~\ref{eq:topk}, the retained student weights sum to $r(h)=p_\theta(I\mid h)/p_\theta(S\mid h)$. At a fixed prefix with a nonempty intersection and detached coefficients, the I64 gradient is $r(h)$ times the gradient obtained by renormalizing the same weights over $I$. Thus removing length weighting does not remove variation in feedback scale across prefixes. Monitoring this retained mass and empty intersections by domain helps assess whether a fixed candidate size supplies comparable coverage; increasing or renormalizing a small intersection requires validation because it can also amplify unreliable feedback.
+Candidate-set coverage also scales the distillation gradient. For the student candidate set $S$ and its intersection $I$ with the teacher set in Equation~\ref{eq:topk}, the retained student weights sum to $r(h)=p_\theta(I\mid h)/p_\theta(S\mid h)$. At a fixed prefix with a nonempty intersection and detached coefficients, the I64 gradient equals $r(h)$ times the gradient obtained by renormalizing the same weights over $I$. Equal response weights therefore do not imply equal gradient scale at every prefix. Measuring the retained mass and empty-intersection rate by domain can reveal unequal coverage under a fixed candidate size. Enlarging the candidate set or renormalizing its intersection changes the objective and requires a separate performance comparison.

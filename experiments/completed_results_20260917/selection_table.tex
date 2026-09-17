@@ -3,11 +3,11 @@
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
-\caption{Frozen checkpoint choices. Max utility and retention select the same checkpoint in every trajectory. Test $\Delta$ is the selected-checkpoint mean minus the endpoint mean in percentage points.}
+\caption{\textbf{The retention constraint leaves every checkpoint choice unchanged.} Test $\Delta$ is the selected-checkpoint mean minus the update-500 mean (percentage points).}
 \label{tab:checkpoint_selection}
 \begin{tabular}{lrrrr}
 \toprule
-Trajectory & Endpoint & Max utility & Retention & Test $\Delta$ (pp) \\
+Trajectory & Endpoint & Max dev. mean & Retention & Test $\Delta$ (pp) \\
 \midrule
 Other nine trajectories & 500 & 500 & 500 & 0.000 \\
 PG-DT / Adam & 500 & 250 & 250 & -0.366 \\

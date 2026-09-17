@@ -1,22 +1,21 @@
 \section{Practical Implications and Checkpoint Selection}
 \label{sec:recipe}
 
-The three studies support practical choices about weighting, diagnostics, and evaluation. They do not identify one configuration that is best across domains and evaluation sets.
+The experiments identify two reasons to assess MOPD with per-task evaluations: loss normalization changes the relative contribution of domains and responses, while optimizer moments and weight precision can hide differences between current gradients.
 
-\paragraph{Specify the intended weighting and measure the resulting capability profile.}
-GT weights tokens equally; DT fixes domain weights while retaining length weighting within each domain; DR also weights responses equally. These are different objectives, even with the same prompt quotas. Likewise, the PG/I16/I64 results favor selecting vocabulary feedback from per-domain capability and measured cost, with retained probability mass used to interpret coverage. The present runs do not provide a matched-cost efficiency ranking.
+\paragraph{Choose domain and response weights explicitly.}
+Specify both the domain loss weights and whether losses are averaged over tokens or responses; equal prompt counts do not define either choice. The PG/I16/I64 comparisons likewise show no consistent benefit from increasing the number of supervised vocabulary tokens. Choose this number using task scores and measured training cost, and report the probability mass covered by the candidate set. Our runs do not support a compute-efficiency ranking because their costs were not matched.
 
-\paragraph{Interpret update geometry with its history and precision.}
-Report the parameter representation, distinguish individual steps from cumulative changes, and compare teacher-conditioned updates at a common state. A zero-current-gradient reference helps assess how much alignment depends on shared history. Evidence of overlap or opposing directions should be followed by per-domain loss or capability measurements before inferring functional interference.
+\paragraph{Separate the current gradient from Adam moments and BF16 rounding.}
+Measure raw gradients, FP32 optimizer updates, and BF16 stored-weight changes separately. For teacher comparisons, start each proposed update from identical student parameters and Adam moment estimates. The zero-gradient reference measures the step driven by the accumulated moments without a new teacher gradient. Its subtraction reveals whether similar complete updates also have similar responses to the current teacher signals. Overlapping changed coordinates or high update cosine alone cannot establish that training with one teacher preserves another task's performance.
 
-\paragraph{Evaluate checkpoint selection on separate questions.}
-To test domain retention as a selection criterion, let $s_d(\theta)$ be a development score, with higher values better, and let $\epsilon_d\geq0$ be a prespecified tolerance relative to initialization. Eligible checkpoints satisfy
+\paragraph{A retention constraint does not improve checkpoint selection in these runs.}
+We test whether ruling out checkpoints with a large task regression improves selection by the mean development score. Let $s_d(\theta)$ be the development score for domain $d$, with higher values better. Eligible checkpoints satisfy
 \begin{equation}
 s_d(\theta)\geq s_d(\theta_0)-\epsilon_d
-\qquad\text{for every domain }d.
+\qquad\text{for every domain }d,
 \label{eq:retention}
 \end{equation}
-We select the eligible checkpoint with maximum equal-domain mean, retaining the initial student if none improves it by at least one percentage point. We compare this rule with unconstrained maximum utility and the final checkpoint, using a two-point domain tolerance fixed before the additional test results. Appendix~\ref{app:completed_selection} gives the development grids and selection outcomes.
+where $\epsilon_d\geq0$ is a prespecified tolerance relative to the initial student. We select the eligible checkpoint with the highest equal-domain mean, keeping the initial student if none improves that mean by at least one percentage point. We compare this rule with maximizing the same mean without the domain constraint and with using the final checkpoint. The tolerance is two percentage points per domain, fixed before the additional test results (Appendix~\ref{app:completed_selection}).
 
-
-The additional test uses separately frozen questions from four domain sources, with 256 questions per domain and a distinct evaluation protocol (Appendix~\ref{app:independent_domain_test}). Relative rankings can change: PG-DR/SGD exceeds Adam by 1.18 mean points on the original benchmarks, but is 0.07 points lower on this test. Retention and unconstrained maximum utility select the same checkpoint on all ten trajectories: update 500 in nine cases and update 250 for PG-DT/Adam. In the latter case, the selected checkpoint scores 43.14\% on the additional test, versus 43.51\% at update 500. The retention constraint therefore has no demonstrated selection benefit here. Because the development benchmarks had been observed previously, this selection study remains exploratory.
+The additional test contains 256 separately selected questions per domain and uses a distinct evaluation protocol (Appendix~\ref{app:independent_domain_test}). The retention-constrained and unconstrained rules select the same checkpoint in all ten trajectories: update 500 in nine cases and update 250 for PG-DT/Adam. For PG-DT/Adam, the selected checkpoint scores 43.14\% on the additional test, below the final checkpoint's 43.51\%. Thus neither the constraint nor the earlier selected checkpoint provides an observed test-score benefit here. Method rankings also depend on the evaluation set: PG-DR/SGD exceeds Adam by 1.18 mean points on the original benchmarks but is 0.07 points lower on the additional test. Because the development benchmarks had already been inspected, this checkpoint-selection analysis is exploratory.

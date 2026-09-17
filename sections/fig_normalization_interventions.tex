@@ -1,9 +1,9 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/added_control_figures_20260914/normalization_interventions.pdf}
-\caption{Averaging rules differ in clipping, while Adam history shapes step size and immediate loss changes.
-(a) Gradient fraction retained; labels give clipping rates, boxes the interquartile range, and whiskers the 5th--95th percentiles.
-(b) FP32 step norms; bars show bank means.
-(c) Held-out reverse-KL changes; lower is better. Open points denote banks; filled points and error bars show mean $\pm$ sample SD.}
+\caption{\textbf{DR triggers clipping at every update; Adam moments change step norms and one-step loss reductions.}
+(a) Retained gradient fraction; labels give clipping rates.
+(b) FP32 step norms under moment resets.
+(c) Held-out reverse-KL changes (lower is better). Open points are cached batches; filled points and error bars show mean $\pm$ SD.}
 \label{fig:normalization_interventions}
 \end{figure}

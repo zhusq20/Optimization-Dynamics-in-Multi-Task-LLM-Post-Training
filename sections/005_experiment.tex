@@ -1,13 +1,13 @@
 \section{Experimental Protocol and Capability Results}
 \label{app:setup}
 
-The experiments compare averaging rules, teacher-conditioned updates, and vocabulary supervision using a shared student initialization and four domain teachers. The ten joint-training configurations in Table~\ref{tab:completed_endpoints} include the original PG-DR and I64-DR/DT/GT branches. Mathematics-only PG/I64 runs provide the single-teacher comparison. All checkpoint axes count optimizer updates, and each trajectory comparison uses checkpoints completed for every included branch.
+The experiments use a shared student initialization and a pool of four domain-specific teachers. We compare loss averaging rules, optimizer updates from different teachers, and the number of vocabulary tokens included in the distillation loss. The ten joint-training configurations in Table~\ref{tab:completed_endpoints} include PG-DR and I64-DR/DT/GT. Mathematics-only PG/I64 runs provide the single-teacher comparison. All checkpoint axes count optimizer updates, and each trajectory comparison uses checkpoints completed for every included branch.
 
 \subsection{Model, data, and training protocol}
 
-The student is Qwen3-1.7B \citep{qwen2025qwen3}. The four frozen teachers are mathematics, code, instruction-following, and science RL descendants of the same initial model. Student and teachers share the tokenizer and native chat template with thinking disabled. The frozen protocol records model revisions and weight identities.
+The student is Qwen3-1.7B \citep{qwen2025qwen3}. The four frozen teachers were trained by reinforcement learning from the same initial model, specializing in mathematics, code, instruction following, and science, respectively. Student and teachers share the tokenizer and native chat template with thinking disabled. The experiment records identify the model revisions and weight files.
 
-AdamW configurations use learning rate $2.5\times10^{-7}$ with $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, no weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Training uses seeds 42--44 for the I64 GT/DT/DR normalization capability summaries and seed 42 for the other comparisons. Each optimizer update aggregates 64 responses across all domain blocks.
+AdamW configurations use learning rate $2.5\times10^{-7}$ with $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, no weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Training uses seeds 42--44 for the I64 GT/DT/DR normalization capability summaries and seed 42 for the other comparisons. Each optimizer update aggregates 64 responses; domain allocation is specified below.
 
 The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. I64 uses the top-$k$ intersection objective in Equation~\ref{eq:topk} with $k=64$ from initialization; I16 uses $k=16$. The supplementary PG/SGD branches use a learning rate of $0.0025$ and each complete 500 updates. Hardware and deployment differ from the AdamW runs, so the capability comparison does not establish a runtime ranking.
 
@@ -17,40 +17,40 @@ Training prompts come from the \href{https://huggingface.co/datasets/nvidia/Nemo
 
 Each capability suite contains MATH-500 (500 questions from the MATH benchmark \citep{hendrycks2021math}; \href{https://huggingface.co/datasets/HuggingFaceH4/MATH-500}{dataset release}), a fixed 128-question LiveCodeBench v6 subset \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 1,720 responses.
 
-The expanded development grid comprises updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories, plus the shared initial evaluation. Appendix~\ref{app:independent_domain_test} describes a separate additional-domain test. Table~\ref{tab:all_capability} supplements the joint endpoints in Table~\ref{tab:completed_endpoints} with single-teacher scores and intermediate PG/I64 checkpoints.
+The expanded development grid comprises updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories, plus the initial student evaluation. Appendix~\ref{app:independent_domain_test} describes additional test sets for the same four domains. Table~\ref{tab:all_capability} supplements the joint endpoints in Table~\ref{tab:completed_endpoints} with single-teacher scores and intermediate PG/I64 checkpoints.
 
 \begin{table}[t]
-\caption{Supplementary seed-42 capability scores (\%). S denotes mathematics-only training and M denotes joint training; both use DR. Single-teacher trajectories and intermediate joint checkpoints complement the initial and joint endpoint scores in Table~\ref{tab:completed_endpoints}.}
+\caption{\textbf{PG/I64 performance depends on the task and checkpoint.} Seed-42 scores (\%): S is mathematics-only training and M is joint training; both use DR. Joint endpoints appear in Table~\ref{tab:completed_endpoints}.}
 \label{tab:all_capability}
 \centering\small
 \input{experiments/appendix_mvp_20260914/capability_table.tex}
 \end{table}
 
-The four RL teachers were evaluated separately on their respective domain benchmarks using the same prompt and decoding protocol (Table~\ref{tab:teachers}). These scores describe the available supervision on each target domain.
+The four RL teachers were evaluated separately on their respective domain benchmarks using the same prompt and decoding protocol (Table~\ref{tab:teachers}). These scores quantify each teacher's performance on its target domain.
 
 \begin{table}[t]
-\caption{Domain teacher reference scores (\%). Science uses GPQA average@4.}
+\caption{\textbf{Reference scores for the four domain-specific teachers} (\%). Science uses GPQA average@4.}
 \label{tab:teachers}
 \centering\small
 \input{experiments/aligned_evidence_20260910/teacher_table.tex}
 \end{table}
 
-\subsection{Paired comparisons and evidence provenance}
+\subsection{Paired comparisons and experiment records}
 
-We verify question correspondence and bootstrap the per-question score differences 10,000 times using seed 1042; each GPQA question retains its four-response cluster. Figure~\ref{fig:normalization_ci} shows percentile 95\% intervals. These are nominal, unadjusted intervals over evaluation questions, conditional on the trained checkpoints. Training-seed variation is a separate source of uncertainty. The same procedure supplies the initial-to-checkpoint comparisons in the evidence bundle.
+We verify question correspondence and bootstrap the per-question score differences 10,000 times using seed 1042; each GPQA question retains its four-response cluster. Figure~\ref{fig:normalization_ci} shows percentile 95\% intervals. These are nominal, unadjusted intervals over evaluation questions, for the evaluated checkpoints. Training-seed variation is a separate source of uncertainty. We use the same procedure for comparisons with the initial student.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/normalization50.pdf}
-\caption{Update-500 I64 capability contrasts against DR, with nominal 95\% paired question-bootstrap intervals.}
+\caption{\textbf{I64 averaging rules produce task-dependent score differences.} Update-500 differences from DR with nominal 95\% paired question-bootstrap intervals.}
 \label{fig:normalization_ci}
 \end{figure}
 
 \begin{table}[t]
-\caption{Update-500 I64-minus-PG capability differences and nominal 95\% paired question-bootstrap intervals (percentage points). All eight intervals include zero.}
+\caption{\textbf{All eight I64-minus-PG intervals include zero.} Update-500 score differences and nominal 95\% paired question-bootstrap intervals (percentage points).}
 \label{tab:endpoint_paired}
 \centering\small
 \input{experiments/appendix_mvp_20260914/endpoint_paired_table.tex}
 \end{table}
 
-The evidence bundles retain frozen scores, question-level records or verified completion summaries, model and data identities, and the analysis scripts. The original benchmarks and expanded matrix share checkpoints and are not independent inventories. Training-seed variation, question-bootstrap uncertainty, and repeated local response banks are reported separately throughout.
+The experiment archive retains scores, question-level results or verified run summaries, model and data identifiers, and analysis scripts. The initial and expanded evaluations reuse some checkpoints and should not be counted as independent runs. We distinguish uncertainty from training seeds, evaluation questions, and repeated sampling of cached response batches (called \emph{banks} in the figures).

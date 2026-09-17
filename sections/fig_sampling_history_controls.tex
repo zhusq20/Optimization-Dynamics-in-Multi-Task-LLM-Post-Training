@@ -1,9 +1,8 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/added_control_figures_20260914/sampling_history_controls.pdf}
-\caption{More PG actions improve gradient alignment, while optimizer history strongly affects BF16 activity.
-(a) Mean gradient cosine to full vocabulary; the dashed line denotes I64.
-(b) A zero-current-gradient step alone produces nearly as much BF16 activity as the supervised steps; bars show means.
-(c) Activity after resetting optimizer history. Points in (b,c) denote banks.}
+\caption{\textbf{More token samples increase PG gradient cosine to full-vocabulary KL; Adam momentum alone changes nearly as many BF16 parameters as PG.}
+(a) Gradient cosine to full-vocabulary KL.
+(b,c) Nonzero BF16 changes with a zero current gradient or reset Adam moments. Points denote cached batches; bars show means.}
 \label{fig:sampling_history_controls}
 \end{figure}

@@ -1,9 +1,9 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section5_supervision.pdf}
-\caption{Vocabulary feedback changes gradient direction while local BF16 activity remains similar; capability gains vary by task and checkpoint.
-(a) Mean BF16 nonzero fractions by student state and loss.
-(b) Alignment with full-vocabulary supervision: PG bank means (lines) and individual banks (points), with the I64 range shaded.
-(c) I64/I16 score differences from PG within single-teacher (S) or joint (M) training. Positive values favor I64 or I16.}
+\caption{\textbf{I64 better approximates the full-vocabulary gradient, with similar BF16 update sparsity and mixed task gains.}
+(a) Nonzero BF16 changes (\%).
+(b) Cosine to the full-vocabulary gradient or update; shading shows the I64 range.
+(c) I64/I16 minus PG scores (percentage points); S/M denote single-teacher/joint training.}
 \label{fig:supervision_overview}
 \end{figure}

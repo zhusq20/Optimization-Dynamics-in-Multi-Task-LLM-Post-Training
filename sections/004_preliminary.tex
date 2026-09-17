@@ -2,39 +2,39 @@
 \label{sec:setting}
 
 \paragraph{Multi-teacher on-policy distillation (MOPD).}
-For domain $d$, the student samples a response $y\sim p_\theta(\cdot\mid x)$ to a prompt $x\sim\mathcal D_d$. The assigned teacher $q_d$ provides supervision at the student prefixes $h_t=(x,y_{<t})$. Following the distinction between token-level supervision and loss aggregation in Open-MOPD \citep{gao2026openmopddiagnosingfixingcapability}, we specify these two choices separately. For a rollout batch $\mathcal B$, let $T_i$ be response $i$'s valid-token count and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss, with the sum over valid positions. The training objective on this batch is
+For task domain $d$, the student generates a response $y\sim p_\theta(\cdot\mid x)$ to a prompt $x\sim\mathcal D_d$. A frozen teacher $q_d$ assigned to that domain provides next-token probabilities at each student-generated prefix $h_t=(x,y_{<t})$. The objective depends on two choices: which vocabulary tokens enter the distillation loss at each prefix, and how token losses are averaged over responses and domains \citep{gao2026openmopddiagnosingfixingcapability}. For a rollout batch $\mathcal B$, let $T_i$ be the number of valid tokens in response $i$ and $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$ its mean token loss, where the sum includes valid response positions only. The batch objective is
 \begin{equation}
 \mathcal L(\theta)=\sum_{i\in\mathcal B}w_i\ell_i(\theta),
 \qquad w_i\geq0,\quad\sum_{i\in\mathcal B}w_i=1.
 \label{eq:mopd}
 \end{equation}
-The token loss specifies the teacher feedback, while $w_i$ specifies how responses contribute to the batch objective. Writing $\ell_i$ as a response mean leaves the averaging rule open: $w_i$ can depend on response length and domain, as defined below. Training holds sampled responses, masks, and averaging weights fixed when differentiating; fresh responses are generated at each update.
+The token loss $\ell_{i,t}$ determines the distillation objective; $w_i$ is the weight on response $i$'s mean loss. As defined below, these response weights implement either token-level or sequence-level loss normalization, with or without explicit domain loss weights. Gradients treat the generated responses, valid-token masks, and weights $w_i$ as fixed. Each training update uses fresh student-generated responses.
 
 \paragraph{Sampled-token, top-$k$, and full-vocabulary supervision.}
-These choices determine which vocabulary alternatives receive teacher feedback at each prefix. Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision computes reverse KL over the vocabulary $\mathcal V$:
+These objectives use teacher probabilities for different numbers of vocabulary tokens at each prefix. Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision minimizes the reverse KL divergence from the student to the teacher over vocabulary $\mathcal V$:
 \begin{equation}
 \ell_{\mathrm{full}}=\sum_{v\in\mathcal V}p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)}.
 \label{eq:full}
 \end{equation}
-Sampled-token supervision (PG) uses only the generated token $a=y_t$:
+Sampled-token supervision uses a policy-gradient (PG) surrogate with the teacher--student log-probability ratio evaluated only at the generated token $a=y_t$:
 \begin{equation}
 \ell_{\mathrm{PG}}(a)=-\sg[\log q_d(a)-\log p_\theta(a)]\log p_\theta(a),
 \qquad a\sim p_\theta.
 \label{eq:pg}
 \end{equation}
-Here $\sg$ stops gradients through the log-ratio coefficient. At a fixed prefix, averaging this gradient over $a\sim p_\theta$ recovers the full-vocabulary reverse-KL gradient (Appendix~\ref{app:losses}).
+Here $\sg$ denotes stop-gradient. At a fixed prefix, the expectation of the PG gradient over $a\sim p_\theta$ equals the full-vocabulary reverse-KL gradient (Appendix~\ref{app:losses}).
 
-Top-$k$ supervision uses the $k$ most probable tokens under the student or teacher. We use their intersection: let $S$ and $T$ be the student and teacher top-$k$ sets fixed at rollout, and $I=S\cap T$. The loss is
+Top-$k$ supervision restricts the loss to a candidate set of likely next tokens. We use the intersection of the student and teacher top-$k$ sets: let $S$ and $T$ contain their respective $k$ most probable tokens, computed at rollout and held fixed during gradient computation, and let $I=S\cap T$. The loss is
 \begin{equation}
 \ell_{\mathrm{top}\text{-}k}=-\sum_{v\in I}\sg\!\left[
 \frac{p_\theta(v)}{\sum_{u\in S}p_\theta(u)}
 \bigl(\log q_d(v)-\log p_\theta(v)\bigr)\right]\log p_\theta(v).
 \label{eq:topk}
 \end{equation}
-The probabilities use full-vocabulary normalization; the detached weights are normalized over $S$ before restricting to $I$. An empty intersection gives zero loss. We call the number of supervised alternatives \emph{supervision density}.
+The probabilities use the full-vocabulary softmax. The detached weights are normalized over the student set $S$ before the sum is restricted to $I$; an empty intersection gives zero loss. We denote $k=16$ and $k=64$ by I16 and I64, respectively. We use \emph{supervision density} to mean the number of vocabulary tokens included in the loss at each prefix: one for PG, $|I|\leq k$ for intersection supervision, and $|\mathcal V|$ for full-vocabulary supervision. The model's vocabulary size is unchanged.
 
-\paragraph{Loss averaging.}
-We compare three choices of $w_i$ in Equation~\ref{eq:mopd}. Let $\mathcal B_d$ contain the responses from domain $d$, and let $\lambda_d\geq0$ be the target domain weights with $\sum_d\lambda_d=1$. We consider batches of nonempty responses with every domain represented. For $i\in\mathcal B_d$,
+\paragraph{Domain weighting and loss normalization.}
+We compare three choices of $w_i$ in Equation~\ref{eq:mopd}. Let $\mathcal B_d$ contain responses from domain $d$, and let $\lambda_d\geq0$, with $\sum_d\lambda_d=1$, denote the target domain loss weights. These weights are distinct from the number of prompts sampled per domain. We assume nonempty responses and at least one response per domain. For $i\in\mathcal B_d$,
 \begin{equation}
 w_i=
 \begin{cases}
@@ -44,7 +44,7 @@ w_i=
 \end{cases}
 \label{eq:averaging}
 \end{equation}
-Under GT, $T_i$ cancels the response-mean denominator in $\ell_i$, so every valid token receives equal weight and each domain's total weight equals its observed token share. DT fixes each domain's total weight to $\lambda_d$ while retaining equal token weights within that domain. DR distributes $\lambda_d$ equally across responses within each domain. Thus all three rules instantiate Equation~\ref{eq:mopd} with the same token loss but different response weights.
+GT averages over all valid tokens in the batch, so a domain's total loss weight equals its fraction of the batch's response tokens. DT first averages over tokens within each domain, then combines domain losses using $\lambda_d$. DR first averages over tokens within each response, then over responses within each domain, and finally combines domain losses using $\lambda_d$. Thus DT and DR use the same domain weights but different within-domain normalization: DT assigns longer responses proportionally more weight, whereas DR assigns equal weight to each response's mean loss.
 
-\paragraph{Update alignment.}
-Let $u_d$ be the parameter change proposed by an optimizer using domain $d$'s mean loss at a given student and optimizer state. For nonzero updates, define $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$. Negative values indicate opposing update directions; positive values indicate alignment. This geometric measure does not by itself determine the effect on domain capabilities.
+\paragraph{Cosine similarity between parameter updates.}
+Let $u_d$ be the parameter change from one optimizer step using domain $d$'s mean loss. To compare domains, each step starts from an identical copy of the student weights and optimizer state, including Adam's first- and second-moment estimates. For nonzero updates, define $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$. Positive values indicate that the update vectors point in similar directions; negative values indicate opposing directions. Update cosine measures parameter-space geometry and does not by itself establish whether training improves or degrades a task's performance.

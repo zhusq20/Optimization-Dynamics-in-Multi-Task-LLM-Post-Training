@@ -1,9 +1,9 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/nine_panel_20260914/section3_normalization.pdf}
-\caption{Loss weighting, optimizer mediation, and capability.
-(a) GT domain weights: faint lines show batches, bold lines five-batch averages, and legend values overall means.
-(b) Pairwise cosines before/after clipping and after Adam; open points show banks, error bars mean $\pm$ SD.
-(c--f) GT/DT/DR task scores (mean $\pm$ SD), with initial-student (S) and teacher (T) references. Capability summaries use the three reported experimental seeds; see Appendix~\ref{app:nine_panel_support}.}
+\caption{\textbf{Loss averaging changes gradient directions and task performance; Adam increases update alignment.}
+(a) GT domain token shares: individual batches and five-batch averages.
+(b) Cosines before/after clipping and after Adam (batch means $\pm$ SD).
+(c--f) I64 task scores (three training seeds, mean $\pm$ SD); S/T mark the initial student/teacher.}
 \label{fig:normalization_capability}
 \end{figure}
