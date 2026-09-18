@@ -15,9 +15,12 @@ Scoring uses mathematics answer verification, code unit tests, instruction-follo
 \subsection{Checkpoint selection before test evaluation}
 \label{app:completed_selection}
 
-We apply the three selection rules in Section~\ref{sec:recipe} to the development grid in Appendix~\ref{app:setup}. Checkpoint choices are fixed before test inference and remain unchanged after the test and overlap-sensitivity analyses. Both development-based rules choose update 250 for PG-DT/Adam and update 500 for the other nine trajectories. The separate PG-DT/Adam update-250 test evaluation allows direct comparison with its update-500 endpoint.
+We apply the three selection rules in Section~\ref{sec:recipe} to the development grid in Appendix~\ref{app:setup}. The grid contains updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories. The retention tolerance is two percentage points per domain relative to the initial student, fixed before the additional test results. Both development rules keep the initial student unless the selected equal-domain mean improves by at least one percentage point. Checkpoint choices are fixed before test inference and remain unchanged after the test and overlap-sensitivity analyses. Both development-based rules choose update 250 for PG-DT/Adam and update 500 for the other nine trajectories. The separate PG-DT/Adam update-250 test evaluation allows direct comparison with its update-500 endpoint.
 
-\input{experiments/completed_results_20260917/selection_table}
+Table~\ref{tab:checkpoint_selection} in the main text summarizes the resulting checkpoint choices and test-score differences.
+
+Table~\ref{tab:qwen_all_checkpoints} gives all 37 trained-checkpoint development evaluations, including the ten endpoints already reported in Table~\ref{tab:completed_endpoints}. These intermediate measurements form the selection grid; they are not additional training runs.
+\input{experiments/visual_mvp_20260918/qwen_all_checkpoints_table}
 
 The retention constraint does not change the checkpoint selected by maximum development mean for any trajectory. On the additional test sets, the update-250 PG-DT/Adam checkpoint scores 0.366 percentage points below its update-500 endpoint in four-domain mean. Thus earlier selection by development mean does not improve the separate-test mean in this case. All selected models satisfy the retention and useful-gain conditions when assessed using test point estimates, which is not a simultaneous confidence guarantee. PG-DR/Adam nevertheless has two development checkpoints outside the retention tolerance: GPQA falls from 32.197\% initially to 28.030\% at update 50 and 30.177\% at update 250, before reaching 34.975\% at update 500. Evaluating only the final checkpoint would miss these intermediate regressions.
 

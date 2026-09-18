@@ -95,3 +95,41 @@
 /figures/coverage_domain_controls_20260917/*
 !/figures/coverage_domain_controls_20260917/i16_online_coverage.pdf
 !/figures/coverage_domain_controls_20260917/normalization_domain_probe.pdf
+
+# Visual MVP: verified Qwen layouts and SmolLM3 diagnostics (2026-09-18).
+!/sections/007_smollm_diagnostics.tex
+!/sections/013_smollm_diagnostics.tex
+!/experiments/visual_mvp_20260918/
+/experiments/visual_mvp_20260918/*
+!/experiments/visual_mvp_20260918/qwen_all_checkpoints_table.tex
+!/experiments/visual_mvp_20260918/smollm_coverage_table.tex
+!/figures/visual_mvp_20260918/
+/figures/visual_mvp_20260918/*
+!/figures/visual_mvp_20260918/section4_sparsity_overlap.pdf
+!/figures/visual_mvp_20260918/section5_supervision.pdf
+!/figures/visual_mvp_20260918/qwen_cumulative_geometry.pdf
+!/figures/visual_mvp_20260918/smollm_supervision.pdf
+!/figures/visual_mvp_20260918/smollm_controls.pdf
+!/figures/visual_mvp_20260918/smollm_cumulative.pdf
+
+# Ten-page main text: compact three-column main figures (2026-09-18).
+!/figures/compact_mvp_20260918/
+/figures/compact_mvp_20260918/*
+!/figures/compact_mvp_20260918/section4_sparsity_overlap.pdf
+!/figures/compact_mvp_20260918/section5_supervision.pdf
+!/figures/compact_mvp_20260918/smollm_supervision.pdf
+
+# Shorter main figures and visible checkpoint-selection evidence (2026-09-18).
+!/figures/layout_followup_20260918/
+/figures/layout_followup_20260918/*
+!/figures/layout_followup_20260918/section4_sparsity_overlap.pdf
+!/figures/layout_followup_20260918/section5_supervision.pdf
+!/figures/layout_followup_20260918/smollm_supervision.pdf
+
+# Completed SmolLM3 endpoint capability evaluation (2026-09-18).
+!/experiments/smollm_capability_20260918/
+/experiments/smollm_capability_20260918/*
+!/experiments/smollm_capability_20260918/endpoint_table.tex
+!/figures/smollm_capability_20260918/
+/figures/smollm_capability_20260918/*
+!/figures/smollm_capability_20260918/endpoint_capability.pdf

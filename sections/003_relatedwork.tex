@@ -1,10 +1,10 @@
 \section{Related Work}
 
-\paragraph{Loss normalization in LLM reinforcement learning.}
-DAPO replaces response-level averaging with token-level averaging to change the contribution of long responses \citep{yu2025dapo}. Dr.~GRPO analyzes the optimization bias from response-length normalization and scaling advantages by the within-group reward standard deviation \citep{liu2025understandingr1zero}. Our analysis concerns a distinct choice in multi-domain distillation: fixing each domain's total loss weight still leaves token-level and response-level averaging within that domain. We measure how this choice changes gradients, Adam updates, and task performance.
+\paragraph{Loss normalization.}
+DAPO replaces response-level with token-level averaging \citep{yu2025dapo}; Dr.~GRPO analyzes response-length and reward-normalization bias \citep{liu2025understandingr1zero}. We distinguish domain weighting from within-domain response weighting and measure their effects on gradients, Adam updates, and task scores.
 
-\paragraph{Multi-teacher on-policy distillation.}
-MOPD combines specialized teachers through supervision on student-generated responses \citep{ma2026mopdmultiteacheronpolicydistillation}. Open-MOPD addresses uneven capability transfer with domain token balancing, performance-gap weighting, and reward refresh \citep{gao2026openmopddiagnosingfixingcapability}. For the same batch and target domain weights, its token-share correction is equivalent to our domain-token averaging. We further separate this domain correction from response-length weighting within each domain.
+\paragraph{Multi-teacher distillation.}
+MOPD integrates specialized teachers on student-generated responses \citep{ma2026mopdmultiteacheronpolicydistillation}. Open-MOPD introduces domain token balancing, performance-gap weighting, and reward refresh \citep{gao2026openmopddiagnosingfixingcapability}. Its token-share correction corresponds to DT for fixed batches and domain weights; our comparison further isolates response-length weighting.
 
-\paragraph{Parameter changes during post-training.}
-\citet{mukherjee2025subnetworks} investigate small parameter subsets that support reinforcement-learning fine-tuning. \citet{yu2026denseupdates} find concentrated checkpoint changes under dense distillation supervision and overlapping changes in students trained separately with different teachers. We instead compare teacher-specific updates from identical copies of a jointly trained student and its Adam state, and distinguish FP32 optimizer updates from BF16 stored-weight changes. \citet{shen2026opdgeometry} study OPD parameter geometry and select response positions for learning. Our vocabulary-supervision comparison varies the candidate tokens scored at each position and evaluates both parameter updates and task scores.
+\paragraph{Post-training parameter geometry.}
+\citet{mukherjee2025subnetworks} study small parameter subsets supporting RL fine-tuning. \citet{yu2026denseupdates} report concentrated changes under dense distillation and overlap between separately trained students. We compare teachers at the same jointly trained student and Adam state, separating FP32 from BF16 changes. \citet{shen2026opdgeometry} study OPD geometry and response-position selection; our supervision comparison varies vocabulary candidates at each position.

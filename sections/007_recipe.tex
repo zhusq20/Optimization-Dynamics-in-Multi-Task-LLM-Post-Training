@@ -1,23 +1,18 @@
 \section{Practical Implications and Checkpoint Selection}
 \label{sec:recipe}
 
-The experiments identify two reasons to assess MOPD with per-task evaluations: loss normalization changes the relative contribution of domains and responses, while optimizer moments and weight precision can hide differences between current gradients.
+\paragraph{Loss weights and optimizer state require separate measurements.}
+Figure~\ref{fig:normalization_capability} shows that equal prompt counts yield unequal token loss weights, while DT and DR still produce different gradients. Figure~\ref{fig:subnetwork_overview} separates FP32 changes from BF16 sparsity and current teacher signals from Adam history. Figures~\ref{fig:supervision_overview} and~\ref{fig:smollm_supervision} show why coverage and update similarity should be read alongside per-task scores and gradient error.
 
-\paragraph{Choose domain and response weights explicitly.}
-Specify both the domain loss weights and whether losses are averaged over tokens or responses; equal prompt counts do not define either choice. The PG/I16/I64 comparisons likewise show no consistent benefit from increasing the number of supervised vocabulary tokens. Choose this number using task scores and measured training cost, and report the probability mass covered by the candidate set. Our runs do not support a compute-efficiency ranking because their costs were not matched.
-
-\paragraph{Separate the current gradient from Adam moments and BF16 rounding.}
-Measure raw gradients, FP32 optimizer updates, and BF16 stored-weight changes separately. For teacher comparisons, start each proposed update from identical student parameters and Adam moment estimates. The zero-gradient reference measures the step driven by the accumulated moments without a new teacher gradient. Its subtraction reveals whether similar complete updates also have similar responses to the current teacher signals. Overlapping changed coordinates or high update cosine alone cannot establish that training with one teacher preserves another task's performance.
-
-\paragraph{A retention constraint does not improve checkpoint selection in these runs.}
-We test whether ruling out checkpoints with a large task regression improves selection by the mean development score. The grid is updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories in Table~\ref{tab:completed_endpoints}. Let $s_d(\theta)$ be the development score for domain $d$, with higher values better. Eligible checkpoints satisfy
+\paragraph{A retention constraint leaves checkpoint selection unchanged.}
+We compare update 500 with two development-based rules over updates 50/100/250/500 for Adam and 100/250/500 for SGD: maximize the equal-domain mean, or maximize it subject to per-domain retention,
 \begin{equation}
-s_d(\theta)\geq s_d(\theta_0)-\epsilon_d
-\qquad\text{for every domain }d,
+s_d(\theta)\geq s_d(\theta_0)-\epsilon_d\quad\text{for all }d,
+\qquad \epsilon_d=2\text{ percentage points}.
 \label{eq:retention}
 \end{equation}
-where $\epsilon_d\geq0$ is a prespecified tolerance relative to the initial student. We select the eligible checkpoint with the highest equal-domain mean, keeping the initial student if none improves that mean by at least one percentage point. We compare this rule with maximizing the same mean without the domain constraint and with using the final checkpoint. The tolerance is two percentage points per domain, fixed before the additional test results (Appendix~\ref{app:completed_selection}).
+Here $s_d$ is the development score for domain $d$ and $\theta_0$ the initial student. Both rules keep the initial student unless the selected mean improves by at least one point. Choices are fixed before evaluation on the separate test sets of 256 questions per domain.
 
-Before test inference, we fix 256 questions per domain from separate Skywork mathematics/TACO-based code pools and Nemotron instruction-following/natural-science pools, excluding exact and lexical near-duplicates of training and development questions. Mathematics, code, and instruction following use greedy responses scored by answer verification, unit tests, and constraint checks; science averages four temperature-1 multiple-choice responses per question. The context limit is 32,768 tokens. These distributions and scorers differ from the development benchmarks, so their absolute scores are reported separately; science here is not GPQA. Appendix~\ref{app:independent_domain_test} gives the source and filtering details.
+Table~\ref{tab:checkpoint_selection} summarizes the selection experiment. Both development rules choose update 500 in nine trajectories and update 250 for PG-DT/Adam. The latter scores 43.14\% on the additional test, below the final checkpoint's 43.51\%; the retention constraint and earlier selection provide no observed test-score benefit. Rankings also change across evaluation sets: PG-DR/SGD exceeds Adam by 1.18 mean points on the development benchmarks but is 0.07 points lower on the additional test.
 
-The retention-constrained and unconstrained rules select the same checkpoint in all ten trajectories: update 500 in nine cases and update 250 for PG-DT/Adam. For PG-DT/Adam, the selected checkpoint scores 43.14\% on the additional test, below the final checkpoint's 43.51\%. Thus neither the constraint nor the earlier selected checkpoint provides an observed test-score benefit here. Method rankings also depend on the evaluation set: PG-DR/SGD exceeds Adam by 1.18 mean points on the original benchmarks but is 0.07 points lower on the additional test. Because the development benchmarks had already been inspected, this checkpoint-selection analysis is exploratory.
+\input{experiments/completed_results_20260917/selection_table}

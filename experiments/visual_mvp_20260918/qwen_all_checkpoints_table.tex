@@ -1,0 +1,62 @@
+\begin{table}[p]
+\centering
+\caption{\textbf{Complete joint-training checkpoint scores.} All 37 evaluated checkpoints from ten Qwen3-1.7B trajectories, training seed 42. Scores (\%) use the original MATH-500, LiveCodeBench, IFBench strict, and GPQA avg@4 protocol; Mean is the unweighted average of the four domains. $\dagger$ marks the ten update-500 rows also reported in Table~\ref{tab:completed_endpoints}. No training-seed uncertainty is estimated.}
+\label{tab:qwen_all_checkpoints}
+\begingroup
+\footnotesize
+\setlength{\tabcolsep}{5pt}
+\renewcommand{\arraystretch}{1.02}
+\begin{tabular}{lrrrrrr}
+\toprule
+Configuration & Update & MATH & Code & IF & GPQA & Mean \\
+\midrule
+PG-DR / Adam & 50 & 69.60 & 16.41 & 18.67 & 28.03 & 33.18 \\
+ & 100 & 72.00 & 17.19 & 19.33 & 31.19 & 34.93 \\
+ & 250 & 73.40 & 16.41 & 26.00 & 30.18 & 36.50 \\
+ & 500$^{\dagger}$ & 73.20 & 17.97 & 27.00 & 34.97 & 38.29 \\
+\addlinespace[2pt]
+PG-DT / Adam & 50 & 71.60 & 17.19 & 19.00 & 34.34 & 35.53 \\
+ & 100 & 74.60 & 19.53 & 18.00 & 34.97 & 36.78 \\
+ & 250 & 77.00 & 19.53 & 25.00 & 33.59 & 38.78 \\
+ & 500$^{\dagger}$ & 73.20 & 17.97 & 27.00 & 33.96 & 38.03 \\
+\addlinespace[2pt]
+PG-GT / Adam & 50 & 71.20 & 18.75 & 19.00 & 34.72 & 35.92 \\
+ & 100 & 74.80 & 21.88 & 17.00 & 31.94 & 36.40 \\
+ & 250 & 74.80 & 19.53 & 25.00 & 33.84 & 38.29 \\
+ & 500$^{\dagger}$ & 76.20 & 17.97 & 27.33 & 31.94 & 38.36 \\
+\addlinespace[2pt]
+I16-DR / Adam & 50 & 69.80 & 17.19 & 17.33 & 31.94 & 34.07 \\
+ & 100 & 72.20 & 17.97 & 19.00 & 32.95 & 35.53 \\
+ & 250 & 75.60 & 18.75 & 25.67 & 33.59 & 38.40 \\
+ & 500$^{\dagger}$ & 75.40 & 18.75 & 27.00 & 33.46 & 38.65 \\
+\addlinespace[2pt]
+I64-DR / Adam & 50 & 69.60 & 17.19 & 19.00 & 31.69 & 34.37 \\
+ & 100 & 71.60 & 17.97 & 19.00 & 32.70 & 35.32 \\
+ & 250 & 74.80 & 17.97 & 26.00 & 33.96 & 38.18 \\
+ & 500$^{\dagger}$ & 75.80 & 17.97 & 27.33 & 33.21 & 38.58 \\
+\addlinespace[2pt]
+I64-DT / Adam & 50 & 72.20 & 18.75 & 17.00 & 32.32 & 35.07 \\
+ & 100 & 74.80 & 19.53 & 19.33 & 33.33 & 36.75 \\
+ & 250 & 75.40 & 21.09 & 25.33 & 32.70 & 38.63 \\
+ & 500$^{\dagger}$ & 74.00 & 17.97 & 28.67 & 34.22 & 38.71 \\
+\addlinespace[2pt]
+I64-GT / Adam & 50 & 74.20 & 17.97 & 17.00 & 32.95 & 35.53 \\
+ & 100 & 74.40 & 17.97 & 21.00 & 32.07 & 36.36 \\
+ & 250 & 74.40 & 18.75 & 25.00 & 33.33 & 37.87 \\
+ & 500$^{\dagger}$ & 74.20 & 17.97 & 28.67 & 33.71 & 38.64 \\
+\addlinespace[2pt]
+PG-DR / SGD & 100 & 73.00 & 18.75 & 25.67 & 35.35 & 38.19 \\
+ & 250 & 75.80 & 18.75 & 25.67 & 31.82 & 38.01 \\
+ & 500$^{\dagger}$ & 76.40 & 19.53 & 28.33 & 33.59 & 39.46 \\
+\addlinespace[2pt]
+PG-DT / SGD & 100 & 74.80 & 18.75 & 23.33 & 34.34 & 37.81 \\
+ & 250 & 74.20 & 19.53 & 25.33 & 35.10 & 38.54 \\
+ & 500$^{\dagger}$ & 75.20 & 20.31 & 28.33 & 32.70 & 39.14 \\
+\addlinespace[2pt]
+PG-GT / SGD & 100 & 74.60 & 17.97 & 20.67 & 35.73 & 37.24 \\
+ & 250 & 73.00 & 20.31 & 23.67 & 33.33 & 37.58 \\
+ & 500$^{\dagger}$ & 75.00 & 19.53 & 25.33 & 33.71 & 38.39 \\
+\bottomrule
+\end{tabular}
+\endgroup
+\end{table}

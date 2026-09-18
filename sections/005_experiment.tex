@@ -1,11 +1,11 @@
 \section{Experimental Protocol and Capability Results}
 \label{app:setup}
 
-The experiments use a shared student initialization and a pool of four domain-specific teachers. We compare loss averaging rules, optimizer updates from different teachers, and the number of vocabulary tokens included in the distillation loss. The ten joint-training configurations in Table~\ref{tab:completed_endpoints} include PG-DR and I64-DR/DT/GT. Mathematics-only PG/I64 runs provide the single-teacher comparison. All checkpoint axes count optimizer updates, and each trajectory comparison uses checkpoints completed for every included branch.
+The Qwen experiments use a shared student initialization and a pool of four domain-specific teachers. We compare loss averaging rules, optimizer updates from different teachers, and the number of vocabulary tokens included in the distillation loss. The ten joint-training configurations in Table~\ref{tab:completed_endpoints} include PG-DR and I64-DR/DT/GT. Mathematics-only PG/I64 runs provide the single-teacher comparison. All checkpoint axes count optimizer updates, and each trajectory comparison uses checkpoints completed for every included branch.
 
 \subsection{Model, data, and training protocol}
 
-The student is Qwen3-1.7B \citep{qwen2025qwen3}. The four frozen teachers were trained by reinforcement learning from the same initial model, specializing in mathematics, code, instruction following, and science, respectively. Student and teachers share the tokenizer and native chat template with thinking disabled. The experiment records identify the model revisions and weight files.
+The main-study student is Qwen3-1.7B \citep{qwen2025qwen3}. The four frozen teachers were trained by reinforcement learning from the same initial model, specializing in mathematics, code, instruction following, and science, respectively. Student and teachers share the tokenizer and native chat template with thinking disabled. The experiment records identify the model revisions and weight files.
 
 AdamW configurations use learning rate $2.5\times10^{-7}$ with $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, no weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Training uses seeds 42--44 for the I64 GT/DT/DR normalization capability summaries and seed 42 for the other comparisons. Each optimizer update aggregates 64 responses; domain allocation is specified below.
 

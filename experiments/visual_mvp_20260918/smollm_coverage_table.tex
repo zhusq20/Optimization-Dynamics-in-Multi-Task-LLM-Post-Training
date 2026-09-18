@@ -1,0 +1,17 @@
+\begin{table}[!htbp]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{High average I64 coverage coexists with a lower tail.} SmolLM3, 384 responses per bank. Mass and frequency columns are percentages; intervals resample responses within domains. The last column counts empty intersections among audited prefixes.}
+\label{tab:smollm_coverage}
+\begin{tabular}{llrrrr}
+\toprule
+Student & Response bank & Mean mass [95\% CI] & $<90\%$ & 1st pct. & Empty \\
+\midrule
+MixSFT & MixSFT & 97.42 [96.93, 97.88] & 8.42 & 62.06 & 0 \\
+DR500 & DR500 & 98.56 [98.16, 98.96] & 3.65 & 64.75 & 0 \\
+GT500 & DR500 & 98.54 [98.13, 98.94] & 3.61 & 64.79 & 1 \\
+DT500 & DR500 & 98.58 [98.18, 98.97] & 3.52 & 65.41 & 1 \\
+PGSGD500 & DR500 & 98.65 [98.27, 99.03] & 3.52 & 66.49 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}

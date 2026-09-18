@@ -1,0 +1,30 @@
+\begin{table}[!htbp]
+\centering\small
+\setlength{\tabcolsep}{3pt}
+\caption{\textbf{SmolLM3 capability under a shared evaluation protocol.} Scores (\%): AIME pass@8, GPQA average over four responses, otherwise greedy accuracy. $Q\!\times\!R$: questions $\times$ responses; Resp.: average response accuracy; Tokens: mean generated length; Cap: budget-capped responses (\%). Intervals resample questions.}
+\label{tab:smollm_capability}
+\begin{tabular}{lcrrrr}
+\toprule
+Benchmark & $Q\!\times\!R$ & Score [95\% CI] & Resp. & Tokens & Cap (\%) \\
+\midrule
+\multicolumn{6}{l}{\textit{MixSFT initialization}} \\
+MATH-500$^{\dagger}$ & $500\times1$ & 50.60 [46.20, 55.00] & 50.60 & 1501 & 3.00 \\
+AIME 2024 & $30\times8$ & 10.00 [0.00, 23.33] & 2.92 & 3840 & 5.83 \\
+AIME 2025 & $30\times8$ & 13.33 [3.33, 26.67] & 1.67 & 2735 & 3.75 \\
+\midrule
+\multicolumn{6}{l}{\textit{I64-DT/Adam, update 500}} \\
+AIME 2024 & $30\times8$ & 26.67 [13.33, 43.33] & 9.58 & 5019 & 7.50 \\
+AIME 2025 & $30\times8$ & 13.33 [3.33, 26.67] & 3.75 & 1227 & 0.00 \\
+\midrule
+\multicolumn{6}{l}{\textit{PG-DR/SGD, update 500}} \\
+MATH-500 & $500\times1$ & 53.80 [49.40, 58.20] & 53.80 & 1520 & 2.80 \\
+LiveCodeBench-128 & $128\times1$ & 17.97 [11.72, 25.00] & 17.97 & 1920 & 5.47 \\
+IFBench (strict) & $300\times1$ & 20.33 [16.00, 25.00] & 20.33 & 2066 & 5.33 \\
+GPQA Diamond & $198\times4$ & 23.99 [20.71, 27.40] & 23.99 & 543 & 0.00 \\
+AIME 2024 & $30\times8$ & 16.67 [3.33, 30.00] & 4.17 & 2215 & 1.67 \\
+AIME 2025 & $30\times8$ & 13.33 [3.33, 26.67] & 2.08 & 4957 & 9.17 \\
+\bottomrule
+\end{tabular}
+\par\vspace{2pt}
+{\footnotesize $\dagger$ Additional complete MixSFT run under the same protocol (500 scored responses).}
+\end{table}
