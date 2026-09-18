@@ -7,7 +7,7 @@ We use the SmolLM3-3B MixSFT student, three domain-specific RL teachers, and exp
 
 Diagnostic prompts come from the frozen Open-MOPD data revision \texttt{9e897efe}, with unique raw messages shuffled within mathematics, code, and instruction following. Coverage, normalization, and probe prompt splits are disjoint within this diagnostic sample; absence from the original training schedule is not established. We preserve dataset messages and disable thinking in the chat template. Generation uses temperature 1, top-$p=1$, a 2,048-token prompt cap, and a 4,096-token response cap. Each natural coverage bank contains 384 responses, 128 per domain, with up to eight uniformly spaced positions per response: 3,053 prefixes for MixSFT and 3,058 for DR500. Additional students score the same 3,058 DR500 prefixes without regenerating responses.
 
-Coverage statistics assign equal weight to domains, responses within domains, and audited positions within a response. Mean-mass intervals resample responses independently within each domain 2,000 times using seed 1042. They do not estimate training-seed variation. The first two rows of Table~\ref{tab:smollm_coverage} use different natural banks; the remaining students use the DR500 bank. The minimum I64 mass on DR500's natural bank is $1.7454\times10^{-8}$; DT500 and GT500 each have one empty intersection in the common-bank audit. Means therefore do not imply uniformly high coverage.
+Coverage statistics assign equal weight to domains, responses within domains, and audited positions within a response. Mean-mass intervals resample responses independently within each domain 2,000 times using seed 1042/1043/1044. They do not estimate training-seed variation. The first two rows of Table~\ref{tab:smollm_coverage} use different natural banks; the remaining students use the DR500 bank. The minimum I64 mass on DR500's natural bank is $1.7454\times10^{-8}$; DT500 and GT500 each have one empty intersection in the common-bank audit. Means therefore do not imply uniformly high coverage.
 
 \input{experiments/visual_mvp_20260918/smollm_coverage_table}
 
@@ -54,7 +54,7 @@ MixSFT to DR500: blocks 0--35, embedding (E), final norm (N). (a) Within-group c
 \subsection{Endpoint capability evaluation}
 \label{app:smollm_capability}
 
-Table~\ref{tab:smollm_capability} evaluates the exported students with shared prompts, scorers, and decoding settings within each benchmark. We use BF16, disable thinking, and allocate a 32,768-token context with the response budget equal to context length minus prompt length. MATH-500, LiveCodeBench-128, and IFBench use greedy decoding; GPQA uses temperature 1 and top-$p=1$; AIME uses temperature 0.6 and top-$p=0.95$. Budget-capped outputs remain in scoring. Score and paired-difference intervals use 100,000 question-bootstrap replicates (seed 1042), retaining all responses to each sampled question.
+Table~\ref{tab:smollm_capability} evaluates the exported students with shared prompts, scorers, and decoding settings within each benchmark. We use BF16, disable thinking, and allocate a 32,768-token context with the response budget equal to context length minus prompt length. MATH-500, LiveCodeBench-128, and IFBench use greedy decoding; GPQA uses temperature 1 and top-$p=1$; AIME uses temperature 0.6 and top-$p=0.95$. Budget-capped outputs remain in scoring. Score and paired-difference intervals use 100,000 question-bootstrap replicates (seed 1042/1043/1044), retaining all responses to each sampled question.
 
 \input{experiments/smollm_capability_20260918/endpoint_table}
 

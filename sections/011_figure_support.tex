@@ -1,8 +1,6 @@
 \section{Supporting Measurements for the Main Figures}
 \label{app:nine_panel_support}
 
-\paragraph{Training-seed uncertainty.}
-Figures~\ref{fig:normalization_capability}(c--f) and~\ref{fig:normalization_aggregate_support} report means and sample standard deviations for three training seeds (42, 43, and 44). The expanded endpoint table and Figure~\ref{fig:supervision_overview}(c) use seed 42; they do not estimate training-seed variability. In Figure~\ref{fig:normalization_capability}(a), legend values are mean domain token shares over the plotted batches.
 
 \paragraph{Teacher-update controls.}
 Figure~\ref{fig:subnetwork_overview}(a) compares cumulative parameter changes at update 500 under DR, with additional I64-DT/GT rows; paired points distinguish FP32 and BF16 for each statistic. Panels (b,c) start from the same M-PG/500 student parameters and Adam moments. With domain-specific inputs, each teacher scores responses from its own domain; with shared inputs, all teachers score the same prefixes. Each of four cached response batches contains six teacher pairs. Small points summarize pairs within a batch, and large points average batches. Equation~\ref{eq:history_subtracted} subtracts the Adam step with the current gradient set to zero before computing FP32 update cosines. It subtracts the zero-gradient baseline; the remaining difference still depends nonlinearly on the saved moments. SGD and reset-$m$ steps are individually rescaled to the norm of the Adam step with trained moments; reset-$m$ retains the second moment and step counter. Teacher pairs reuse teachers and responses, so pairwise observations are dependent. These calculations use non-fused PyTorch updates on copies of saved checkpoints and need not reproduce the fused training optimizer bit for bit. Mathematics-only and joint training also differ in mathematics prompt exposure (Appendix~\ref{app:setup}).
@@ -33,7 +31,7 @@ Figure~\ref{fig:geometry} shows the trajectories underlying the update-500 summa
 \centering
 \includegraphics[width=\linewidth]{figures/visual_mvp_20260918/qwen_cumulative_geometry.pdf}
 \caption{\textbf{Cumulative BF16 changes remain much sparser than FP32 changes.}
-Seed-42 PG/I64 trajectories under DR in single-teacher (S) and joint (M) training, with joint I64-DT/GT added: (a,b) nonzero coordinate fractions; (c,d) coordinate fractions containing 90\% of squared displacement from initialization. Lines connect measured updates 1, 50, 100, 250, and 500; dashed lines denote S. No training-seed uncertainty is estimated.}
+Seed-42/43/44 PG/I64 trajectories under DR in single-teacher (S) and joint (M) training, with joint I64-DT/GT added: (a,b) nonzero coordinate fractions; (c,d) coordinate fractions containing 90\% of squared displacement from initialization. Lines connect measured updates 1, 50, 100, 250, and 500; dashed lines denote S. No training-seed uncertainty is estimated.}
 \label{fig:geometry}
 \end{figure}
 

@@ -7,7 +7,7 @@ The Qwen experiments use a shared student initialization and a pool of four doma
 
 The main-study student is Qwen3-1.7B \citep{qwen2025qwen3}. The four frozen teachers were trained by reinforcement learning from the same initial model, specializing in mathematics, code, instruction following, and science, respectively. Student and teachers share the tokenizer and native chat template with thinking disabled. The experiment records identify the model revisions and weight files.
 
-AdamW configurations use learning rate $2.5\times10^{-7}$ with $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, no weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Training uses seeds 42--44 for the I64 GT/DT/DR normalization capability summaries and seed 42 for the other comparisons. Each optimizer update aggregates 64 responses; domain allocation is specified below.
+AdamW configurations use learning rate $2.5\times10^{-7}$ with $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, no weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Training uses seeds 42/43/44 for the comparisons. Each optimizer update aggregates 64 responses; domain allocation is specified below.
 
 The multi-teacher configurations allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts follow a seeded shuffled schedule, repeated after exhaustion. I64 uses the top-$k$ intersection objective in Equation~\ref{eq:topk} with $k=64$ from initialization; I16 uses $k=16$. The supplementary PG/SGD branches use a learning rate of $0.0025$ and each complete 500 updates. Hardware and deployment differ from the AdamW runs, so the capability comparison does not establish a runtime ranking.
 
@@ -20,7 +20,7 @@ Each capability suite contains MATH-500 (500 questions from the MATH benchmark \
 The expanded development grid comprises updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories, plus the initial student evaluation. Appendix~\ref{app:independent_domain_test} describes additional test sets for the same four domains. Table~\ref{tab:all_capability} supplements the joint endpoints in Table~\ref{tab:completed_endpoints} with single-teacher scores and intermediate PG/I64 checkpoints.
 
 \begin{table}[t]
-\caption{\textbf{PG/I64 performance depends on the task and checkpoint.} Seed-42 scores (\%): S is mathematics-only training and M is joint training; both use DR. Joint endpoints appear in Table~\ref{tab:completed_endpoints}.}
+\caption{\textbf{PG/I64 performance depends on the task and checkpoint.} Seed 42/43/44 average scores (\%): S is mathematics-only training and M is joint training; both use DR. Joint endpoints appear in Table~\ref{tab:completed_endpoints}.}
 \label{tab:all_capability}
 \centering\small
 \input{experiments/appendix_mvp_20260914/capability_table.tex}
