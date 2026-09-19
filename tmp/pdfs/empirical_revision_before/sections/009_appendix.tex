@@ -1,0 +1,119 @@
+\section{Length-Weighting Derivation}
+\label{app:normalization}
+
+Fix a rollout batch, its valid-token masks, and domain loss weights $\lambda_d$. The PG log-ratio coefficients are treated as constants during backpropagation. For $n_d=|\mathcal B_d|$, let $\bar T_d=n_d^{-1}\sum_{i\in\mathcal B_d}T_i$ and $\bar g_d=n_d^{-1}\sum_{i\in\mathcal B_d}g_i$. Define the empirical covariance using the same $1/n_d$ normalization:
+\begin{equation}
+\operatorname{Cov}_d(T,g)=\frac{1}{n_d}\sum_{i\in\mathcal B_d}(T_i-\bar T_d)(g_i-\bar g_d).
+\end{equation}
+Expanding gives $n_d^{-1}\sum_iT_i g_i-\bar T_d\bar g_d$. Dividing by $\bar T_d$ gives Equation~\ref{eq:weighting}. GT combines the resulting domain gradients using observed token shares; DT combines them using $\lambda_d$; DR combines $\bar g_d$ using $\lambda_d$. Multiplying each domain's globally averaged terms by its target weight divided by its observed token share therefore gives DT exactly.
+
+The derivation is a finite-batch weighted-average identity. Response sampling, masks, and lengths are held fixed. Its population analogue involves an expectation of a ratio; replacing that expectation by a ratio of expectations requires additional assumptions or a large-batch limit.
+
+\subsection{Fixed-batch gradient comparison}
+\label{app:fixed_batch_normalization}
+
+At M-PG checkpoints 100 and 250, three cached response batches (seeds 1042, 1043, and 1044) each contain eight responses per domain. Responses use the training prompt format and 4,096-token response cap. For each batch, we compute each response's mean I64 gradient once at the saved BF16 model values using FP32 computation, then aggregate those gradients under DR, DT, and GT. All three averaging rules use the same responses, token masks, teacher scores, and model coordinates. Each comparison starts from the same student parameters and Adam first and second moments.
+
+Table~\ref{tab:fixed_batch_normalization} reports every pairwise raw-gradient cosine. The domain-wise covariance decomposition is checked in FP64 for all 24 batch-domain groups; the largest relative residual is $1.53\times10^{-15}$. This numerical check verifies the aggregation identity. The measured cosine differences show that response length and gradient direction are correlated in these batches.
+
+The optimizer interventions in Figure~\ref{fig:normalization_interventions} reuse these six batches. Each aggregate gradient is globally clipped at norm 1 and applied to the same saved FP32 Adam state for that batch. The saved-state branch retains both moments; the reset-$m$ branch zeros the first moment while retaining the second moment and optimizer step counter; reset-$(m,v)$ zeros both moments while retaining the step counter. The momentum-free SGD control follows the negative gradient and is rescaled separately for DR, DT, and GT to match the FP32 Adam step norm for that averaging rule. After each FP32 update, the model parameters are cast to BF16 and evaluated on one held-out response per domain. Evaluation uses full-vocabulary reverse KL; the experiment archive also retains the I64 surrogate used for training. Each comparison applies a single optimizer step to a checkpoint copy.
+
+\begin{table}[t]
+\caption{\textbf{Equal domain weights do not imply equal gradient directions.} Raw-gradient cosines on identical cached responses. DR and DT use equal domain loss weights; only DT weights responses by length.}
+\label{tab:fixed_batch_normalization}
+\centering\small
+\input{experiments/aligned_evidence_20260910/normalization_fixed_batch_table.tex}
+\end{table}
+
+\section{Parameter and Optimizer Measurements}
+\label{app:records}
+
+\subsection{Coordinates and recorded quantities}
+
+Training measurements separately record gradients before and after clipping, FP32 optimizer steps, and cumulative parameter changes in the FP32 master weights and BF16 model weights. Cumulative changes are measured from the same initialization. All global statistics use unique model coordinates, excluding vocabulary padding and duplicate entries for tied weights. Per-layer statistics and absolute-threshold sensitivities are retained in the experiment archive. For an absolute threshold $\tau$, sparsity is the fraction of coordinates with magnitude at most $\tau$; the figures show the fraction exceeding $\tau$. Energy concentration uses squared Euclidean norm and ranks coordinates by absolute change.
+
+For checkpoint-based measurements, the exported checkpoint contains FP32 master values, BF16 model values, first and second moments, optimizer hyperparameters, and step counters. Student and teacher values are verified against their saved models in the same precision. Forward and backward passes evaluate these values in FP32 with TF32 disabled. All proposed steps are computed from the same saved state with a non-fused Adam implementation. The online training optimizer uses its own fused implementation.
+
+We compare three Adam states at the same checkpoint. \emph{Saved} retains both moments and the step counter. \emph{Reset m} zeros the first moment while retaining the second moment and step counter. \emph{Fresh} zeros both moments and resets the step counter. Global norm clipping at 1 is applied before the Adam calculation, and weight decay is zero. The plotted controls use two cached response batches; the zero-gradient control is evaluated once. For the zero-gradient branch, the saved first moment continues to decay and move the master weights. Casting the saved FP32 master weights to BF16 without an optimizer step exactly reproduces the saved model. Figure~\ref{fig:thresholds} shows how the threshold changes the measured fraction of updated coordinates.
+
+Setting the current gradient to zero while retaining the trained Adam moments changes 0.1403\% of BF16 coordinates, compared with 0.1486\% for PG. Resetting the first moment gives 0.0504\% for PG; resetting both moments and the step counter gives 0.5140\%. The parameters changed by Adam therefore depend on its accumulated moments and BF16 rounding, not just on which entries of the current gradient are nonzero. These controls supplement the update-sparsity measurements in Sections~\ref{sec:subnetworks} and~\ref{sec:density}.
+
+Figure~\ref{fig:sampling_history_controls}(b,c) displays these BF16 controls. The full FP32 and BF16 measurements are retained in the experiment archive.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/thresholds.pdf}
+\caption{\textbf{Update sparsity depends on the numerical threshold.} FP32 steps and BF16 parameter changes; lines show batch means and shading their range.}
+\label{fig:thresholds}
+\end{figure}
+
+\subsection{Cached responses, gradient overlap, and gradient norms}
+\label{app:gradient_overlap}
+
+These raw-gradient diagnostics use the M-PG/100 student, whereas Figure~\ref{fig:subnetwork_overview}(b,c) measures teacher-conditioned optimizer steps at M-PG/500. Batches use seeds 42 and 43, one response per domain per batch, a 2,048-token prompt cap, and a 256-token generation cap. All eight responses reach the cap. Four response positions are sampled without replacement per response. Each response's four prefixes receive equal weight. For domain-specific inputs, each teacher scores the response from its own domain; for shared inputs, each teacher scores all four responses with equal domain weights. A third control evaluates every teacher on every input domain separately, keeping four prefixes per gradient. These conditions reuse the same responses, allowing paired comparisons within each batch.
+
+Let $S_d(\rho)$ contain the largest-magnitude $\rho$ fraction of teacher $d$'s gradient or update coordinates, with stable coordinate-index tie breaking. Jaccard overlap $J(d,e)=|S_d(\rho)\cap S_e(\rho)|/|S_d(\rho)\cup S_e(\rho)|$ measures shared locations; cosine also captures signs and magnitudes \citep{yu2026denseupdates}. Table~\ref{tab:coverage_mass} reports PG gradient norms for domain-specific inputs; the first batch's instruction-following gradient has norm $6.13\times10^{-9}$. Since cosine divides out gradient norms, a negative value need not imply a large opposing contribution. Independent uniform sets of fraction $\rho$ have expected-intersection to expected-union ratio $\rho/(2-\rho)$, approximately 0.00503 at $\rho=1\%$. This reference uses uniform coordinates; layer and weight-magnitude structure remain in the measured gradients.
+
+The largest-magnitude 1\% of raw-gradient coordinates give mean Jaccard overlaps of 0.0951 for PG and 0.0999 for I64 on domain-specific inputs, averaging the two batches and six teacher pairs. Their ranges are 0.0744--0.1077 and 0.0737--0.1178. When every teacher instead scores all four domain responses, the respective means are 0.3808 and 0.4577. The latter comparison changes both input composition and prefix count; the teacher-by-input-domain comparison below fixes the prefix count.
+
+Holding the teacher fixed while changing the input domain gives mean gradient cosines of 0.0059 for PG and 0.0072 for I64. Holding the input domain fixed while changing teachers produces both aligned and opposed gradients. For domain-specific inputs the mean cosines are $-0.0020$ and $0.0081$, respectively, despite partial coordinate overlap. Figure~\ref{fig:teacher} shows how input choice affects the teacher-overlap measurements in Section~\ref{sec:subnetworks}.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/aligned_evidence_20260910/teacher_input.pdf}
+\caption{\textbf{Gradient overlap depends strongly on the input domain.} Left/center: teacher-by-input-domain controls. Right: top-1\% gradient Jaccard versus cosine on domain-specific or shared inputs.}
+\label{fig:teacher}
+\end{figure}
+
+\section{Vocabulary Supervision and Coverage}
+\label{app:losses}
+
+\paragraph{Single-step comparison using four response batches.}
+The M-PG/100 row of Figure~\ref{fig:supervision_overview}(a) uses four cached response batches with seeds 2042--2045. Each batch contains one response per domain. Generation uses the training prompt format, a 2,048-token prompt cap, and a 4,096-token response cap. The 16 response lengths range from 81 to 4,096 tokens; two responses reach the cap. Six positions per response give 96 prefixes. PG actions are independently sampled from the student at these fixed prefixes. All losses use the same prefixes, equal domain weights, and equal response weights within each domain. Gradients are globally clipped at norm 1 before applying the same saved Adam state. Table~\ref{tab:local_concentration} adds the FP32 and energy-concentration measurements for this state.
+
+\begin{table}[t]
+\centering\small
+\caption{\textbf{Vocabulary supervision produces similar single-step update concentration.} M-PG/100 means over four cached batches. NZ: nonzero coordinates (\%); top-1\%: squared step norm in the largest 1\% of coordinates (\%).}
+\label{tab:local_concentration}
+\input{experiments/appendix_mvp_20260914/local_concentration_table.tex}
+\end{table}
+
+The loss and Adam implementations match the two-batch controls in Appendix~\ref{app:records}. Appendix~\ref{app:actual_intersection_coverage} reports the actual I64 intersection coverage at all four student checkpoints.
+
+
+\paragraph{Implementation details.}
+For I64 (Equation~\ref{eq:topk}), candidate sets and teacher scores are fixed at rollout. Each student forward recomputes current probabilities at the saved candidate positions and refreshes the detached coefficients. PG also refreshes its detached log-ratio coefficients and uses no advantage or policy-ratio clipping.
+
+\paragraph{Teacher-top-64 reference objective.}
+The teacher-top-64 diagnostic uses the fixed teacher set $T$ and full-vocabulary probabilities:
+\begin{equation}
+\ell_{\mathrm{T64}}=\sum_{v\in T}\left[p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)}-p_\theta(v)+q_d(v)\right].
+\label{eq:t64}
+\end{equation}
+Its gradient is $\sum_{v\in T}p_\theta(v)\log(p_\theta(v)/q_d(v))\nabla_\theta\log p_\theta(v)$. I64 instead uses the detached weights in Equation~\ref{eq:topk}, normalized over the original student set $S$. T64 and full-vocabulary KL are used only for single-step comparisons. End-to-end training compares PG, I16, and I64; the I16 runs have no corresponding single-step gradient or update measurements.
+
+Differentiating Equation~\ref{eq:full} gives
+\begin{align}
+\nabla_\theta\ell_{\mathrm{full}}
+=\sum_{v\in\cV}p_\theta(v)\left(\log\frac{p_\theta(v)}{q_d(v)}+1\right)\nabla_\theta\log p_\theta(v)
+=\mathbb E_{a\sim p_\theta}\!\left[\log\frac{p_\theta(a)}{q_d(a)}\nabla_\theta\log p_\theta(a)\right]
+\end{align}
+using $\sum_v\nabla_\theta p_\theta(v)=0$. This identity conditions on fixed prefixes and weights; the training loss additionally depends on the sampled response and the token weights induced by its final length and the normalization rule. Table~\ref{tab:coverage_mass} reports candidate-set coverage for the two-batch gradient-overlap and Adam-state controls.
+
+\begin{table}[t]
+\caption{\textbf{The teacher top-64 set captures nearly all student probability mass in these controls.} Means over sampled prefixes; gradient norms use domain-specific inputs. Entropy is in nats, and 100\% may reflect rounding.}
+\label{tab:coverage_mass}
+\centering\small
+\input{experiments/aligned_evidence_20260910/coverage_table.tex}
+\end{table}
+
+% \section{Teacher Distribution Distance}
+% \label{app:teacher_distance}
+
+% We measure teacher distribution differences using Jensen--Shannon divergence on the full next-token vocabulary at identical prefixes:
+% \begin{equation}
+% \operatorname{JS}(q_d,q_e)=\tfrac12 D_{\mathrm{KL}}(q_d\|m)+\tfrac12 D_{\mathrm{KL}}(q_e\|m),
+% \qquad m=\tfrac12(q_d+q_e).
+% \label{eq:teacher_js}
+% \end{equation}
+% We average over the same equally weighted domains and prefixes for every pair. Figure~\ref{fig:teacher_overlap_support}(b) pairs this distance with the largest-magnitude coordinates of optimizer steps on shared inputs at M-PG/500. The earlier M-PG/100 raw-gradient diagnostic contains twelve batch--teacher-pair JS measurements, ranging from 0.00151 to 0.02714 nats; the per-pair measurements are retained in the experiment archive. Both diagnostics share teachers and prefixes within each batch, so teacher-pair observations are dependent.

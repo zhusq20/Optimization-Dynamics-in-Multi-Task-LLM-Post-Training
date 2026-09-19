@@ -1,0 +1,38 @@
+\section{Vocabulary Supervision: Parameter Updates and Task Performance}
+\label{sec:density}
+
+More vocabulary supervision need not spread parameter updates more widely. Sampled-token, top-$k$, and full-vocabulary losses have nearly identical one-step concentration at the same student and Adam state, consistent with concentrated changes under dense distillation \citep{yu2026denseupdates}. End-to-end scores nevertheless differ: I64 improves mathematics over PG at the endpoint while losing GPQA accuracy.
+
+\subsection{Vocabulary support and experimental controls}
+
+PG supervises one sampled token per prefix; I64 uses the intersection of student and teacher top-64 sets (Equations~\ref{eq:pg},~\ref{eq:topk}). We compare mathematics-only S-PG/S-I64 and joint M-PG/M-I64-DR, sharing initialization, teachers, response averaging, optimizer settings, and prompt schedule within each setting. Joint I16 uses the same objective with $k=16$.
+
+For one-step comparisons, PG, I64, teacher-top-64 (T64), and full-vocabulary reverse KL use identical prefixes, weights, and saved Adam moments at M-PG and M-I64-DR updates 100 and 500. Each checkpoint supplies 96 prefixes in four batches. T64 restricts the PG gradient expectation to the teacher's fixed top-64 set without renormalizing probabilities.
+
+\subsection{Update concentration}
+
+\paragraph{More supervised tokens leave one-step concentration nearly unchanged.}
+At M-PG/100, all four losses change about 88.0\% of FP32 master weights. BF16 changes fall to 0.149\% for PG and 0.150\% for I64, T64, and full vocabulary. The largest 1\% of coordinates carry about 8.8\% of FP32 squared step norm and all BF16 squared step norm. BF16 nonzero fractions remain similar across losses at the other checkpoints (Figure~\ref{fig:supervision_overview}a). Even zero current gradient changes 0.140\% of BF16 parameters at M-PG/100 through Adam's saved moments.
+
+\input{sections/fig_nine_supervision}
+
+I64 already captures nearly all student mass here: its mean intersection mass exceeds 99.9\% at every checkpoint, with a minimum of 96.55\% across 384 prefixes. Section~\ref{sec:smollm_diagnostics} examines lower-coverage prefixes.
+
+\paragraph{Sampling changes gradient direction while history shapes writeback.}
+Averaging 1, 16, and 64 PG token samples on fixed prefixes raises mean gradient cosine with full-vocabulary KL from 0.537 to 0.865 to 0.967 (Figure~\ref{fig:sampling_history_controls}a). Finite sampling explains part of PG's gradient difference. The zero-gradient and moment-reset controls in panels b,c show how Adam history changes BF16 writeback.
+
+\input{sections/fig_sampling_history_controls}
+
+Single-step similarity also coexists with different cumulative changes: after 500 updates, I64 changes 8.46\% of BF16 weights versus PG's 7.30\% (Section~\ref{sec:subnetworks}). Training accumulates changes in the student, generated responses, and optimizer moments that a fixed-state comparison holds constant.
+
+\subsection{Capability under single-teacher and joint training}
+
+\paragraph{I64's mathematics advantage emerges late and trades off with GPQA.}
+In single-teacher training, PG leads I64 on mathematics by 2.8 points at update 100, but I64 leads by 2.2 at update 500 (Figure~\ref{fig:supervision_overview}c). Endpoint I64-minus-PG differences are $+0.67$ on instruction following, $-1.56$ on code, and $-1.77$ on GPQA.
+
+Joint-training endpoint differences are $+2.60$ on mathematics, $0.00$ on code, $+0.33$ on instruction following, and $-1.77$ on GPQA (Table~\ref{tab:completed_endpoints}); all four paired question-bootstrap 95\% intervals include zero. Rankings also change: at update 250, I64 leads on mathematics, code, and GPQA and ties on instruction following. Its mean advantage then shrinks from 1.69 to 0.29 points by update 500.
+
+\paragraph{Top-64 does not consistently outperform top-16.}
+Joint I16 and I64 endpoint means are 38.65\% and 38.58\%. On separate test sets of 256 questions per domain, their means are also close, at 44.56\% and 44.46\%: I64 gains 1.96 points on mathematics but loses 2.35 on code. Increasing $k$ changes both candidate support and token weights in Equation~\ref{eq:topk}, producing task-dependent trade-offs.
+
+\input{sections/007_smollm_diagnostics}

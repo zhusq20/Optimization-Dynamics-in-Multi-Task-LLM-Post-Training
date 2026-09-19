@@ -1,0 +1,12 @@
+{
+  "source": "User-provided measured three-seed standard deviations for Figure 1(c-f).",
+  "status": "measured",
+  "units": "percentage points",
+  "domains": ["MATH", "Code", "IF", "GPQA"],
+  "steps": [0, 100, 250],
+  "sd": {
+    "DR": [[0.00, 0.00, 0.00, 0.00], [1.05, 0.90, 1.35, 1.75], [0.90, 0.82, 1.15, 1.60]],
+    "DT": [[0.00, 0.00, 0.00, 0.00], [1.20, 0.85, 1.55, 1.55], [1.05, 0.76, 1.42, 1.40]],
+    "GT": [[0.00, 0.00, 0.00, 0.00], [1.05, 1.05, 1.50, 1.90], [0.92, 0.95, 1.38, 1.75]]
+  }
+}

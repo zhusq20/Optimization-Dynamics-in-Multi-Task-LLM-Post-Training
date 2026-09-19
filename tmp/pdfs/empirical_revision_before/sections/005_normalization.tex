@@ -1,0 +1,48 @@
+\section{Loss Normalization and Task Performance}
+\label{sec:normalization}
+
+\subsection{Equal domain weights do not remove response-length weighting}
+
+DT and DR both assign domain $d$ weight $\lambda_d$, but only DT weights responses by length. Their gradient difference depends on how response length covaries with gradient direction.
+
+For response gradients $g_i=\nabla_\theta\ell_i$ and domain means $\bar g_d,\bar T_d$, the token-weighted gradient is
+\begin{equation}
+\frac{\sum_{i\in\mathcal B_d}T_i g_i}{\sum_{i\in\mathcal B_d}T_i}
+=\bar g_d+\frac{\operatorname{Cov}_d(T,g)}{\bar T_d}.
+\label{eq:weighting}
+\end{equation}
+DT retains the length-gradient covariance term, DR uses $\bar g_d$ alone. Correcting each domain's GT contribution by its target weight divided by its observed token share gives DT exactly, as in Open-MOPD \citep{gao2026openmopddiagnosingfixingcapability}. This correction leaves within-domain length weighting intact.
+
+\subsection{Similar I64 endpoint scores despite different loss weights}
+
+\paragraph{Experimental setting.}
+We train Qwen3-1.7B for 500 updates with four RL-specialized teachers derived from the same base model for mathematics, code, instruction following, and science. Each update uses 16 fresh responses per domain. The I64 GT/DT/DR runs share initialization, teachers, prompt schedule, and AdamW settings. We evaluate MATH-500, LiveCodeBench v6 (1,055 questions), IFBench, and GPQA Diamond, reporting their equally weighted mean. The first three use greedy accuracy; GPQA averages correctness over four sampled responses per question. Thinking is disabled throughout.
+
+\paragraph{A threefold loss-weight imbalance yields close I64 point estimates.}
+Mathematics and instruction following each receive 25\% of prompts but account for 44.05\% and 14.98\% of GT's valid response tokens in the first 50 batches. DT and DR fix both loss weights at 25\% (Figure~\ref{fig:normalization_capability}a). Yet update-500 mean scores are 39.04\% (DR), 39.19\% (DT), and 39.02\% (GT), spanning 0.17 percentage points. The preferred rule varies by task and checkpoint: all three approach teacher performance on mathematics and instruction following, retain a code gap, and start near the science teacher's score. DT exceeds GT by 0.17 mean points, with an estimated paired 95\% interval of $[-1.27,1.61]$ (Appendix~\ref{app:capability_uncertainty}); the close point estimates do not establish equivalence.
+
+\input{sections/fig_nine_normalization}
+
+\paragraph{Normalization has a larger observed score spread under PG/SGD.}
+The endpoint score range across rules is 0.01 points for PG/Adam and 1.39 for PG/SGD, versus 0.17 for I64/Adam (Table~\ref{tab:completed_endpoints}). PG/SGD favors DR over GT by 1.39 points, with an estimated paired 95\% interval of $[-0.04,2.82]$; PG/Adam is nearly tied. The observed normalization spread depends on the training configuration, but these comparisons do not establish a difference between rules (Table~\ref{tab:paired_contrasts}). All ten configurations improve the initial mean from 33.94\% to 38.58--39.96\%.
+
+\input{experiments/completed_results_20260917/endpoint_table}
+
+\subsection{Adam reduces directional differences between normalization rules}
+
+Adam's adaptive update is invariant to a fixed positive rescaling of each gradient coordinate across the entire history when $\epsilon=0$, and approximately so when $\epsilon$ is negligible \citep{kingma2015adam}. This property does not guarantee invariance to domain reweighting, which can change gradient direction, or to changing only the current gradient while holding saved moments fixed. Our comparisons measure these effects empirically.
+
+\paragraph{Different gradients produce similar Adam updates.}
+On six fixed batches at joint-PG checkpoints 100 and 250, I64 gradient cosines average 0.680 (DR--DT), 0.483 (DR--GT), and 0.822 (DT--GT). Student weights, responses, masks, and teacher scores are shared, isolating loss normalization. Applying the gradients to identical copies of the saved Adam moments raises FP32 update cosines to 0.960, 0.939, and 0.979. Adam thus produces much more aligned updates from directionally different gradients.
+
+\paragraph{Clipping changes magnitude, not direction.}
+Global norm clipping preserves pairwise gradient cosines. DR is clipped on all 500 updates and retains a median 9.3\% of the gradient norm; DT and GT are clipped on 46.2\% and 15.0\% of updates (Figure~\ref{fig:normalization_interventions}a). Clipping cannot explain Adam's higher update cosine. Resetting its moments also changes update norms (panel b), linking update magnitude to optimizer history.
+
+\paragraph{Optimizer history also shapes one-step loss changes.}
+Saved-state Adam gives similar held-out KL changes across rules after BF16 writeback (Figure~\ref{fig:normalization_interventions}c). SGD steps rescaled to the corresponding Adam step norm separate the rules more strongly: all three lower mean KL at update 100 but raise it at update 250.
+
+The average also hides domain differences: at update 250, DT/GT with saved Adam moments lower mean held-out KL but increase instruction-following KL by $0.293/0.272\times10^{-3}$.
+
+\input{sections/fig_normalization_interventions}
+
+\FloatBarrier

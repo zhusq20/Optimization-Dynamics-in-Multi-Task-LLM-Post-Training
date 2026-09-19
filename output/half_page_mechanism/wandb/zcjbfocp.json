@@ -1,0 +1,423 @@
+{
+  "run_id": "zcjbfocp",
+  "name": "m-pg-s42-g123",
+  "state": "failed",
+  "url": "https://wandb.ai/zsqzz/iclr2027-mopd-dynamics/runs/zcjbfocp",
+  "config": {
+    "mopd_loss": "sampled_reverse_kl",
+    "mopd_topk": 16,
+    "mopd_reduction": "domain_response",
+    "optimizer": "adam",
+    "lr": 2.5e-07,
+    "mopd_output_dir": "/workspace/dev/iclr2027/slime_opd_geometry/outputs/mopd_qwen3_aligned_m_pg_20260909/m-pg-s42-g123",
+    "hf_checkpoint": "/workspace/dev/checkpoints/Qwen3-1.7B",
+    "seed": 42,
+    "mopd_seed": 42,
+    "clip_grad": 1,
+    "adam_beta1": 0.9,
+    "adam_beta2": 0.98,
+    "rollout_max_response_len": 4096,
+    "mopd_total_steps": 500
+  },
+  "retrieved_at": "2026-09-19T02:58:37.341317+00:00",
+  "histories": {
+    "gradient": [
+      {
+        "_step": 19,
+        "mopd/update": 101,
+        "mopd/aggregate_grad_norm": 25.29751672023464,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 39,
+        "mopd/update": 102,
+        "mopd/aggregate_grad_norm": 23.973691804452937,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 56,
+        "mopd/update": 103,
+        "mopd/aggregate_grad_norm": 21.272601789593786,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 79,
+        "mopd/update": 104,
+        "mopd/aggregate_grad_norm": 11.815773202563342,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 97,
+        "mopd/update": 105,
+        "mopd/aggregate_grad_norm": 19.953073256580055,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 116,
+        "mopd/update": 106,
+        "mopd/aggregate_grad_norm": 25.825453297883158,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 136,
+        "mopd/update": 107,
+        "mopd/aggregate_grad_norm": 13.324851035462508,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 158,
+        "mopd/update": 108,
+        "mopd/aggregate_grad_norm": 28.933313269952283,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 179,
+        "mopd/update": 109,
+        "mopd/aggregate_grad_norm": 6.172778456371379,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 199,
+        "mopd/update": 110,
+        "mopd/aggregate_grad_norm": 14.937490954655859,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 219,
+        "mopd/update": 111,
+        "mopd/aggregate_grad_norm": 38.356036860849954,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 239,
+        "mopd/update": 112,
+        "mopd/aggregate_grad_norm": 36.311036683003465,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 258,
+        "mopd/update": 113,
+        "mopd/aggregate_grad_norm": 15.89634563110662,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 278,
+        "mopd/update": 114,
+        "mopd/aggregate_grad_norm": 15.3712591828396,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 297,
+        "mopd/update": 115,
+        "mopd/aggregate_grad_norm": 19.27893819148172,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 317,
+        "mopd/update": 116,
+        "mopd/aggregate_grad_norm": 15.091717277094965,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 339,
+        "mopd/update": 117,
+        "mopd/aggregate_grad_norm": 28.91185444710702,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 358,
+        "mopd/update": 118,
+        "mopd/aggregate_grad_norm": 30.839722703432386,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 378,
+        "mopd/update": 119,
+        "mopd/aggregate_grad_norm": 20.25943312928464,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 399,
+        "mopd/update": 120,
+        "mopd/aggregate_grad_norm": 76.34764769584501,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 418,
+        "mopd/update": 121,
+        "mopd/aggregate_grad_norm": 25.05708771459146,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 439,
+        "mopd/update": 122,
+        "mopd/aggregate_grad_norm": 33.90727032598062,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 459,
+        "mopd/update": 123,
+        "mopd/aggregate_grad_norm": 6.921155958769076,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 479,
+        "mopd/update": 124,
+        "mopd/aggregate_grad_norm": 15.20403175791395,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 496,
+        "mopd/update": 125,
+        "mopd/aggregate_grad_norm": 10.271377633077424,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 517,
+        "mopd/update": 126,
+        "mopd/aggregate_grad_norm": 17.43728623321401,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 538,
+        "mopd/update": 127,
+        "mopd/aggregate_grad_norm": 8.988109803739272,
+        "mopd/aggregate_grad_clipped": 1
+      },
+      {
+        "_step": 559,
+        "mopd/update": 128,
+        "mopd/aggregate_grad_norm": 12.355929888997796,
+        "mopd/aggregate_grad_clipped": 1
+      }
+    ],
+    "domain": [],
+    "clock": [
+      {
+        "_step": 1,
+        "mopd/update": 0
+      },
+      {
+        "_step": 19,
+        "mopd/update": 101
+      },
+      {
+        "_step": 20,
+        "mopd/update": 101
+      },
+      {
+        "_step": 39,
+        "mopd/update": 102
+      },
+      {
+        "_step": 41,
+        "mopd/update": 102
+      },
+      {
+        "_step": 56,
+        "mopd/update": 103
+      },
+      {
+        "_step": 60,
+        "mopd/update": 103
+      },
+      {
+        "_step": 79,
+        "mopd/update": 104
+      },
+      {
+        "_step": 81,
+        "mopd/update": 104
+      },
+      {
+        "_step": 97,
+        "mopd/update": 105
+      },
+      {
+        "_step": 101,
+        "mopd/update": 105
+      },
+      {
+        "_step": 116,
+        "mopd/update": 106
+      },
+      {
+        "_step": 121,
+        "mopd/update": 106
+      },
+      {
+        "_step": 136,
+        "mopd/update": 107
+      },
+      {
+        "_step": 141,
+        "mopd/update": 107
+      },
+      {
+        "_step": 158,
+        "mopd/update": 108
+      },
+      {
+        "_step": 161,
+        "mopd/update": 108
+      },
+      {
+        "_step": 179,
+        "mopd/update": 109
+      },
+      {
+        "_step": 180,
+        "mopd/update": 109
+      },
+      {
+        "_step": 199,
+        "mopd/update": 110
+      },
+      {
+        "_step": 201,
+        "mopd/update": 110
+      },
+      {
+        "_step": 219,
+        "mopd/update": 111
+      },
+      {
+        "_step": 220,
+        "mopd/update": 111
+      },
+      {
+        "_step": 239,
+        "mopd/update": 112
+      },
+      {
+        "_step": 241,
+        "mopd/update": 112
+      },
+      {
+        "_step": 258,
+        "mopd/update": 113
+      },
+      {
+        "_step": 261,
+        "mopd/update": 113
+      },
+      {
+        "_step": 278,
+        "mopd/update": 114
+      },
+      {
+        "_step": 281,
+        "mopd/update": 114
+      },
+      {
+        "_step": 297,
+        "mopd/update": 115
+      },
+      {
+        "_step": 300,
+        "mopd/update": 115
+      },
+      {
+        "_step": 317,
+        "mopd/update": 116
+      },
+      {
+        "_step": 321,
+        "mopd/update": 116
+      },
+      {
+        "_step": 339,
+        "mopd/update": 117
+      },
+      {
+        "_step": 341,
+        "mopd/update": 117
+      },
+      {
+        "_step": 358,
+        "mopd/update": 118
+      },
+      {
+        "_step": 360,
+        "mopd/update": 118
+      },
+      {
+        "_step": 378,
+        "mopd/update": 119
+      },
+      {
+        "_step": 380,
+        "mopd/update": 119
+      },
+      {
+        "_step": 399,
+        "mopd/update": 120
+      },
+      {
+        "_step": 401,
+        "mopd/update": 120
+      },
+      {
+        "_step": 418,
+        "mopd/update": 121
+      },
+      {
+        "_step": 421,
+        "mopd/update": 121
+      },
+      {
+        "_step": 439,
+        "mopd/update": 122
+      },
+      {
+        "_step": 441,
+        "mopd/update": 122
+      },
+      {
+        "_step": 459,
+        "mopd/update": 123
+      },
+      {
+        "_step": 460,
+        "mopd/update": 123
+      },
+      {
+        "_step": 479,
+        "mopd/update": 124
+      },
+      {
+        "_step": 481,
+        "mopd/update": 124
+      },
+      {
+        "_step": 496,
+        "mopd/update": 125
+      },
+      {
+        "_step": 501,
+        "mopd/update": 125
+      },
+      {
+        "_step": 517,
+        "mopd/update": 126
+      },
+      {
+        "_step": 520,
+        "mopd/update": 126
+      },
+      {
+        "_step": 538,
+        "mopd/update": 127
+      },
+      {
+        "_step": 540,
+        "mopd/update": 127
+      },
+      {
+        "_step": 559,
+        "mopd/update": 128
+      }
+    ]
+  },
+  "expected_gradient_count": 28
+}

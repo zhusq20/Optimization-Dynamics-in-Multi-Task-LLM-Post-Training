@@ -1,0 +1,43 @@
+\section{Preliminaries}
+\label{sec:setting}
+
+\paragraph{Multi-teacher on-policy distillation (MOPD).}
+For domain $d$, the student generates $y\sim p_\theta(\cdot\mid x)$ for $x\sim\mathcal D_d$, and a frozen teacher $q_d$ supplies probabilities at each prefix $h_t=(x,y_{<t})$ \citep{gao2026openmopddiagnosingfixingcapability}. For a rollout batch $\mathcal B$, response $i$ has $T_i$ valid tokens and mean loss $\ell_i=T_i^{-1}\sum_t\ell_{i,t}$. The objective is
+\begin{equation}
+\mathcal L(\theta)=\sum_{i\in\mathcal B}w_i\ell_i(\theta),
+\qquad w_i\geq0,\quad\sum_{i\in\mathcal B}w_i=1.
+\label{eq:mopd}
+\end{equation}
+The token loss determines the vocabulary supervision; the response weights $w_i$ determine normalization across tokens, responses, and domains. Each update uses fresh student responses, held fixed with their masks and weights during gradient computation.
+
+\paragraph{Sampled-token, top-$k$, and full-vocabulary supervision.}
+Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision minimizes reverse KL over $\mathcal V$; the policy-gradient (PG) loss scores the sampled token $y_t$:
+\begin{equation}
+\label{eq:full}
+\ell_{\mathrm{full}}=\sum_{v\in\mathcal V}p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)},\qquad
+\ell_{\mathrm{PG}}(y_t)=-\sg[\log q_d(y_t)-\log p_\theta(y_t)]\log p_\theta(y_t)
+\end{equation}
+
+Here $\sg$ denotes stop-gradient. The expected PG gradient equals the full reverse-KL gradient: differentiating Equation~\ref{eq:full} gives $\mathbb E_{a\sim p_\theta}[\log(p_\theta(a)/q_d(a))\nabla_\theta\log p_\theta(a)]$, since $\sum_v\nabla_\theta p_\theta(v)=0$.
+
+Top-$k$ supervision uses $I=S\cap T$, where $S,T$ are the student and teacher top-$k$ sets, computed at rollout and held fixed. Its loss is
+\begin{equation}
+\ell_{\mathrm{top}\text{-}k}=-\sum_{v\in I}\sg\!\left[
+\frac{p_\theta(v)}{\sum_{u\in S}p_\theta(u)}
+\bigl(\log q_d(v)-\log p_\theta(v)\bigr)\right]\log p_\theta(v).
+\label{eq:topk}
+\end{equation}
+Probabilities use the full-vocabulary softmax; detached weights are normalized over $S$, and an empty intersection gives zero loss. I16 and I64 denote $k=16$ and $64$. We call the number of supervised vocabulary tokens the \emph{supervision density}: one for PG, $|I|\leq k$ for intersection supervision, and $|\mathcal V|$ for full supervision.
+
+\paragraph{Domain weighting and loss normalization.}
+Let $\mathcal B_d$ contain responses from domain $d$, and let $\lambda_d\geq0$ with $\sum_d\lambda_d=1$ be the target domain loss weights. For nonempty responses and domains, the three rules assign response $i\in\mathcal B_d$ weights
+\begin{equation}
+w_i^{\mathrm{GT}}=\frac{T_i}{\sum_{j\in\mathcal B}T_j},\qquad
+w_i^{\mathrm{DT}}=\frac{\lambda_d T_i}{\sum_{j\in\mathcal B_d}T_j},\qquad
+w_i^{\mathrm{DR}}=\frac{\lambda_d}{|\mathcal B_d|}.
+\label{eq:averaging}
+\end{equation}
+Global-token (GT) averaging weights domains by their response-token shares. Domain-token (DT) and domain-response (DR) averaging fix each domain's total weight to $\lambda_d$: DT weights responses by length, while DR weights their mean losses equally. Domain loss weights are distinct from prompt sampling proportions.
+
+\paragraph{Update similarity.}
+Let $u_d$ be the parameter change from one step on domain $d$'s mean loss. Each compared step starts from identical student weights and optimizer state, including Adam's moments. For nonzero updates, their cosine is $C_{de}=(u_d^\top u_e)/(\|u_d\|\,\|u_e\|)$.

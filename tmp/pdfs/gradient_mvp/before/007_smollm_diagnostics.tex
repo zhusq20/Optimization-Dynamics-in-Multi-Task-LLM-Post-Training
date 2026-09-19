@@ -1,0 +1,23 @@
+\subsection{Coverage, gradient error, and capability in SmolLM3}
+\label{sec:smollm_diagnostics}
+
+SmolLM3-3B provides a lower-coverage comparison using the MixSFT initialization, its I64-DR update-500 student, and three Open-MOPD teachers for mathematics, code, and instruction following \citep{gao2026openmopddiagnosingfixingcapability}.
+
+\paragraph{High mean coverage leaves a measurable tail.}
+At $k=64$, mean intersection mass is 97.42\% for MixSFT and 98.56\% for DR500 on their respective generated responses. Yet 8.42\% and 3.65\% of domain/response-balanced prefix weight falls below 90\% mass (Figure~\ref{fig:smollm_supervision}a,b). Increasing $k$ reduces this tail without eliminating it.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/layout_followup_20260918/smollm_supervision.pdf}
+\caption{\textbf{High coverage and aligned gradients can conceal omitted mass and vector error.}
+(a,b) Responses sampled separately from MixSFT and DR500, 384 each; band: response-cluster 95\% interval; tail: mass below 90\%. Dashed lines mark $k=64$. (c,d) Fixed DR500 gradients: three batches per stratum (thin), with means (bold). Coverage and teacher targets use BF16 forwards; student gradients use FP32.}
+\label{fig:smollm_supervision}
+\end{figure}
+
+\paragraph{Direction alone understates approximation error.}
+On representative, high-entropy, and low-I64-coverage strata at fixed DR500 parameters, I64/full-KL gradient cosines range from 0.9696 to 0.9998 across nine batches. Nevertheless, relative vector error $\|g_{I64}-g_{\mathrm{full}}\|/\|g_{\mathrm{full}}\|$ spans 2.16--24.54\% (Figure~\ref{fig:smollm_supervision}c,d). I4 and I8 have larger errors than I64, but the low-coverage stratum is not uniformly worst. High average mass and cosine can therefore hide substantial gradient approximation error.
+
+\paragraph{Equal endpoint scores can hide different solved questions.}
+We compare MixSFT with update-500 I64-DT/Adam and PG-DR/SGD using shared prompts, scorers, and decoding settings within each benchmark. MATH-500 greedy accuracy is 50.60\% for MixSFT and 53.80\% for PG-DR/SGD. AIME pass@8 is the fraction of questions with at least one correct answer among eight samples. In 2024, the three models solve 3/30, 8/30, and 5/30 questions, respectively; in 2025, each solves 4/30. Yet their 2025 average response accuracies are 1.67/3.75/2.08\%, and only one solved question is common to all three.
+
+\FloatBarrier

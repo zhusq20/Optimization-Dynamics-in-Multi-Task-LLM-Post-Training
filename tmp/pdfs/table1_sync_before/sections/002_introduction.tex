@@ -1,0 +1,18 @@
+\section{Introduction}
+\label{sec:intro}
+
+Multi-teacher on-policy distillation (MOPD) transfers specialized capabilities into a single model \citep{xiaomi2026mimov2flash,nvidia2026nemotron3ultra,kimiteam2026kimik3openfrontier,deepseekai2026deepseekv4highlyefficientmilliontoken}. The student generates responses, and a teacher assigned to each prompt domain supplies token-level supervision. Improving several capabilities requires deciding how much each domain and response contributes to the loss, and how many next-token alternatives the teacher supervises.
+
+Recent work establishes both the potential of MOPD and its sensitivity to these choices. \citet{ma2026mopdmultiteacheronpolicydistillation} study capability integration with policy-gradient and top-$k$ objectives. Open-MOPD addresses uneven transfer through domain token balancing, performance-gap weighting, and refreshed rewards \citep{gao2026openmopddiagnosingfixingcapability}. The Nemotron 3 Ultra report finds no advantage for top-$k$ or full-vocabulary matching over sampled-token supervision in preliminary experiments \citep[Section~3.3.5]{nvidia2026nemotron3ultra}. Other studies report parameter changes concentrated in a small set of stored weights \citep{yu2026denseupdates,shen2026opdgeometry}. How these observations connect loss construction, optimizer updates, and task performance remains open.
+
+We distinguish three effects. Equal prompt counts do not imply equal domain loss weights when response lengths differ; fixing domain weights still leaves a choice between token and response averaging. Adam mixes the current gradient with accumulated moments, while BF16 storage can hide small FP32 changes. Finally, supervising more vocabulary tokens need not improve every task. We examine these effects with Qwen3-1.7B and four domain teachers:
+\begin{enumerate}
+\item \textbf{Normalization changes gradients more than final top-64/Adam scores (Section~\ref{sec:normalization}).}
+Domain-token and domain-response gradients have mean cosine 0.680, rising to 0.960 after applying the same Adam state. The three averaging rules finish within 0.14 mean-score points, although their learning curves differ.
+\item \textbf{BF16 sparsity and Adam alignment obscure current teacher signals (Section~\ref{sec:subnetworks}).}
+Joint training changes about 97\% of FP32 weights but only 7.3--8.5\% of BF16 weights. Subtracting Adam's zero-gradient step reduces the mean teacher-update cosine from above 0.83 to below 0.01 on domain-specific inputs.
+\item \textbf{More vocabulary supervision does not consistently improve task performance (Section~\ref{sec:density}).}
+Top-64 and full-vocabulary supervision yield similar single-step concentration. Against sampled-token supervision, top-64's joint-training mean advantage shrinks from 1.69 points at update 250 to 0.29 at update 500, with mixed per-task differences.
+\end{enumerate}
+
+SmolLM3-3B diagnostics extend the vocabulary comparison to lower-coverage conditions: high average intersection mass can conceal a low-coverage tail, and high gradient cosine can coexist with appreciable vector error. Section~\ref{sec:recipe} connects these measurements to checkpoint selection: a per-domain retention constraint leaves all ten development-selected checkpoints unchanged. Together, the results motivate per-task learning curves alongside gradient and parameter statistics.

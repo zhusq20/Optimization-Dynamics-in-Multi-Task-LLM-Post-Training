@@ -1,0 +1,35 @@
+\section{Vocabulary Supervision: Parameter Updates and Task Performance}
+\label{sec:density}
+
+We examine how vocabulary support affects gradient approximation, parameter updates, and task performance. Qwen3 and SmolLM3 diagnostics compare retained probability mass and gradients against full-vocabulary supervision. In Qwen3, sampled-token, top-$k$, and full-vocabulary losses have nearly identical one-step concentration at the same student and Adam state, consistent with concentrated changes under dense distillation \citep{yu2026denseupdates}. End-to-end scores nevertheless differ: I64 improves mathematics over PG at the endpoint while losing GPQA accuracy.
+
+\subsection{Vocabulary support and experimental controls}
+
+PG supervises one sampled token per prefix; I64 uses the intersection of student and teacher top-64 sets (Equations~\ref{eq:full},~\ref{eq:topk}). We compare mathematics-only S-PG/S-I64 and joint M-PG/M-I64-DR, sharing initialization, teachers, response averaging, optimizer settings, and prompt schedule within each setting. Joint I16 uses the same objective with $k=16$.
+
+Support truncation can change the distillation target through omitted probability mass and renormalization \citep{anshumann2025sparse,huang2026tailaware}. We therefore compare these explicit loss definitions and measure coverage and gradient error alongside update concentration. We define intersection coverage at prefix $h$ as the student probability mass retained by the student--teacher top-$k$ intersection: $c_k(h)=p_\theta(I\mid h)=\sum_{v\in I}p_\theta(v\mid h)$, where $I=S\cap T$ as in Equation~\ref{eq:topk}.
+
+For one-step comparisons, PG, I64, teacher-top-64 (T64), and full-vocabulary reverse KL use identical prefixes, weights, and saved Adam moments at M-PG and M-I64-DR updates 100 and 500. Each checkpoint supplies 96 prefixes in four batches. T64 restricts the PG gradient expectation to the teacher's fixed top-64 set without renormalizing probabilities.
+
+\input{sections/007_smollm_diagnostics}
+
+\subsection{Update concentration}
+
+\paragraph{More supervised tokens leave one-step concentration nearly unchanged.}
+At M-PG/100, all four losses change about 88.0\% of FP32 master weights. BF16 changes fall to 0.149\% for PG and 0.150\% for I64, T64, and full vocabulary. The largest 1\% of coordinates carry about 8.8\% of FP32 squared step norm and all BF16 squared step norm. BF16 nonzero fractions remain similar across losses at the other checkpoints (Figure~\ref{fig:supervision_overview}a). Even zero current gradient changes 0.140\% of BF16 parameters at M-PG/100 through Adam's saved moments.
+
+The zero-gradient and moment-reset controls in Figure~\ref{fig:sampling_history_controls}b,c further show how Adam history changes BF16 writeback, complementing the gradient comparisons in Section~\ref{sec:coverage_gradient}.
+
+\input{sections/fig_sampling_history_controls}
+
+Single-step similarity also coexists with different cumulative changes: after 500 updates, I64 changes 8.46\% of BF16 weights versus PG's 7.30\% (Section~\ref{sec:subnetworks}). Training accumulates changes in the student, generated responses, and optimizer moments that a fixed-state comparison holds constant.
+
+\subsection{Capability under single-teacher and joint training}
+
+\paragraph{I64's mathematics advantage emerges late and trades off with GPQA.}
+In single-teacher training, PG leads I64 on mathematics by 2.8 points at update 100, but I64 leads by 2.2 at update 500 (Figure~\ref{fig:supervision_overview}c). Endpoint I64-minus-PG differences are $+0.67$ on instruction following, $-1.56$ on code, and $-1.77$ on GPQA.
+
+Joint-training endpoint differences are $+2.60$ on mathematics, $+0.03$ on code, $+0.33$ on instruction following, and $-1.26$ on GPQA (Table~\ref{tab:completed_endpoints}). The mean difference is $+0.43$ points, with an estimated paired 95\% interval of $[-1.01,1.86]$ (Table~\ref{tab:paired_contrasts}). Rankings also change: at update 250, I64 leads on mathematics, code, and GPQA and ties on instruction following. Its mean advantage then shrinks from 1.69 to 0.43 points by update 500.
+
+\paragraph{Top-64 does not consistently outperform top-16.}
+Joint I16 and I64 endpoint means are 38.90\% and 39.04\%, respectively. I64 gains 0.13 mean points on these benchmarks. On separate test sets of 256 questions per domain, their means are also close, at 44.56\% and 44.46\%: I64 gains 1.96 points on mathematics but loses 2.35 on code. Increasing $k$ changes both candidate support and token weights in Equation~\ref{eq:topk}, producing task-dependent trade-offs.

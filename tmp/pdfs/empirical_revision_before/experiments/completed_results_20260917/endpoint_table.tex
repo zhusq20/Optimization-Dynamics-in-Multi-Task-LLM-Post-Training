@@ -1,0 +1,29 @@
+% Estimated paired intervals: experiments/table1_paired_estimates_20260918/estimate_intervals.py.
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{\textbf{task gains coexist with domain-level trade-offs.} Joint-training scores (\%); Mean weights domains equally. $\Delta$ is the mean difference from PG-DR/Adam (percentage points); brackets give estimated paired 95\% intervals.}
+\label{tab:completed_endpoints}
+\begin{tabular}{lrrrrrr}
+\toprule
+Configuration & MATH-500 & Code & IF & GPQA & Mean & $\Delta$ [95\% interval]$^{\dagger}$ \\
+\midrule
+Initial student & 68.80 & 16.41 & 18.33 & 32.20 & 33.94 & $-4.68$ [-6.42, -2.93] \\
+\midrule
+\multicolumn{7}{l}{\textit{Adam}} \\
+PG-DR & 73.20 & 18.27 & 27.00 & 35.97 & 38.61 & Reference \\
+PG-DT & 73.20 & 19.24 & 27.00 & 34.96 & 38.60 & $-0.01$ [-1.45, 1.43] \\
+PG-GT & 76.20 & 17.92 & 27.33 & 32.94 & 38.60 & $-0.01$ [-1.44, 1.42] \\
+I16-DR & 75.40 & 17.75 & 27.00 & 35.46 & 38.90 & $+0.29$ [-1.15, 1.73] \\
+I64-DR & 75.80 & 18.30 & 27.33 & 34.71 & 39.04 & $+0.43$ [-1.01, 1.86] \\
+I64-DT & 74.00 & 18.86 & 28.67 & 35.22 & 39.19 & $+0.58$ [-0.87, 2.02] \\
+I64-GT & 74.20 & 19.80 & 28.67 & 33.41 & 39.02 & $+0.41$ [-1.03, 1.85] \\
+\midrule
+\multicolumn{7}{l}{\textit{SGD}} \\
+PG-DR & 76.40 & 19.53 & 28.33 & 35.59 & 39.96 & $+1.35$ [-0.09, 2.79] \\
+PG-DT & 75.20 & 20.31 & 28.33 & 33.90 & 39.44 & $+0.83$ [-0.61, 2.26] \\
+PG-GT & 75.00 & 19.26 & 25.33 & 34.71 & 38.58 & $-0.04$ [-1.47, 1.40] \\
+\bottomrule
+\end{tabular}
+\par\vspace{2pt}
+\end{table}

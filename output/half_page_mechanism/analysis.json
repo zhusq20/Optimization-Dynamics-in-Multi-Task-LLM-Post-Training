@@ -1,0 +1,260 @@
+{
+  "sources": [
+    {
+      "revision": "74219fe52df5b566a8ccf438d70ede1679bce23c",
+      "path": "experiments/optimizer_mediation_20260913/measurements.json",
+      "sha256": "cbdc80333b18c32db72979bc3759b0f11cdb7889ea1ceddc07c0ebe083298a70"
+    },
+    {
+      "revision": "74219fe52df5b566a8ccf438d70ede1679bce23c",
+      "path": "experiments/optimizer_mediation_20260913/online_clip_coefficients.json",
+      "sha256": "a9d5ccc2988e29ba2f7dda41e17fdbbfb7e92dd1749e97d49a09c880b2af87fd"
+    }
+  ],
+  "online": {
+    "DR": {
+      "1-100": {
+        "clip_fraction": 1.0,
+        "gradient_norm_median": 9.768371552828416
+      },
+      "101-250": {
+        "clip_fraction": 1.0,
+        "gradient_norm_median": 13.345252635871478
+      },
+      "251-500": {
+        "clip_fraction": 1.0,
+        "gradient_norm_median": 9.076423672513794
+      },
+      "1-500": {
+        "clip_fraction": 1.0,
+        "gradient_norm_median": 10.714036287538065
+      }
+    },
+    "DT": {
+      "1-100": {
+        "clip_fraction": 0.89,
+        "gradient_norm_median": 2.9824723921421965
+      },
+      "101-250": {
+        "clip_fraction": 0.44,
+        "gradient_norm_median": 0.9134996000614115
+      },
+      "251-500": {
+        "clip_fraction": 0.304,
+        "gradient_norm_median": 0.5799748249923427
+      },
+      "1-500": {
+        "clip_fraction": 0.462,
+        "gradient_norm_median": 0.9026469127033763
+      }
+    },
+    "GT": {
+      "1-100": {
+        "clip_fraction": 0.71,
+        "gradient_norm_median": 1.807459459729911
+      },
+      "101-250": {
+        "clip_fraction": 0.013333333333333334,
+        "gradient_norm_median": 0.4424136528817767
+      },
+      "251-500": {
+        "clip_fraction": 0.008,
+        "gradient_norm_median": 0.2721503205172434
+      },
+      "1-500": {
+        "clip_fraction": 0.15,
+        "gradient_norm_median": 0.37728366288004134
+      }
+    }
+  },
+  "local": {
+    "100": {
+      "direction": {
+        "DR_DT": {
+          "gradient_cosine_mean": 0.7575922518193029,
+          "adam_cosine_mean": 0.9807172629860945,
+          "unit_direction_distance_ratio": [
+            0.27765234959855023,
+            0.36309085708855393,
+            0.2641494877394523
+          ],
+          "ratio_mean": 0.3016308981421855
+        },
+        "DR_GT": {
+          "gradient_cosine_mean": 0.6019415078145017,
+          "adam_cosine_mean": 0.9716636836743048,
+          "unit_direction_distance_ratio": [
+            0.2689354953129008,
+            0.2600670026731474,
+            0.2738962081679699
+          ],
+          "ratio_mean": 0.2676329020513393
+        },
+        "DT_GT": {
+          "gradient_cosine_mean": 0.8673539267531952,
+          "adam_cosine_mean": 0.9907444157113955,
+          "unit_direction_distance_ratio": [
+            0.3166481760504044,
+            0.24648038488552163,
+            0.29636016660008113
+          ],
+          "ratio_mean": 0.2864962425120024
+        }
+      },
+      "norm_ratios": {
+        "DR": {
+          "adam_reset_m": {
+            "ratios": [
+              0.33898886158222563,
+              0.3344911870553517,
+              0.30615985710312293
+            ],
+            "mean": 0.32654663524690014
+          },
+          "adam_reset_m_v": {
+            "ratios": [
+              2.158806708587213,
+              2.147999076886316,
+              2.1276263990330153
+            ],
+            "mean": 2.144810728168848
+          }
+        },
+        "DT": {
+          "adam_reset_m": {
+            "ratios": [
+              0.3145126048962123,
+              0.3303267101774059,
+              0.282765255300305
+            ],
+            "mean": 0.3092015234579744
+          },
+          "adam_reset_m_v": {
+            "ratios": [
+              2.1402645925731063,
+              2.1323698442595185,
+              2.1286966627779624
+            ],
+            "mean": 2.133777033203529
+          }
+        },
+        "GT": {
+          "adam_reset_m": {
+            "ratios": [
+              0.2882878141830153,
+              0.28386191481478595,
+              0.28747594596060233
+            ],
+            "mean": 0.2865418916528012
+          },
+          "adam_reset_m_v": {
+            "ratios": [
+              2.1417726927986966,
+              2.1404037739169444,
+              2.1241929610858215
+            ],
+            "mean": 2.135456475933821
+          }
+        }
+      }
+    },
+    "250": {
+      "direction": {
+        "DR_DT": {
+          "gradient_cosine_mean": 0.6031246155130557,
+          "adam_cosine_mean": 0.9388377463509069,
+          "unit_direction_distance_ratio": [
+            0.40970855764296643,
+            0.4131095295630294,
+            0.37366074529260407
+          ],
+          "ratio_mean": 0.39882627749953325
+        },
+        "DR_GT": {
+          "gradient_cosine_mean": 0.3647679976555937,
+          "adam_cosine_mean": 0.9056296485337173,
+          "unit_direction_distance_ratio": [
+            0.38686749855421315,
+            0.39681849011534437,
+            0.37184282682521314
+          ],
+          "ratio_mean": 0.38517627183159026
+        },
+        "DT_GT": {
+          "gradient_cosine_mean": 0.7768895061673663,
+          "adam_cosine_mean": 0.9668968302235333,
+          "unit_direction_distance_ratio": [
+            0.3604352629864106,
+            0.3878719262181936,
+            0.4257186149070825
+          ],
+          "ratio_mean": 0.3913419347038956
+        }
+      },
+      "norm_ratios": {
+        "DR": {
+          "adam_reset_m": {
+            "ratios": [
+              0.410251478891646,
+              0.4031333531895616,
+              0.3794293857806251
+            ],
+            "mean": 0.3976047392872775
+          },
+          "adam_reset_m_v": {
+            "ratios": [
+              2.783083956658919,
+              2.786785446030749,
+              2.761441942543726
+            ],
+            "mean": 2.777103781744465
+          }
+        },
+        "DT": {
+          "adam_reset_m": {
+            "ratios": [
+              0.4233625401535935,
+              0.41331090980273893,
+              0.393745774489894
+            ],
+            "mean": 0.4101397414820755
+          },
+          "adam_reset_m_v": {
+            "ratios": [
+              2.7294590087627215,
+              2.770722445742384,
+              2.737911778870923
+            ],
+            "mean": 2.746031077792009
+          }
+        },
+        "GT": {
+          "adam_reset_m": {
+            "ratios": [
+              0.40725199456899264,
+              0.4300469707805183,
+              0.39407835318246465
+            ],
+            "mean": 0.41045910617732523
+          },
+          "adam_reset_m_v": {
+            "ratios": [
+              2.734605670593777,
+              2.711710815726039,
+              2.7391445777902352
+            ],
+            "mean": 2.7284870213700168
+          }
+        }
+      }
+    }
+  },
+  "notes": [
+    "The online series contain one recorded training trajectory per averaging rule, 500 updates each; no across-seed uncertainty is inferred.",
+    "Fixed-state probes replay I64 gradients at common M-PG checkpoints 100 and 250, with three cached batches each. These are distinct from the independently trained online trajectories.",
+    "SGD unit-direction discrepancy is analytically equal to gradient unit-direction discrepancy for positive scalar learning rates and global clipping. The SGD reference is an identity, not an extra measurement.",
+    "Reset-m ratios describe step norms, not percentages of additive update energy or explained performance.",
+    "Clearing m retains v and the optimizer step counter; clearing m,v also retains the counter. These are local interventions, not retrained RMSProp or fresh-Adam models.",
+    "Two diagnostic checkpoints do not establish a monotone temporal law."
+  ]
+}

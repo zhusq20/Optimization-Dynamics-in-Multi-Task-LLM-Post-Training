@@ -1,29 +1,26 @@
 \section{Parameter-Update Sparsity and Teacher Alignment}
 \label{sec:subnetworks}
 
-Concentrated checkpoint changes \citep{yu2026denseupdates} depend on both precision and optimizer history. The joint student changes few BF16 weights but most FP32 master weights; updates from different teachers also align strongly when they share accumulated Adam moments.
+We examine numerical precision and shared optimizer state when interpreting concentrated checkpoint changes \citep{yu2026denseupdates} and teacher-update alignment.
 
-\subsection{Sparse BF16 changes mask widespread FP32 updates}
+\subsection{BF16 rounding hides widespread FP32 changes}
 
-For cumulative changes $\Delta=\theta-\theta_0$ or individual steps $u=\theta_{\mathrm{after}}-\theta_{\mathrm{before}}$, we measure the changed fraction $f_\tau(z)=P^{-1}\sum_{j=1}^{P}\mathbf 1\{|z_j|>\tau\}$ and the smallest coordinate fraction carrying 90\% of squared change. Here $P$ is the number of coordinates; reported nonzero fractions use $\tau=0$. Both metrics are computed for FP32 master weights and stored BF16 weights.
+Joint training changes about 97\% of FP32 master weights. After BF16 rounding, only 7--9\% of weights differ visibly from initialization (Figure~\ref{fig:subnetwork_overview}a). Small updates are widespread in FP32 and disappear when the weights are stored in BF16.
 
-After 500 updates, joint PG changes 7.30\% of BF16 weights, with 3.79\% of coordinates carrying 90\% of squared change; I64-DR gives 8.46\% and 4.38\% (Figure~\ref{fig:subnetwork_overview}a). In FP32, however, 97.37\% and 97.17\% of weights change, and the 90\%-energy fractions rise to 34.03\% and 35.14\%. Even the individual step at update 500 changes 86.80\% and 87.05\% of FP32 coordinates. Most parameters receive optimizer updates, many of which disappear in BF16. Sparse checkpoint differences therefore do not imply updates restricted to a small parameter subset.
+The precision effect also extends to the concentration of update magnitude. About one third of FP32 coordinates carry 90\% of squared cumulative change, compared with about 4\% of BF16 coordinates.
 
-Similar scores also coexist with different cumulative changes: I64-DR/DT/GT change 8.46/10.52/11.24\% of BF16 coordinates, with 4.38/5.39/5.92\% carrying 90\% of squared change. A larger changed fraction does not imply better performance.
+Loss averaging provides a further comparison between parameter changes and performance. The averaging rules produce different fractions of changed BF16 weights while reaching similar final mean scores.
 
 \input{sections/fig_nine_sparsity}
 
-\subsection{Adam moments align updates from different teachers}
+\subsection{Shared Adam moments align teacher-specific updates}
 
-At the joint-PG update-500 checkpoint, all teacher-specific steps start from identical student parameters and saved Adam moments. We compare teachers on shared prefixes (common inputs) and on their own domains' prefixes (routed inputs), averaging six teacher pairs within each of four cached batches. With routed inputs and saved Adam moments, mean FP32 update cosines are 0.8774 for PG and 0.8347 for I64. Resetting the first moment while retaining the second, or using norm-matched SGD, reduces both to near zero (Figure~\ref{fig:subnetwork_overview}b). The accumulated first moment accounts for much of the alignment.
+Teacher-specific steps are strongly aligned by Adam. On responses from each teacher's own domain, mean update cosines exceed 0.83 under both sampled-token and top-64 supervision. Resetting the first moment while retaining the second, or replacing Adam with norm-matched SGD, reduces the mean cosine to near zero (Figure~\ref{fig:subnetwork_overview}b). The accumulated first moment accounts for much of the alignment.
 
-\subsection{Subtracting the zero-gradient step removes most update alignment}
-
-Adam's first moment can move parameters even with zero current gradient. For update function $U(g;H)$ and saved state $H$, we measure the effect of teacher $d$'s current gradient by
+Adam's first moment can move parameters even with zero current gradient. To measure the change in a step induced by the current teacher gradient, we subtract this baseline. For update function $U(g;H)$ and saved state $H$,
 \begin{equation}
 \delta U_d=U(g_d;H)-U(0;H).
 \label{eq:history_subtracted}
 \end{equation}
-Both steps start from identical parameters and state; the difference retains Adam's dependence on its saved moments.
 
-With routed inputs, mean PG/I64 pairwise cosines fall from 0.8774/0.8347 for complete steps to 0.0098/0.0067 for $\delta U_d$ (Figure~\ref{fig:subnetwork_overview}b). With common inputs, they fall from 0.8415/0.8562 to 0.2373/0.3462 (panel c). Current teacher gradients thus induce step differences with near-zero mean cosine on routed inputs despite strongly aligned complete updates. Their apparent alignment largely reflects shared optimizer history.
+After this subtraction, the mean cosine between teacher-specific step differences falls below 0.01 on domain-specific inputs. When all teachers score the same prefixes, the residual cosine is larger, about 0.24--0.35 (Figure~\ref{fig:subnetwork_overview}c). Teacher-specific alignment therefore depends on both shared optimizer history and shared inputs: removing the zero-gradient component reveals much greater directional separation across domains.

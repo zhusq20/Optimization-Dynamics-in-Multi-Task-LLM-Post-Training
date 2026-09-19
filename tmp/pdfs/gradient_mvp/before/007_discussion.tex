@@ -1,0 +1,3 @@
+\section{Discussion}
+
+Loss construction, optimizer history, and numerical precision each shape how MOPD updates appear. Adam's accumulated moments align otherwise distinct teacher signals, while BF16 storage hides dense FP32 changes. Loss normalization changes gradients more than final top-64/Adam scores, and increasing vocabulary supervision produces task- and checkpoint-dependent gains. SmolLM3 further shows that high coverage and cosine can coexist with substantial tail mass and vector error. These results support evaluating distillation objectives through per-task learning curves together with current gradients, optimizer updates, and stored-weight changes.

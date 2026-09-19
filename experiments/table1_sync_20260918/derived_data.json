@@ -1,0 +1,729 @@
+{
+  "source": "Current Table 1 domain scores, as authorized by the user; no raw outcomes fabricated.",
+  "uncertainty": {
+    "status": "estimated",
+    "n": [
+      500,
+      1055,
+      300,
+      198
+    ],
+    "errorbar_sd_multiplier": 1.0,
+    "cross_model_covariance": 0,
+    "gpqa_effective_n": 198,
+    "training_seed_variance": "not identified from aggregate scores"
+  },
+  "initial": [
+    "68.80",
+    "16.41",
+    "18.33",
+    "32.20"
+  ],
+  "endpoints": {
+    "PG-DR / Adam": {
+      "scores": [
+        "73.20",
+        "18.27",
+        "27.00",
+        "35.97"
+      ],
+      "mean_unrounded": "38.61",
+      "mean_std": 1.2129766807002478,
+      "domain_std": [
+        1.9807877220944194,
+        1.189689951245612,
+        2.563201123595259,
+        3.410588903205232
+      ]
+    },
+    "PG-DT / Adam": {
+      "scores": [
+        "73.20",
+        "19.24",
+        "27.00",
+        "34.96"
+      ],
+      "mean_unrounded": "38.60",
+      "mean_std": 1.2106343312440744,
+      "domain_std": [
+        1.9807877220944194,
+        1.2135969020882897,
+        2.563201123595259,
+        3.3887800611769276
+      ]
+    },
+    "PG-GT / Adam": {
+      "scores": [
+        "76.20",
+        "17.92",
+        "27.33",
+        "32.94"
+      ],
+      "mean_unrounded": "38.5975",
+      "mean_std": 1.1936785434196533,
+      "domain_std": [
+        1.904499934365974,
+        1.1807594953173108,
+        2.572982121974422,
+        3.340111593127609
+      ]
+    },
+    "I16-DR / Adam": {
+      "scores": [
+        "75.40",
+        "17.75",
+        "27.00",
+        "35.46"
+      ],
+      "mean_unrounded": "38.9025",
+      "mean_std": 1.2047311496487836,
+      "domain_std": [
+        1.9260529587734598,
+        1.1763617701277145,
+        2.563201123595259,
+        3.399783415561537
+      ]
+    },
+    "I64-DR / Adam": {
+      "scores": [
+        "75.80",
+        "18.30",
+        "27.33",
+        "34.71"
+      ],
+      "mean_unrounded": "39.035",
+      "mean_std": 1.2029042388440074,
+      "domain_std": [
+        1.9153902996517447,
+        1.1904477631451333,
+        2.572982121974422,
+        3.3831250122460514
+      ]
+    },
+    "I64-DT / Adam": {
+      "scores": [
+        "74.00",
+        "18.86",
+        "28.67",
+        "35.22"
+      ],
+      "mean_unrounded": "39.1875",
+      "mean_std": 1.2154803556177478,
+      "domain_std": [
+        1.9616319736382766,
+        1.2043760650897781,
+        2.6108945465746665,
+        3.3945526772739703
+      ]
+    },
+    "I64-GT / Adam": {
+      "scores": [
+        "74.20",
+        "19.80",
+        "28.67",
+        "33.41"
+      ],
+      "mean_unrounded": "39.02",
+      "mean_std": 1.208999777862761,
+      "domain_std": [
+        1.9567115270269144,
+        1.226855882102799,
+        2.6108945465746665,
+        3.35204739184453
+      ]
+    },
+    "PG-DR / SGD": {
+      "scores": [
+        "76.40",
+        "19.53",
+        "28.33",
+        "35.59"
+      ],
+      "mean_unrounded": "39.9625",
+      "mean_std": 1.2104054146365537,
+      "domain_std": [
+        1.8989681408596615,
+        1.2205115468601506,
+        2.601545117809799,
+        3.402577677068497
+      ]
+    },
+    "PG-DT / SGD": {
+      "scores": [
+        "75.20",
+        "20.31",
+        "28.33",
+        "33.90"
+      ],
+      "mean_unrounded": "39.435",
+      "mean_std": 1.2080253808269221,
+      "domain_std": [
+        1.93130008025682,
+        1.238598772577819,
+        2.601545117809799,
+        3.3640929256073187
+      ]
+    },
+    "PG-GT / SGD": {
+      "scores": [
+        "75.00",
+        "19.26",
+        "25.33",
+        "34.71"
+      ],
+      "mean_unrounded": "38.575",
+      "mean_std": 1.1982840639332037,
+      "domain_std": [
+        1.9364916731037085,
+        1.214077146451388,
+        2.5109036222045638,
+        3.3831250122460514
+      ]
+    }
+  },
+  "grid": [
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "69.60",
+        "16.41",
+        "18.67",
+        "28.03"
+      ]
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "72.00",
+        "17.19",
+        "19.33",
+        "31.19"
+      ]
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "73.40",
+        "16.41",
+        "26.00",
+        "30.18"
+      ]
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "73.20",
+        "18.27",
+        "27.00",
+        "35.97"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "71.60",
+        "17.19",
+        "19.00",
+        "34.34"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "74.60",
+        "19.53",
+        "18.00",
+        "34.97"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "77.00",
+        "19.53",
+        "25.00",
+        "33.59"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "73.20",
+        "19.24",
+        "27.00",
+        "34.96"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "71.20",
+        "18.75",
+        "19.00",
+        "34.72"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "74.80",
+        "21.88",
+        "17.00",
+        "31.94"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "74.80",
+        "19.53",
+        "25.00",
+        "33.84"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "76.20",
+        "17.92",
+        "27.33",
+        "32.94"
+      ]
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "69.80",
+        "17.19",
+        "17.33",
+        "31.94"
+      ]
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "72.20",
+        "17.97",
+        "19.00",
+        "32.95"
+      ]
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "75.60",
+        "18.75",
+        "25.67",
+        "33.59"
+      ]
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "75.40",
+        "17.75",
+        "27.00",
+        "35.46"
+      ]
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "69.60",
+        "17.19",
+        "19.00",
+        "31.69"
+      ]
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "71.60",
+        "17.97",
+        "19.00",
+        "32.70"
+      ]
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "74.80",
+        "17.97",
+        "26.00",
+        "33.96"
+      ]
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "75.80",
+        "18.30",
+        "27.33",
+        "34.71"
+      ]
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "72.20",
+        "18.75",
+        "17.00",
+        "32.32"
+      ]
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "74.80",
+        "19.53",
+        "19.33",
+        "33.33"
+      ]
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "75.40",
+        "21.09",
+        "25.33",
+        "32.70"
+      ]
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "74.00",
+        "18.86",
+        "28.67",
+        "35.22"
+      ]
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        "74.20",
+        "17.97",
+        "17.00",
+        "32.95"
+      ]
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        "74.40",
+        "17.97",
+        "21.00",
+        "32.07"
+      ]
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        "74.40",
+        "18.75",
+        "25.00",
+        "33.33"
+      ]
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        "74.20",
+        "19.80",
+        "28.67",
+        "33.41"
+      ]
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 100,
+      "scores": [
+        "73.00",
+        "18.75",
+        "25.67",
+        "35.35"
+      ]
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        "75.80",
+        "18.75",
+        "25.67",
+        "31.82"
+      ]
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 500,
+      "scores": [
+        "76.40",
+        "19.53",
+        "28.33",
+        "35.59"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "SGD",
+      "update": 100,
+      "scores": [
+        "74.80",
+        "18.75",
+        "23.33",
+        "34.34"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        "74.20",
+        "19.53",
+        "25.33",
+        "35.10"
+      ]
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "SGD",
+      "update": 500,
+      "scores": [
+        "75.20",
+        "20.31",
+        "28.33",
+        "33.90"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "SGD",
+      "update": 100,
+      "scores": [
+        "74.60",
+        "17.97",
+        "20.67",
+        "35.73"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        "73.00",
+        "20.31",
+        "23.67",
+        "33.33"
+      ]
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "SGD",
+      "update": 500,
+      "scores": [
+        "75.00",
+        "19.26",
+        "25.33",
+        "34.71"
+      ]
+    }
+  ],
+  "single": [
+    {
+      "configuration": "S-PG",
+      "update": 100,
+      "scores": [
+        "77.40",
+        "18.75",
+        "18.67",
+        "31.82"
+      ]
+    },
+    {
+      "configuration": "S-PG",
+      "update": 250,
+      "scores": [
+        "73.80",
+        "20.31",
+        "17.00",
+        "35.35"
+      ]
+    },
+    {
+      "configuration": "S-PG",
+      "update": 500,
+      "scores": [
+        "73.80",
+        "19.53",
+        "18.00",
+        "31.82"
+      ]
+    },
+    {
+      "configuration": "S-I64",
+      "update": 100,
+      "scores": [
+        "74.60",
+        "18.75",
+        "17.67",
+        "33.21"
+      ]
+    },
+    {
+      "configuration": "S-I64",
+      "update": 250,
+      "scores": [
+        "74.40",
+        "21.09",
+        "18.33",
+        "32.45"
+      ]
+    },
+    {
+      "configuration": "S-I64",
+      "update": 500,
+      "scores": [
+        "76.00",
+        "17.97",
+        "18.67",
+        "30.05"
+      ]
+    }
+  ],
+  "math_sensitivity": [
+    {
+      "configuration": "Initial student",
+      "update": 0,
+      "mean500": "33.935",
+      "mean496": "34.0225"
+    },
+    {
+      "configuration": "PG-DR / Adam",
+      "update": 500,
+      "mean500": "38.61",
+      "mean496": "38.7575"
+    },
+    {
+      "configuration": "PG-DT / Adam",
+      "update": 250,
+      "mean500": "38.78",
+      "mean496": "38.885"
+    },
+    {
+      "configuration": "PG-DT / Adam",
+      "update": 500,
+      "mean500": "38.60",
+      "mean496": "38.6975"
+    },
+    {
+      "configuration": "PG-GT / Adam",
+      "update": 500,
+      "mean500": "38.5975",
+      "mean496": "38.75"
+    },
+    {
+      "configuration": "I16-DR / Adam",
+      "update": 500,
+      "mean500": "38.9025",
+      "mean496": "39.055"
+    },
+    {
+      "configuration": "I64-DR / Adam",
+      "update": 500,
+      "mean500": "39.035",
+      "mean496": "39.1875"
+    },
+    {
+      "configuration": "I64-DT / Adam",
+      "update": 500,
+      "mean500": "39.1875",
+      "mean496": "39.2875"
+    },
+    {
+      "configuration": "I64-GT / Adam",
+      "update": 500,
+      "mean500": "39.02",
+      "mean496": "39.12"
+    },
+    {
+      "configuration": "PG-DR / SGD",
+      "update": 500,
+      "mean500": "39.9625",
+      "mean496": "40.1175"
+    },
+    {
+      "configuration": "PG-DT / SGD",
+      "update": 500,
+      "mean500": "39.435",
+      "mean496": "39.5875"
+    },
+    {
+      "configuration": "PG-GT / SGD",
+      "update": 500,
+      "mean500": "38.575",
+      "mean496": "38.725"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+\section{Vocabulary Supervision: Parameter Updates and Task Performance}
+\label{sec:density}
+
+Expanding supervision from one sampled token to a larger vocabulary set changes gradient approximation and task-level learning. We compare sampled-token supervision with the student--teacher top-64 intersection during mathematics-only and joint training. Full-vocabulary supervision supplies a reference for the gradient and single-step comparisons.
+
+\subsection{Broader supervision produces task-dependent gains}
+
+\paragraph{The mathematics advantage develops during training.}
+In mathematics-only training, sampled-token supervision leads top-64 by 2.8 accuracy points at update 100; top-64 leads by 2.2 points at update 500 (Figure~\ref{fig:supervision_overview}c). Joint training also ends with a mathematics gain from top-64 supervision, accompanied by a science loss: final differences are $+2.6$ points on mathematics and $-1.3$ on GPQA. Code and instruction-following differences are smaller.
+
+Top-64's joint-training mean advantage narrows from 1.69 points at update 250 to 0.43 at update 500. These trajectories show that the observed benefit depends on the task and the stage of training.
+
+\paragraph{Larger candidate sets redistribute gains across tasks.}
+Top-16 and top-64 supervision reach development means of 38.90\% and 39.04\%, and separate-test means of 44.56\% and 44.46\% (Table~\ref{tab:main_outcomes}). On the separate tests, top-64 gains 1.96 mathematics points and loses 2.35 code points relative to top-16.
+
+\input{sections/fig_nine_supervision}
+
+\input{sections/007_smollm_diagnostics}
+
+\subsection{Vocabulary supervision leaves single-step concentration nearly unchanged}
+
+Sampled-token, top-64, teacher-top-64, and full-vocabulary losses produce nearly identical single-step concentration (Figure~\ref{fig:supervision_overview}a). This similarity across vocabulary supports is consistent with concentrated stored-weight changes under dense distillation \citep{yu2026denseupdates}.
+
+The teacher-top-64 reference uses a fixed teacher top-64 set $T$ and full-vocabulary probabilities:
+\begin{equation}
+\ell_{\mathrm{T64}}=\sum_{v\in T}\left[p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)}-p_\theta(v)+q_d(v)\right].
+\label{eq:t64}
+\end{equation}
+The $-p_\theta(v)$ correction cancels the $+1$ derivative term on this restricted support; $q_d(v)$ is constant with respect to the student and makes each summand zero when $p_\theta(v)=q_d(v)$. Hence $\nabla_\theta\ell_{\mathrm{T64}}=g_T$, using the notation of Section~\ref{sec:setting}. T64 omits terms outside $T$ but has no $1/Z_S$ rescaling, whereas I64 uses $g_I/Z_S$. Neither generally recovers the full-KL gradient. T64 and full KL are single-step references; end-to-end training compares PG, I16, and I64.
+
+Shared optimizer history contributes strongly to the similar concentration. Even a zero current gradient changes about 0.14\% of BF16 parameters in the same comparison, close to the fraction changed by the supervised losses. Resetting Adam's moments changes the amount of BF16 writeback (Figure~\ref{fig:sampling_history_controls}b,c).
+
+\input{sections/fig_sampling_history_controls}
+
+Over training, student parameters, responses, and optimizer moments evolve together. Top-64 and sampled-token supervision consequently accumulate different BF16 displacements (Section~\ref{sec:subnetworks}), alongside the task-dependent learning trajectories above.
+
+\FloatBarrier

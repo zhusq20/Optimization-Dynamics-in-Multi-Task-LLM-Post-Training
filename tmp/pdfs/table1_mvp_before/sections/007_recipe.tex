@@ -1,0 +1,22 @@
+\section{Task-Level Monitoring and Checkpoint Selection}
+\label{sec:recipe}
+
+\paragraph{Separate test questions assess transfer beyond development rankings.}
+We evaluate 256 additional questions per domain, using Skywork mathematics and TACO code pools, Nemotron instruction-following data, and the natural-science portion of Nemotron knowledge validation. Exact and lexical overlap with the training and known evaluation pools is removed. Scoring uses answer verification, unit tests, instruction constraints, and multiple-choice accuracy, with the same decoding scheme as development evaluation. Table~\ref{tab:main_outcomes} reports its means for all ten final students.
+
+\paragraph{Intermediate checkpoints reveal temporary domain regressions.}
+With sampled-token supervision and response averaging under Adam, science accuracy changes from 32.20\% initially to 28.03\% at update 50, 30.18\% at update 250, and 35.97\% at update 500. Tracking individual domains captures this temporary regression and its recovery.
+
+\paragraph{A domain-retention constraint selects the same checkpoints as the mean score.}
+We compare the highest development mean with the highest mean subject to
+\begin{equation}
+s_d(\theta)\geq s_d(\theta_0)-\epsilon_d\quad\text{for all }d,
+\qquad \epsilon_d=2\text{ percentage points},
+\label{eq:retention}
+\end{equation}
+where $s_d$ is the domain score and $\theta_0$ the initial student. Both rules retain the initialization unless the mean improves by at least one point.
+
+Both rules select update 500 in nine trajectories and update 250 for sampled-token training with domain-token averaging under Adam. The earlier checkpoint scores 43.14\% on the separate test, compared with 43.51\% at update 500.
+
+\paragraph{Method rankings vary with evaluation questions.}
+For sampled-token supervision with response averaging, SGD leads Adam by 1.35 mean points on development benchmarks; separate-test means are 43.48\% and 43.55\%, respectively. A further sensitivity check removes four MATH-500 questions with known training-pool matches: four-domain means change by 0.09--0.16 points, reordering some near-tied methods while preserving the highest observed mean for response-averaged SGD. Together, these results support reading aggregate rankings alongside per-task trajectories and the evaluation questions that produced them.

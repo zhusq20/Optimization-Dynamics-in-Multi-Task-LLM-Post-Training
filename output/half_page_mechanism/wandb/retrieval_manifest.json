@@ -1,0 +1,74 @@
+[
+  {
+    "run_id": "qyjllpm6",
+    "name": "m-intersection64-dr-s42",
+    "gradient_count": 241,
+    "gradient_update_range": [
+      1,
+      224
+    ],
+    "domain_count": 0,
+    "sparse_geometry_series": 15,
+    "sha256": "fa59d27bd7c66a1b9dfb6dd4848ed5d55cda0e66e3cd245776f8241b92660963"
+  },
+  {
+    "run_id": "p5zo7hs6",
+    "name": "m-intersection64-dt-s42",
+    "gradient_count": 100,
+    "gradient_update_range": [
+      1,
+      100
+    ],
+    "domain_count": 0,
+    "sparse_geometry_series": 15,
+    "sha256": "321475a82afcbf40f0e5786b2ceaff40fc1e0e244bffe30e850dbc0349ad59e2"
+  },
+  {
+    "run_id": "iy0r84am",
+    "name": "m-intersection64-gt-s42",
+    "gradient_count": 120,
+    "gradient_update_range": [
+      1,
+      115
+    ],
+    "domain_count": 0,
+    "sparse_geometry_series": 15,
+    "sha256": "86945098455b66f528b80c3c56b49f456606c77004d6c29dc0bf9725913c0b56"
+  },
+  {
+    "run_id": "01ode9mp",
+    "name": "m-pg-s42-g123",
+    "gradient_count": 400,
+    "gradient_update_range": [
+      101,
+      500
+    ],
+    "domain_count": 0,
+    "sparse_geometry_series": 15,
+    "sha256": "047ea83420ee3e35d609c6dfa6508ca523b387ac9a7ac0dedddaf5c771e3bde3"
+  },
+  {
+    "run_id": "2uqnli25",
+    "name": "m-pg-s42-g123",
+    "gradient_count": 201,
+    "gradient_update_range": [
+      1,
+      152
+    ],
+    "domain_count": 0,
+    "sparse_geometry_series": 15,
+    "sha256": "b1856fb1fa5806de879b2a3318871c03b48c136c86f3dd28ea096f79c0de4020"
+  },
+  {
+    "run_id": "zcjbfocp",
+    "name": "m-pg-s42-g123",
+    "gradient_count": 28,
+    "gradient_update_range": [
+      101,
+      128
+    ],
+    "domain_count": 0,
+    "sparse_geometry_series": 0,
+    "sha256": "1bac9cc6d3aa3621631973385b6eeb921fb45e16aa7c243f263cefd1705e515f"
+  }
+]

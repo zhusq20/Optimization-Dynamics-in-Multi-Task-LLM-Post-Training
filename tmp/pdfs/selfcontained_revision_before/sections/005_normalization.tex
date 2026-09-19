@@ -1,0 +1,45 @@
+\section{Loss Normalization and Task Performance}
+\label{sec:normalization}
+
+\subsection{Response length changes the contribution of each domain and response}
+
+Longer responses receive more weight when the loss is averaged over all tokens. In our training batches, mathematics accounts for about three times as many response tokens as instruction following, even though the two domains receive equal numbers of prompts (Figure~\ref{fig:normalization_capability}a). Global token averaging therefore gives mathematics a larger share of the loss. Averaging each domain separately fixes its total contribution; averaging response losses equally also removes the extra weight assigned to long responses.
+
+The remaining effect of length within a domain has a simple form. For response gradients $g_i=\nabla_\theta\ell_i$ and domain means $\bar g_d,\bar T_d$, the token-weighted gradient is
+\begin{equation}
+\frac{\sum_{i\in\mathcal B_d}T_i g_i}{\sum_{i\in\mathcal B_d}T_i}
+=\bar g_d+\frac{\operatorname{Cov}_d(T,g)}{\bar T_d}.
+\label{eq:weighting}
+\end{equation}
+Token averaging retains the length--gradient covariance term; response averaging uses $\bar g_d$. Correcting each domain's global-token contribution by its target weight divided by its observed token share gives domain-token averaging exactly, as in Open-MOPD \citep{gao2026openmopddiagnosingfixingcapability}. This correction preserves within-domain length weighting.
+
+\subsection{Trained Adam moments align updates from different averaging rules}
+
+\paragraph{Different gradients produce closely aligned Adam steps.}
+On identical student responses, equal response weighting and within-domain token weighting produce gradients with mean cosine 0.68. Applying those gradients to copies of the same saved Adam state raises their update cosine to 0.96 (Figure~\ref{fig:normalization_capability}b). Comparisons with global token averaging show the same pattern. Thus, the optimizer substantially reduces the directional differences introduced by loss averaging.
+
+\input{sections/fig_nine_normalization}
+
+Adam's response to gradient scaling provides relevant context: its adaptive update is invariant to a fixed positive rescaling of each coordinate throughout the gradient history when $\epsilon=0$, and approximately so when $\epsilon$ is negligible \citep{kingma2015adam}. Domain reweighting also changes gradient direction, and the fixed-state comparisons above measure Adam's response to those changes directly.
+
+The SmolLM comparisons with zero-initialized Adam moments give lower pairwise cosines than the raw gradients (Appendix~\ref{app:smollm_controls}). Together, these observations make the optimizer state central to interpreting update alignment.
+
+\paragraph{Clipping preserves gradient direction; optimizer history shapes the step.}
+Equal response weighting triggers clipping throughout training, and token weighting triggers it less often (Figure~\ref{fig:normalization_interventions}a). Global norm clipping preserves pairwise gradient cosines. Resetting Adam's moments changes step norms and held-out loss changes, while norm-matched SGD steps separate the averaging rules more strongly (panels b,c). These interventions show how accumulated moments shape the effect of the current gradient.
+
+One-step improvements also vary by domain. At a later checkpoint, token-weighted Adam steps lower average held-out KL while increasing instruction-following KL. The aggregate improvement therefore coexists with a domain-level regression (Appendix~\ref{app:domain_probe_breakdown}).
+
+\input{sections/fig_normalization_interventions}
+
+\subsection{Final scores are close under Adam, with different task trajectories}
+
+We compare the averaging rules during joint training on mathematics, code, instruction following, and science, keeping initialization, teachers, prompt schedule, and optimizer settings fixed. Task scores use MATH-500, LiveCodeBench, IFBench, and GPQA; the reported mean weights the four domains equally. Appendix~\ref{app:setup} gives the training and evaluation protocol.
+
+\paragraph{Top-64 supervision yields similar final means across averaging rules.}
+The three rules finish within 0.17 percentage points in mean score. Their learning curves and task rankings vary (Figure~\ref{fig:normalization_capability}c--f): all three approach teacher performance on mathematics and instruction following, retain a code gap, and start near the science teacher's score. The endpoint differences are small relative to the model-based sampling uncertainty reported in Appendix~\ref{app:capability_uncertainty}.
+
+
+\paragraph{The observed score spread is larger with SGD.}
+With sampled-token supervision, final mean scores span about 1.4 points under SGD and are nearly tied under Adam. Equal response weighting has the highest observed SGD mean. The estimated interval for its advantage over global token weighting includes zero (Table~\ref{tab:paired_contrasts}). Across the evaluated training choices, the initial four-domain mean rises from about 34\% to 39--40\%; the complete endpoint scores appear in Table~\ref{tab:completed_endpoints}.
+
+\FloatBarrier

@@ -1,0 +1,29 @@
+\section{Parameter-Update Sparsity and Teacher Alignment}
+\label{sec:subnetworks}
+
+Concentrated checkpoint changes \citep{yu2026denseupdates} depend on both precision and optimizer history. The joint student changes few BF16 weights but most FP32 master weights; updates from different teachers also align strongly when they share accumulated Adam moments.
+
+\subsection{Sparse BF16 changes mask widespread FP32 updates}
+
+For cumulative changes $\Delta=\theta-\theta_0$ or individual steps $u=\theta_{\mathrm{after}}-\theta_{\mathrm{before}}$, we measure the changed fraction $f_\tau(z)=P^{-1}\sum_{j=1}^{P}\mathbf 1\{|z_j|>\tau\}$ and the smallest coordinate fraction carrying 90\% of squared change. Here $P$ is the number of coordinates; reported nonzero fractions use $\tau=0$. Both metrics are computed for FP32 master weights and stored BF16 weights.
+
+After 500 updates, joint PG changes 7.30\% of BF16 weights, with 3.79\% of coordinates carrying 90\% of squared change; I64-DR gives 8.46\% and 4.38\% (Figure~\ref{fig:subnetwork_overview}a). In FP32, however, 97.37\% and 97.17\% of weights change, and the 90\%-energy fractions rise to 34.03\% and 35.14\%. Even the individual step at update 500 changes 86.80\% and 87.05\% of FP32 coordinates. Most parameters receive optimizer updates, many of which disappear in BF16. Sparse checkpoint differences therefore do not imply updates restricted to a small parameter subset.
+
+Similar scores also coexist with different cumulative changes: I64-DR/DT/GT change 8.46/10.52/11.24\% of BF16 coordinates, with 4.38/5.39/5.92\% carrying 90\% of squared change. A larger changed fraction does not imply better performance.
+
+\input{sections/fig_nine_sparsity}
+
+\subsection{Adam moments align updates from different teachers}
+
+At the joint-PG update-500 checkpoint, all teacher-specific steps start from identical student parameters and saved Adam moments. We compare teachers on shared prefixes (common inputs) and on their own domains' prefixes (routed inputs), averaging six teacher pairs within each of four cached batches. With routed inputs and saved Adam moments, mean FP32 update cosines are 0.8774 for PG and 0.8347 for I64. Resetting the first moment while retaining the second, or using norm-matched SGD, reduces both to near zero (Figure~\ref{fig:subnetwork_overview}b). The accumulated first moment accounts for much of the alignment.
+
+\subsection{Subtracting the zero-gradient step removes most update alignment}
+
+Adam's first moment can move parameters even with zero current gradient. For update function $U(g;H)$ and saved state $H$, we measure the effect of teacher $d$'s current gradient by
+\begin{equation}
+\delta U_d=U(g_d;H)-U(0;H).
+\label{eq:history_subtracted}
+\end{equation}
+Both steps start from identical parameters and state; the difference retains Adam's dependence on its saved moments.
+
+With routed inputs, mean PG/I64 pairwise cosines fall from 0.8774/0.8347 for complete steps to 0.0098/0.0067 for $\delta U_d$ (Figure~\ref{fig:subnetwork_overview}b). With common inputs, they fall from 0.8415/0.8562 to 0.2373/0.3462 (panel c). Current teacher gradients thus induce step differences with near-zero mean cosine on routed inputs despite strongly aligned complete updates. Their apparent alignment largely reflects shared optimizer history.

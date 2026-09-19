@@ -1,23 +1,24 @@
-\subsection{Coverage, gradient error, and capability in SmolLM3}
-\label{sec:smollm_diagnostics}
+\subsection{Larger candidate sets improve gradient approximation}
+\label{sec:coverage_gradient}
 
-SmolLM3-3B provides a lower-coverage comparison using the MixSFT initialization, its I64-DR update-500 student, and three Open-MOPD teachers for mathematics, code, and instruction following \citep{gao2026openmopddiagnosingfixingcapability}.
+Truncating vocabulary support omits probability mass and changes token weights \citep{anshumann2025sparse,huang2026tailaware}. We measure coverage as the student probability retained by the student--teacher candidate intersection, $c_k(h)=\sum_{v\in S\cap T}p_\theta(v\mid h)$, and compare gradients.
 
-\paragraph{High mean coverage leaves a measurable tail.}
-At $k=64$, mean intersection mass is 97.42\% for MixSFT and 98.56\% for DR500 on their respective generated responses. Yet 8.42\% and 3.65\% of domain/response-balanced prefix weight falls below 90\% mass (Figure~\ref{fig:smollm_supervision}a,b). Increasing $k$ reduces this tail without eliminating it.
+\paragraph{Top-64 closely matches the full-vocabulary direction in Qwen.}
+The intersection retains over 99.9\% of student probability on average, and its gradient direction is close to that of full-vocabulary supervision (Figure~\ref{fig:supervision_overview}b). Averaging 1, 16, and 64 token samples raises the mean gradient cosine from 0.54 to 0.87 to 0.97; top-64 exceeds 0.999 (Figure~\ref{fig:sampling_history_controls}a). This sampling control identifies finite-sample variation as one source of the directional difference.
+
+\paragraph{Lower-coverage inputs retain appreciable gradient error in SmolLM.}
+SmolLM3-3B measurements use the MixSFT initialization and its student after 500 updates of top-64 training with response averaging and three teachers for mathematics, code, and instruction following \citep{gao2026openmopddiagnosingfixingcapability}. Mean top-64 coverage is 97.42\% initially and 98.56\% after training; 8.42\% and 3.65\% of weighted prefixes retain less than 90\% mass (Figure~\ref{fig:smollm_supervision}a,b). Larger candidate sets reduce this low-coverage tail.
+
+We compare gradients on typical prefixes, high-entropy prefixes, and prefixes with top-64 coverage below 99\%. Top-64 has 2.16--24.54\% relative gradient error against full-vocabulary supervision. Top-4 and top-8 produce larger errors in the evaluated batches (Figure~\ref{fig:smollm_supervision}d). Here relative error is the norm of the gradient difference divided by the full-vocabulary gradient norm, capturing both direction and magnitude. Larger candidate sets improve the approximation, with residual error at top-64.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/layout_followup_20260918/smollm_supervision.pdf}
-\caption{\textbf{High coverage and aligned gradients can conceal omitted mass and vector error.}
-(a,b) Responses sampled separately from MixSFT and DR500, 384 each; band: response-cluster 95\% interval; tail: mass below 90\%. Dashed lines mark $k=64$. (c,d) Fixed DR500 gradients: three batches per stratum (thin), with means (bold). Coverage and teacher targets use BF16 forwards; student gradients use FP32.}
+\caption{\textbf{Larger candidate sets improve coverage and gradient approximation in SmolLM.}
+(a,b) Mean retained student probability and fraction of inputs below 90\% coverage; bands show response-cluster 95\% intervals. Dashed lines mark top-64.
+(c,d) Gradient cosine and relative error against full-vocabulary supervision at the trained student. Groups comprise typical inputs, uncertain next-token predictions, and inputs with lower top-64 coverage; thin lines show batches and bold lines their means. MixSFT/DR500 denote the initialization/trained student.}
 \label{fig:smollm_supervision}
 \end{figure}
 
-\paragraph{Direction alone understates approximation error.}
-On representative, high-entropy, and low-I64-coverage strata at fixed DR500 parameters, I64/full-KL gradient cosines range from 0.9696 to 0.9998 across nine batches. Nevertheless, relative vector error $\|g_{I64}-g_{\mathrm{full}}\|/\|g_{\mathrm{full}}\|$ spans 2.16--24.54\% (Figure~\ref{fig:smollm_supervision}c,d). I4 and I8 have larger errors than I64, but the low-coverage stratum is not uniformly worst. High average mass and cosine can therefore hide substantial gradient approximation error.
-
-\paragraph{Equal endpoint scores can hide different solved questions.}
-We compare MixSFT with update-500 I64-DT/Adam and PG-DR/SGD using shared prompts, scorers, and decoding settings within each benchmark. MATH-500 greedy accuracy is 50.60\% for MixSFT and 53.80\% for PG-DR/SGD. AIME pass@8 is the fraction of questions with at least one correct answer among eight samples. In 2024, the three models solve 3/30, 8/30, and 5/30 questions, respectively; in 2025, each solves 4/30. Yet their 2025 average response accuracies are 1.67/3.75/2.08\%, and only one solved question is common to all three.
-
-\FloatBarrier
+\paragraph{SmolLM capability scores also reveal changes below the aggregate.}
+Sampled-token training with SGD raises MATH-500 accuracy from 50.60\% to 53.80\%. On AIME 2025, the initialization, the top-64/domain-token Adam student, and the sampled-token/response-averaged SGD student each solve four of 30 questions with eight samples per question; only one solved question is common to all three.

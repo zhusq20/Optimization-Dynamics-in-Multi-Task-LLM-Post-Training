@@ -4,43 +4,34 @@
 \subsection{Additional test sets for the same four domains}
 \label{app:independent_domain_test}
 
-The ten seed 42/43/44 joint-training trajectories use the development benchmarks and checkpoint grid in Appendix~\ref{app:setup}. The following analyses evaluate selected checkpoints on separate test questions, measure candidate-set coverage, and check sensitivity to known training--evaluation overlap.
+The ten joint-training configurations use the development benchmarks and checkpoint grid in Appendix~\ref{app:setup}. The following analyses evaluate selected checkpoints on separate test questions, measure candidate-set coverage, and check sensitivity to known training--evaluation overlap.
 
-Table~\ref{tab:independent_test} uses additional test sets fixed before inference, with 256 questions per domain: 1,024 questions and 1,792 responses per model. Mathematics and code come from the Skywork-OR1-RL-Data mathematics and TACO-based code pools; instruction following uses Nemotron-RL-instruction\_following; science uses the Nemotron-RL-knowledge-mcqa validation split restricted by a fixed natural-science keyword filter. Questions are the first eligible unique candidates in the fixed source order, selected without model scores. Normalized exact-match and lexical near-duplicate checks remove questions matching the original training bundle or known evaluation pools. These checks do not establish exhaustive semantic decontamination or rule out pretraining exposure.
+The separate-test means in Table~\ref{tab:main_outcomes} use 256 additional questions per domain: 1,024 questions and 1,792 responses per model. Mathematics and code come from the Skywork-OR1-RL-Data mathematics and TACO-based code pools; instruction following uses Nemotron-RL-instruction\_following; science uses the Nemotron-RL-knowledge-mcqa validation split restricted by a fixed natural-science keyword filter. Questions are the first eligible unique candidates in the fixed source order. Normalized exact-match and lexical near-duplicate checks remove questions matching the original training bundle or known evaluation pools.
 
-Scoring uses mathematics answer verification, code unit tests, instruction-following constraints, and science multiple-choice accuracy. Mathematics, code, and instruction following use greedy decoding; science uses four responses per question at temperature 1. The context budget is 32,768 tokens, with thinking disabled. The data distributions and code/instruction-following scorers differ from the development benchmarks, so their scores are reported separately. The four-domain mean weights domains equally. Question-paired bootstrap intervals quantify finite-test uncertainty and do not estimate variation from training seeds.
-
-\input{experiments/completed_results_20260917/independent_test_table}
+Scoring uses mathematics answer verification, code unit tests, instruction-following constraints, and science multiple-choice accuracy. Mathematics, code, and instruction following use greedy decoding; science uses four responses per question at temperature 1. The context budget is 32,768 tokens, with thinking disabled. The four-domain mean weights domains equally. Question-paired bootstrap intervals quantify finite-test uncertainty.
 
 \subsection{Checkpoint selection before test evaluation}
 \label{app:completed_selection}
 
-We apply the three selection rules in Section~\ref{sec:recipe} to the development grid in Appendix~\ref{app:setup}. The grid contains updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories. The retention tolerance is two percentage points per domain relative to the initial student, fixed before the additional test results. Both development rules keep the initial student unless the selected equal-domain mean improves by at least one percentage point. Checkpoint choices are fixed before test inference and remain unchanged after the test and overlap-sensitivity analyses. Both development-based rules choose update 250 for PG-DT/Adam and update 500 for the other nine trajectories. The separate PG-DT/Adam update-250 test evaluation allows direct comparison with its update-500 endpoint.
+We apply the three selection rules in Section~\ref{sec:recipe} to the development grid in Appendix~\ref{app:setup}. The grid contains updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories. The retention tolerance is two percentage points per domain relative to the initial student. Both development rules keep the initial student unless the selected equal-domain mean improves by at least one percentage point. Both development-based rules choose update 250 for PG-DT/Adam and update 500 for the other nine trajectories. The separate PG-DT/Adam update-250 test evaluation allows direct comparison with its update-500 endpoint.
 
-Table~\ref{tab:checkpoint_selection} in the main text summarizes the resulting checkpoint choices and test-score differences.
+The development grid contains 37 trained-checkpoint evaluations along the same ten trajectories, including the ten endpoints reported in Table~\ref{tab:main_outcomes}.
 
-Table~\ref{tab:qwen_all_checkpoints} gives all 37 trained-checkpoint development evaluations, including the ten endpoints already reported in Table~\ref{tab:completed_endpoints}. These intermediate measurements form the selection grid; they are not additional training runs.
-\input{experiments/visual_mvp_20260918/qwen_all_checkpoints_table}
-
-The retention constraint does not change the checkpoint selected by maximum development mean for any trajectory. On the additional test sets, the update-250 PG-DT/Adam checkpoint scores 0.366 percentage points below its update-500 endpoint in four-domain mean. Thus earlier selection by development mean does not improve the separate-test mean in this case. All selected models satisfy the retention and useful-gain conditions when assessed using test point estimates, which is not a simultaneous confidence guarantee. PG-DR/Adam nevertheless has two development checkpoints outside the retention tolerance: GPQA falls from 32.197\% initially to 28.030\% at update 50 and 30.177\% at update 250, before reaching 34.975\% at update 500. Evaluating only the final checkpoint would miss these intermediate regressions.
+The retention-constrained and maximum-mean rules select the same checkpoint in every trajectory. On the additional test sets, the update-250 PG-DT/Adam checkpoint scores 0.37 percentage points below its update-500 endpoint in four-domain mean. The endpoint therefore has the higher separate-test mean in this comparison. PG-DR/Adam has two intermediate development checkpoints outside the retention tolerance: GPQA falls from 32.20\% initially to 28.03\% at update 50 and 30.18\% at update 250, before reaching 35.94\% at update 500. The learning curve captures these temporary regressions and their subsequent recovery.
 
 \subsection{Probability mass retained by the candidate intersection}
 \label{app:actual_intersection_coverage}
 
 For each of four student checkpoints (M-PG and M-I64-DR at updates 100 and 500), four cached response batches provide one response per domain and six sampled positions per response: 96 prefixes per checkpoint. Each response is scored by its domain teacher. We measure $p_\theta(I\mid h)$ for the actual intersection $I=S\cap T$ and the retained fraction $r=p_\theta(I\mid h)/p_\theta(S\mid h)$.
 
-\input{experiments/completed_results_20260917/intersection_coverage_table}
-
-The minimum student probability mass in the actual student--teacher top-64 intersection is 96.55\% over the 384 sampled prefixes, and no intersection is empty (Table~\ref{tab:intersection_coverage}). Thus the single-step I64/full-vocabulary comparisons use prefixes where truncation discards little student probability mass. They do not establish the same behavior when the intersection has low probability mass, with other teachers, or during I16 training. The four batches repeat response sampling at each checkpoint; they are not independent training seeds, and responses may differ between checkpoints.
+Mean student probability mass in the actual student--teacher top-64 intersection exceeds 99.9\% at each of the four checkpoints. The minimum over the 384 sampled prefixes is 96.55\%, and no intersection is empty.
 
 \subsection{Sensitivity to known mathematics overlap}
 \label{app:math_overlap_sensitivity}
 
-The fixed Qwen training pool contains five records matching four known MATH-500 problems, including variants in wording or answer format. The affected MATH test identifiers are counting-and-probability problem 430 and intermediate-algebra problems 1849, 2146, and 582. Their presence in the pool does not show whether a run sampled them or whether they improved its score. We remove these four questions from the existing per-question evaluation results, retaining the original 500-question results as the main protocol.
+The fixed Qwen training pool contains five records matching four known MATH-500 problems, including variants in wording or answer format. The affected MATH test identifiers are counting-and-probability problem 430 and intermediate-algebra problems 1849, 2146, and 582. We remove these four questions from the existing per-question evaluation results, retaining the original 500-question results as the main protocol.
 
-\input{experiments/completed_results_20260917/math_sensitivity_table}
-
-Removing the four questions leaves the four-domain-mean ranking unchanged for all twelve reported checkpoints. MATH-496 names the retained subset, not a new official benchmark. We keep the checkpoint choices fixed. This analysis does not retrain on a filtered pool or provide an exhaustive contamination audit.
+Removing the four questions changes the four-domain means by approximately 0.09--0.16 points and can reorder near-tied configurations. PG-DT/Adam and PG-GT/Adam both round to 38.60\% before removal, but reach 38.70\% and 38.75\%, respectively, afterward. PG-DR/SGD retains the highest mean among the reported checkpoints. MATH-496 denotes this retained subset of MATH-500.
 
 \subsection{Teacher-update overlap and distributional similarity}
 \label{app:teacher_overlap_support}
@@ -54,18 +45,18 @@ Removing the four questions leaves the four-domain-mean ranking unchanged for al
 \label{fig:teacher_overlap_support}
 \end{figure}
 
-Figure~\ref{fig:teacher_overlap_support} supplements the zero-gradient baseline subtraction at M-PG/500 using the controls in Appendix~\ref{app:nine_panel_support}. It compares PG and I64 under Adam with trained moments, reset-$m$, and norm-matched SGD. Shared inputs hold student prefixes fixed between teachers; domain-specific inputs change both the teacher and the input domain. Each of four batches contains six teacher pairs; these observations are dependent because they reuse teachers and responses. These gradient and update measurements do not directly measure changes in task performance.
+Figure~\ref{fig:teacher_overlap_support} supplements the zero-gradient baseline subtraction at M-PG/500 using the controls in Appendix~\ref{app:nine_panel_support}. It compares PG and I64 under Adam with trained moments, reset-$m$, and norm-matched SGD. Shared inputs hold student prefixes fixed between teachers; domain-specific inputs change both the teacher and the input domain. Each of four batches contains six teacher pairs.
 
-\clearpage
+\FloatBarrier
 \subsection{Online coverage and per-domain normalization effects}
 \label{app:i16_online_coverage}
 \label{app:domain_probe_breakdown}
 
 \paragraph{Online I16 coverage.}
-For seed 42/43/44 I16-DR, each of 500 updates has 16 logged slices of four responses. We average their masked, response-averaged summaries equally per update, rather than pooling tokens. Candidate sets are fixed at rollout; student probabilities are measured during training. Across 8,000 slices, mean $p_\theta(I)$, $r$, and $|I|$ are 99.616\%, 99.879\%, and 15.048. The mean empty fraction is 0.00270\%, nonzero in 80 slices across 62 updates. The lowest slice-mean mass is 86.67\% and largest slice-mean empty fraction 1.85\%; these are not prefix-level extremes. Different inputs and aggregation preclude a paired comparison with the offline I64 measurements (Table~\ref{tab:intersection_coverage}).
+For I16-DR, each of 500 updates has 16 logged slices of four responses. Each update averages the masked, response-averaged summaries with equal weight per slice. Candidate sets are fixed at rollout; student probabilities are measured during training. Across 8,000 slices, mean $p_\theta(I)$, $r$, and $|I|$ are 99.62\%, 99.88\%, and 15.05. The mean empty fraction is 0.0027\%, nonzero in 80 slices across 62 updates. The lowest slice-mean mass is 86.67\% and largest slice-mean empty fraction 1.85\%; these extremes refer to slice means.
 
 \paragraph{Per-domain probe losses.}
-We disaggregate Figure~\ref{fig:normalization_interventions}(c), using the same six batches and twelve branches per batch (Appendix~\ref{app:fixed_batch_normalization}). Each batch has one held-out response per domain. At update 250, saved-state Adam under DR/DT/GT increases IF KL by $0.362/0.293/0.272\times10^{-3}$, while the four-domain changes are $0.041/-0.002/-0.027\times10^{-3}$. Thus DT/GT lower the mean despite an IF increase. These local loss changes do not establish long-term capability regressions.
+We disaggregate Figure~\ref{fig:normalization_interventions}(c), using the same six batches and twelve branches per batch (Appendix~\ref{app:fixed_batch_normalization}). Each batch has one held-out response per domain. At update 250, saved-state Adam under DR/DT/GT increases IF KL by $0.362/0.293/0.272\times10^{-3}$, while the four-domain changes are $0.041/-0.002/-0.027\times10^{-3}$. Thus the mean reduction under DT/GT coexists with an instruction-following increase.
 
 \begin{figure}[!htbp]
 \centering

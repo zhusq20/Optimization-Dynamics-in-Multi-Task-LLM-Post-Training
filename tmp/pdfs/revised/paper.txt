@@ -1279,10 +1279,7 @@
 830   The multi-teacher configurations allocate 16 prompts to each domain per update and use target do-
 831   main weights 1/4. Single-teacher configurations allocate all 64 prompts to mathematics. Prompts
 832   follow a seeded shuffled schedule, repeated after exhaustion. I64 uses the top-k intersection objec-
-833   tive in Equation 4 with k = 64 from initialization; I16 uses k = 16. The supplementary PG/SGD
-834
-      branches use a learning rate of 0.0025 and each complete 500 updates. Hardware and deployment
-      differ from the AdamW runs, so the capability comparison does not establish a runtime ranking.
+833   tive in Equation 4 with k = 64 from initialization; I16 uses k = 16.
 835
 836   Training prompts come from the Nemotron-3-Nano-RL-Training-Blend: the DAPO and Skywork
 837   mathematics subsets, competition coding with unit tests, instruction following, and STEM multiple-
@@ -1296,7 +1293,7 @@
 843
       A.2   E VALUATION AND SCORING
 844   Each capability suite contains MATH-500 (500 questions from the MATH benchmark (Hendrycks
-845   et al., 2021); dataset release), a fixed 128-question LiveCodeBench v6 subset (Jain et al., 2024),
+845   et al., 2021); dataset release), LiveCodeBench v6 (Jain et al., 2024),
 846   IFBench strict (300 questions) (Pyatkin et al., 2025), and GPQA Diamond (198 questions) (Rein
 847   et al., 2023). Mathematics, code, and instruction following use one greedy response per question.
 848   GPQA uses four responses per question at temperature 1 and top-p = 1. Its score is the mean

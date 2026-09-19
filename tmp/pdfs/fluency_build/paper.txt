@@ -1,0 +1,2620 @@
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+000
+001
+      U NDERSTANDING M ULTI -T EACHER O N -P OLICY D IS -
+002   TILLATION : F ROM G RADIENTS TO C APABILITIES
+003
+004
+005    Anonymous authors
+006    Paper under double-blind review
+007
+008
+009                                               A BSTRACT
+010
+011            Multi-teacher on-policy distillation transfers domain expertise into a shared stu-
+012            dent. We study how loss averaging, optimizer history, and vocabulary super-
+013            vision shape this transfer, using Qwen3-1.7B and four domain specialists, with
+014            additional SmolLM3-3B measurements. Token and response averaging produce
+015            different gradients whose update directions become more similar after applying
+016            saved Adam moments; final mean scores are close. Training changes most pa-
+017
+               rameters, although low-precision storage hides many of these changes. Adam’s
+               accumulated moments also account for much of the alignment between teacher-
+018
+               specific updates: subtracting the zero-gradient step reduces their mean cosine
+019
+               from above 0.83 to below 0.01 on domain-specific inputs. Expanding supervi-
+020            sion from a sampled token to the top-64 intersection improves final mathematics
+021            accuracy and lowers science accuracy, with relative gains changing during train-
+022            ing. Top-64 closely approximates the full-vocabulary gradient direction in Qwen,
+023            while SmolLM retains appreciable gradient error. Together, these findings con-
+024            nect local update measurements to task-dependent learning trajectories and iden-
+025            tify optimizer history and numerical precision as central to interpreting distillation
+026            updates.
+027
+028
+029
+      1   I NTRODUCTION
+030
+      Multi-teacher on-policy distillation (MOPD) transfers specialized capabilities into a single model
+031
+      (Xiaomi LLM-Core Team, 2026; NVIDIA, 2026; Kimi Team et al., 2026; DeepSeek-AI et al., 2026).
+032
+      The student generates responses, and a teacher assigned to each prompt domain supplies token-level
+033   supervision. Improving several capabilities requires deciding how much each domain and response
+034   contributes to the loss, and how many next-token alternatives the teacher supervises.
+035
+036
+      Recent work establishes both the potential of MOPD and its sensitivity to these choices. Ma et al.
+      (2026) study capability integration with policy-gradient and top-k objectives. Open-MOPD ad-
+037
+      dresses uneven transfer through domain token balancing, performance-gap weighting, and refreshed
+038
+      rewards (Gao et al., 2026). The Nemotron 3 Ultra report finds no advantage for top-k or full-
+039   vocabulary matching over sampled-token supervision in preliminary experiments (NVIDIA, 2026,
+040   Section 3.3.5). Other studies report parameter changes concentrated in a small set of stored weights
+041   (Yu et al., 2026; Shen et al., 2026). How these observations connect loss construction, optimizer
+042   updates, and task performance remains open.
+043
+      Our study follows the path from loss construction to gradients, parameter updates, and task perfor-
+044
+      mance. The main experiments train Qwen3-1.7B with teachers for mathematics, code, instruction
+045   following, and science. We vary loss averaging and vocabulary supervision during training, and
+046   compare gradients and optimizer steps. Three findings emerge:
+047
+048        1. Adam brings different normalization gradients closer in update direction (Section 3).
+049           Weighting responses by length or equally produces gradients with mean cosine 0.68; Adam
+050           raises the update cosine to 0.96. The averaging rules reach similar final mean scores and
+051           follow different task-level learning curves.
+052        2. Precision and optimizer history strongly shape measured update sparsity and align-
+053           ment (Section 4). Training changes most FP32 weights, while BF16 rounding leaves a
+              small fraction visibly changed. Teacher-specific steps are strongly aligned through shared
+
+
+                                                         1
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+054
+               Adam moments; subtracting the zero-gradient step leaves near-zero mean alignment on
+055            domain-specific inputs.
+056
+            3. Broader vocabulary supervision produces task-dependent gains (Section 5). Top-64
+057
+               supervision improves final mathematics accuracy and lowers science accuracy relative to
+058
+               sampled-token supervision. Its mean advantage narrows as training proceeds. The losses
+059            produce similar update concentration.
+060
+061   Additional SmolLM3-3B measurements show that top-64 retains high average student probability
+062   while omitting substantial mass on some inputs. Enlarging the candidate set improves gradient
+063   approximation, with residual error relative to full-vocabulary supervision. Section 6 connects these
+064   observations to checkpoint selection: individual tasks can regress during training and recover by
+065   the endpoint, and development-set rankings can change on separate test questions. These results
+066
+      motivate tracking per-task learning curves alongside gradients and parameter changes.
+067
+068   2   P RELIMINARIES
+069
+070   Multi-teacher on-policy distillation (MOPD). For domain d, the student generates y ∼ pθ (· | x)
+071   for x ∼ Dd , and a frozen teacher qd supplies probabilities at each prefix ht = (x, y<t )P(Gao et al.,
+072   2026). For a rollout batch B, response i has Ti valid tokens and mean loss ℓi = Ti−1 t ℓi,t . The
+073   objective is                     X                             X
+074                            L(θ) =       wi ℓi (θ),   wi ≥ 0,         wi = 1.                        (1)
+075                                             i∈B                                  i∈B
+076   The token loss determines the vocabulary supervision; the response weights wi determine normal-
+077   ization across tokens, responses, and domains. Each update uses fresh student responses, held fixed
+078   with their masks and weights during gradient computation.
+079
+080   Sampled-token, top-k, and full-vocabulary supervision. Write pθ (v) = pθ (v | ht ) and qd (v) =
+081   qd (v | ht ). Full-vocabulary supervision minimizes reverse KL over V; the policy-gradient (PG) loss
+082   scores the sampled token yt :
+083                    X                  pθ (v)
+084          ℓfull =         pθ (v) log          ,       ℓPG (yt ) = − sg[log qd (yt ) − log pθ (yt )] log pθ (yt )   (2)
+                                          qd (v)
+085                    v∈V
+086
+087   Here sg denotes stop-gradient. The expected PG gradient equals the full reverse-KL
+                                                                                  P         gradient: dif-
+088   ferentiating Equation 2 gives Ea∼pθ [log(pθ (a)/qd (a))∇θ log pθ (a)], since v ∇θ pθ (v) = 0.
+089   Top-k supervision uses I = S ∩ T , where S, T are the student and teacher top-k sets, computed at
+090   rollout and held fixed. Its loss is
+091                                X        pθ (v)                           
+                                                                                
+092                   ℓtop-k = −        sg P           log qd (v) − log pθ (v) log pθ (v).          (3)
+093                                  v∈I    u∈S pθ (u)
+
+094   Probabilities use the full-vocabulary softmax; detached weights are normalized over S, and an empty
+095   intersection gives zero loss. I16 and I64 denote k = 16 and 64. We call the number of supervised
+096   vocabulary tokens the supervision density: one for PG, |I| ≤ k for intersection supervision, and |V|
+097   for full supervision.
+098
+099   Domain weighting
+                    P       and loss normalization. Let Bd contain responses from domain d, and let
+100   λd ≥ 0 with d λd = 1 be the target domain loss weights. For nonempty responses and domains,
+101   the three rules assign response i ∈ Bd weights
+102                                        Ti                          λd Ti                         λd
+103                      wiGT = P                    ,    wiDT = P               ,         wiDR =         .           (4)
+                                          j∈B Tj                       j∈Bd Tj                      |Bd |
+104
+105   Global-token (GT) averaging weights domains by their response-token shares. Domain-token (DT)
+106   and domain-response (DR) averaging fix each domain’s total weight to λd : DT weights responses by
+107   length, while DR weights their mean losses equally. Domain loss weights are distinct from prompt
+      sampling proportions.
+
+
+                                                                  2
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+108
+109   Table 1: Task gains and method rankings vary across domains and evaluation sets. Joint-
+110   training scores (%) after 500 updates. The four development tasks are MATH-500, LiveCodeBench
+111   v6, IFBench, and GPQA Diamond; both means weight domains equally. Response and domain-
+112   token averaging assign equal domain loss weights and average responses equally or by length;
+113
+      global-token averaging weights all tokens equally.
+114            Supervision       Averaging      Math    Code       IF Science Dev. mean Test mean
+115            Initial student   —              68.80 16.41 18.33       32.20     33.94      38.60
+116            Adam
+117            Sampled token     Response       73.20   18.27   27.00   35.97     38.61      43.55
+118            Sampled token     Domain token   73.20   19.24   27.00   34.96     38.60      43.51
+119            Sampled token     Global token   76.20   17.92   27.33   32.94     38.60      44.51
+               Top-16            Response       75.40   17.75   27.00   35.46     38.90      44.56
+120
+               Top-64            Response       75.80   18.30   27.33   34.71     39.04      44.46
+121            Top-64            Domain token   74.00   18.86   28.67   35.22     39.19      43.68
+122            Top-64            Global token   74.20   19.80   28.67   33.41     39.02      44.97
+123
+               SGD
+124            Sampled token Response     76.40 19.53 28.33             35.59     39.96      43.48
+125            Sampled token Domain token 75.20 20.31 28.33             33.90     39.44      43.90
+126            Sampled token Global token 75.00 19.26 25.33             34.71     38.58      42.97
+127
+128
+129   Update similarity. Let ud be the parameter change from one step on domain d’s mean loss. Each
+130
+      compared step starts from identical student weights and optimizer state, including Adam’s moments.
+      For nonzero updates, their cosine is Cde = (u⊤d ue )/(∥ud ∥ ∥ue ∥).
+131
+132
+133   3     L OSS N ORMALIZATION AND TASK P ERFORMANCE
+134
+135   Shared experimental setting. We train Qwen3-1.7B with four RL-specialized teachers derived
+136   from the same base model, covering mathematics, code, instruction following, and science. Training
+137   runs for 500 updates. AdamW uses learning rate 2.5 × 10−7 , moments (0.9, 0.98), and norm-1
+138   clipping. Responses are sampled at temperature 1 with a 4,096-token cap; thinking is disabled
+139
+      throughout.
+140
+      Evaluation. Development scores use MATH-500, LiveCodeBench v6, IFBench, and GPQA Dia-
+141
+      mond. The first three use greedy decoding; GPQA averages correctness over four sampled responses
+142
+      per question. Evaluation uses a 32,768-token context, and the four-domain mean weights tasks
+143   equally. Appendix A provides the full experimental protocol and uncertainty estimates. Table 1
+144   collects the endpoint scores and the separate-test means evaluated in Section 6.
+145
+146   3.1   R ESPONSE LENGTH CHANGES THE CONTRIBUTION OF EACH DOMAIN AND RESPONSE
+147
+148   Longer responses receive more weight when the loss is averaged over all tokens. In our training
+149   batches, mathematics accounts for about three times as many response tokens as instruction fol-
+150   lowing, even though the two domains receive equal numbers of prompts (Figure 1a). Global token
+151   averaging therefore gives mathematics a larger share of the loss. Averaging each domain separately
+152   fixes its total contribution; averaging response losses equally also removes the extra weight assigned
+153
+      to long responses.
+154   The remaining effect of length within a domain has a simple form. For response gradients gi = ∇θ ℓi
+155   and domain means ḡd , T̄d , the token-weighted gradient is
+156                                      P
+                                                 Ti gi         Covd (T, g)
+157                                       Pi∈Bd        = ḡd +             .                         (5)
+                                                  T
+                                             i∈Bd i               T̄d
+158
+159   Token averaging retains the length–gradient covariance term; response averaging uses ḡd . Correct-
+160   ing each domain’s global-token contribution by its target weight divided by its observed token share
+161   gives domain-token averaging exactly, as in Open-MOPD (Gao et al., 2026). This correction pre-
+      serves within-domain length weighting.
+
+
+                                                          3
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+162
+163                                         (a) Domain weights                                                      (b) Gradient to update                                             (c) MATH-500
+                                                                                                                                                                            80.0
+
+
+
+
+      Domain loss weight (%)
+164                                                                                                     1.0
+                               60
+165                                                                                                                                                                         77.5
+
+
+
+
+                                                                                      Pairwise cosine
+                                                                                                        0.8
+                                                                                                                                                                                                                T 75.6
+
+
+
+                                                                                                                                                                Score (%)
+166                            40                                                                       0.6
+                                                                                                                                                                            75.0
+
+167                                                              DT / DR: 25%
+                                                                                                                                                                            72.5
+                                                                                                        0.4
+168                            20                                                                                                                                           70.0
+                                                                                                        0.2                                                                                                     S 68.8
+169                                                                                                                                                                         67.5
+                                                                                                                    6 banks · updates 100 / 250
+170                                    0                                                                0.0                                                                 65.0
+                                           1                25              50                                       Raw         Clipped         Adam                                  0   100     250            500
+171                                                Optimizer update                                                                                                                          Optimizer update
+172                                            Math 44.1%        IF 15.0%                                                DR–DT        DR–GT       DT–GT
+                                               Code 19.2%        Science 21.7%
+173
+                                               (d) LiveCodeBench v6                                                 (e) IFBench strict                                                 (f) GPQA (avg@4)
+174                                    26                                                                                                                                         40
+175                                    24                                 T 23.4                                                                                                  38
+                                                                                                               30                                   T 29.0
+                                                                                                                                                                                                                T 36.4
+176                                    22                                                                                                                                         36
+
+
+                           Score (%)                                                               Score (%)                                                          Score (%)
+177                                    20                                                                      25                                                                 34
+178                                    18                                                                                                                                         32
+                                                                                                               20                                                                                               S 32.2
+179                                    16                                 S 16.4                                                                    S 18.3                        30
+180                                    14                                                                      15                                                                 28
+181
+                                               0   100       250                500                                  0     100        250              500                             0   100     250            500
+182                                                  Optimizer update                                                        Optimizer update                                                Optimizer update
+
+183                                                                                   DR                             DT          GT           Initial student                     Domain teacher
+
+184
+185
+      Figure 1: Loss averaging changes gradient directions; Adam produces more aligned updates
+186
+      and similar final mean scores. (a) Domain shares under global token averaging (GT). (b) Gradient
+187
+      and update cosines for global token, within-domain token (DT), and within-domain response (DR)
+188   averaging; points and bars show batch means and standard deviations. (c–f) Task learning curves
+189   under top-64 intersection supervision (I64); S/T mark the initial student/teacher; error bars show
+190   model-based question-sampling standard deviations.
+191
+192
+193
+194
+      3.2                                  T RAINED A DAM MOMENTS ALIGN UPDATES FROM DIFFERENT AVERAGING RULES
+195
+196
+197   Different gradients produce closely aligned Adam steps. Equal response weighting and within-
+198   domain token weighting produce gradients with mean cosine 0.68. Adam raises their update cosine
+199
+      to 0.96 (Figure 1b). Comparisons with global token averaging show the same pattern.
+200   Adam transforms the current gradient through its accumulated first and second moments (Kingma
+201   & Ba, 2015).
+202
+      In SmolLM, zero-initialized Adam moments lower the response-versus-token cosine from 0.59–
+203   0.90 for raw gradients to 0.41–0.70 for steps. Together, these observations make the optimizer state
+204   central to interpreting update alignment.
+205
+206
+207
+208   Clipping preserves gradient direction; optimizer history shapes the step. Equal response
+209   weighting triggers clipping throughout training, and token weighting triggers it less often (Fig-
+210   ure 2a). Global norm clipping preserves pairwise gradient cosines. Resetting Adam’s moments
+211   changes step norms and held-out loss changes, while norm-matched SGD steps separate the aver-
+212
+      aging rules more strongly (panels b,c). These interventions show how accumulated moments shape
+      the effect of the current gradient.
+213
+214   One-step improvements also vary by domain. For example, global token averaging changes mean
+215   full-vocabulary KL by −0.027 × 10−3 and instruction-following KL by +0.272 × 10−3 . The ag-
+      gregate improvement coexists with a domain-level regression.
+
+
+                                                                                                                                 4
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+216
+                                (a) Clipping                               (b) Adam moments                        (c) Held-out KL
+217
+                                                                                                              10
+
+
+
+
+      Gradient retained                             Step norm (10−3)
+218                             100% 46.2% 15%
+                          1.0                                          6
+
+
+
+                                                                                               Δ KL (10−3)
+219
+220                                                                    4                                       0
+                          0.5
+221                                                                    2
+222
+                          0.0                                          0                                     −10
+223
+224                              DR    DT      GT                          Saved Reset Reset                       Adam SGD Adam SGD
+                                                                                  m     m, v                        100 100 250 250
+225
+                                                                           DR        DT        GT
+226
+227
+228
+      Figure 2: Response averaging triggers more clipping; Adam history shapes step norms and
+      one-step loss changes. (a) Retained gradient fraction and clipping rates for response (DR), within-
+229
+      domain token (DT), and global token (GT) averaging. (b) Step norms after resetting Adam’s first
+230
+      moment or both moments, retaining the step count. (c) Held-out reverse-KL changes (lower is
+231   better). Open points are the three batches per checkpoint; filled points and bars show their means
+232   and standard deviations. SGD steps match the corresponding Adam step norm.
+233
+234
+235   3.3                   F INAL SCORES ARE CLOSE UNDER A DAM , WITH DIFFERENT TASK TRAJECTORIES
+236
+237   Averaging rules yield similar final means. The three rules finish within 0.17 percentage points in
+238
+      mean score. Their learning curves and task rankings vary (Figure 1c–f): all three approach teacher
+      performance on mathematics and instruction following, retain a code gap, and start near the science
+239
+      teacher’s score. Domain token averaging exceeds global token averaging by 0.17 mean points.
+240
+241
+      The observed score spread is larger with SGD. With sampled-token supervision, final mean
+242
+      scores span about 1.4 points under SGD and are nearly tied under Adam. Equal response weight-
+243
+      ing has the highest observed SGD mean. Its advantage over global token weighting is 1.39 points.
+244   Across the evaluated choices, the initial four-domain mean rises from about 34% to 39–40% (Ta-
+245   ble 1).
+246
+247
+248   4                    PARAMETER -U PDATE S PARSITY AND T EACHER A LIGNMENT
+249
+250   We examine numerical precision and shared optimizer state when interpreting concentrated check-
+251   point changes (Yu et al., 2026) and teacher-update alignment.
+252
+253   4.1                   BF16 ROUNDING HIDES WIDESPREAD FP32 CHANGES
+254
+255   Joint training changes about 97% of FP32 master weights. After BF16 rounding, only 7–9% of
+256
+      weights differ visibly from initialization (Figure 3a). Small updates are widespread in FP32 and
+      disappear when the weights are stored in BF16.
+257
+258   The precision effect also extends to the concentration of update magnitude. About one third of FP32
+259   coordinates carry 90% of squared cumulative change, compared with about 4% of BF16 coordinates.
+260   Loss averaging provides a further comparison between parameter changes and performance. The
+261   averaging rules produce different fractions of changed BF16 weights while reaching similar final
+262   mean scores.
+263
+264   4.2                   S HARED A DAM MOMENTS ALIGN TEACHER - SPECIFIC UPDATES
+265
+266   Teacher-specific steps are strongly aligned by Adam. On responses from each teacher’s own domain,
+267   mean update cosines exceed 0.83 under both sampled-token and top-64 supervision. Resetting the
+268   first moment while retaining the second, or replacing Adam with norm-matched SGD, reduces the
+269   mean cosine to near zero (Figure 3b). The accumulated first moment accounts for much of the
+      alignment.
+
+
+                                                                                 5
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+270              (a) Cumulative changes                                                  (b) Routed inputs                 (c) Common inputs
+271                     NZ (%)                E90 (%)
+272              7.5                    4.4                                        1.0                               1.0
+          S-PG
+
+
+
+
+                                                             FP32 update cosine
+273              8.1          88.6      4.9           38.3
+       S-I64
+274              7.3          88.7      3.8           39.8
+       M-PG                                                                        0.5                               0.5
+275              8.5           97.4     4.4          34.0
+       M-DR
+276              10.5          97.2     5.4          35.1
+277    M-DT                                                                        0.0                               0.0
+                 11.2          97.4     5.9          36.8
+278    M-GT
+                               97.0                  37.3                         −0.3                           −0.3
+279
+                 0       50      100    0       20      40                               Adam −U0   m = 0 SGD              Adam   −U0   m=0   SGD
+280                              BF16         FP32                                                              PG         I64
+281
+282
+      Figure 3: BF16 rounding hides widespread parameter changes, and shared Adam moments
+283
+      align teacher-specific steps. (a) Fractions of changed coordinates (NZ) and coordinates carrying
+284   90% of squared change (E90), measured in FP32 and BF16. (b,c) Update cosines on domain-
+285   specific/shared inputs; −U0 subtracts the zero-gradient step and m = 0 resets the first moment.
+286   Small/large points show batch/overall means. S/M denote mathematics-only/joint training and
+287   PG/I64 denote sampled-token/top-64 supervision. M-DR/DT/GT use top-64 with response/within-
+288   domain token/global token averaging; other rows use response averaging.
+289
+290
+291   Adam’s first moment can move parameters even with zero current gradient. To measure the change
+292   in a step induced by the current teacher gradient, we subtract this baseline. For update function
+293   U (g; H) and saved state H,
+294                                                     δUd = U (gd ; H) − U (0; H).                                                           (6)
+295
+296   After this subtraction, the mean cosine between teacher-specific step differences falls below 0.01
+297   on domain-specific inputs. When all teachers score the same prefixes, the residual cosine is larger,
+298   about 0.24–0.35 (Figure 3c). Teacher-specific alignment therefore depends on both shared optimizer
+299   history and shared inputs: removing the zero-gradient component reveals much greater directional
+300   separation across domains.
+301
+302
+      5     VOCABULARY S UPERVISION : PARAMETER U PDATES AND TASK
+303
+304
+            P ERFORMANCE
+305
+306   Expanding supervision from one sampled token to a larger vocabulary set changes gradient approx-
+307   imation and task-level learning. We compare sampled-token supervision with the student–teacher
+308
+      top-64 intersection during mathematics-only and joint training. Full-vocabulary supervision sup-
+      plies a reference for the gradient and single-step comparisons.
+309
+310
+311   5.1        B ROADER SUPERVISION PRODUCES TASK - DEPENDENT GAINS
+312
+313   The mathematics advantage develops during training. In mathematics-only training, sampled-
+314
+      token supervision leads top-64 by 2.8 accuracy points at update 100; top-64 leads by 2.2 points at
+      update 500 (Figure 4c). Joint training also ends with a mathematics gain from top-64 supervision,
+315
+      accompanied by a science loss: final differences are +2.6 points on mathematics and −1.3 on
+316
+      GPQA. Code and instruction-following differences are smaller.
+317
+318   Top-64’s joint-training mean advantage narrows from 1.69 points at update 250 to 0.43 at update
+319   500. These trajectories show that the observed benefit depends on the task and the stage of training.
+320
+321   Larger candidate sets redistribute gains across tasks. Top-16 and top-64 supervision reach de-
+322   velopment means of 38.90% and 39.04%, and separate-test means of 44.56% and 44.46% (Table 1).
+323   On the separate tests, top-64 gains 1.96 mathematics points and loses 2.35 code points relative to
+      top-16.
+
+
+                                                                                           6
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+324   (a) BF16 changes (%)                               (b) Alignment to full            (c) Score change (pp)
+325                                                                                                Math    -2.8    +0.6    +2.2
+                                                                 Grey: I64 range
+                                                                                           S-I64
+                                                                                                   Code    +0.0    +0.8    -1.6
+326             PG    I64   T64    Full
+                                                   1.0                                                IF   -1.0    +1.3    +0.7
+327   PG100    0.149 0.150 0.150 0.150                                                             GPQA    +1.4    -2.9    -1.8
+                                                                                                   Math    -0.4    +1.4    +2.6
+328   PG500    0.137 0.139 0.139 0.139
+                                                                                           M-I64
+                                                                                                           +0.8    +1.6    +0.0
+
+                                          Cosine
+                                                                                                   Code
+                                                   0.5                                                     -0.3    +0.0    +0.3
+329                                                                                                   IF
+      I64100   0.172 0.173 0.173 0.172                                                             GPQA    +1.5    +3.8    -1.3
+330                                                                                                Math    +0.2    +2.2    +2.2
+      I64500   0.141 0.143 0.143 0.143
+                                                                                           M-I16
+331                                                0.0                                             Code    +0.8    +2.3    -0.5
+                                                                                                      IF   -0.3    -0.3    +0.0
+332                                                                                                GPQA    +1.8    +3.4    -0.5
+                                                         Grad.        FP32         BF16
+333                                                                                                        100     250     500
+334                   PG100       PG500            I64100         I64500                                          Update
+
+335
+336   Figure 4: Top-64 supervision closely approximates the full-vocabulary gradient in Qwen and
+337   produces task-dependent learning gains. (a) Fraction of changed BF16 weights for each local
+338   loss at fixed checkpoints. (b) Gradient and update cosines to full-vocabulary supervision. (c) Score
+339   differences from sampled-token supervision over training. PG: sampled token; I16/I64: student–
+340   teacher top-16/top-64 intersection; T64: teacher top-64. S/M denote mathematics-only/joint train-
+341   ing; checkpoint numbers are training updates.
+342
+343
+      5.2   L ARGER CANDIDATE SETS IMPROVE GRADIENT APPROXIMATION
+344
+345   Truncating vocabulary support omits probability mass and changes token weights (Anshumann et al.,
+346   2025; Huang & Wei, 2026). We measureP   coverage as the student probability retained by the student–
+347   teacher candidate intersection, ck (h) = v∈S∩T pθ (v | h), and compare gradients.
+348
+349   Top-64 closely matches the full-vocabulary direction in Qwen. The intersection retains over
+350   99.9% of student probability on average, and its gradient direction is close to that of full-vocabulary
+351   supervision (Figure 4b). Averaging 1, 16, and 64 token samples raises the mean gradient cosine
+352   from 0.54 to 0.87 to 0.97; top-64 reaches 0.99999 (Figure 6a). This sampling control identifies
+353   finite-sample variation as one source of the directional difference.
+354
+355   Lower-coverage inputs retain appreciable gradient error in SmolLM. SmolLM3-3B measure-
+356   ments use the MixSFT initialization and its student after 500 updates of top-64 training with response
+357
+      averaging and three teachers for mathematics, code, and instruction following (Gao et al., 2026).
+      Mean top-64 coverage is 97.42% initially and 98.56% after training; 8.42% and 3.65% of weighted
+358
+      prefixes retain less than 90% mass (Figure 5a,b). Larger candidate sets reduce this low-coverage
+359
+      tail.
+360
+361   We compare gradients on typical prefixes, high-entropy prefixes, and prefixes with top-64 coverage
+362   below 99%. Top-64 has 2.16–24.54% relative gradient error against full-vocabulary supervision.
+363
+      Top-4 and top-8 produce larger errors in the evaluated batches (Figure 5d). Here relative error is
+      the norm of the gradient difference divided by the full-vocabulary gradient norm, capturing both
+364
+      direction and magnitude. Larger candidate sets improve the approximation, with residual error at
+365
+      top-64.
+366
+367
+      SmolLM capability scores also reveal changes below the aggregate. Sampled-token training
+368
+      with SGD raises MATH-500 accuracy from 50.60% to 53.80%. On AIME 2025, the initializa-
+369   tion, the top-64/domain-token Adam student, and the sampled-token/response-averaged SGD stu-
+370   dent each solve four of 30 questions with eight samples per question; only one solved question is
+371   common to all three.
+372
+373   5.3   VOCABULARY SUPERVISION LEAVES SINGLE - STEP CONCENTRATION NEARLY
+374         UNCHANGED
+375
+376   Sampled-token, top-64, teacher-top-64, and full-vocabulary losses produce nearly identical single-
+377   step concentration (Figure 4a). This similarity across vocabulary supports is consistent with con-
+      centrated stored-weight changes under dense distillation (Yu et al., 2026).
+
+
+                                                                       7
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+378                                   (a) Mean coverage                                          (c) Gradient direction                                  (d) Relative error
+379                             100                                                       1.0
+
+               Mean (%)
+380                                                                                                                                                 60
+
+
+
+
+                                                                                                                                 Vector error (%)
+381
+
+
+
+                                                                         Cosine to full
+382                              85
+                                                                                          0.9                                                       40
+383                                   (b) Low-coverage tail
+                                 30
+384
+
+               Tail (%)
+                                                                                                                                                    20
+385                              15                                                       0.8
+386
+                                  0                                                                                                                  0
+387                                   4     8 16 32 64 128                                       4      8               64                               4     8                  64
+                                          Candidate budget k                                         Candidate budget k                                      Candidate budget k
+388
+                                          MixSFT        DR500                                            Representative      High entropy                       Low coverage
+389
+390
+391   Figure 5: Larger candidate sets improve coverage and gradient approximation in SmolLM.
+392
+      (a,b) Mean retained student probability and fraction of inputs below 90% coverage; bands show
+      response-cluster 95% intervals. Dashed lines mark top-64. (c,d) Gradient cosine and relative error
+393
+      against full-vocabulary supervision at the trained student. Groups comprise typical inputs, uncertain
+394
+      next-token predictions, and inputs with lower top-64 coverage; thin lines show batches and bold
+395   lines their means. MixSFT/DR500 denote the initialization/trained student.
+396
+397
+398                                   (a) PG sampling                                             (b) Zero gradient                                          (c) Reset moments
+
+
+
+
+      Cosine to full gradient
+                                                                 BF16 nonzero (%)                                             BF16 nonzero (%)
+399                             1.0
+                                                                                          0.15                                                      0.50
+400
+401                                                                                       0.10                                                                  PG
+                                0.5                                                                                                                 0.25        I64
+402
+                                                          PG                              0.05
+403
+                                                          I64
+404                             0.0                                                       0.00                                                      0.00
+405                                   1            16       64                                    Zero PG I64 T64 Full                                       Saved    Reset    Fresh
+                                                                                                                                                                       m
+406                                    Actions per prefix
+407
+408
+409   Figure 6: Averaging more token samples improves gradient alignment; Adam history con-
+410
+      tributes strongly to BF16 changes. (a) Gradient cosine to full-vocabulary supervision; I64 uses
+      the top-64 intersection. (b,c) Fractions of changed BF16 weights with zero current gradient or reset
+411
+      moments. PG denotes sampled-token supervision; reset-m keeps the second moment and step count,
+412
+      and fresh Adam resets both moments and the count. Points show batches and bars show means.
+413
+414
+415   The teacher-top-64 reference restricts the full-KL gradient sum to the teacher’s top-64 tokens using
+416   full-vocabulary probabilities. Shared optimizer history contributes strongly to the similar concentra-
+417   tion. Even a zero current gradient changes about 0.14% of BF16 parameters in the same compari-
+418   son, close to the fraction changed by the supervised losses. Resetting Adam’s moments changes the
+419   amount of BF16 writeback (Figure 6b,c).
+420   Over training, student parameters, responses, and optimizer moments evolve together. Top-64
+421   and sampled-token supervision consequently accumulate different BF16 displacements (Section 4),
+422   alongside the task-dependent learning trajectories above.
+423
+424
+425   6                          TASK -L EVEL M ONITORING AND C HECKPOINT S ELECTION
+426
+427   Separate test questions assess transfer beyond development rankings. We evaluate 256 ad-
+428   ditional questions per domain, using Skywork mathematics and TACO code pools, Nemotron
+429   instruction-following data, and the natural-science portion of Nemotron knowledge validation. Ex-
+430   act and lexical overlap with the training and known evaluation pools is removed. Scoring uses
+431   answer verification, unit tests, instruction constraints, and multiple-choice accuracy, with the same
+      decoding scheme as development evaluation. Table 1 reports its means for all ten final students.
+
+
+                                                                                                            8
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+432
+      Intermediate checkpoints reveal temporary domain regressions. With sampled-token supervi-
+433   sion and response averaging under Adam, science accuracy changes from 32.20% initially to 28.03%
+434   at update 50, 30.18% at update 250, and 35.97% at update 500. Tracking individual domains cap-
+435   tures this temporary regression and its recovery.
+436
+437   A domain-retention constraint selects the same checkpoints as the mean score.             We compare
+438   the highest development mean with the highest mean subject to
+439                      sd (θ) ≥ sd (θ0 ) − ϵd   for all d,    ϵd = 2 percentage points,                 (7)
+440
+      where sd is the domain score and θ0 the initial student. Both rules retain the initialization unless the
+441
+      mean improves by at least one point.
+442
+443   Both rules select update 500 in nine trajectories and update 250 for sampled-token training with
+444   domain-token averaging under Adam. The earlier checkpoint scores 43.14% on the separate test,
+445   compared with 43.51% at update 500.
+446
+447
+      Method rankings vary with evaluation questions. For sampled-token supervision with response
+      averaging, SGD leads Adam by 1.35 mean points on development benchmarks; separate-test means
+448
+      are 43.48% and 43.55%, respectively. A further sensitivity check removes four MATH-500 ques-
+449
+      tions with known training-pool matches: four-domain means change by 0.09–0.16 points, reordering
+450   some near-tied methods while preserving the highest observed mean for response-averaged SGD.
+451   Together, these results support reading aggregate rankings alongside per-task trajectories and the
+452   evaluation questions that produced them.
+453
+454
+455
+      7   R ELATED W ORK
+456
+      Distillation objectives and vocabulary truncation. MiniLLM uses reverse KL (Gu et al., 2024);
+457
+      Generalized Knowledge Distillation (GKD) combines student-generated sequences with alterna-
+458   tive divergences (Agarwal et al., 2024); f -DISTILL derives word-level losses from sequence-level
+459   f -divergences (Wen et al., 2023). Sparse Logit Sampling analyzes top-k caching bias (Anshu-
+460   mann et al., 2025), while Tail-Aware OPD restores tail-mass information lost by top-k renormal-
+461   ization (Huang & Wei, 2026). Our intersection loss retains full-softmax log ratios with detached
+462   student-top-k weights. Section 5 compares its coverage, gradient error, updates, and task scores
+463   with sampled-token and full-vocabulary supervision.
+464
+465   Multi-teacher distillation and loss normalization. MOPD integrates specialized teachers on
+466   student-generated responses (Ma et al., 2026); Open-MOPD adds domain token balancing and adap-
+467
+      tive weighting (Gao et al., 2026). DAPO uses token-level averaging (Yu et al., 2025), and Dr. GRPO
+      analyzes length and reward-normalization bias (Liu et al., 2025). We separate domain weighting
+468
+      from within-domain response weighting: Open-MOPD’s token-share correction gives DT for fixed
+469
+      batches and domain weights, while DR also removes response-length weighting.
+470
+471
+      Post-training parameter geometry. Mukherjee et al. (2025) study small parameter subsets sup-
+472   porting RL fine-tuning; Yu et al. (2026) report concentrated distillation updates and overlap between
+473   separately trained students. Shen et al. (2026) examine OPD geometry and response-position selec-
+474   tion. We examine teacher alignment, distinguish FP32 from BF16 changes, and vary vocabulary
+475   support.
+476
+477
+      8   D ISCUSSION
+478
+479
+      The path from a distillation loss to task performance passes through optimizer history, numeri-
+480   cal precision, and an evolving training trajectory. In our comparisons, Adam aligns directionally
+481   different gradients, and BF16 rounding hides widespread FP32 changes. Broader vocabulary su-
+482   pervision improves gradient approximation and produces task-dependent learning gains, including
+483   a mathematics–science trade-off and changing advantages over time. These findings give comple-
+484   mentary roles to the measurements: gradients describe the immediate training signal, parameter
+485   changes show its interaction with the optimizer and precision, and per-task learning curves reveal
+      the resulting capability gains and regressions.
+
+
+                                                          9
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+486
+      R EPRODUCIBILITY S TATEMENT
+487
+488
+      The evidence bundle includes figure and table values, configurations, source hashes, scoring audits,
+489   and plotting scripts. The appendix provides full protocols, supporting analyses, and overlap checks.
+490
+491
+492   E THICS S TATEMENT
+493
+494   We use public models and benchmarks. Generative AI assisted manuscript editing and analysis
+495
+      code; the authors are responsible for the measurements and their interpretation.
+496
+497
+498
+499
+500
+501
+502
+503
+504
+505
+506
+507
+508
+509
+510
+511
+512
+513
+514
+515
+516
+517
+518
+519
+520
+521
+522
+523
+524
+525
+526
+527
+528
+529
+530
+531
+532
+533
+534
+535
+536
+537
+538
+539
+
+
+
+                                                      10
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+540
+      R EFERENCES
+541
+542   Rishabh Agarwal, Nino Vieillard, Yongchao Zhou, Piotr Stanczyk, Sabela Ramos, Matthieu Geist,
+543     and Olivier Bachem. On-policy distillation of language models: Learning from self-generated
+544     mistakes. In International Conference on Learning Representations, 2024. URL https://
+545
+        arxiv.org/abs/2306.13649.
+546   Anshumann, Mohd Abbas Zaidi, Akhil Kedia, Jinwoo Ahn, Taehwak Kwon, Kangwook Lee, Hae-
+547     jun Lee, and Joohyung Lee. Sparse logit sampling: Accelerating knowledge distillation in
+548     LLMs. In Proceedings of the 63rd Annual Meeting of the Association for Computational Lin-
+549     guistics (Volume 1: Long Papers), pp. 18085–18108. Association for Computational Linguistics,
+550     2025. doi: 10.18653/v1/2025.acl-long.885. URL https://aclanthology.org/2025.
+551     acl-long.885/.
+552
+      DeepSeek-AI, Anyi Xu, Bangcai Lin, Bing Xue, Bingxuan Wang, Bingzheng Xu, Bochao Wu,
+553
+        Bowei Zhang, Chaofan Lin, Chen Dong, Chenchen Ling, Chengda Lu, Chenggang Zhao, Chengqi
+554
+        Deng, Chengyu Hou, Chenhao Xu, Chenze Shao, Chong Ruan, Conner Sun, Damai Dai, Daya
+555     Guo, Dejian Yang, Deli Chen, Donghao Li, Dongjie Ji, Erhang Li, Fang Wei, Fangyun Lin,
+556     Fangzhou Yuan, Feiyu Xia, Fucong Dai, Guangbo Hao, Guanting Chen, Guoai Cao, Guolai
+557     Meng, Guowei Li, Han Yu, Han Zhang, Hanwei Xu, Hao Li, Haofen Liang, Haoling Zhang,
+558     Haoming Luo, Haoran Wei, Haotian Yuan, Haowei Zhang, Haowen Luo, Haoyu Chen, Haozhe
+559     Ji, Hengqing Zhang, Honghui Ding, Hongxuan Tang, Huanqi Cao, Huazuo Gao, Hui Qu, Hui
+560     Zeng, J Yang, JQ Zhu, Jia Luo, Jia Song, Jia Yu, Jialiang Huang, Jialu Cai, Jian Liang, Jiangting
+561     Zhou, Jiasheng Ye, Jiashi Li, Jiaxin Xu, Jiewen Hu, Jieyu Yang, Jin Chen, Jin Yan, Jingchang
+562     Chen, Jingli Zhou, Jingting Xiang, Jingyang Yuan, Jingyuan Cheng, Jingzi Zhou, Jinhua Zhu,
+563
+        Jiping Yu, Joseph Sun, Jun Ran, Junguang Jiang, Junjie Qiu, Junlong Li, Junmin Zheng, Junxiao
+        Song, Kai Dong, Kaige Gao, Kang Guan, Kexing Zhou, Kezhao Huang, Kuai Yu, Lean Wang,
+564
+        Lecong Zhang, Lei Wang, Leyi Xia, Li Zhang, Liang Zhao, Lihua Guo, Lingxiao Luo, Linwang
+565
+        Ma, Linyan Zhu, Litong Wang, Liyu Cai, Liyue Zhang, Longhao Chen, MS Di, MY Xu, Max
+566     Mei, Miaojun Wang, Mingchuan Zhang, Minghua Zhang, Minghui Tang, Mingming Li, Mingxu
+567     Zhou, Minmin Han, Ning Wang, Panpan Huang, Panpan Wang, Peixin Cong, Peiyi Wang, Peng
+568     Zhang, Qiancheng Wang, Qihao Zhu, Qingyang Li, Qinyu Chen, Qiushi Du, Qiwei Jiang, Rui
+569     Tian, Ruifan Xu, Ruijie Lu, Ruiling Xu, Ruiqi Ge, Ruisong Zhang, Ruizhe Pan, Runji Wang,
+570     Runqian Chen, Runqiu Yin, Runxin Xu, Ruomeng Shen, Ruoyu Zhang, Ruyi Chen, SH Liu,
+571     Shanghao Lu, Shangmian Sun, Shangyan Zhou, Shanhuang Chen, Shaofei Cai, Shaoheng Nie,
+572     Shaoqing Wu, Shaoyuan Chen, Shengding Hu, Shengyu Liu, Shiqiang Hu, Shirong Ma, Shiyu
+573     Wang, Shuiping Yu, Shunfeng Zhou, Shuting Pan, Shuying Yu, Songyang Zhou, Tao Ni, Tao
+574
+        Yun, Tian Jin, Tian Pei, Tian Ye, Tianle Lin, Tianran Ji, Tianyi Cui, Tianyuan Yue, Tingting
+        Yu, Tun Wang, W Zhang, WL Xiao, Wangding Zeng, Wei An, Weilin Zhao, Wen Liu, Wenfeng
+575
+        Liang, Wenjie Pang, Wenjing Luo, Wenjing Yao, Wenjun Gao, Wenkai Yang, Wenlve Huang,
+576
+        Wenqing Hou, Wentao Zhang, Wenting Ma, Xi Gao, Xiang He, Xiangwen Wang, Xianzu Wang,
+577     Xiao Bi, Xiaodong Liu, Xiaohan Wang, Xiaokang Chen, Xiaokang Zhang, Xiaotao Nie, Xiaowen
+578     Sun, Xiaoxiang Wang, Xin Cheng, Xin Liu, Xin Xie, Xingchao Liu, Xingchen Liu, Xingkai Yu,
+579     Xingyou Li, Xinyu Yang, Xinyu Zhang, Xu Chen, Xuanyu Wang, Xuecheng Su, Xueyin Chen,
+580     Xuheng Lin, Xuwei Fu, YC Yan, YQ Wang, YW Ma, Yanfeng Luo, Yang Zhang, Yanhong Xu,
+581     Yanru Ma, Yanwen Huang, Yao Li, Yao Li, Yao Xu, Yao Zhao, Yaofeng Sun, Yaohui Wang,
+582     Yi Qian, Yi Shao, Yi Yu, Yichao Zhang, Yifan Ding, Yifan Shi, Yijia Wu, Yiliang Xiong, Yiling
+583     Ma, Ying He, Ying Tang, Ying Zhou, Yingjia Luo, Yinmin Zhong, Yishi Piao, Yisong Wang,
+584     Yixiang Zhang, Yixiao Chen, Yixuan Tan, Yixuan Wei, Yiyang Ma, Yiyuan Liu, Yonglun Yang,
+585
+        Yongqiang Guo, Yongtong Wu, Yu Wu, YuKun Li, Yuan Cheng, Yuan Ou, Yuanfan Xu, Yuanhao
+        Li, Yuduan Wang, Yuehan Yang, Yuer Xu, Yuhan Wu, Yuhao Meng, Yuheng Zou, Yukun Zha,
+586
+        Yunfan Xiong, Yupeng Chen, Yuping Lin, Yuqian Cao, Yuqian Wang, Yushun Zhang, Yuting Yan,
+587
+        Yutong Lin, Yuxian Gu, Yuxiang Luo, Yuxiang You, Yuxuan Liu, Yuxuan Zhou, Yuyang Zhou,
+588     Yuzhen Huang, ZF Wu, Zehao Wang, Zehua Zhao, Zehui Ren, Zekai Zhang, Zhangli Sha, Zhe
+589     Fu, Zhe Ju, Zhean Xu, Zhenda Xie, Zhengyan Zhang, Zheren Gao, Zhewen Hao, Zhibin Gou,
+590     Zhicheng Ma, Zhigang Yan, Zhihong Shao, Zhixian Huang, Zhixuan Chen, Zhiyu Wu, Zhizhou
+591     Ren, Zhongyu Wu, Zhuoshu Li, Zhuping Zhang, Zian Xu, Zihao Wang, Zihua Qu, Zihui Gu,
+592     Zijia Zhu, Zilin Li, Zipeng Zhang, Ziwei Xie, Ziyi Gao, Ziyi Wan, Zizheng Pan, and Zongqing
+593     Yao. Deepseek-v4: Towards highly efficient million-token context intelligence, 2026. URL
+        https://arxiv.org/abs/2606.19348.
+
+
+                                                      11
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+594
+      Huan-ang Gao, Haohan Chi, Yong Yan, Shiyuan Feng, Hanlin Wu, Zheng Jiang, Bingxiang He,
+595     Wei-Ying Ma, Ya-Qin Zhang, and Hao Zhou. Open-MOPD: Diagnosing and fixing capability
+596     imbalance in multi-teacher on-policy distillation, 2026. URL https://arxiv.org/abs/
+597     2608.19098v1.
+598
+599   Yuxian Gu, Li Dong, Furu Wei, and Minlie Huang. MiniLLM: Knowledge distillation of large
+600     language models. In International Conference on Learning Representations, 2024. URL https:
+601
+        //arxiv.org/abs/2306.08543v4.
+602
+      Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric Tang, Dawn Song,
+603     and Jacob Steinhardt. Measuring mathematical problem solving with the MATH dataset. In
+604     Advances in Neural Information Processing Systems, 2021. doi: 10.48550/arXiv.2103.03874.
+605     URL https://arxiv.org/abs/2103.03874v2.
+606
+607   Huipeng Huang and Hongxin Wei. Tail-aware top-k on-policy distillation, 2026. URL https:
+608     //arxiv.org/abs/2608.14728.
+609
+      Naman Jain, King Han, Alex Gu, Wen-Ding Li, Fanjia Yan, Tianjun Zhang, Sida Wang, Armando
+610     Solar-Lezama, Koushik Sen, and Ion Stoica. Livecodebench: Holistic and contamination free
+611     evaluation of large language models for code, 2024. URL https://arxiv.org/abs/
+612     2403.07974v2.
+613
+614   Kimi Team, Tongtong Bai, Yifan Bai, Yiping Bao, M. C., Jianfeng Cai, Xinyuan Cai, Peizhou Cao,
+615     Yuxuan Cao, Ziwei Chai, Y. Charles, H. S. Che, Guanduo Chen, Guangyu Chen, Guanzheng
+616     Chen, Huarong Chen, Jia Chen, Jianlong Chen, Jun Chen, Kexin Chen, Peng Chen, Ruijue Chen,
+617
+        Wentao Chen, Xin Chen, Yang Chen, Yanru Chen, Yifei Chen, Yingjiang Chen, Yuankun Chen,
+        Yujie Chen, Yutian Chen, Zhirong Chen, Dazhi Cheng, Yean Cheng, Jialei Cui, Jingbing Cui,
+618
+        Anqi Dai, Jiaqi Deng, Hao Ding, Rui Ding, Shaofeng Ding, Mengfan Dong, Mengnan Dong,
+619
+        Yuhao Dong, Yuxin Dong, Angang Du, Chenzhuang Du, Dikang Du, Jusen Du, Yulun Du, Yu Fan,
+620     Jing Feng, Qiulin Feng, Yichen Feng, Kelin Fu, Qiang Fu, Fuxuan Gao, Hongcheng Gao, Jingyue
+621     Gao, Tong Gao, Weijia Gao, Shangyi Geng, Jie Gong, Linhu Gong, Shengao Gong, Xiaochen
+622     Gong, Qizheng Gu, Yicheng Gu, Shuhao Guan, Haiqing Guo, Shiqi Guo, Xiang Guo, Zhengyan
+623     Guo, Beixi Hao, Wenxin Hao, Xiaoru Hao, Dailan He, Haotian He, Lehan He, Qi He, Weiran He,
+624     Xinran He, Xinyi He, Yibo He, Yunjia He, Chao Hong, Tiange Hong, Hao Hu, Jiaxi Hu, Ruikun
+625     Hu, Weiming Hu, Yangyang Hu, Zhenxing Hu, Liang Hua, Jinbin Huang, Ke Huang, Ruiyuan
+626     Huang, Siying Huang, Weixiao Huang, Yan Huang, Zhengjie Huang, Zhiqi Huang, Yulong Hui,
+627     Chaobo Jia, Yutong Jiang, Zhejun Jiang, Zuoyou Jiang, Wenyi Jin, Xinyi Jin, Yu Jing, Huanjun
+628
+        Kong, Guokun Lai, Aidi Li, Cheng Li, Chengyuan Li, Cong Li, Fang Li, Guanyu Li, Haoyang
+        Li, Jia Li, Junxiong Li, Lei Li, Letian Li, Lincan Li, Weihong Li, Wentao Li, Xintong Li, Yang
+629
+        Li, Yishen Li, Yiwei Li, Yuxiao Li, Zhaowei Li, Zhaoxi Li, Zheming Li, Zhengxiao Li, Zhiyuan
+630
+        Li, Jiawei Lin, Xiaohan Lin, Yibo Lin, Zichao Lin, Ziyan Lin, Bill Liu, Boxiao Liu, Chuan Liu,
+631     Liang Liu, Shaowei Liu, Shudong Liu, Shuran Liu, Tianwei Liu, Weizhou Liu, Yangyang Liu,
+632     Yanming Liu, Yibo Liu, Yipeng Liu, Zhengying Liu, Zhiheng Liu, Enzhe Lu, Haoyu Lu, Lin-
+633     qiang Lu, Tingzhan Lu, Zhiyuan Lu, Aotian Luo, G. Luo, Junyu Luo, Yifan Luo, B. Lyu, Wen-
+634     zhou Lyu, Shaoguang Mao, Yuan Mei, Xin Men, Minqing Ni, Yixuan Niu, Siyuan Pan, Shujun
+635     Peng, Zhangyang Qi, Ruoyu Qin, ZeChao Qin, Zeyu Qin, Haiquan Qiu, Jianxin Qiu, Jiezhong
+636     Qiu, Bowen Qu, Yuhao Qu, Zeyu Shang, Youbo Shao, Han Shen, Jincheng Shi, Juanfeng Shi,
+637     Lidong Shi, Shengyuan Shi, Wingchun Siu, Pengwei Song, Xiaoxi Song, Jianlin Su, Yunfeng
+638     Su, Zhaochen Su, Lin Sui, Jingsong Sun, Junyao Sun, Shaoning Sun, Shuzhe Sun, Tongyu Sun,
+639
+        Yujun Sun, Yunpeng Tai, Chuning Tang, Heyi Tang, Sirui Tang, Zecheng Tang, Chaoran Tian,
+        Rongpeng Tian, Yu Tian, Wei Tu, Chensi Wang, Chuang Wang, Chunjie Wang, Dinglu Wang,
+640
+        Feng Wang, Hailong Wang, Haiming Wang, Hao Wang, Hao Wang, Huaqing Wang, Hui Wang,
+641
+        Jiayi Wang, Jinglong Wang, Jinhong Wang, Jiuzheng Wang, Linian Wang, Shaobo Wang, Shen-
+642     zhi Wang, Shuyi Wang, Si Wang, Siyuan Wang, Tianfu Wang, Wenjue Wang, Xingran Wang,
+643     Xinmei Wang, Xinyuan Wang, Xusheng Wang, Yalin Wang, Yangkun Wang, Yao Wang, Yaoyu
+644     Wang, Yejie Wang, Yiqin Wang, Yucheng Wang, Yuzhi Wang, Zhaoji Wang, Zhaowei Wang,
+645     Zhengtao Wang, Zhenhao Wang, Zhongsheng Wang, Zifan Wang, Chu Wei, Ming Wei, Shouxin
+646     Wei, Zichen Wen, Fan Wu, Haoning Wu, Rucong Wu, Wenhao Wu, Xiaoxue Wu, Yingcong
+647     Wu, Yongqi Wu, Yuxin Wu, Zijian Wu, Xinglang Xian, Chenxuan Xiang, Yuye Xiang, Bocheng
+        Xiao, Chenjun Xiao, Xin Xiao, Jin Xie, Xiaotong Xie, Yifeng Xie, Zhe Xie, Bowei Xing, Yiming
+
+                                                    12
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+648
+        Xiong, Baosheng Xu, Boyu Xu, Jiale Xu, Jianfan Xu, Jing Xu, Jinjing Xu, L. H. Xu, Qing-
+649     tao Xu, Shuyao Xu, Suting Xu, Tiantian Xu, Tianxiang Xu, Weixin Xu, Xinran Xu, Yangchuan
+650     Xu, Ye Xu, Yueni Xu, Ziyao Xu, Haonan Xue, Junjie Yan, Yaoyao Yan, Fan Yang, Guangyao
+651     Yang, Hao Yang, Junwei Yang, Ruoyu Yang, Wenjie Yang, Xiaofei Yang, Xinyu Yang, Yi Yang,
+652     Yiling Yang, Ying Yang, Yuchen Yang, Zhen Yang, Zhilin Yang, Zian Yang, Zuhao Yang, Hao-
+653     tian Yao, Dan Ye, Haoran Ye, Wenjie Ye, Zhanbo Ye, Bohong Yin, Haoxiang Yin, Xietong Yin,
+654     Chengzhen Yu, Haozhen Yu, Longhui Yu, Shengnan Yu, Shuying Yu, Tianxiang Yu, Enming
+655     Yuan, Mengjie Yuan, Tongtian Yue, Wei Yue, Yang Yue, Dunyuan Zha, Haobing Zhan, B. H.
+656     Zhang, Dehao Zhang, Fei Zhang, Hao Zhang, Haoyuan Zhang, Huanyu Zhang, Jiapei Zhang,
+657
+        Jiaxuan Zhang, Jin Zhang, Kaiyi Zhang, Miaozhen Zhang, Puqi Zhang, Qinglei Zhang, Rong
+        Zhang, Rui Zhang, Shaoshuai Zhang, Shiyi Zhang, Xiaobin Zhang, Xiaoyun Zhang, Y. Zhang,
+658
+        Yangkun Zhang, Ye Zhang, Yichi Zhang, Yikun Zhang, Yizhi Zhang, Yongting Zhang, Yu Zhang,
+659
+        Yutao Zhang, Yutong Zhang, Zheng Zhang, Zijing Zhang, Bin Zhao, Chenguang Zhao, Feifan
+660     Zhao, Jinglun Zhao, Jinxiang Zhao, Shuai Zhao, Wenshuo Zhao, Xiangyu Zhao, Xuanle Zhao,
+661     Yikai Zhao, Zijia Zhao, Haozhi Zheng, Huabin Zheng, Ruihan Zheng, Shaojie Zheng, Tengyang
+662     Zheng, Haofeng Zhong, Lei Zhong, Longguang Zhong, M. Zhou, Qiankang Zhou, Runjie Zhou,
+663     Ruozhang Zhou, Xinyu Zhou, Yiqiao Zhou, Zaida Zhou, Jinguo Zhu, Liya Zhu, Xinhao Zhu,
+664     Yangjunfeng Zhu, Yuxuan Zhu, Zhen Zhu, Chen Zhuang, Weiyu Zhuang, and Xinxing Zu. Kimi
+665     k3: Open frontier intelligence, 2026. URL https://arxiv.org/abs/2607.24653.
+666
+667
+      Diederik P. Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In International
+        Conference on Learning Representations, 2015. URL https://arxiv.org/abs/1412.
+668
+        6980.
+669
+670   Zichen Liu, Changyu Chen, Wenjun Li, Penghui Qi, Tianyu Pang, Chao Du, Wee Sun Lee, and
+671     Min Lin. Understanding R1-Zero-like training: A critical perspective, 2025. URL https:
+672     //arxiv.org/abs/2503.20783.
+673
+674   Wenhan Ma, Jianyu Wei, Liang Zhao, Hailin Zhang, Bangjun Xiao, Lei Li, Qibin Yang, Bofei Gao,
+675    Yudong Wang, Rang Li, Jinhao Dong, Zhifang Sui, and Fuli Luo. MOPD: Multi-teacher on-
+676    policy distillation for capability integration in llm post-training, 2026. URL https://arxiv.
+677
+       org/abs/2606.30406v1.
+678
+      Sagnik Mukherjee, Lifan Yuan, Dilek Hakkani-Tur, and Hao Peng. Reinforcement learning finetunes
+679     small subnetworks in large language models, 2025. URL https://arxiv.org/abs/2505.
+680     11711v2. Version 2; NeurIPS 2025.
+681
+682   NVIDIA. Nemotron 3 Ultra: Open, efficient mixture-of-experts hybrid Mamba-Transformer model
+683    for agentic reasoning, 2026. URL https://arxiv.org/abs/2606.15007v1.
+684
+685
+      Valentina Pyatkin, Saumya Malik, Victoria Graf, Hamish Ivison, Shengyi Huang, Pradeep Dasigi,
+        Nathan Lambert, and Hannaneh Hajishirzi. Generalizing verifiable instruction following, 2025.
+686
+        URL https://arxiv.org/abs/2507.02833v3.
+687
+688   David Rein, Betty Li Hou, Asa Cooper Stickland, Jackson Petty, Richard Yuanzhe Pang, Julien
+689     Dirani, Julian Michael, and Samuel R. Bowman. GPQA: A graduate-level google-proof q&a
+690     benchmark, 2023. URL https://arxiv.org/abs/2311.12022v1.
+691
+692   Zhennan Shen, Yanshu Li, Qingyu Yin, Chak Tou Leong, Zhilin Wang, Yanxu Chen, Rongduo
+693     Han, Sunbowen Lee, and Yi R. Fung. On the geometry of on-policy distillation, 2026. URL
+694
+        https://arxiv.org/abs/2606.07082v3. Version 3, June 14, 2026.
+695
+      Yuqiao Wen, Zichao Li, Wenyu Du, and Lili Mou. f -divergence minimization for sequence-level
+696     knowledge distillation. In Proceedings of the 61st Annual Meeting of the Association for Compu-
+697     tational Linguistics (Volume 1: Long Papers), pp. 10817–10834. Association for Computational
+698     Linguistics, 2023. doi: 10.18653/v1/2023.acl-long.605. URL https://aclanthology.
+699     org/2023.acl-long.605/.
+700
+701   Xiaomi LLM-Core Team. MiMo-V2-Flash technical report, 2026. URL https://arxiv.org/
+        abs/2601.02780v2.
+
+
+                                                     13
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+702
+      An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang
+703     Gao, Chengen Huang, Chenxu Lv, Chujie Zheng, Dayiheng Liu, Fan Zhou, Fei Huang, Feng Hu,
+704     Hao Ge, Haoran Wei, Huan Lin, Jialong Tang, Jian Yang, Jianhong Tu, Jianwei Zhang, Jianxin
+705     Yang, Jiaxi Yang, Jing Zhou, Jingren Zhou, Junyang Lin, Kai Dang, Keqin Bao, Kexin Yang,
+706     Le Yu, Lianghao Deng, Mei Li, Mingfeng Xue, Mingze Li, Pei Zhang, Peng Wang, Qin Zhu, Rui
+707     Men, Ruize Gao, Shixuan Liu, Shuang Luo, Tianhao Li, Tianyi Tang, Wenbiao Yin, Xingzhang
+708     Ren, Xinyu Wang, Xinyu Zhang, Xuancheng Ren, Yang Fan, Yang Su, Yichang Zhang, Yinger
+709     Zhang, Yu Wan, Yuqiong Liu, Zekun Wang, Zeyu Cui, Zhenru Zhang, Zhipeng Zhou, and Zihan
+710     Qiu. Qwen3 technical report, 2025. URL https://arxiv.org/abs/2505.09388v1.
+711   Guo Yu, Wenlin Liu, Yulan Hu, Hao-Xuan Ma, Jun-Peng Jiang, and Han-Jia Ye. Dense supervision,
+712     sparse updates: On the sparsity and geometry of on-policy distillation, 2026. URL https:
+713     //arxiv.org/abs/2606.13657v3. Version 3, July 30, 2026.
+714
+715   Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian
+716
+        Fan, Gaohong Liu, Lingjun Liu, Xin Liu, Haibin Lin, Zhiqi Lin, Bole Ma, Guangming Sheng,
+        Yuxuan Tong, Chi Zhang, Mofan Zhang, Wang Zhang, Hang Zhu, Jinhua Zhu, Jiaze Chen,
+717
+        Jiangjie Chen, Chengyi Wang, Hongli Yu, Yuxuan Song, Xiangpeng Wei, Hao Zhou, Jingjing
+718
+        Liu, Wei-Ying Ma, Ya-Qin Zhang, Lin Yan, Mu Qiao, Yonghui Wu, and Mingxuan Wang.
+719     DAPO: An open-source LLM reinforcement learning system at scale, 2025. URL https:
+720     //arxiv.org/abs/2503.14476.
+721
+722
+723
+724
+725
+726
+727
+728
+729
+730
+731
+732
+733
+734
+735
+736
+737
+738
+739
+740
+741
+742
+743
+744
+745
+746
+747
+748
+749
+750
+751
+752
+753
+754
+755
+
+
+
+                                                   14
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+756
+757   Table 2: Task gains coexist with domain-level trade-offs. Joint-training endpoint scores (%);
+758   Mean weights domains equally. PG: sampled-token supervision; I16/I64: top-16/top-64 intersec-
+759   tion supervision. DR/DT: equal domain weights with response/token averaging; GT: global token
+760   averaging. ∆ is the mean difference from PG-DR/Adam (percentage points). Brackets give model-
+761
+      based paired 95% intervals (Appendix A.3).
+762                Configuration MATH-500 Code           IF GPQA Mean           ∆ [95% interval]
+763                Initial student    68.80 16.41 18.33       32.20 33.94 −4.68 [-6.42, -2.93]
+764                Adam
+765                PG-DR              73.20   18.27   27.00   35.97   38.61            Reference
+766                PG-DT              73.20   19.24   27.00   34.96   38.60   −0.01 [-1.45, 1.43]
+767                PG-GT              76.20   17.92   27.33   32.94   38.60   −0.01 [-1.44, 1.42]
+                   I16-DR             75.40   17.75   27.00   35.46   38.90   +0.29 [-1.15, 1.73]
+768
+                   I64-DR             75.80   18.30   27.33   34.71   39.04   +0.43 [-1.01, 1.86]
+769                I64-DT             74.00   18.86   28.67   35.22   39.19   +0.58 [-0.87, 2.02]
+770                I64-GT             74.20   19.80   28.67   33.41   39.02   +0.41 [-1.03, 1.85]
+771
+                   SGD
+772                PG-DR              76.40 19.53 28.33       35.59 39.96     +1.35 [-0.09, 2.79]
+773                PG-DT              75.20 20.31 28.33       33.90 39.44     +0.83 [-0.61, 2.26]
+774                PG-GT              75.00 19.26 25.33       34.71 38.58     −0.04 [-1.47, 1.40]
+775
+776
+777   A     E XPERIMENTAL P ROTOCOL AND R ESULTS
+778
+779
+      A.1   M ODEL , DATA , AND TRAINING PROTOCOL
+780
+781   The main-study student is Qwen3-1.7B (Yang et al., 2025); training uses seeds 42, 43, and 44.
+782   The four teachers were trained by reinforcement learning from the same initial model, specializing
+783   in mathematics, code, instruction following, and science, respectively. Student and teachers share
+784   the tokenizer and native chat template with thinking disabled. The experiment records identify the
+785   model revisions and weight files.
+786   AdamW configurations use learning rate 2.5 × 10−7 with (β1 , β2 ) = (0.9, 0.98), ϵ = 10−8 , no
+787   weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and
+788   top-p = 1, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is
+789   sampled per prompt. Each optimizer update aggregates 64 responses; domain allocation is specified
+790   below.
+791
+      The multi-teacher setup allocates 16 prompts to each domain per update and uses target domain
+792   weights 1/4. The single-teacher setup allocates all 64 prompts to the same domain. I64 uses the
+793   top-64 objective in Equation 3; I16 uses k = 16. Comparisons within each optimizer share initializa-
+794   tion, teachers, and prompt schedules. The vocabulary-supervision comparison also holds response
+795   averaging and optimizer settings fixed within each training setting.
+796
+797
+      A.2   E VALUATION AND SCORING
+798
+799   Each main-study capability suite contains MATH-500 (500 questions) (Hendrycks et al., 2021),
+800   LiveCodeBench v6 (1,055 questions) (Jain et al., 2024), IFBench strict (300 questions) (Pyatkin
+801   et al., 2025), and GPQA Diamond (198 questions) (Rein et al., 2023). Mathematics, code, and
+802   instruction following use one greedy response per question. GPQA uses four responses per question
+803   at temperature 1 and top-p = 1. Its score is the mean correctness over all four responses, then
+804   over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by
+805   the remaining configured 32,768-token context. Each complete suite contains 2,053 questions and
+806
+      2,647 responses per model evaluation.
+807   The expanded development grid comprises updates of 50/100/250/500 for seven Adam trajectories
+808   and 100/250/500 for three SGD trajectories, plus the initial student evaluation. Appendix G.1 de-
+809   scribes additional test sets for the same four domains. Table 2 gives the complete joint-training
+      endpoint scores. Table 3 adds single-teacher scores and intermediate checkpoints.
+
+
+                                                        15
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+810
+811   Table 3: PG/I64 performance depends on the task and checkpoint. Mean scores (%): S is
+812   mathematics-only training and M is joint training; both use DR. Joint endpoints appear in Table 2.
+813                          Configuration    Updates     Math    Code        IF    GPQA
+814                          S-PG                  100   77.40    18.75    18.67     31.82
+815                          S-PG                  250   73.80    20.31    17.00     35.35
+816                          S-PG                  500   73.80    19.53    18.00     31.82
+817                          S-I64                 100   74.60    18.75    17.67     33.21
+                             S-I64                 250   74.40    21.09    18.33     32.45
+818
+                             S-I64                 500   76.00    17.97    18.67     30.05
+819                          M-PG                   50   69.60    16.41    18.67     28.03
+820                          M-PG                  100   72.00    17.19    19.33     31.19
+821                          M-PG                  250   73.40    16.41    26.00     30.18
+822                          M-I64-DR               50   69.60    17.19    19.00     31.69
+                             M-I64-DR              100   71.60    17.97    19.00     32.70
+823
+                             M-I64-DR              250   74.80    17.97    26.00     33.96
+824
+825
+826   Table 4: Reference scores for the four domain-specific teachers (%). Science uses GPQA aver-
+827   age@4.
+828                      Teacher / target domain    Responses     Score (%)    Truncation (%)
+829
+                         Math                             500         75.60              6.80
+830
+                         Code                            1055         23.44             24.22
+831                      If                               300         29.00              7.33
+832                      Science                          792         36.40              0.51
+833
+834
+835   The four RL teachers were evaluated separately on their respective domain benchmarks using the
+836   same prompt and decoding protocol (Table 4). These scores quantify each teacher’s performance on
+837
+      its target domain.
+838
+839
+      A.3    C APABILITY UNCERTAINTY
+840
+      Table 5 reports model-based sampling intervals for the capability contrasts. They estimate finite-
+841   question uncertainty using historical paired-question variance calibration. The calculation uses
+842   100,000 Gaussian parametric-bootstrap replicates (seed 1042), independent domains, and question
+843   counts of 500/1,055/300/198 for mathematics/code/instruction following/GPQA. Domain-specific
+844   variance ratios κ are calibrated from historical paired-question intervals relative to independent
+845   Bernoulli variances, with score-lattice variance floors. GPQA retains 198 question clusters. The
+846   table also reports sensitivity checks using min(2κ, 1) and the independent reference κ = 1.
+847
+848   B     L ENGTH -W EIGHTING D ERIVATION
+849
+850   Fix a rollout batch, its valid-token masks, and domain loss weights λd . The PG log-ratio     P coefficients
+851   are treated as constants during backpropagation. For nd = |Bd |, let T̄d = n−1             d     i∈Bd Ti and
+852   ḡd = n−1
+                 P
+              d          g
+                    i∈Bd i  . Define   the empirical    covariance  using the same   1/n d normalization:
+853
+                                                         1 X
+854                                   Covd (T, g) =              (Ti − T̄d )(gi − ḡd ).                        (8)
+855
+                                                         nd
+                                                            i∈Bd
+856   Expanding gives n−1
+                              P
+                          d      i Ti gi − T̄d ḡd . Dividing by T̄d gives Equation 5. GT combines the resulting
+857   domain gradients using observed token shares; DT combines them using λd ; DR combines ḡd using
+858   λd . Multiplying each domain’s globally averaged terms by its target weight divided by its observed
+859   token share therefore gives DT exactly.
+860
+861   B.1    F IXED - BATCH GRADIENT COMPARISON
+862
+863   At M-PG checkpoints 100 and 250, three cached response batches (seeds 1042, 1043, and 1044)
+      each contain eight responses per domain. Responses use the training prompt format and 4,096-
+
+
+                                                           16
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+864
+865   Table 5: Small endpoint contrasts remain uncertain under the calibrated model. Mean differ-
+866   ences (percentage points) and estimated paired 95% intervals; 2κ weakens the assumed variance
+867   reduction, and κ = 1 uses the independent Bernoulli reference.
+868                  Contrast                      ∆     Calibrated     min(2κ, 1)           κ=1
+869                  I64/Adam: DT − DR      +0.15      [-1.28, 1.59]   [-1.88, 2.18]   [-3.20, 3.51]
+870                  I64/Adam: GT − DR      −0.02      [-1.44, 1.41]   [-2.04, 2.01]   [-3.36, 3.33]
+871                  I64/Adam: DT − GT      +0.17      [-1.27, 1.61]   [-1.87, 2.20]   [-3.19, 3.53]
+872                  PG/Adam: DT − DR       −0.01      [-1.45, 1.43]   [-2.05, 2.03]   [-3.37, 3.35]
+                     PG/Adam: GT − DR       −0.01      [-1.44, 1.42]   [-2.04, 2.01]   [-3.35, 3.33]
+873
+                     PG/Adam: DT − GT       +0.00      [-1.43, 1.43]   [-2.02, 2.02]   [-3.33, 3.34]
+874                  PG/SGD: DT − DR        −0.53      [-1.96, 0.90]   [-2.55, 1.49]   [-3.88, 2.83]
+875                  PG/SGD: GT − DR        −1.39      [-2.82, 0.04]   [-3.41, 0.63]   [-4.73, 1.96]
+876                  PG/SGD: DT − GT        +0.86      [-0.57, 2.29]   [-1.16, 2.88]   [-2.48, 4.20]
+877                  PG-DR: SGD − Adam      +1.35      [-0.09, 2.79]   [-0.68, 3.39]   [-2.01, 4.71]
+                     PG-DT: SGD − Adam      +0.84      [-0.60, 2.27]   [-1.20, 2.87]   [-2.52, 4.19]
+878
+                     PG-GT: SGD − Adam      −0.02      [-1.44, 1.40]   [-2.03, 1.99]   [-3.34, 3.30]
+879                  Adam/DR: I64 − PG      +0.43      [-1.01, 1.86]   [-1.61, 2.46]   [-2.93, 3.78]
+880                  Adam/DR: I64 − I16     +0.13      [-1.30, 1.56]   [-1.89, 2.15]   [-3.21, 3.47]
+881
+882
+883   Table 6: Response weighting changes gradient directions at equal domain weights. Raw-
+884   gradient cosines on identical cached responses. DR and DT use equal domain loss weights; only DT
+885   weights responses by length.
+886                             Updates   Batch        DR–DT     DR–GT        DT–GT
+887                                 100        1       0.7838     0.6219      0.9266
+888                                 100        2       0.9110     0.5180      0.7010
+889                                 100        3       0.5780     0.6659      0.9745
+                                    250        1       0.6240     0.4072      0.8742
+890
+                                    250        2       0.7864     0.3302      0.4953
+891                                 250        3       0.3990     0.3569      0.9612
+892
+893
+894   token response cap. For each batch, we compute each response’s mean I64 gradient once at the
+895   saved BF16 model values using FP32 computation, then aggregate those gradients under DR, DT,
+896   and GT. All three averaging rules use the same responses, token masks, teacher scores, and model
+897   coordinates. Each comparison starts from the same student parameters and Adam first and second
+898   moments.
+899   Table 6 reports every pairwise raw-gradient cosine. The domain-wise covariance decomposition
+900   is checked in FP64 for all 24 batch-domain groups; the largest relative residual is 1.53 × 10−15 .
+901   This numerical check verifies the aggregation identity. The measured cosine differences show that
+902   response length and gradient direction are correlated in these batches.
+903
+      The optimizer interventions in Figure 2 reuse these six batches. Each aggregate gradient is globally
+904
+      clipped at norm 1 and applied to the same saved FP32 Adam state for that batch. The saved-state
+905   branch retains both moments; the reset-m branch zeros the first moment while retaining the sec-
+906   ond moment and optimizer step counter; reset-(m, v) zeros both moments while retaining the step
+907   counter. The momentum-free SGD control follows the negative gradient and is rescaled separately
+908   for DR, DT, and GT to match the FP32 Adam step norm for that averaging rule. After each FP32
+909   update, the model parameters are cast to BF16 and evaluated on one held-out response per domain.
+910   Evaluation uses full-vocabulary reverse KL; the experiment archive also retains the I64 surrogate
+911   used for training. Each comparison applies a single optimizer step to a checkpoint copy.
+912
+913   C     PARAMETER AND O PTIMIZER M EASUREMENTS
+914
+915   C.1   C OORDINATES AND RECORDED QUANTITIES
+916
+917   Training measurements separately record gradients before and after clipping, FP32 optimizer steps,
+      and cumulative parameter changes in the FP32 master weights and BF16 model weights. Cumulative
+
+
+                                                         17
+      Under review as a conference paper at ICLR 2027
+
+
+
+
+918                               FP32 step                                                 BF16 writeback
+919                                                                              0.15
+
+
+
+
+      Coordinates (%)                                          Coordinates (%)
+920                     75
+921                                                                              0.10
+                        50
+922
+                        25                                                       0.05
+923
+924                      0
+925                           0   10−8   10−7   10−6    10−5                            0     10−8   10−7   10−6   10−5
+926                          Absolute-change threshold                                  Absolute-change threshold
+927                                              Zero                      PG               I64        Teacher64          Full
+928
+929
+930   Figure 7: Update sparsity depends on the numerical threshold. FP32 steps and BF16 parameter
+931
+      changes; lines show batch means and shading their range.
+932
+933
+934   changes are measured from the same initialization. All global statistics use unique model coordi-
+935   nates, excluding vocabulary padding and duplicate entries for tied weights. Per-layer statistics and
+936   absolute-threshold sensitivities are retained in the experiment archive. For an absolute threshold τ ,
+937
+      sparsity is the fraction of coordinates with magnitude at most τ ; the figures show the fraction ex-
+      ceeding τ . Energy concentration uses squared Euclidean norm and ranks coordinates by absolute
+938
+      change.
+939
+940   For checkpoint-based measurements, the exported checkpoint contains FP32 master values, BF16
+941   model values, first and second moments, optimizer hyperparameters, and step counters. Student and
+942   teacher values are verified against their saved models in the same precision. Forward and backward
+943
+      passes evaluate these values in FP32 with TF32 disabled. All proposed steps are computed from
+      the same saved state with a non-fused Adam implementation. The online training optimizer uses its
+944
+      own fused implementation.
+945
+946   We compare three Adam states at the same checkpoint. Saved retains both moments and the step
+947   counter. Reset m zeros the first moment while retaining the second moment and step counter. Fresh
+948   zeros both moments and resets the step counter. Global norm clipping at 1 is applied before the
+949
+      Adam calculation, and weight decay is zero. The plotted controls use two cached response batches;
+      the zero-gradient control is evaluated once. For the zero-gradient branch, the saved first moment
+950
+      continues to decay and move the master weights. Casting the saved FP32 master weights to BF16
+951
+      without an optimizer step exactly reproduces the saved model. Figure 7 shows how the threshold
+952   changes the measured fraction of updated coordinates.
+953
+954   Setting the current gradient to zero while retaining the trained Adam moments changes 0.1403% of
+955
+      BF16 coordinates, compared with 0.1486% for PG. Resetting the first moment gives 0.0504% for
+      PG; resetting both moments and the step counter gives 0.5140%. The parameters changed by Adam
+956
+      depend jointly on the current gradient, accumulated moments, and BF16 rounding. These controls
+957
+      supplement the update-sparsity measurements in Sections 4 and 5.
+958
+959   Figure 6(b,c) displays these BF16 controls. The full FP32 and BF16 measurements are retained in
+960   the experiment archive.
+961
+962
+      C.2                    C ACHED RESPONSES , GRADIENT OVERLAP, AND GRADIENT NORMS
+963
+964
+      These raw-gradient diagnostics use the M-PG/100 student, whereas Figure 3(b,c) measures teacher-
+965
+      conditioned optimizer steps at M-PG/500. Batches use seeds 42 and 43, one response per domain
+966   per batch, a 2,048-token prompt cap, and a 256-token generation cap. All eight responses reach the
+967   cap. Four response positions are sampled without replacement per response. Each response’s four
+968   prefixes receive equal weight. For domain-specific inputs, each teacher scores the response from its
+969   own domain; for shared inputs, each teacher scores all four responses with equal domain weights.
+970   A third control evaluates every teacher on every input domain separately, keeping four prefixes
+971   per gradient. These conditions reuse the same responses, allowing paired comparisons within each
+      batch.
+
+
+                                                                                             18
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+972                             PG: teacher / input                                 I64: teacher / input                               Overlap and direction
+973                       1.0                                                 1.0                                               1.0
+974
+
+
+
+
+       Gradient cosine                                     Gradient cosine                                   Gradient cosine
+975                       0.5                                                 0.5                                               0.5
+976
+                          0.0                                                 0.0                                               0.0
+977
+978                      −0.5                                                −0.5                                              −0.5
+                                    Bank 1
+979                                 Bank 2
+980                      −1.0                                                −1.0                                              −1.0
+
+981                               Fix              Fix                                Fix            Fix                              0.0   0.2   0.4   0.6   0.8
+                                teacher          input                              teacher        input                              Gradient top-1% Jaccard
+982
+983                                   PG / routed                            PG / common          I64 / routed                         I64 / common
+984
+985
+       Figure 8: Gradient overlap depends strongly on the input domain. Left/center: teacher-by-input-
+986    domain controls. Right: top-1% gradient Jaccard versus cosine on domain-specific or shared inputs.
+987
+988
+989    Table 7: Vocabulary supervision produces similar single-step update concentration. M-PG/100
+990    means over four cached batches. NZ: nonzero coordinates (%); top-1%: squared step norm in the
+991    largest 1% of coordinates (%).
+992                                       Loss      FP32 NZ                     BF16 NZ       FP32 top-1%    BF16 top-1%
+993                                       PG             87.982                     0.149           8.845                       100.000
+994                                       I64            87.989                     0.150           8.827                       100.000
+995                                       T64            87.989                     0.150           8.828                       100.000
+996                                       Full           87.999                     0.150           8.828                       100.000
+997
+998
+999    Let Sd (ρ) contain the largest-magnitude ρ fraction of teacher d’s gradient or update coordinates, with
+1000   stable coordinate-index tie breaking. Jaccard overlap J(d, e) = |Sd (ρ) ∩ Se (ρ)|/|Sd (ρ) ∪ Se (ρ)|
+1001   measures shared locations; cosine also captures signs and magnitudes (Yu et al., 2026). Table 8
+1002   reports PG gradient norms for domain-specific inputs; the first batch’s instruction-following gradient
+1003
+       has norm 6.13 × 10−9 . Cosine measures directional opposition, while the gradient norm determines
+       its magnitude. Independent uniform sets of fraction ρ have expected-intersection to expected-union
+1004
+       ratio ρ/(2 − ρ), approximately 0.00503 at ρ = 1%.
+1005
+1006   The largest-magnitude 1% of raw-gradient coordinates give mean Jaccard overlaps of 0.0951 for
+1007   PG and 0.0999 for I64 on domain-specific inputs, averaging the two batches and six teacher pairs.
+1008   Their ranges are 0.0744–0.1077 and 0.0737–0.1178. When every teacher scores all four domain
+1009
+       responses, the respective means are 0.3808 and 0.4577. The teacher-by-input-domain comparison
+       below uses four prefixes per gradient.
+1010
+1011   Holding the teacher fixed while changing the input domain gives mean gradient cosines of 0.0059
+1012   for PG and 0.0072 for I64. Holding the input domain fixed while changing teachers produces
+1013   both aligned and opposed gradients. For domain-specific inputs the mean cosines are −0.0020
+1014   and 0.0081, respectively, alongside partial coordinate overlap. Figure 8 shows how input choice
+1015
+       affects the teacher-overlap measurements in Section 4.
+1016
+1017   D                  VOCABULARY S UPERVISION AND C OVERAGE
+1018
+1019
+       Single-step comparison using four response batches. The M-PG/100 row of Figure 4(a) uses
+1020   four cached response batches with seeds 2042–2045. Each batch contains one response per domain.
+1021   Generation uses the training prompt format, a 2,048-token prompt cap, and a 4,096-token response
+1022   cap. The 16 response lengths range from 81 to 4,096 tokens; two responses reach the cap. Six
+1023   positions per response give 96 prefixes. PG actions are independently sampled from the student at
+1024   these fixed prefixes. All losses use the same prefixes, equal domain weights, and equal response
+1025   weights within each domain. Gradients are globally clipped at norm 1 before applying the same
+       saved Adam state. Table 7 adds the FP32 and energy-concentration measurements for this state.
+
+
+                                                                                            19
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1026
+1027   Table 8: The teacher top-64 set captures nearly all student probability mass in these controls.
+1028   Means over sampled prefixes; gradient norms use domain-specific inputs. Entropy is in nats, and
+1029   100% may reflect rounding.
+1030              Bank    Domain    Mass in T (%)    Mass in I (%)        Entropy        ∥gPG ∥2
+1031                  1   Math           100.0000         100.0000         0.3243          132.6
+1032                  1   Code            99.9968          99.9965         0.7701          163.8
+1033                  1   IF             100.0000         100.0000   1.85 × 10−5    6.13 × 10−9
+1034                  1   Science         99.9184          99.9162         0.7405          54.82
+                      2   Math            99.9991          99.9991         0.3221          2.605
+1035
+                      2   Code           100.0000         100.0000         0.2962          3.167
+1036                  2   IF             100.0000         100.0000         0.5004          55.52
+1037                  2   Science         99.9993          99.9992         0.2442         0.8505
+1038
+1039
+1040   The loss and Adam implementations match the two-batch controls in Appendix C. Appendix G.3
+1041   reports the actual I64 intersection coverage at all four student checkpoints.
+1042
+1043   Implementation details. For I64 (Equation 3), candidate sets and teacher scores are fixed at roll-
+1044   out. Each student forward recomputes current probabilities at the saved candidate positions and
+1045   refreshes the detached coefficients. PG also refreshes its detached log-ratio coefficients and uses no
+1046
+       advantage or policy-ratio clipping.
+1047
+1048
+       Teacher-top-64 reference objective. The teacher-top-64 diagnostic uses the fixed teacher set T
+       and full-vocabulary probabilities:
+1049
+1050                                     X             pθ (v)
+                                                                                
+                               ℓT64 =        pθ (v) log        − pθ (v) + qd (v) .                    (9)
+1051                                                    qd (v)
+                                         v∈T
+1052                  P
+1053   Its gradient is v∈T pθ (v) log(pθ (v)/qd (v))∇θ log pθ (v). I64 uses the detached weights in Equa-
+1054   tion 3, normalized over the original student set S. T64 and full-vocabulary KL are evaluated in
+1055   single-step comparisons. End-to-end training compares PG, I16, and I64; the I16 measurements
+1056   cover task performance and online coverage.
+1057   Differentiating Equation 2 gives
+1058                                                                                         
+                      X              pθ (v)                                 pθ (a)
+1059       ∇θ ℓfull =     pθ (v) log         + 1 ∇θ log pθ (v) = Ea∼pθ log         ∇θ log pθ (a)   (10)
+1060                                  qd (v)                                qd (a)
+                      v∈V
+1061         P
+       using v ∇θ pθ (v) = 0. Table 8 reports candidate-set coverage for the two-batch gradient-overlap
+1062
+       and Adam-state controls.
+1063
+1064
+1065   E    S UPPORTING M EASUREMENTS FOR THE M AIN F IGURES
+1066
+1067   Teacher-update controls. Figure 3(a) compares cumulative parameter changes at update 500 un-
+1068   der DR, with additional I64-DT/GT rows; paired points distinguish FP32 and BF16 for each statistic.
+1069
+       Panels (b,c) start from the same M-PG/500 student parameters and Adam moments. With domain-
+       specific inputs, each teacher scores responses from its own domain; with shared inputs, all teachers
+1070
+       score the same prefixes. Each of four cached response batches contains six teacher pairs. Small
+1071
+       points summarize pairs within a batch, and large points average batches. Equation 6 subtracts the
+1072   Adam step with the current gradient set to zero before computing FP32 update cosines. SGD and
+1073   reset-m steps are individually rescaled to the norm of the Adam step with trained moments; reset-m
+1074   retains the second moment and step counter. These calculations use non-fused PyTorch updates on
+1075   copies of saved checkpoints.
+1076
+1077   Vocabulary-supervision controls. Figure 4(a,b) uses four cached response batches at each of four
+1078   student checkpoints: M-PG and M-I64-DR at updates 100 and 500. Losses use identical prefixes
+1079   and Adam moments within each checkpoint, while responses can differ between checkpoints. Each
+       checkpoint uses 96 prefixes across the four batches. Panel (a) reports batch means. In panel (b),
+
+
+                                                        20
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1080
+                                 (a) Four-domain mean                                                               (b) Retention from initialization
+1081
+
+
+
+
+                                                                                    Worst-domain change (pp)
+                            42                                      T 41.11
+1082                                                                                                            2
+                            40
+
+
+
+
+           Mean score (%)
+1083
+                            38                                                                                  1
+1084
+1085                        36
+                                                                                                                0
+
+1086                        34
+                                                                    S 33.94
+                                                                                                               −1
+1087                        32
+1088                              0     100         250                500                                           0       100          250           500
+                                              Optimizer update                                                                      Optimizer update
+1089
+                                                                          DR        DT                                GT
+1090
+1091
+       Figure 9: Mean performance gains can coexist with a regression in an individual domain.
+1092
+       (a) Four-domain mean ± std; S/T mark the initial student/teacher. (b) Worst-domain change from
+1093   initialization; zero means no regression. Lines connect reported point estimates.
+1094
+1095
+1096   points are individual batches, lines connect PG batch means, and shading spans the I64 measure-
+1097   ments. The direction measurements cover PG, I64, and full-vocabulary supervision; I16 appears in
+1098   the end-to-end training results. Panel (c) compares S-I64, M-I64, and M-I16 with PG at the same
+1099   task, teacher setting, and update. Table 7 adds FP32 and energy-concentration measurements for the
+1100   M-PG/100 comparison in Appendix D.
+1101
+1102   E.1                  A DDITIONAL OPTIMIZER AND SAMPLING CONTROLS
+1103
+1104   Figure 2 uses the six cached response batches and training clipping records described in Ap-
+1105   pendix B.1. In panel (a), boxes mark the interquartile range and whiskers the 5th–95th percentiles;
+1106   labels give the fraction of training updates clipped. Reset-m and reset-(m, v) retain the optimizer
+1107
+       step counter. Panel (c) averages four domain probe losses within each batch; error bars show sample
+       standard deviations over the three batches at each checkpoint.
+1108
+1109   Figure 6(a) uses three M-PG/100 response batches, with a 4,096-token response cap, containing 48
+1110   responses and 288 prefixes. Twelve fixed subsets of prefixes each receive two independent draws of
+1111   1, 16, or 64 PG actions per prefix. I64 is evaluated once per subset. Increasing the sample count
+1112   raises the mean PG gradient cosine to full-vocabulary KL from 0.5374 to 0.8652 and 0.9667; I64
+1113
+       reaches 0.999988. Panels (b,c) use the separate two-batch experiment with a 256-token response
+       cap (Appendix C); its zero-gradient control is evaluated once. Reset-m retains the second moment
+1114
+       and step counter, whereas fresh Adam resets both moments and the counter. The sampling and
+1115
+       moment-reset comparisons each use their own response batches.
+1116
+1117
+       Cumulative parameter changes.                             Figure 10 shows the trajectories underlying the update-500
+1118
+       summary in Figure 3(a).
+1119
+1120
+1121   F                P ROMPT E XPOSURE AND C ANDIDATE -S ET W EIGHTS
+1122
+1123   When each domain loss is averaged separately, its prompt quota and loss weight control different
+1124   quantities. Increasing the quota at fixed λd changes the number of sampled responses and the vari-
+1125   ance of the gradient estimate, without directly increasing the domain’s expected contribution to the
+1126   total gradient. Mathematics-only runs receive four times as many mathematics prompts per update
+1127   as joint runs.
+1128   Candidate-set coverage also scales the distillation gradient. For the student candidate set S and
+1129   its intersection I with the teacher set in Equation 3, the retained student weights sum to r(h) =
+1130   pθ (I | h)/pθ (S | h). At a fixed prefix with a nonempty intersection and detached coefficients,
+1131   the I64 gradient equals r(h) times the gradient obtained by renormalizing the same weights over
+1132   I. Coverage therefore changes gradient scale across prefixes even under equal response weighting.
+1133   Measuring the retained mass and empty-intersection rate by domain can reveal unequal coverage
+       under a fixed candidate size.
+
+
+                                                                               21
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1134
+1135                                                 S-PG          M-PG                               M-I64-DT
+1136                                                 S-I64         M-I64-DR                           M-I64-GT
+1137
+                              (a) FP32 · changed                                          (b) BF16 · changed
+1138
+1139
+
+
+
+
+       Coordinates (%)                                              Coordinates (%)
+1140                     75                                                           9
+1141
+                         50                                                           6
+1142
+1143                     25                                                           3
+1144
+1145                      0                                                           0
+1146
+1147                          (c) FP32 · 90% energy                                       (d) BF16 · 90% energy
+1148                                                                                  6
+
+
+
+
+       Coordinates (%)                                              Coordinates (%)
+1149                     60
+1150                                                                                  4
+1151                     40
+1152
+                                                                                      2
+1153                     20
+1154
+                          0                                                           0
+1155
+                              0    100         250           500                          0    100         250          500
+1156
+                                         Optimizer update                                            Optimizer update
+1157
+1158
+1159   Figure 10: Cumulative BF16 changes remain much sparser than FP32 changes. PG/I64 tra-
+1160   jectories under DR in single-teacher (S) and joint (M) training, with joint I64-DT/GT added: (a,b)
+1161
+       nonzero coordinate fractions; (c,d) coordinate fractions containing 90% of squared displacement
+       from initialization. Lines connect measured updates 1, 50, 100, 250, and 500; dashed lines denote
+1162
+       S.
+1163
+1164
+1165   G                  A DDITIONAL T EST R ESULTS AND ROBUSTNESS C HECKS
+1166
+1167   G.1                A DDITIONAL TEST SETS FOR THE SAME FOUR DOMAINS
+1168
+1169   The ten joint-training configurations use the development benchmarks and checkpoint grid in Ap-
+1170   pendix A. The following analyses evaluate selected checkpoints on separate test questions, measure
+1171   candidate-set coverage, and check sensitivity to known training–evaluation overlap.
+1172   Table 9 uses additional test sets with 256 questions per domain: 1,024 questions and 1,792 responses
+1173   per model. Mathematics and code come from the Skywork-OR1-RL-Data mathematics and TACO-
+1174   based code pools; instruction following uses Nemotron-RL-instruction_following; science uses the
+1175   Nemotron-RL-knowledge-mcqa validation split restricted by a fixed natural-science keyword filter.
+1176   Questions are the first eligible unique candidates in the fixed source order. Normalized exact-match
+1177   and lexical near-duplicate checks remove questions matching the original training bundle or known
+1178   evaluation pools.
+1179   Scoring uses mathematics answer verification, code unit tests, instruction-following constraints, and
+1180   science multiple-choice accuracy. Mathematics, code, and instruction following use greedy decod-
+1181   ing; science uses four responses per question at temperature 1. The context budget is 32,768 tokens,
+1182   with thinking disabled. The four-domain mean weights domains equally. Question-paired bootstrap
+1183   intervals quantify finite-test uncertainty.
+1184
+1185   G.2                C HECKPOINT SELECTION BEFORE TEST EVALUATION
+1186
+1187   We apply the three selection rules in Section 6 to the development grid in Appendix A. The grid
+       contains updates 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD tra-
+
+
+                                                               22
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1188
+1189   Table 9: Method rankings depend on the task and test set. Additional test-set scores (%) for the
+1190   same four domains; mean weights domains equally.
+1191                     Configuration         Update     Math      Code          IF   Science    Mean
+1192                     Initial student           0      42.97     23.44    25.78      62.21     38.60
+1193                     PG-DR / Adam            500      46.48     26.17    37.50      64.06     43.55
+1194                     PG-DT / Adam            250      44.53     26.56    36.72      64.75     43.14
+1195                     PG-DT / Adam            500      44.92     27.34    38.28      63.48     43.51
+                         PG-GT / Adam            500      44.92     28.91    39.06      65.14     44.51
+1196
+                         I16-DR / Adam           500      44.92     28.52    40.23      64.55     44.56
+1197                     I64-DR / Adam           500      46.88     26.17    39.06      65.72     44.46
+1198                     I64-DT / Adam           500      43.36     27.73    39.06      64.55     43.68
+1199                     I64-GT / Adam           500      45.31     27.34    41.02      66.21     44.97
+1200                     PG-DR / SGD             500      46.88     27.73    37.11      62.21     43.48
+                         PG-DT / SGD             500      46.48     28.52    37.11      63.48     43.90
+1201
+                         PG-GT / SGD             500      44.53     26.17    36.72      64.45     42.97
+1202
+1203
+1204
+       Table 10: The retention constraint leaves every checkpoint choice unchanged. Test ∆ is the
+1205
+       selected-checkpoint mean minus the update-500 mean (percentage points).
+1206
+                     Trajectory                 Endpoint      Max dev. mean        Retention     Test ∆ (pp)
+1207
+1208                 Other nine trajectories            500                 500          500          0.000
+                     PG-DT / Adam                       500                 250          250         -0.366
+1209
+1210
+1211
+1212
+       jectories. The retention tolerance is two percentage points per domain relative to the initial student.
+       Both development rules keep the initial student unless the selected equal-domain mean improves by
+1213
+       at least one percentage point. Both development-based rules choose update 250 for PG-DT/Adam
+1214
+       and update 500 for the other nine trajectories. The separate PG-DT/Adam update-250 test evaluation
+1215   allows direct comparison with its update-500 endpoint.
+1216
+1217   Table 10 summarizes the resulting checkpoint choices and test-score differences.
+1218   Table 11 gives all 37 trained-checkpoint development evaluations, including the ten endpoints al-
+1219   ready reported in Table 2. These intermediate measurements evaluate checkpoints along the same
+1220   ten training trajectories.
+1221
+       The retention-constrained and maximum-mean rules select the same checkpoint in every trajectory.
+1222   On the additional test sets, the update-250 PG-DT/Adam checkpoint scores 0.366 percentage points
+1223   below its update-500 endpoint in four-domain mean. The endpoint therefore has the higher separate-
+1224   test mean in this comparison. PG-DR/Adam has two intermediate development checkpoints outside
+1225   the retention tolerance: GPQA falls from 32.20% initially to 28.03% at update 50 and 30.18% at
+1226   update 250, before reaching 35.97% at update 500. The learning curve captures these temporary
+1227   regressions and their subsequent recovery.
+1228
+1229   G.3   P ROBABILITY MASS RETAINED BY THE CANDIDATE INTERSECTION
+1230
+1231   For each of four student checkpoints (M-PG and M-I64-DR at updates 100 and 500), four cached
+1232   response batches provide one response per domain and six sampled positions per response: 96
+1233   prefixes per checkpoint. Each response is scored by its domain teacher. We measure pθ (I | h) for
+1234
+       the actual intersection I = S ∩ T and the retained fraction r = pθ (I | h)/pθ (S | h).
+1235   The minimum student probability mass in the actual student–teacher top-64 intersection is 96.55%
+1236   over the 384 sampled prefixes, and no intersection is empty (Table 12).
+1237
+1238   G.4   S ENSITIVITY TO KNOWN MATHEMATICS OVERLAP
+1239
+1240   The fixed Qwen training pool contains five records matching four known MATH-500 problems,
+1241   including variants in wording or answer format. The affected MATH test identifiers are counting-
+       and-probability problem 430 and intermediate-algebra problems 1849, 2146, and 582. We remove
+
+
+                                                               23
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1242
+1243
+1244
+1245
+1246
+1247
+1248
+1249
+1250   Table 11: Complete joint-training checkpoint scores. All 37 evaluated checkpoints from ten
+1251   Qwen3-1.7B joint-training configurations. Scores (%) use the original MATH-500, LiveCodeBench,
+1252   IFBench strict, and GPQA avg@4 protocol; Mean is the unweighted average of the four domains. †
+1253   marks the ten update-500 rows also reported in Table 2.
+1254                    Configuration   Update   MATH    Code       IF   GPQA    Mean
+1255                    PG-DR / Adam       50    69.60   16.41   18.67   28.03   33.18
+1256                                      100    72.00   17.19   19.33   31.19   34.93
+1257                                      250    73.40   16.41   26.00   30.18   36.50
+1258                                     500†    73.20   18.27   27.00   35.97   38.61
+1259                    PG-DT / Adam       50    71.60   17.19   19.00   34.34   35.53
+1260                                      100    74.60   19.53   18.00   34.97   36.78
+1261
+                                          250    77.00   19.53   25.00   33.59   38.78
+                                         500†    73.20   19.24   27.00   34.96   38.60
+1262
+                        PG-GT / Adam       50    71.20   18.75   19.00   34.72   35.92
+1263
+                                          100    74.80   21.88   17.00   31.94   36.41
+1264                                      250    74.80   19.53   25.00   33.84   38.29
+1265                                     500†    76.20   17.92   27.33   32.94   38.60
+1266                    I16-DR / Adam      50    69.80   17.19   17.33   31.94   34.07
+1267                                      100    72.20   17.97   19.00   32.95   35.53
+1268                                      250    75.60   18.75   25.67   33.59   38.40
+1269                                     500†    75.40   17.75   27.00   35.46   38.90
+1270                    I64-DR / Adam      50    69.60   17.19   19.00   31.69   34.37
+1271                                      100    71.60   17.97   19.00   32.70   35.32
+                                          250    74.80   17.97   26.00   33.96   38.18
+1272
+                                         500†    75.80   18.30   27.33   34.71   39.04
+1273
+                        I64-DT / Adam      50    72.20   18.75   17.00   32.32   35.07
+1274
+                                          100    74.80   19.53   19.33   33.33   36.75
+1275                                      250    75.40   21.09   25.33   32.70   38.63
+1276                                     500†    74.00   18.86   28.67   35.22   39.19
+1277                    I64-GT / Adam      50    74.20   17.97   17.00   32.95   35.53
+1278                                      100    74.40   17.97   21.00   32.07   36.36
+1279                                      250    74.40   18.75   25.00   33.33   37.87
+1280                                     500†    74.20   19.80   28.67   33.41   39.02
+1281                    PG-DR / SGD       100    73.00   18.75   25.67   35.35   38.19
+                                          250    75.80   18.75   25.67   31.82   38.01
+1282
+                                         500†    76.40   19.53   28.33   35.59   39.96
+1283
+                        PG-DT / SGD       100    74.80   18.75   23.33   34.34   37.81
+1284
+                                          250    74.20   19.53   25.33   35.10   38.54
+1285                                     500†    75.20   20.31   28.33   33.90   39.44
+1286
+                        PG-GT / SGD       100    74.60   17.97   20.67   35.73   37.24
+1287                                      250    73.00   20.31   23.67   33.33   37.58
+1288                                     500†    75.00   19.26   25.33   34.71   38.58
+1289
+1290
+1291
+1292
+1293
+1294
+1295
+
+
+
+                                                    24
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1296
+1297   Table 12: The minimum observed I64 intersection mass is 96.55%. Statistics over sampled
+1298   prefixes; p(I) is in percent and r = pθ (I | h)/pθ (S | h).
+1299                              Checkpoint              p(I): mean             p(I): min        |I|: mean                               |I|: min        r: mean               r: min
+1300                              M-PG/100                     99.9141             96.5482             58.96                                      43   0.9999413         0.9977714
+1301                              M-PG/500                     99.9952             99.7825             61.59                                      50   0.9999975         0.9998511
+1302                              M-I64-DR/100                 99.9564             97.5664             60.08                                      36   0.9997331         0.9757993
+1303                              M-I64-DR/500                 99.9826             99.3722             61.75                                      51   0.9999912         0.9997005
+1304
+1305
+1306   Table 13: Removing four overlapping mathematics questions can reorder near-tied configura-
+1307
+       tions. Mean (496) substitutes MATH-496 for MATH-500 and keeps the other domain scores fixed.
+1308                                    Configuration             Update         MATH-500           MATH-496                                     Mean (500)       Mean (496)
+1309                                    Initial student                  0                68.80             69.15                                      33.94              34.02
+1310                                    PG-DR / Adam                   500                73.20             73.79                                      38.61              38.76
+1311
+                                        PG-DT / Adam                   250                77.00             77.42                                      38.78              38.89
+                                        PG-DT / Adam                   500                73.20             73.59                                      38.60              38.70
+1312                                    PG-GT / Adam                   500                76.20             76.81                                      38.60              38.75
+1313                                    I16-DR / Adam                  500                75.40             76.01                                      38.90              39.06
+1314                                    I64-DR / Adam                  500                75.80             76.41                                      39.04              39.19
+1315                                    I64-DT / Adam                  500                74.00             74.40                                      39.19              39.29
+1316
+                                        I64-GT / Adam                  500                74.20             74.60                                      39.02              39.12
+                                        PG-DR / SGD                    500                76.40             77.02                                      39.96              40.12
+1317                                    PG-DT / SGD                    500                75.20             75.81                                      39.44              39.59
+1318                                    PG-GT / SGD                    500                75.00             75.60                                      38.58              38.73
+1319
+1320
+1321   these four questions from the existing per-question evaluation results, retaining the original 500-
+1322   question results as the main protocol.
+1323
+       Removing the four questions changes the four-domain means by approximately 0.09–0.16 points
+1324
+       and can reorder near-tied configurations. PG-DT/Adam and PG-GT/Adam both round to 38.60%
+1325   before removal, but reach 38.70% and 38.75%, respectively, afterward. PG-DR/SGD retains the
+1326   highest mean among the reported checkpoints. MATH-496 denotes this retained subset of MATH-
+1327   500.
+1328
+1329   G.5                      T EACHER - UPDATE OVERLAP AND DISTRIBUTIONAL SIMILARITY
+1330
+1331
+1332                                  (a) Overlap vs direction                                                                                 (b) JS vs selection
+
+
+
+
+                                                                                                          Selection difference (1 − J)
+                               1.00                                                                                                      1.0
+1333
+
+
+
+
+         FP32 update cosine
+                               0.75                                                                                                      0.8
+1334
+1335                           0.50                                                                                                      0.6
+
+1336                           0.25
+                                                                                                                                         0.4
+1337                           0.00
+                                                                                                                                         0.2
+1338                          −0.25
+                                                                                                                                         0.0
+1339
+                                      0.0                      0.4                         0.8                                                 0.00       0.02           0.04              0.06
+1340                                              Top-1% update Jaccard                                                                                      Teacher JS (nats)
+1341                                              Adam         SGD         Reset m                                                                               Adam        SGD
+                                            ○ PG · △ I64; open: common / filled: routed                                                                6 pairs × 4 banks · common inputs
+1342
+1343
+1344   Figure 11: Coordinate overlap and update direction measure different properties. (a) Top-1%
+1345   FP32 update-set Jaccard versus cosine; small/large points show batch/overall means. (b) Teacher-
+1346   distribution JS divergence versus 1−Jaccard on shared inputs; each point is a teacher pair within a
+1347   batch.
+1348
+1349   Figure 11 supplements the zero-gradient baseline subtraction at M-PG/500 using the controls in Ap-
+       pendix E. It compares PG and I64 under Adam with trained moments, reset-m, and norm-matched
+
+
+                                                                                                  25
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1350
+       SGD. Shared inputs hold student prefixes fixed between teachers; domain-specific inputs change
+1351   both the teacher and the input domain. Each of four batches contains six teacher pairs.
+1352
+1353
+1354
+1355
+1356
+1357
+1358
+1359
+1360
+1361
+1362
+1363
+1364
+1365
+1366
+1367
+1368
+1369
+1370
+1371
+1372
+1373
+1374
+1375
+1376
+1377
+1378
+1379
+1380
+1381
+1382
+1383
+1384
+1385
+1386
+1387
+1388
+1389
+1390
+1391
+1392
+1393
+1394
+1395
+1396
+1397
+1398
+1399
+1400
+1401
+1402
+1403
+
+
+
+                                                    26
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1404
+       G.6                            O NLINE COVERAGE AND PER - DOMAIN NORMALIZATION EFFECTS
+1405
+1406
+1407   Online I16 coverage. For I16-DR, each of 500 updates has 16 logged slices of four responses.
+1408
+       Each update averages the masked, response-averaged summaries with equal weight per slice. Can-
+       didate sets are fixed at rollout; student probabilities are measured during training. Across 8,000
+1409
+       slices, mean pθ (I), r, and |I| are 99.616%, 99.879%, and 15.048. The mean empty fraction is
+1410
+       0.00270%, nonzero in 80 slices across 62 updates. The lowest slice-mean mass is 86.67% and
+1411   largest slice-mean empty fraction 1.85%; these extremes refer to slice means.
+1412
+1413
+1414
+1415   Per-domain probe losses. We disaggregate Figure 2(c), using the same six batches and twelve
+1416
+       branches per batch (Appendix B.1). Each batch has one held-out response per domain. At update
+       250, saved-state Adam under DR/DT/GT increases IF KL by 0.362/0.293/0.272 × 10−3 , while the
+1417
+       four-domain changes are 0.041/ − 0.002/ − 0.027 × 10−3 . Thus the mean reduction under DT/GT
+1418
+       coexists with an instruction-following increase.
+1419
+1420
+1421
+1422                                        (a) Intersection coverage                                                 (b) Retained tokens                                                    (c) Empty sets
+
+
+
+
+       Student mass / weight (%)                                                                                                                            Empty intersections (%)
+1423                               100.0                                                                     16.0                                                                     0.12                      Mean: 0.00270%
+                                                                                                                                    Candidate cap: 16
+                                                                                                                                                                                                             62/500 updates > 0
+
+
+
+
+                                                                                         Intersection size
+1424
+                                                                                                             15.5
+1425                                99.5                                                                                                                                              0.08
+1426                                                                                                         15.0
+1427                                99.0                                                                                                                                              0.04
+                                                                pθ(I)                                        14.5
+1428                                                            r = pθ(I)/pθ(S)
+1429                                98.5                                                                                                                                              0.00
+                                            1             250                   500                                  1               250             500                                     1                 250              500
+1430
+                                                 Optimizer update                                                           Optimizer update                                                         Optimizer update
+1431
+1432
+1433                                                  (d) Update 100                                                                                 (e) Update 250
+1434                                  Adam / DR        -0.058           -0.2      -2.7                        -0.68         -0.9                DR      -0.02                          -0.048        +0.36         -0.13    +0.041
+1435                                                   -0.07        -0.24         -2.5                        -0.78         -0.91                       -0.033                         -0.071        +0.29          -0.2    -0.0021
+                                       Adam / DT                                                                                                DT
+1436                                                   -0.076       -0.24         -2.4                        -0.82         -0.89                       -0.05                          -0.084        +0.27         -0.25    -0.027
+                                       Adam / GT                                                                                                GT
+1437
+                                    Reset m / DR -0.0095           -0.033         -0.4                        -0.1          -0.14               DR -0.0026                            -0.0074        +0.13         -0.013   +0.026
+1438                                                   -0.022      -0.075         -0.28                       -0.21         -0.15                       -0.015                         -0.036        +0.096        -0.084   -0.0099
+                                    Reset m / DT                                                                                                DT
+1439
+                                    Reset m / GT       -0.03       -0.073         -0.13                       -0.25         -0.12               GT      -0.034                         -0.045        +0.15         -0.14    -0.016
+1440
+                                   Reset m,v / DR      -0.054           -0.2      -2.3                        -0.61         -0.78               DR      -0.017                         -0.038         +1.1         -0.08    +0.25
+1441
+                                   Reset m,v / DT       -0.1        -0.38         -1.9                        -1.1          -0.85               DT      -0.073                          -0.18        +0.72          -0.4    +0.018
+1442
+                                   Reset m,v / GT      -0.13        -0.37         -1.3                        -1.3          -0.78               GT      -0.14                           -0.25        +0.94         -0.64    -0.022
+1443
+                                        SGD / DR       -0.32        -0.91         -25                         -2.4          -7.3                DR      -0.038                          -0.23         +6.3         -0.31     +1.4
+1444
+                                        SGD / DT        -1.4            -4.7      -6.8                        -9.5          -5.6                DT      -0.33                           -1.4          +11           -2.2     +1.9
+1445
+                                           SGD / GT     -1.8            -4.8      +9.5                         -12          -2.3                GT      -0.77                           -1.6          +18           -3.7     +2.9
+1446
+1447                                                   Math         Code           IF                        Science     Mean                           Math                           Code            IF      Science      Mean
+
+1448
+1449                                                                      −30            −3                          −0.3                  0                  0.3                                3            30
+1450                                                                                           Δ full-vocabulary KL (10−3); symmetric-log color scale
+
+1451
+1452   Figure 12: High average coverage and low mean probe loss can conceal exceptions. (a–c) I16
+1453   per-update means of 16 logged slices, without temporal smoothing; the mass axis spans 98.5–100%.
+1454   (d,e) Full-vocabulary KL after minus before BF16 writeback, in units of 10−3 . Cells show three-
+1455   batch means; dots show batches 1042–1044 from left to right. The shared symmetric-log color scale
+1456   is linear within ±0.1. SGD is matched to each rule’s Adam step norm.
+1457
+
+
+
+                                                                                                                               27
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1458
+       H     S MOL LM3 D IAGNOSTICS AND C APABILITY E VALUATION
+1459
+1460
+       H.1   C HECKPOINTS , RESPONSES , AND WEIGHTING
+1461
+1462   We use the SmolLM3-3B MixSFT student, three domain-specific RL teachers, and exported 500-
+1463   update students for I64-DR/DT/GT and PG-DR/SGD. The model and data revisions, export hashes,
+1464   and diagnostic source snapshots are recorded with the measurements. The reported I64 training
+1465   configurations use Adam with learning rate 2.5 × 10−7 ; PG uses SGD with learning rate 0.0025.
+1466   The capability comparison uses a new shared evaluation protocol.
+1467   Diagnostic prompts come from the frozen Open-MOPD data revision 9e897efe, with unique raw
+1468   messages shuffled within mathematics, code, and instruction following. Coverage, normalization,
+1469   and probe prompt splits are disjoint within this diagnostic sample. We preserve dataset messages
+1470   and disable thinking in the chat template. Generation uses temperature 1, top-p = 1, a 2,048-
+1471   token prompt cap, and a 4,096-token response cap. Each natural coverage bank contains 384 re-
+1472   sponses, 128 per domain, with up to eight uniformly spaced positions per response: 3,053 prefixes
+1473
+       for MixSFT and 3,058 for DR500. Additional students score the same 3,058 DR500 prefixes without
+       regenerating responses.
+1474
+1475   Coverage statistics assign equal weight to domains, responses within domains, and audited posi-
+1476   tions within a response. Mean-mass intervals resample responses independently within each domain
+1477   2,000 times using seed 1042/1043/1044. The first two rows of Table 14 use different natural banks;
+1478   the remaining students use the DR500 bank. The minimum I64 mass on DR500’s natural bank is
+1479
+       1.7454 × 10−8 ; DT500 and GT500 each have one empty intersection in the common-bank audit.
+1480
+1481   Table 14: High average I64 coverage coexists with a lower tail. SmolLM3, 384 responses per
+1482   bank. Mass and frequency columns are percentages; intervals resample responses within domains.
+1483   The last column counts empty intersections among audited prefixes.
+1484                Student       Response bank Mean mass [95% CI] < 90% 1st pct. Empty
+1485
+                    MixSFT        MixSFT           97.42 [96.93, 97.88]    8.42    62.06       0
+1486                DR500         DR500            98.56 [98.16, 98.96]    3.65    64.75       0
+1487                GT500         DR500            98.54 [98.13, 98.94]    3.61    64.79       1
+1488                DT500         DR500            98.58 [98.18, 98.97]    3.52    65.41       1
+1489                PGSGD500      DR500            98.65 [98.27, 99.03]    3.52    66.49       0
+1490
+1491
+       H.2   F ROZEN SUBSETS AND GRADIENT COMPARISONS
+1492
+1493   Within each domain we select representative prefixes, prefixes above its 75th entropy percentile, and
+1494   prefixes with I64 mass below 0.99. Selection allows overlap between strata and uses up to 32 distinct
+1495   prompts per domain. The low-coverage code stratum has 21 eligible prompts, yielding 85 distinct
+1496   prefixes overall. Each stratum is divided into three batches. Small candidate budgets k = 4, 8 are
+1497   selected by a coverage-only rule.
+1498   The BF16 coverage audit sorts a top-128 list and takes its first k entries, whereas gradient diagnostics
+1499   recompute top-k directly in FP32 at the exported BF16 parameter values. Student forward/backward
+1500   passes use FP32; cached teacher targets use BF16 forward passes followed by FP32 log-softmax.
+1501   One of the 85 frozen low-coverage prefixes crosses 0.99 during the FP32 diagnostic and remains in
+1502   its original stratum. The FP32 diagnostic mean I64 masses are 99.049%, 95.684%, and 93.121% for
+1503   the representative, high-entropy, and low-coverage groups.
+1504   Full KL, PG, and intersection objectives use the definitions in Appendix D. Empty intersections
+1505   produce zero loss. We retain zero- and small-norm cases and report vector differences in addition
+1506   to cosine. The plotted relative error is ∥gIk − gfull ∥/∥gfull ∥, which measures the vector difference
+1507   relative to the full-vocabulary gradient norm.
+1508
+1509   H.3   O PTIMIZER STATE , SAMPLING , AND NUMERICAL PRECISION
+1510
+1511   Normalization uses three separate batches, each with eight responses per domain, and the true re-
+       sponse lengths for GT/DT weights. Raw gradients, fresh Adam, and SGD start from independent
+
+
+                                                         28
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1512
+       copies of the same exported parameters. Fresh Adam starts with both moments zero and performs
+1513   its first step; SGD uses learning rate 0.0025, zero momentum, and norm-1 clipping. Fresh Adam is
+1514   distinct from the Qwen reset-m control, which retains the trained second moment and step counter.
+1515
+1516
+       For all three rule pairs in all three batches, fresh Adam lowers cosine relative to the raw gradi-
+       ents. For example, DT–DR raw cosines are 0.8968/0.8655/0.5933, versus 0.7013/0.6489/0.4126
+1517
+       after fresh Adam.
+1518
+1519   Conditional PG variance uses three fixed prefixes per group, one per domain, with eight independent
+1520   action-sampling repetitions. Sample budgets m = 1, 16, 64 use nested actions within a repetition.
+1521   We normalize the total coordinate sample variance by ∥gfull ∥2 and separately report the error of the
+1522
+       eight-repetition mean. The representative-group variance is 1.426/0.570/0.123; the low-coverage-
+       group variance is 4.965/2.566/0.434.
+1523
+1524   The precision controls begin exactly at parameter values represented by BF16, cast to FP32 for
+1525   computation.
+1526
+1527   H.4   C UMULATIVE BF16 CHANGES BY PARAMETER GROUP
+1528
+1529   The exported MixSFT-to-DR500 comparison contains 3,075,098,624 unique parameter coordinates
+1530
+       after accounting for tied embeddings. The 36 transformer blocks each contain 78,123,008 coordi-
+       nates, the token embedding 262,668,288, and the final normalization 2,048. We compare the two
+1531
+       BF16 exports directly. Overall, 10.4695% of coordinates change; the largest 1% carry 36.8477%
+1532
+       of squared displacement, and 5.8496% of coordinates carry 90%. Figure 14 retains all parameter
+1533   groups. Per-group changed fractions use each group’s own coordinate count; displacement shares
+1534   use total model squared displacement.
+1535
+1536
+1537
+1538
+1539
+1540
+1541
+1542
+1543
+1544
+1545
+1546
+1547
+1548
+1549
+1550
+1551
+1552
+1553
+1554
+1555
+1556
+1557
+1558
+1559
+1560
+1561
+1562
+1563
+1564
+1565
+
+
+
+                                                        29
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1566
+1567                                                    (a) Normalization: direction                                                                                    (b) Normalization: vector gap
+                                     1.00
+1568                                                                GT–DT         GT–DR          DT–DR                                                            2.0                      Thin: paired batches
+
+
+
+
+                                                                                                                          ‖xa − xb‖2 / ‖xa‖2
+                                                                                                                                                                                           Thick: batch means
+1569
+                                     0.75                                                                                                                         1.5
+
+       Cosine
+1570
+1571                                                                                                                                                              1.0
+                                     0.50
+1572                                                                                                                                                              0.5
+1573
+1574                                 0.25                                                                                                                         0.0
+                                                        Raw                      Fresh               Actual-LR                                                          Raw                    Fresh               Actual-LR
+1575                                                     g                       Adam                  SGD                                                               g                     Adam                  SGD
+1576
+1577                                                    (c) PG: conditional variance                                                                                    (d) PG: vector-mean error
+1578
+                                                                                                                                                                                               3 prefixes / group
+
+
+
+
+                                                                                                                        ‖gm − gfull‖2/‖gfull‖2
+                                                                                       Representative
+
+
+
+
+         tr(Cov[̂ĝ m])/‖gfull‖22
+                                                                                                                                                                         1.01
+1579                                              10     4.97                          Low I64 coverage                                                                                        8 independent draws
+                                                                                                                                                                  1.0
+1580                                                                                    2.57                                                                                                   Nested across m
+1581                                                                                                                                                                                                   0.51
+                                                   1                                                    0.43
+1582                                                     1.43                                                                                                     0.5
+                                                                                         0.57                                                                            0.52                                         0.23
+1583                                                                                                                                                                                                   0.39    0.18
+                                                                                                 0.12
+1584                                              0.1
+                                                                                                                                                                  0.0
+1585                                                        1                             16            64                                                                  1                           16            64
+1586                                                            Actions per fixed prefix, m                                                                                     Actions per fixed prefix, m
+
+
+
+
+                                                                                                                      Top 1% squared-norm share (%)
+1587
+1588                                                    (e) Precision: visible coordinates                                                                              (f) Precision: concentration
+
+
+
+
+       Nonzero coordinates (%)
+1589                                       100
+                                                                                                                                                         100
+1590
+                                                  10
+                                                                                                                                                                                                                       GT
+1591
+                                                   1                                                                                                              10                                                   DT
+1592
+                                                                                                                                                                                                                       DR
+1593                                              0.1
+1594
+                                     0.01                                                                                                                          1
+1595
+                                                        FP32              BF16           FP32         BF16                                                              FP32            BF16           FP32         BF16
+1596
+                                                            Fresh Adam                    Actual-LR SGD                                                                     Fresh Adam                  Actual-LR SGD
+1597
+1598
+1599   Figure 13: Local controls separate optimizer, sampling, and precision effects. (a,b) Three paired
+1600   SmolLM3 batches (thin) and their means (bold). In (b), x is the gradient or step, normalized by the
+1601   first named rule. (c,d) Three fixed prefixes per group, eight action repeats; (d) error of the vector
+1602   mean. (e,f) Each rule/batch pairs FP32 changes with BF16 writeback. Fresh Adam starts at the
+1603   exported BF16 parameter values with both moments zero.
+1604
+1605                                                    (a) Within-group changed fraction                                                                               (b) Share of total squared change
+
+
+
+
+                        Changed coordinates (%)                                                                                        Squared-change share (%)
+1606                                              20
+                                                         Global: 10.47%                                                                                           10     Top 1%: 36.85% energy
+1607
+                                                                                                                                                                         90% energy: 5.85% coordinates
+                                                  15                                                                                                               8
+1608
+1609                                                                                                                                                               6
+                                                  10
+1610                                                                                                                                                               4
+1611                                               5
+                                                                                                                                                                   2
+1612
+                                                   0                                                                                                               0
+1613                                                    E       4     9           18            27      33 N                                                            E       4   9           18            27      33 N
+1614                                                     Transformer block / parameter group                                                                             Transformer block / parameter group
+1615
+1616
+1617   Figure 14: Cumulative BF16 changes differ across all 38 SmolLM3 parameter groups. MixSFT
+1618
+       to DR500: blocks 0–35, embedding (E), final norm (N). (a) Within-group changed fraction; dashed:
+       global parameter-weighted fraction. (b) Share of total squared displacement. Tied weights count
+1619
+       once.
+
+
+                                                                                                                 30
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1620
+       H.5   E NDPOINT CAPABILITY EVALUATION
+1621
+1622   Table 15 evaluates the exported students with shared prompts, scorers, and decoding settings within
+1623   each benchmark. We use BF16, disable thinking, and allocate a 32,768-token context with the
+1624   response budget equal to context length minus prompt length. The SmolLM evaluation uses the sep-
+1625   arately recorded 128-question LiveCodeBench subset; the main Qwen study uses 1,055 questions.
+1626   MATH-500, this LiveCodeBench subset, and IFBench use greedy decoding; GPQA uses tempera-
+1627   ture 1 and top-p = 1; AIME uses temperature 0.6 and top-p = 0.95. Budget-capped outputs remain
+1628
+       in scoring. Score and paired-difference intervals use 100,000 question-bootstrap replicates (seed
+       1042/1043/1044), retaining all responses to each sampled question.
+1629
+1630
+1631   Table 15: SmolLM3 capability under a shared evaluation protocol. Scores (%): AIME pass@8,
+1632   GPQA average over four responses, otherwise greedy accuracy. Q × R: questions × responses;
+1633   Resp.: average response accuracy; Tokens: mean generated length; Cap: budget-capped responses
+1634   (%). Intervals resample questions.
+1635                 Benchmark            Q×R          Score [95% CI] Resp. Tokens Cap (%)
+1636                 MixSFT initialization
+1637                 MATH-500†             500 × 1 50.60 [46.20, 55.00] 50.60    1501      3.00
+1638                 AIME 2024              30 × 8  10.00 [0.00, 23.33] 2.92     3840      5.83
+1639                 AIME 2025              30 × 8  13.33 [3.33, 26.67] 1.67     2735      3.75
+1640                 I64-DT/Adam, update 500
+1641                 AIME 2024          30 × 8     26.67 [13.33, 43.33]   9.58   5019      7.50
+1642                 AIME 2025          30 × 8      13.33 [3.33, 26.67]   3.75   1227      0.00
+1643                 PG-DR/SGD, update 500
+1644                 MATH-500          500 × 1 53.80 [49.40, 58.20] 53.80        1520      2.80
+1645                 LiveCodeBench v6 1055 × 1 17.97 [11.72, 25.00] 17.97        1920      5.47
+                     IFBench (strict)  300 × 1 20.33 [16.00, 25.00] 20.33        2066      5.33
+1646
+                     GPQA Diamond      198 × 4 23.99 [20.71, 27.40] 23.99         543      0.00
+1647                 AIME 2024          30 × 8  16.67 [3.33, 30.00] 4.17         2215      1.67
+1648                 AIME 2025          30 × 8  13.33 [3.33, 26.67] 2.08         4957      9.17
+1649              † Additional complete MixSFT run under the same protocol (500 scored responses).
+1650
+1651   MATH-500 greedy accuracy is 50.60% for MixSFT and 53.80% for update-500 PG-DR/SGD, a
+1652   change of +3.20 points (95% paired interval [−0.20, 6.60]), gaining 45 questions and losing 29.
+1653   Update-500 I64-DT/Adam changes AIME 2024 pass@8 by +16.67 points ([0.00, 33.33]) relative
+1654   to MixSFT.
+1655
+1656   Equal endpoint scores can hide different solved questions. AIME pass@8 is the fraction
+1657   of questions with at least one correct answer among eight samples. MixSFT, update-500
+1658   I64-DT/Adam, and update-500 PG-DR/SGD solve 3/30, 8/30, and 5/30 questions on AIME
+1659
+       2024, respectively. On AIME 2025, each solves 4/30. Their average response accuracies are
+       1.67/3.75/2.08%, and only one solved question is common to all three. MixSFT and PG-DR/SGD
+1660
+       also share only one of their four solved questions (Figure 15).
+1661
+1662
+1663
+1664
+1665
+1666
+1667
+1668
+1669
+1670
+1671
+1672
+1673
+
+
+
+                                                        31
+       Under review as a conference paper at ICLR 2027
+
+
+
+
+1674
+1675
+1676
+1677
+1678
+1679
+1680
+1681
+1682
+1683
+1684
+1685
+1686
+1687
+1688
+1689
+1690
+1691
+1692
+1693                                         MixSFT          I64-DT          PG/SGD
+
+1694               (a) Change vs. MixSFT           (b) AIME25: correct / 8                         (c) AIME25: pass@k
+1695                                                                                          15
+                                                                                                   All: 13.33% at k=8
+1696    MATH-500                            MixSFT 1 1 1 0 0 1 0 0
+
+
+
+                                                                                 Pass@k (%)
+1697                                                                                          10
+1698      AIME24                            I64-DT 1 5 0 0 1 0 2 0
+1699                                                                                           5
+1700      AIME25                           PG/SGD 1 0 0 1 0 0 2 1
+1701                                                                                           0
+                                                   0 2 4 5 7 8 16 26
+1702               −15   0    15   30                                                              1     2      4       8
+                                                      Frozen question ID
+                    Score change (pp)                                                                  Subset size k
+1703
+1704
+1705   Figure 15: Equal aggregate scores can conceal different solved questions and sampling out-
+1706   comes. (a) Differences from MixSFT with paired question-bootstrap 95% intervals: accuracy for
+1707   MATH-500, pass@8 for AIME. (b) Correct responses out of eight for every AIME 2025 question
+1708   solved by any model; the other 22 questions have zero successes. (c) Subset estimates from the same
+                                                8−cq
+                                                      8
+                         \ = 1
+                                      P
+1709   eight responses: pass@k     30    q [1 −  k
+                                                      / k ], where cq counts correct responses.
+1710
+1711
+1712
+1713
+1714
+1715
+1716
+1717
+1718
+1719
+1720
+1721
+1722
+1723
+1724
+1725
+1726
+1727
+
+
+
+                                                        32
+

@@ -1,0 +1,27 @@
+\begin{table}[t]
+\centering\small
+\setlength{\tabcolsep}{4pt}
+\caption{\textbf{Task gains and method rankings vary across domains and evaluation sets.} Joint-training scores (\%) after 500 updates. The four development tasks are MATH-500, LiveCodeBench v6, IFBench, and GPQA Diamond; both means weight domains equally. Response and domain-token averaging assign equal domain loss weights and average responses equally or by length; global-token averaging weights all tokens equally.}
+\label{tab:main_outcomes}
+\begin{tabular}{llrrrrrr}
+\toprule
+Supervision & Averaging & Math & Code & IF & Science & Dev. mean & Test mean \\
+\midrule
+Initial student & --- & 68.80 & 16.41 & 18.33 & 32.20 & 33.94 & 38.60 \\
+\midrule
+\multicolumn{8}{l}{\textit{Adam}} \\
+Sampled token & Response & 73.20 & 18.27 & 27.00 & 35.97 & 38.61 & 43.55 \\
+Sampled token & Domain token & 73.20 & 19.24 & 27.00 & 34.96 & 38.60 & 43.51 \\
+Sampled token & Global token & 76.20 & 17.92 & 27.33 & 32.94 & 38.60 & 44.51 \\
+Top-16 & Response & 75.40 & 17.75 & 27.00 & 35.46 & 38.90 & 44.56 \\
+Top-64 & Response & 75.80 & 18.30 & 27.33 & 34.71 & 39.04 & 44.46 \\
+Top-64 & Domain token & 74.00 & 18.86 & 28.67 & 35.22 & 39.19 & 43.68 \\
+Top-64 & Global token & 74.20 & 19.80 & 28.67 & 33.41 & 39.02 & 44.97 \\
+\midrule
+\multicolumn{8}{l}{\textit{SGD}} \\
+Sampled token & Response & 76.40 & 19.53 & 28.33 & 35.59 & 39.96 & 43.48 \\
+Sampled token & Domain token & 75.20 & 20.31 & 28.33 & 33.90 & 39.44 & 43.90 \\
+Sampled token & Global token & 75.00 & 19.26 & 25.33 & 34.71 & 38.58 & 42.97 \\
+\bottomrule
+\end{tabular}
+\end{table}

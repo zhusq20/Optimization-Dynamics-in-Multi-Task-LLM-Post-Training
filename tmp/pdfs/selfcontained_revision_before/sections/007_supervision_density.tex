@@ -1,0 +1,30 @@
+\section{Vocabulary Supervision: Parameter Updates and Task Performance}
+\label{sec:density}
+
+Expanding supervision from one sampled token to a larger vocabulary set changes gradient approximation and task-level learning. We compare sampled-token supervision with the student--teacher top-64 intersection during mathematics-only and joint training. Within each setting, initialization, teachers, response averaging, optimizer settings, and prompt schedule are shared. Full-vocabulary supervision supplies a reference for the gradient and single-step comparisons.
+
+\subsection{Broader supervision produces task-dependent gains}
+
+\paragraph{The mathematics advantage develops during training.}
+In mathematics-only training, sampled-token supervision leads top-64 by 2.8 accuracy points early in training; top-64 leads by 2.2 points at the endpoint (Figure~\ref{fig:supervision_overview}c). Joint training also ends with a mathematics gain from top-64 supervision, accompanied by a science loss: final differences are $+2.6$ points on mathematics and $-1.3$ on GPQA. Code and instruction-following differences are smaller.
+
+Top-64's joint-training mean advantage narrows from about 1.7 points at the intermediate checkpoint to 0.4 points at the endpoint. The final difference is small relative to its estimated sampling uncertainty (Table~\ref{tab:paired_contrasts}). These trajectories show that the observed benefit depends on the task and the stage of training.
+
+\paragraph{Larger candidate sets redistribute gains across tasks.}
+Top-16 and top-64 supervision reach similar final mean scores on both the development benchmarks and separate test questions. On the separate tests, top-64 gains about two mathematics points and loses about two code points relative to top-16. Increasing the candidate set changes both vocabulary support and token weights in Equation~\ref{eq:topk}; the resulting gains vary across domains. Tables~\ref{tab:completed_endpoints} and~\ref{tab:independent_test} report the full scores.
+
+\input{sections/fig_nine_supervision}
+
+\input{sections/007_smollm_diagnostics}
+
+\subsection{Vocabulary supervision leaves single-step concentration nearly unchanged}
+
+At fixed student parameters, prefixes, and Adam state, sampled-token, top-64, teacher-top-64, and full-vocabulary losses produce nearly identical single-step concentration (Figure~\ref{fig:supervision_overview}a). In a representative comparison, all four change about 88\% of FP32 coordinates and about 0.15\% of BF16 coordinates. This similarity across vocabulary supports is consistent with concentrated stored-weight changes under dense distillation \citep{yu2026denseupdates}.
+
+Shared optimizer history contributes strongly to this result. Even a zero current gradient changes about 0.14\% of BF16 parameters in the same comparison, close to the fraction changed by the supervised losses. Resetting Adam's moments changes the amount of BF16 writeback (Figure~\ref{fig:sampling_history_controls}b,c).
+
+\input{sections/fig_sampling_history_controls}
+
+Cumulative changes develop over the whole training trajectory. Top-64 and sampled-token supervision end with different fractions of changed BF16 weights (Section~\ref{sec:subnetworks}), as student parameters, generated responses, and optimizer moments evolve together. The task-level trajectories above describe the learning outcomes of these accumulating differences.
+
+\FloatBarrier

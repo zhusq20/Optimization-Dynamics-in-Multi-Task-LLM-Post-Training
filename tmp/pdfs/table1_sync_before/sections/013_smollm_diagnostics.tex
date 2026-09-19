@@ -1,0 +1,69 @@
+\section{SmolLM3 Diagnostics and Capability Evaluation}
+\label{app:smollm_diagnostics}
+
+\subsection{Checkpoints, responses, and weighting}
+
+We use the SmolLM3-3B MixSFT student, three domain-specific RL teachers, and exported 500-update students for I64-DR/DT/GT and PG-DR/SGD. The model and data revisions, export hashes, and diagnostic source snapshots are recorded with the measurements. The reported I64 training configurations use Adam with learning rate $2.5\times10^{-7}$; PG uses SGD with learning rate $0.0025$. We do not use historical aggregate capability scores as a matched evaluation, and the three original I64 training source revisions and prompt schedules were not fully recovered. The exported checkpoints do not establish that those runs differed only in loss reduction.
+
+Diagnostic prompts come from the frozen Open-MOPD data revision \texttt{9e897efe}, with unique raw messages shuffled within mathematics, code, and instruction following. Coverage, normalization, and probe prompt splits are disjoint within this diagnostic sample; absence from the original training schedule is not established. We preserve dataset messages and disable thinking in the chat template. Generation uses temperature 1, top-$p=1$, a 2,048-token prompt cap, and a 4,096-token response cap. Each natural coverage bank contains 384 responses, 128 per domain, with up to eight uniformly spaced positions per response: 3,053 prefixes for MixSFT and 3,058 for DR500. Additional students score the same 3,058 DR500 prefixes without regenerating responses.
+
+Coverage statistics assign equal weight to domains, responses within domains, and audited positions within a response. Mean-mass intervals resample responses independently within each domain 2,000 times using seed 1042/1043/1044. They do not estimate training-seed variation. The first two rows of Table~\ref{tab:smollm_coverage} use different natural banks; the remaining students use the DR500 bank. The minimum I64 mass on DR500's natural bank is $1.7454\times10^{-8}$; DT500 and GT500 each have one empty intersection in the common-bank audit. Means therefore do not imply uniformly high coverage.
+
+\input{experiments/visual_mvp_20260918/smollm_coverage_table}
+
+\subsection{Frozen subsets and gradient comparisons}
+
+Within each domain we select representative prefixes, prefixes above its 75th entropy percentile, and prefixes with I64 mass below 0.99. Selection precedes the objective-gradient comparison, allows overlap between strata, and uses up to 32 distinct prompts per domain. The low-coverage code stratum has only 21 eligible prompts, giving 85 prefixes overall rather than 96; no duplicated positions fill the gap. Each stratum is divided into three batches. Small candidate budgets $k=4,8$ are selected by a coverage-only rule before inspecting objective gradients.
+
+The BF16 coverage audit sorts a top-128 list and takes its first $k$ entries, whereas gradient diagnostics recompute top-$k$ directly in FP32 at the exported BF16 parameter values. Student forward/backward passes use FP32; cached teacher targets use BF16 forward passes followed by FP32 log-softmax. Thus their probabilities and threshold membership need not match bit for bit; one of the 85 frozen low-coverage prefixes crosses 0.99 during the FP32 diagnostic, and remains in its original stratum. The FP32 diagnostic mean I64 masses are 99.049\%, 95.684\%, and 93.121\% for the representative, high-entropy, and low-coverage groups. These are domain-weighted summaries of the selected prefixes, not estimates of their prevalence in natural generation.
+
+Full KL, PG, and intersection objectives use the definitions in Appendix~\ref{app:losses}. Empty intersections produce zero loss. We retain zero- and small-norm cases and report vector differences in addition to cosine. The plotted error is $\|g_{I_k}-g_{\mathrm{full}}\|/\|g_{\mathrm{full}}\|$, not the difference of the two gradient norms. Batch means and thin batch trajectories in Figure~\ref{fig:smollm_supervision} make the diagnostic replication unit explicit.
+
+\subsection{Optimizer state, sampling, and numerical precision}
+\label{app:smollm_controls}
+
+Normalization uses three separate batches, each with eight responses per domain, and the true response lengths for GT/DT weights. Raw gradients, fresh Adam, and SGD start from independent copies of the same exported parameters. Fresh Adam starts with both moments zero and performs its first step; SGD uses learning rate 0.0025, zero momentum, and norm-1 clipping. Fresh Adam is distinct from the Qwen reset-$m$ control, which retains the trained second moment and step counter. We do not match their norms to an unavailable native Adam step.
+
+For all three rule pairs in all three batches, fresh Adam lowers cosine relative to the raw gradients. For example, DT--DR raw cosines are 0.8968/0.8655/0.5933, versus 0.7013/0.6489/0.4126 after fresh Adam. This qualifies an optimizer-wide interpretation of alignment: the effect depends on state, and the native SmolLM3 history remains untested.
+
+Conditional PG variance uses only three fixed prefixes per group, one per domain, with eight independent action-sampling repetitions. Sample budgets $m=1,16,64$ use nested actions within a repetition. We normalize the total coordinate sample variance by $\|g_{\mathrm{full}}\|^2$ and separately report the error of the eight-repetition mean. The representative-group variance is 1.426/0.570/0.123; the low-coverage-group variance is 4.965/2.566/0.434. These finite conditional measurements do not establish an exact $1/m$ law or training-run variance.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth]{figures/visual_mvp_20260918/smollm_controls.pdf}
+\caption{\textbf{Local controls separate optimizer, sampling, and precision effects.}
+(a,b) Three paired SmolLM3 batches (thin) and their means (bold). In (b), $x$ is the gradient or step, normalized by the first named rule. (c,d) Three fixed prefixes per group, eight action repeats; (d) error of the vector mean. (e,f) Each rule/batch pairs FP32 changes with BF16 writeback. Fresh Adam uses zero moments at exported BF16 parameters, not native master weights or trained history.}
+\label{fig:smollm_controls}
+\end{figure}
+
+The precision controls begin exactly at parameter values represented by BF16, cast to FP32 for computation. Their BF16 writeback depends on this initial position on the quantization grid, so single-step changed fractions need not reproduce native training with accumulated rounding residuals. Native DR500 FP32 master weights, Adam moments and step, and the initialization master were not available for these diagnostics. We therefore report no native-history/reset-$m$ comparison or cumulative FP32 change for SmolLM3.
+
+\subsection{Cumulative BF16 changes by parameter group}
+
+The exported MixSFT-to-DR500 comparison contains 3,075,098,624 unique parameter coordinates after accounting for tied embeddings. The 36 transformer blocks each contain 78,123,008 coordinates, the token embedding 262,668,288, and the final normalization 2,048. We compare the two BF16 exports directly. Overall, 10.4695\% of coordinates change; the largest 1\% carry 36.8477\% of squared displacement, and 5.8496\% of coordinates carry 90\%. Figure~\ref{fig:smollm_cumulative} retains all parameter groups. Per-group changed fractions use each group's own coordinate count; displacement shares use total model squared displacement. Neither a local nor a cumulative BF16 statistic supplies the missing FP32 history.
+
+\begin{figure}[p]
+\centering
+\includegraphics[width=\linewidth]{figures/visual_mvp_20260918/smollm_cumulative.pdf}
+\caption{\textbf{Cumulative BF16 changes differ across all 38 SmolLM3 parameter groups.}
+MixSFT to DR500: blocks 0--35, embedding (E), final norm (N). (a) Within-group changed fraction; dashed: global parameter-weighted fraction. (b) Share of total squared displacement. Tied weights count once; native FP32 changes are unavailable.}
+\label{fig:smollm_cumulative}
+\end{figure}
+
+\FloatBarrier
+\subsection{Endpoint capability evaluation}
+\label{app:smollm_capability}
+
+Table~\ref{tab:smollm_capability} evaluates the exported students with shared prompts, scorers, and decoding settings within each benchmark. We use BF16, disable thinking, and allocate a 32,768-token context with the response budget equal to context length minus prompt length. MATH-500, LiveCodeBench-128, and IFBench use greedy decoding; GPQA uses temperature 1 and top-$p=1$; AIME uses temperature 0.6 and top-$p=0.95$. Budget-capped outputs remain in scoring. Score and paired-difference intervals use 100,000 question-bootstrap replicates (seed 1042/1043/1044), retaining all responses to each sampled question.
+
+\input{experiments/smollm_capability_20260918/endpoint_table}
+
+Relative to MixSFT, PG/SGD changes MATH-500 accuracy by $+3.20$ points (95\% paired interval $[-0.20,6.60]$), gaining 45 questions and losing 29. I64-DT changes AIME 2024 pass@8 by $+16.67$ points ($[0.00,33.33]$). On AIME 2025, MixSFT and PG/SGD share only one of their four solved questions despite equal pass@8 (Figure~\ref{fig:smollm_capability}).
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/smollm_capability_20260918/endpoint_capability.pdf}
+\caption{\textbf{Equal aggregate scores can conceal different solved questions and sampling outcomes.}
+(a) Differences from MixSFT with paired question-bootstrap 95\% intervals: accuracy for MATH-500, pass@8 for AIME. (b) Correct responses out of eight for every AIME 2025 question solved by any model; the other 22 questions have zero successes. (c) Subset estimates from the same eight responses: $\widehat{\mathrm{pass@}k}=\frac{1}{30}\sum_q[1-\binom{8-c_q}{k}/\binom{8}{k}]$, where $c_q$ counts correct responses.}
+\label{fig:smollm_capability}
+\end{figure}

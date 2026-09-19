@@ -1,0 +1,10 @@
+\section{Related Work}
+
+\paragraph{Distillation objectives and vocabulary truncation.}
+MiniLLM uses reverse KL \citep{gu2024minillm}; Generalized Knowledge Distillation (GKD) combines student-generated sequences with alternative divergences \citep{agarwal2024gkd}; $f$-DISTILL derives word-level losses from sequence-level $f$-divergences \citep{wen2023fdivergence}. Sparse Logit Sampling analyzes top-$k$ caching bias \citep{anshumann2025sparse}, while Tail-Aware OPD restores tail-mass information lost by top-$k$ renormalization \citep{huang2026tailaware}. Our intersection loss retains full-softmax log ratios with detached student-top-$k$ weights. Section~\ref{sec:density} compares its coverage, gradient error, updates, and task scores with sampled-token and full-vocabulary supervision.
+
+\paragraph{Multi-teacher distillation and loss normalization.}
+MOPD integrates specialized teachers on student-generated responses \citep{ma2026mopdmultiteacheronpolicydistillation}; Open-MOPD adds domain token balancing and adaptive weighting \citep{gao2026openmopddiagnosingfixingcapability}. DAPO uses token-level averaging \citep{yu2025dapo}, and Dr.~GRPO analyzes length and reward-normalization bias \citep{liu2025understandingr1zero}. We separate domain weighting from within-domain response weighting: Open-MOPD's token-share correction gives DT for fixed batches and domain weights, while DR also removes response-length weighting.
+
+\paragraph{Post-training parameter geometry.}
+\citet{mukherjee2025subnetworks} study small parameter subsets supporting RL fine-tuning; \citet{yu2026denseupdates} report concentrated distillation updates and overlap between separately trained students. \citet{shen2026opdgeometry} examine OPD geometry and response-position selection. We compare teachers at the same student and Adam state, distinguish FP32 from BF16 changes, and vary vocabulary support at fixed prefixes.

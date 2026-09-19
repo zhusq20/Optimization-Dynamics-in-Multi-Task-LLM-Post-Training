@@ -1,0 +1,18 @@
+\section{Practical Implications and Checkpoint Selection}
+\label{sec:recipe}
+
+\paragraph{Loss weights and optimizer state require separate measurements.}
+Figure~\ref{fig:normalization_capability} shows that equal prompt counts yield unequal token loss weights, while DT and DR still produce different gradients. Figure~\ref{fig:subnetwork_overview} separates FP32 changes from BF16 sparsity and current teacher signals from Adam history. Figures~\ref{fig:supervision_overview} and~\ref{fig:smollm_supervision} show why coverage and update similarity should be read alongside per-task scores and gradient error.
+
+\paragraph{A retention constraint leaves checkpoint selection unchanged.}
+We compare update 500 with two development-based rules over updates 50/100/250/500 for Adam and 100/250/500 for SGD: maximize the equal-domain mean, or maximize it subject to per-domain retention,
+\begin{equation}
+s_d(\theta)\geq s_d(\theta_0)-\epsilon_d\quad\text{for all }d,
+\qquad \epsilon_d=2\text{ percentage points}.
+\label{eq:retention}
+\end{equation}
+Here $s_d$ is the development score for domain $d$ and $\theta_0$ the initial student. Both rules keep the initial student unless the selected mean improves by at least one point. Choices are fixed before evaluation on the separate test sets of 256 questions per domain.
+
+Table~\ref{tab:checkpoint_selection} summarizes the selection experiment. Both development rules choose update 500 in nine trajectories and update 250 for PG-DT/Adam. The latter scores 43.14\% on the additional test, below the final checkpoint's 43.51\%; the retention constraint and earlier selection provide no observed test-score benefit. Rankings also change across evaluation sets: PG-DR/SGD exceeds Adam by 1.18 mean points on the development benchmarks but is 0.07 points lower on the additional test.
+
+\input{experiments/completed_results_20260917/selection_table}

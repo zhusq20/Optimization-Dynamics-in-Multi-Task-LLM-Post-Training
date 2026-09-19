@@ -1,0 +1,24 @@
+\subsection{Coverage and gradient error}
+\label{sec:coverage_gradient}
+
+\paragraph{Qwen3: high coverage and close gradient directions.}
+At all four Qwen3 checkpoints, I64 retains more than 99.9\% of student probability on average, with a minimum of 96.55\% across the 384 audited prefixes (Appendix~\ref{app:actual_intersection_coverage}). Figure~\ref{fig:supervision_overview}b compares I64 and PG gradient directions with full-vocabulary KL. In the additional M-PG/100 sampling control, I64 reaches a mean gradient cosine of 0.999988. Averaging 1, 16, and 64 PG token samples per fixed prefix raises the corresponding cosine from 0.537 to 0.865 to 0.967 (Figure~\ref{fig:sampling_history_controls}a). Thus, I64 closely matches the full-vocabulary direction in this control, while finite sampling explains part of PG's gradient difference. Cosine measures direction, not relative gradient magnitude.
+
+\input{sections/fig_nine_supervision}
+
+\paragraph{SmolLM3: lower coverage and residual gradient error.}
+SmolLM3-3B extends the comparison to inputs with lower coverage, using the MixSFT initialization, its I64-DR student after 500 updates (DR500), and three Open-MOPD teachers for mathematics, code, and instruction following \citep{gao2026openmopddiagnosingfixingcapability}. At $k=64$, mean intersection mass is 97.42\% for MixSFT and 98.56\% for DR500 on their respective generated responses. Yet 8.42\% and 3.65\% of domain/response-balanced prefix weight falls below 90\% mass (Figure~\ref{fig:smollm_supervision}a,b). Increasing $k$ reduces this tail without eliminating it.
+
+At the fixed DR500 model, we compare restricted-vocabulary and full-vocabulary KL gradients on identical inputs within each batch. Across nine batches, I64 differs from the full-vocabulary gradient by 2.16--24.54\% in relative error (Figure~\ref{fig:smollm_supervision}d). Using top-4 or top-8 produces larger errors in these batches. Thus, top-64 provides a closer approximation, but still changes the training signal. Appendix~\ref{app:smollm_diagnostics} gives the batch selection and error definition.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\linewidth]{figures/layout_followup_20260918/smollm_supervision.pdf}
+\caption{\textbf{Larger candidate sets retain more probability mass and reduce gradient error in the SmolLM3 comparisons.}
+(a,b) Mean retained student probability and the fraction below 90\%, using 384 responses per model; bands: response-cluster 95\% intervals. Dashed lines mark $k=64$. (c,d) Gradient cosine and relative error against full-vocabulary KL at the same trained model (DR500). Colors distinguish typical inputs, uncertain next-token predictions, and inputs where I64 omits more probability mass. Thin lines show three batches per group; bold lines show group means. The reported I64 error range spans all nine batch values at $k=64$. Coverage and teacher targets use BF16 forwards; student gradients use FP32.}
+\label{fig:smollm_supervision}
+\end{figure}
+
+Together, these results motivate measuring coverage and gradient approximation for each training setting rather than treating a fixed $k$ as uniformly accurate. The models use different teachers, response banks, and diagnostic sampling protocols, so the contrast does not isolate model identity or establish a quantitative mapping from retained mass to gradient error. Supplementary SmolLM3 endpoint capability evaluations appear in Appendix~\ref{app:smollm_capability}.
+
+\FloatBarrier

@@ -1,0 +1,33 @@
+{
+  "contrasts_checked": 121,
+  "domain_scores_unchanged": 44,
+  "checks_passed": [
+    "variance_nonnegative",
+    "contrast_reversal",
+    "self_contrast",
+    "analytic_gaussian",
+    "unchanged_point_scores"
+  ],
+  "method_interval_width_ratios": [
+    0.42730508614800977,
+    0.43068358045570737
+  ],
+  "variance_floor_contrasts": [
+    "PG-DR / Adam minus PG-DT / SGD",
+    "PG-GT / Adam minus PG-DT / SGD",
+    "I16-DR / Adam minus I64-GT / Adam",
+    "I16-DR / Adam minus PG-DT / SGD",
+    "I64-DR / Adam minus PG-DT / SGD",
+    "I64-GT / Adam minus I16-DR / Adam",
+    "PG-DT / SGD minus PG-DR / Adam",
+    "PG-DT / SGD minus PG-GT / Adam",
+    "PG-DT / SGD minus I16-DR / Adam",
+    "PG-DT / SGD minus I64-DR / Adam"
+  ],
+  "pdf_sha256": "03ffff81555702f81e2e9454289231bc5adc27621198871797deb0b82e025114",
+  "pdf_pages": 31,
+  "main_text_pages": 10,
+  "latex_undefined_references": 0,
+  "latex_overfull_boxes": 0,
+  "visual_review": "All 31 pages reviewed as montages; Table 1 and Appendix A.3 inspected at full readable resolution."
+}

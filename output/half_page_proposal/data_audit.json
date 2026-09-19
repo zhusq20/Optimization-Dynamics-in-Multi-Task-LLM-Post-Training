@@ -1,0 +1,689 @@
+{
+  "sources": [
+    {
+      "path": "sections/table_main_outcomes.tex",
+      "sha256": "5365e99fc79dcc9f51b6663dea375b8e0e27a920797a4e32af75fb83a24dbeeb"
+    },
+    {
+      "path": "experiments/visual_mvp_20260918/qwen_all_checkpoints_table.tex",
+      "sha256": "1bc0c18b63d4ec53b3d1c4623988af6005ad8ddafc1f388f622378ca39af4964"
+    }
+  ],
+  "initial_scores": [
+    68.8,
+    16.4,
+    18.33,
+    32.2
+  ],
+  "records": [
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        69.6,
+        16.41,
+        18.67,
+        28.03
+      ],
+      "mean_gain": -0.7549999999999999,
+      "minimum_domain_gain": -4.170000000000002,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        72.0,
+        17.19,
+        19.33,
+        31.19
+      ],
+      "mean_gain": 0.995000000000001,
+      "minimum_domain_gain": -1.0100000000000016,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        73.4,
+        16.41,
+        26.0,
+        30.18
+      ],
+      "mean_gain": 2.565000000000002,
+      "minimum_domain_gain": -2.020000000000003,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        73.2,
+        18.26,
+        27.0,
+        35.94
+      ],
+      "mean_gain": 4.667500000000001,
+      "minimum_domain_gain": 1.860000000000003,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        71.6,
+        17.19,
+        19.0,
+        34.34
+      ],
+      "mean_gain": 1.6000000000000005,
+      "minimum_domain_gain": 0.6700000000000017,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.6,
+        19.53,
+        18.0,
+        34.97
+      ],
+      "mean_gain": 2.8424999999999994,
+      "minimum_domain_gain": -0.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        77.0,
+        19.53,
+        25.0,
+        33.59
+      ],
+      "mean_gain": 4.847500000000002,
+      "minimum_domain_gain": 1.3900000000000006,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        73.2,
+        19.24,
+        27.0,
+        34.93
+      ],
+      "mean_gain": 4.660000000000001,
+      "minimum_domain_gain": 2.729999999999997,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        71.2,
+        18.75,
+        19.0,
+        34.72
+      ],
+      "mean_gain": 1.9850000000000012,
+      "minimum_domain_gain": 0.6700000000000017,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.8,
+        21.88,
+        17.0,
+        31.94
+      ],
+      "mean_gain": 2.4725,
+      "minimum_domain_gain": -1.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        74.8,
+        19.53,
+        25.0,
+        33.84
+      ],
+      "mean_gain": 4.360000000000001,
+      "minimum_domain_gain": 1.6400000000000006,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        76.2,
+        17.91,
+        27.33,
+        32.91
+      ],
+      "mean_gain": 4.655,
+      "minimum_domain_gain": 0.7099999999999937,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        69.8,
+        17.19,
+        17.33,
+        31.94
+      ],
+      "mean_gain": 0.13250000000000028,
+      "minimum_domain_gain": -1.0,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        72.2,
+        17.97,
+        19.0,
+        32.95
+      ],
+      "mean_gain": 1.597500000000002,
+      "minimum_domain_gain": 0.6700000000000017,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        75.6,
+        18.75,
+        25.67,
+        33.59
+      ],
+      "mean_gain": 4.470000000000001,
+      "minimum_domain_gain": 1.3900000000000006,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        75.4,
+        17.73,
+        27.0,
+        35.98
+      ],
+      "mean_gain": 5.0950000000000015,
+      "minimum_domain_gain": 1.3300000000000018,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        69.6,
+        17.19,
+        19.0,
+        31.69
+      ],
+      "mean_gain": 0.4375,
+      "minimum_domain_gain": -0.5100000000000016,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        71.6,
+        17.97,
+        19.0,
+        32.7
+      ],
+      "mean_gain": 1.3849999999999998,
+      "minimum_domain_gain": 0.5,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        74.8,
+        17.97,
+        26.0,
+        33.96
+      ],
+      "mean_gain": 4.25,
+      "minimum_domain_gain": 1.5700000000000003,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        75.8,
+        18.29,
+        27.33,
+        34.68
+      ],
+      "mean_gain": 5.092499999999999,
+      "minimum_domain_gain": 1.8900000000000006,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        72.2,
+        18.75,
+        17.0,
+        32.32
+      ],
+      "mean_gain": 1.1350000000000016,
+      "minimum_domain_gain": -1.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.8,
+        19.53,
+        19.33,
+        33.33
+      ],
+      "mean_gain": 2.8149999999999995,
+      "minimum_domain_gain": 1.0,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        75.4,
+        21.09,
+        25.33,
+        32.7
+      ],
+      "mean_gain": 4.6975000000000025,
+      "minimum_domain_gain": 0.5,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        74.0,
+        18.86,
+        28.67,
+        35.19
+      ],
+      "mean_gain": 5.2475000000000005,
+      "minimum_domain_gain": 2.460000000000001,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        74.2,
+        17.97,
+        17.0,
+        32.95
+      ],
+      "mean_gain": 1.597500000000002,
+      "minimum_domain_gain": -1.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.4,
+        17.97,
+        21.0,
+        32.07
+      ],
+      "mean_gain": 2.427500000000002,
+      "minimum_domain_gain": -0.13000000000000256,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        74.4,
+        18.75,
+        25.0,
+        33.33
+      ],
+      "mean_gain": 3.9375000000000018,
+      "minimum_domain_gain": 1.1299999999999955,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 500,
+      "scores": [
+        74.2,
+        19.78,
+        28.67,
+        33.38
+      ],
+      "mean_gain": 5.075000000000003,
+      "minimum_domain_gain": 1.1799999999999997,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 100,
+      "scores": [
+        73.0,
+        18.75,
+        25.67,
+        35.35
+      ],
+      "mean_gain": 4.260000000000002,
+      "minimum_domain_gain": 2.3500000000000014,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        75.8,
+        18.75,
+        25.67,
+        31.82
+      ],
+      "mean_gain": 4.077500000000001,
+      "minimum_domain_gain": -0.38000000000000256,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 500,
+      "scores": [
+        76.4,
+        19.53,
+        28.33,
+        35.56
+      ],
+      "mean_gain": 6.022500000000003,
+      "minimum_domain_gain": 3.1300000000000026,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "SGD",
+      "update": 100,
+      "scores": [
+        74.8,
+        18.75,
+        23.33,
+        34.34
+      ],
+      "mean_gain": 3.8725000000000005,
+      "minimum_domain_gain": 2.1400000000000006,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        74.2,
+        19.53,
+        25.33,
+        35.1
+      ],
+      "mean_gain": 4.607500000000002,
+      "minimum_domain_gain": 2.8999999999999986,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "SGD",
+      "update": 500,
+      "scores": [
+        75.2,
+        20.28,
+        28.33,
+        33.88
+      ],
+      "mean_gain": 5.490000000000002,
+      "minimum_domain_gain": 1.6799999999999997,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "SGD",
+      "update": 100,
+      "scores": [
+        74.6,
+        17.97,
+        20.67,
+        35.73
+      ],
+      "mean_gain": 3.3099999999999987,
+      "minimum_domain_gain": 1.5700000000000003,
+      "worst_domain": "Code"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        73.0,
+        20.31,
+        23.67,
+        33.33
+      ],
+      "mean_gain": 3.6450000000000005,
+      "minimum_domain_gain": 1.1299999999999955,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "SGD",
+      "update": 500,
+      "scores": [
+        75.0,
+        19.24,
+        25.33,
+        34.72
+      ],
+      "mean_gain": 4.64,
+      "minimum_domain_gain": 2.519999999999996,
+      "worst_domain": "Science"
+    }
+  ],
+  "intermediate_count": 27,
+  "positive_mean_negative_domain_count": 10,
+  "positive_mean_negative_domain_records": [
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        72.0,
+        17.19,
+        19.33,
+        31.19
+      ],
+      "mean_gain": 0.995000000000001,
+      "minimum_domain_gain": -1.0100000000000016,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "Adam",
+      "update": 250,
+      "scores": [
+        73.4,
+        16.41,
+        26.0,
+        30.18
+      ],
+      "mean_gain": 2.565000000000002,
+      "minimum_domain_gain": -2.020000000000003,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.6,
+        19.53,
+        18.0,
+        34.97
+      ],
+      "mean_gain": 2.8424999999999994,
+      "minimum_domain_gain": -0.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "PG-GT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.8,
+        21.88,
+        17.0,
+        31.94
+      ],
+      "mean_gain": 2.4725,
+      "minimum_domain_gain": -1.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I16-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        69.8,
+        17.19,
+        17.33,
+        31.94
+      ],
+      "mean_gain": 0.13250000000000028,
+      "minimum_domain_gain": -1.0,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I64-DR",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        69.6,
+        17.19,
+        19.0,
+        31.69
+      ],
+      "mean_gain": 0.4375,
+      "minimum_domain_gain": -0.5100000000000016,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "I64-DT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        72.2,
+        18.75,
+        17.0,
+        32.32
+      ],
+      "mean_gain": 1.1350000000000016,
+      "minimum_domain_gain": -1.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 50,
+      "scores": [
+        74.2,
+        17.97,
+        17.0,
+        32.95
+      ],
+      "mean_gain": 1.597500000000002,
+      "minimum_domain_gain": -1.3299999999999983,
+      "worst_domain": "IF"
+    },
+    {
+      "configuration": "I64-GT",
+      "optimizer": "Adam",
+      "update": 100,
+      "scores": [
+        74.4,
+        17.97,
+        21.0,
+        32.07
+      ],
+      "mean_gain": 2.427500000000002,
+      "minimum_domain_gain": -0.13000000000000256,
+      "worst_domain": "Science"
+    },
+    {
+      "configuration": "PG-DR",
+      "optimizer": "SGD",
+      "update": 250,
+      "scores": [
+        75.8,
+        18.75,
+        25.67,
+        31.82
+      ],
+      "mean_gain": 4.077500000000001,
+      "minimum_domain_gain": -0.38000000000000256,
+      "worst_domain": "Science"
+    }
+  ],
+  "notes": [
+    "Endpoints replaced by active Table 1 domain means; obsolete endpoint rows in the full-grid table are not used.",
+    "Mean changes recomputed from displayed domain scores, so up to 0.01 pp rounding differences from displayed macro scores are possible.",
+    "Intermediate points use the recorded grid summaries; complete matched per-seed grid outcomes are unavailable in this checkout.",
+    "Counts are descriptive, correlated checkpoint observations; zero crossings are not significance tests.",
+    "This figure does not establish a causal link between update geometry and capability outcomes."
+  ]
+}

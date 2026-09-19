@@ -1,0 +1,19 @@
+\section{Task-Level Monitoring and Checkpoint Selection}
+\label{sec:recipe}
+
+\paragraph{Intermediate checkpoints reveal temporary domain regressions.}
+The learning curves show how a strong final mean can coexist with an earlier loss of capability. With sampled-token supervision and equal response weighting under Adam, science accuracy falls from about 32\% to 28\% early in training and later recovers to about 36\%. Tracking individual domains makes this temporary regression visible (Appendix~\ref{app:completed_selection}).
+
+\paragraph{A domain-retention constraint selects the same checkpoints as the mean score.}
+We compare selection by the highest development mean with selection by the highest mean subject to a per-domain retention constraint,
+\begin{equation}
+s_d(\theta)\geq s_d(\theta_0)-\epsilon_d\quad\text{for all }d,
+\qquad \epsilon_d=2\text{ percentage points}.
+\label{eq:retention}
+\end{equation}
+Here $s_d$ is the domain score and $\theta_0$ the initial student. Both rules retain the initialization unless the selected mean improves by at least one point. Checkpoints are fixed before evaluation on separate test questions.
+
+The two development rules choose the same checkpoint in every training trajectory. They select the final checkpoint in nine trajectories and an earlier checkpoint in one; that earlier checkpoint scores about 0.4 mean points below its endpoint on the separate test. Table~\ref{tab:checkpoint_selection} gives the choices and comparison. Thus, the retention constraint is inactive at the selected checkpoints, even though the learning curves contain temporary domain regressions.
+
+\paragraph{Method rankings also depend on the evaluation questions.}
+For sampled-token supervision with equal response weighting, SGD leads Adam by about 1.4 mean points on the development benchmarks, and the two are nearly tied on the separate tests. This change in ranking complements the task-level trade-offs in vocabulary supervision. Together, the results support assessing learning curves and separate-test performance alongside measurements of gradients, optimizer steps, and stored weights.

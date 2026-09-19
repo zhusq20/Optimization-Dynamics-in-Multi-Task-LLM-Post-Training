@@ -1,0 +1,34 @@
+\section{Experimental Protocol and Results}
+\label{app:setup}
+
+\subsection{Model, data, and training protocol}
+
+The main-study student is Qwen3-1.7B \citep{qwen2025qwen3}; training uses seeds 42, 43, and 44. The four teachers were trained by reinforcement learning from the same initial model, specializing in mathematics, code, instruction following, and science, respectively. Student and teachers share the tokenizer and native chat template with thinking disabled. The experiment records identify the model revisions and weight files.
+
+AdamW configurations use learning rate $2.5\times10^{-7}$ with $(\beta_1,\beta_2)=(0.9,0.98)$, $\epsilon=10^{-8}$, no weight decay or schedule, and global norm-1 clipping. Training sampling uses temperature 1 and top-$p=1$, with a 2,048-token prompt cap and 4,096-token response cap. One fresh response is sampled per prompt. Each optimizer update aggregates 64 responses; domain allocation is specified below.
+
+The multi-teacher setup allocate 16 prompts to each domain per update and use target domain weights $1/4$. Single-teacher setup allocate all 64 prompts to the same domain. I64 uses the top-$64$ objective in Equation~\ref{eq:topk}; I16 uses $k=16$.
+
+
+\subsection{Evaluation and scoring}
+
+Each main-study capability suite contains MATH-500 (500 questions) \citep{hendrycks2021math}, LiveCodeBench v6 (1,055 questions) \citep{jain2024livecodebench}, IFBench strict (300 questions) \citep{pyatkin2025ifbench}, and GPQA Diamond (198 questions) \citep{rein2023gpqa}. Mathematics, code, and instruction following use one greedy response per question. GPQA uses four responses per question at temperature 1 and top-$p=1$. Its score is the mean correctness over all four responses, then over questions: average@4 accuracy. Evaluation permits up to 32,768 response tokens, bounded by the remaining configured 32,768-token context. Each complete suite contains 2,053 questions and 2,647 responses per model evaluation.
+
+The expanded development grid comprises updates of 50/100/250/500 for seven Adam trajectories and 100/250/500 for three SGD trajectories, plus the initial student evaluation. Appendix~\ref{app:independent_domain_test} describes additional test sets for the same four domains. Table~\ref{tab:all_capability} supplements the joint endpoints in Table~\ref{tab:completed_endpoints} with single-teacher scores and intermediate PG/I64 checkpoints.
+
+\begin{table}[t]
+\caption{\textbf{PG/I64 performance depends on the task and checkpoint.} Mean scores (\%): S is mathematics-only training and M is joint training; both use DR. Joint endpoints appear in Table~\ref{tab:completed_endpoints}.}
+\label{tab:all_capability}
+\centering\small
+\input{experiments/appendix_mvp_20260914/capability_table.tex}
+\end{table}
+
+The four RL teachers were evaluated separately on their respective domain benchmarks using the same prompt and decoding protocol (Table~\ref{tab:teachers}). These scores quantify each teacher's performance on its target domain.
+
+\begin{table}[t]
+\caption{\textbf{Reference scores for the four domain-specific teachers} (\%). Science uses GPQA average@4.}
+\label{tab:teachers}
+\centering\small
+\input{experiments/aligned_evidence_20260910/teacher_table.tex}
+\end{table}
+

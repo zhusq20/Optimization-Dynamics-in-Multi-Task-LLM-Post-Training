@@ -1,8 +1,8 @@
 \begin{figure}[t]
 \centering
 \includegraphics[width=\linewidth]{figures/added_control_figures_20260914/sampling_history_controls.pdf}
-\caption{\textbf{More token samples increase PG gradient cosine to full-vocabulary KL; Adam momentum alone changes nearly as many BF16 parameters as PG.}
-(a) Gradient cosine to full-vocabulary KL.
-(b,c) Nonzero BF16 changes with a zero current gradient or reset moments. Reset-$m$ keeps the second moment and step count; fresh Adam resets both moments and the count. Points denote cached batches; bars show means.}
+\caption{\textbf{Averaging more token samples improves gradient alignment; Adam history contributes strongly to BF16 changes.}
+(a) Gradient cosine to full-vocabulary supervision; I64 uses the top-64 intersection.
+(b,c) Fractions of changed BF16 weights with zero current gradient or reset moments. PG denotes sampled-token supervision; reset-$m$ keeps the second moment and step count, and fresh Adam resets both moments and the count. Points show batches and bars show means.}
 \label{fig:sampling_history_controls}
 \end{figure}

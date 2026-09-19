@@ -1,9 +1,9 @@
 \begin{figure}[t]
 \centering
-\includegraphics[width=\linewidth]{figures/nine_panel_20260914/section3_normalization.pdf}
-\caption{\textbf{Loss averaging changes gradient directions and task performance; Adam increases update alignment.}
-(a) GT domain token shares: individual batches and five-batch averages.
-(b) Cosines before/after clipping and after Adam (batch means $\pm$ SD).
-(c--f) I64 task scores (three training seeds, mean $\pm$ SD); S/T mark the initial student/teacher.}
+\includegraphics[width=\linewidth]{figures/table1_sync_20260918/section3_normalization.pdf}
+\caption{\textbf{Loss averaging changes gradient directions; Adam produces more aligned updates and similar final mean scores.}
+(a) Domain shares under global token averaging (GT).
+(b) Gradient and update cosines for global token, within-domain token (DT), and within-domain response (DR) averaging; points and bars show batch means and standard deviations.
+(c--f) Task learning curves under top-64 intersection supervision (I64); S/T mark the initial student/teacher. At updates 100, 250, and 500, error bars show $\pm$ one SD over three training seeds (update-500 results are also reported in Table~\ref{tab:main_outcomes}). The initial checkpoint has zero SD. Points and error bars are slightly offset horizontally for clarity.}
 \label{fig:normalization_capability}
 \end{figure}

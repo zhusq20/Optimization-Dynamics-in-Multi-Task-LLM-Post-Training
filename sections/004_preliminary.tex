@@ -11,12 +11,14 @@ For domain $d$, the student generates $y\sim p_\theta(\cdot\mid x)$ for $x\sim\m
 The token loss determines the vocabulary supervision; the response weights $w_i$ determine normalization across tokens, responses, and domains. Each update uses fresh student responses, held fixed with their masks and weights during gradient computation.
 
 \paragraph{Sampled-token, top-$k$, and full-vocabulary supervision.}
-Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision minimizes reverse KL over $\mathcal V$; the policy-gradient (PG) surrogate scores only the generated token $a=y_t$:
-\begin{align}
-\ell_{\mathrm{full}}&=\sum_{v\in\mathcal V}p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)},\label{eq:full}\\
-\ell_{\mathrm{PG}}(a)&=-\sg[\log q_d(a)-\log p_\theta(a)]\log p_\theta(a),\qquad a\sim p_\theta.\label{eq:pg}
-\end{align}
-Here $\sg$ denotes stop-gradient. At a fixed prefix, the expected PG gradient equals the full reverse-KL gradient: differentiating Equation~\ref{eq:full} gives $\mathbb E_{a\sim p_\theta}[\log(p_\theta(a)/q_d(a))\nabla_\theta\log p_\theta(a)]$, since $\sum_v\nabla_\theta p_\theta(v)=0$.
+Write $p_\theta(v)=p_\theta(v\mid h_t)$ and $q_d(v)=q_d(v\mid h_t)$. Full-vocabulary supervision minimizes reverse KL over $\mathcal V$; the policy-gradient (PG) loss scores the sampled token $y_t$:
+\begin{equation}
+\label{eq:full}
+\ell_{\mathrm{full}}=\sum_{v\in\mathcal V}p_\theta(v)\log\frac{p_\theta(v)}{q_d(v)},\qquad
+\ell_{\mathrm{PG}}(y_t)=-\sg[\log q_d(y_t)-\log p_\theta(y_t)]\log p_\theta(y_t)
+\end{equation}
+
+Here $\sg$ denotes stop-gradient. At a fixed prefix, the expected PG gradient equals the full reverse-KL gradient: differentiating Equation~\ref{eq:full} gives $\sum_v[\log(p_\theta(v)/q_d(v))+1]\nabla_\theta p_\theta(v)$. The $+1$ term cancels because $\sum_v\nabla_\theta p_\theta(v)=0$, leaving $\mathbb E_{a\sim p_\theta}[\log(p_\theta(a)/q_d(a))\nabla_\theta\log p_\theta(a)]$.
 
 Top-$k$ supervision uses $I=S\cap T$, where $S,T$ are the student and teacher top-$k$ sets, computed at rollout and held fixed. Its loss is
 \begin{equation}
@@ -25,7 +27,17 @@ Top-$k$ supervision uses $I=S\cap T$, where $S,T$ are the student and teacher to
 \bigl(\log q_d(v)-\log p_\theta(v)\bigr)\right]\log p_\theta(v).
 \label{eq:topk}
 \end{equation}
-Probabilities use the full-vocabulary softmax; detached weights are normalized over $S$, and an empty intersection gives zero loss. I16 and I64 denote $k=16$ and $64$. We call the number of supervised vocabulary tokens per prefix the \emph{supervision density}: one for PG, $|I|\leq k$ for intersection supervision, and $|\mathcal V|$ for full supervision.
+Probabilities use the full-vocabulary softmax; detached weights are normalized over $S$, and an empty intersection gives zero loss. We call the number of supervised vocabulary tokens the \emph{supervision density}: one for PG, $|I|\leq k$ for intersection supervision, and $|\mathcal V|$ for full supervision.
+
+\paragraph{Intersection supervision is a biased gradient surrogate.}
+For a fixed set $A$, write $Z_A=\sum_{v\in A}p_\theta(v)$ and $g_A=\sum_{v\in A}\log(p_\theta(v)/q_d(v))\nabla_\theta p_\theta(v)$. Unlike the full-vocabulary cancellation, $\nabla_\theta Z_I$ is generally nonzero. Thus directly truncating the KL objective gives $\nabla_\theta\sum_{v\in I}p_\theta(v)\log(p_\theta(v)/q_d(v))=g_I+\nabla_\theta Z_I$. Equation~\ref{eq:topk} instead uses detached coefficients, so its gradient and discrepancy from full KL are
+\begin{equation}
+\nabla_\theta\ell_{\mathrm{top}\text{-}k}=\frac{g_I}{Z_S},\qquad
+\nabla_\theta\ell_{\mathrm{top}\text{-}k}-\nabla_\theta\ell_{\mathrm{full}}
+=\left(\frac{1}{Z_S}-1\right)g_I-g_{\mathcal V\setminus I}.
+\label{eq:intersection_bias}
+\end{equation}
+I64 therefore omits contributions outside $I$ and rescales those retained by $1/Z_S$; it is neither an unbiased full-KL gradient estimator nor the gradient of the directly truncated KL objective. The missing $+1$ term follows from stop-gradient, not cancellation on $I$. These differences mean that PG--I64 comparisons change the gradient surrogate as well as supervision density.
 
 \paragraph{Domain weighting and loss normalization.}
 Let $\mathcal B_d$ contain responses from domain $d$, and let $\lambda_d\geq0$ with $\sum_d\lambda_d=1$ be the target domain loss weights. For nonempty responses and domains, the three rules assign response $i\in\mathcal B_d$ weights

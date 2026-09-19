@@ -1,0 +1,18 @@
+\section{Introduction}
+\label{sec:intro}
+
+Multi-teacher on-policy distillation (MOPD) transfers specialized capabilities into a single model \citep{xiaomi2026mimov2flash,nvidia2026nemotron3ultra,kimiteam2026kimik3openfrontier,deepseekai2026deepseekv4highlyefficientmilliontoken}. The student generates responses, and a teacher assigned to each prompt domain supplies token-level supervision. Improving several capabilities requires deciding how much each domain and response contributes to the loss, and how many next-token alternatives the teacher supervises.
+
+Recent work establishes both the potential of MOPD and its sensitivity to these choices. \citet{ma2026mopdmultiteacheronpolicydistillation} study capability integration with policy-gradient and top-$k$ objectives. Open-MOPD addresses uneven transfer through domain token balancing, performance-gap weighting, and refreshed rewards \citep{gao2026openmopddiagnosingfixingcapability}. The Nemotron 3 Ultra report finds no advantage for top-$k$ or full-vocabulary matching over sampled-token supervision in preliminary experiments \citep[Section~3.3.5]{nvidia2026nemotron3ultra}. Other studies report parameter changes concentrated in a small set of stored weights \citep{yu2026denseupdates,shen2026opdgeometry}. How these observations connect loss construction, optimizer updates, and task performance remains open.
+
+Our study follows the path from loss construction to gradients, parameter updates, and task performance. The main experiments train Qwen3-1.7B with teachers for mathematics, code, instruction following, and science. We vary loss averaging and vocabulary supervision during training, and compare gradients and optimizer steps at fixed student parameters and inputs. Three findings emerge:
+\begin{enumerate}
+\item \textbf{Adam brings different normalization gradients closer in update direction (Section~\ref{sec:normalization}).}
+Weighting responses by length or equally produces gradients with mean cosine 0.68; applying the same saved Adam state raises the update cosine to 0.96. Under top-64 supervision, the averaging rules reach similar final mean scores and follow different task-level learning curves.
+\item \textbf{Precision and optimizer history strongly shape measured update sparsity and alignment (Section~\ref{sec:subnetworks}).}
+Training changes most FP32 weights, while BF16 rounding leaves a small fraction visibly changed. Teacher-specific steps are strongly aligned through shared Adam moments; subtracting the zero-gradient step leaves near-zero mean alignment on domain-specific inputs.
+\item \textbf{Broader vocabulary supervision produces task-dependent gains (Section~\ref{sec:density}).}
+Top-64 supervision improves final mathematics accuracy and lowers science accuracy relative to sampled-token supervision. Its mean advantage narrows as training proceeds. At fixed student and optimizer state, the losses produce similar update concentration.
+\end{enumerate}
+
+Additional SmolLM3-3B measurements show that top-64 retains high average student probability while omitting substantial mass on some inputs. Enlarging the candidate set improves gradient approximation, with residual error relative to full-vocabulary supervision. Section~\ref{sec:recipe} connects these observations to checkpoint selection: individual tasks can regress during training and recover by the endpoint, and development-set rankings can change on separate test questions. These results motivate tracking per-task learning curves alongside gradients and parameter changes.
